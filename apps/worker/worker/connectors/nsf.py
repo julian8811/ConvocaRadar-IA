@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime
+from datetime import UTC, datetime
 from urllib.parse import urljoin, urlparse
 
 from selectolax.parser import HTMLParser
@@ -12,8 +12,16 @@ from worker.connectors.rss import RssConnector
 
 
 NSF_HOSTS = {"nsf.gov", "www.nsf.gov"}
-
-
+NSF_CLOSED_KEYWORDS = (
+    "closed",
+    "archived",
+    "expired",
+    "no longer accepting",
+    "deadline passed",
+    "past deadline",
+    "solicitation has been replaced",
+    "solicitation closed",
+)
 
 def _title_from(container) -> str:
     heading = container.css_first("h1, h2, h3, h4")
@@ -23,6 +31,14 @@ def _title_from(container) -> str:
     if anchor:
         return clean_text(anchor.text())
     return ""
+
+
+def _is_closed(candidate: OpportunityCandidate) -> bool:
+    if candidate.close_date and candidate.close_date.date() < datetime.now(UTC).date():
+        return True
+    normalized = clean_text(f"{candidate.title} {candidate.summary} {candidate.raw_text}")
+    lowered = normalized.lower()
+    return any(keyword in lowered for keyword in NSF_CLOSED_KEYWORDS)
 
 
 class NSFFundingConnector:
@@ -56,6 +72,10 @@ class NSFFundingConnector:
                 if official_url in seen:
                     continue
                 seen.add(official_url)
+                open_date = parse_date_text(text)
+                close_date = parse_date_text(text)
+                if close_date and close_date.date() < datetime.now(UTC).date():
+                    continue
                 candidates.append(
                     OpportunityCandidate(
                         title=title[:180],
@@ -67,7 +87,8 @@ class NSFFundingConnector:
                         topics=["NSF", "funding"],
                         raw_text=text[:2500],
                         confidence_score=0.72,
-                        open_date=parse_date_text(text),
+                        open_date=open_date,
+                        close_date=close_date,
                     )
                 )
 
@@ -82,6 +103,10 @@ class NSFFundingConnector:
                 if official_url in seen:
                     continue
                 seen.add(official_url)
+                open_date = parse_date_text(title)
+                close_date = open_date
+                if close_date and close_date.date() < datetime.now(UTC).date():
+                    continue
                 candidates.append(
                     OpportunityCandidate(
                         title=title[:180],
@@ -93,6 +118,8 @@ class NSFFundingConnector:
                         topics=["NSF", "funding"],
                         raw_text=title[:2500],
                         confidence_score=0.6,
+                        open_date=open_date,
+                        close_date=close_date,
                     )
                 )
 
@@ -103,6 +130,8 @@ class NSFFundingConnector:
             return ValidationResult(ok=False, reason="Missing title or URL")
         if urlparse(candidate.official_url).netloc not in NSF_HOSTS:
             return ValidationResult(ok=False, reason="URL is outside NSF")
+        if _is_closed(candidate):
+            return ValidationResult(ok=False, reason="Funding opportunity appears closed")
         return ValidationResult(ok=True)
 
 

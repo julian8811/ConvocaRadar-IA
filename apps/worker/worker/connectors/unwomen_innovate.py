@@ -1,7 +1,7 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime
+from datetime import UTC, datetime
 from urllib.parse import urljoin
 
 from selectolax.parser import HTMLParser
@@ -12,6 +12,15 @@ from worker.connectors.common import clean_text, fetch_httpx_text, normalize_tex
 
 class UnwomenInnovateConnector:
     source_key = "unwomen-innovate"
+    CLOSED_KEYWORDS = (
+        "closed",
+        "archived",
+        "expired",
+        "no longer accepting",
+        "deadline passed",
+        "past deadline",
+        "closed call",
+    )
 
     def __init__(self, base_url: str | None = None) -> None:
         self.base_url = base_url or "https://www.unwomen.org/en/how-we-work/innovation-and-technology"
@@ -66,6 +75,12 @@ class UnwomenInnovateConnector:
                     continue
         return None
 
+    def _is_closed(self, candidate: OpportunityCandidate) -> bool:
+        if candidate.close_date and candidate.close_date.date() < datetime.now(UTC).date():
+            return True
+        normalized = normalize_text(f"{candidate.title} {candidate.summary} {candidate.raw_text}")
+        return any(keyword in normalized for keyword in self.CLOSED_KEYWORDS)
+
     def _candidate(self, title: str, href: str, text: str, raw_url: str) -> OpportunityCandidate | None:
         lowered = normalize_text(f"{title} {text}")
         keywords = ("innovation", "technology", "digital", "women", "gender", "ai", "research", "call", "grant", "fund", "fellowship")
@@ -97,7 +112,7 @@ class UnwomenInnovateConnector:
                 title, href = self._title_from_container(container)
                 text = (container.text() or "").strip()
                 candidate = self._candidate(title, href, text, raw.url)
-                if not candidate or candidate.official_url in seen:
+                if not candidate or candidate.official_url in seen or self._is_closed(candidate):
                     continue
                 seen.add(candidate.official_url)
                 candidates.append(candidate)
@@ -110,7 +125,7 @@ class UnwomenInnovateConnector:
             href = link.attributes.get("href") or ""
             text = clean_text(link.parent.text() if link.parent else title)
             candidate = self._candidate(title, href, text, raw.url)
-            if not candidate or candidate.official_url in seen:
+            if not candidate or candidate.official_url in seen or self._is_closed(candidate):
                 continue
             seen.add(candidate.official_url)
             candidates.append(candidate)
@@ -121,4 +136,6 @@ class UnwomenInnovateConnector:
             return ValidationResult(ok=False, reason="Missing title or URL")
         if "unwomen.org" not in candidate.official_url:
             return ValidationResult(ok=False, reason="Unexpected official URL")
+        if self._is_closed(candidate):
+            return ValidationResult(ok=False, reason="Opportunity appears closed")
         return ValidationResult(ok=True)

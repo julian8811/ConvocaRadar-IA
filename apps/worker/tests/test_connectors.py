@@ -781,11 +781,11 @@ async def test_nsf_connector_parses_multiple_cards_fixture() -> None:
       <body>
         <article class="card">
           <h3><a href="/awardsearch/showAward?AWD_ID=123">NSF Research Opportunity 2026</a></h3>
-          <p>Funding opportunity for innovative research proposals. Closing date March 10, 2026.</p>
+          <p>Funding opportunity for innovative research proposals. Closing date March 10, 2027.</p>
         </article>
         <article class="card">
           <h3><a href="/awardsearch/showAward?AWD_ID=456">NSF AI Education Grant</a></h3>
-          <p>Funding opportunity for education and AI capacity building. Closing date April 20, 2026.</p>
+          <p>Funding opportunity for education and AI capacity building. Closing date April 20, 2027.</p>
         </article>
       </body>
     </html>
@@ -817,7 +817,7 @@ async def test_unwomen_connector_parses_listing_fixture() -> None:
       <body>
         <article class="card">
           <h3><a href="/en/how-we-work/innovation-and-technology/open-call-2026">Open Call 2026</a></h3>
-          <p>UN Women innovation challenge for women-led digital solutions. Deadline March 10, 2026.</p>
+          <p>UN Women innovation challenge for women-led digital solutions. Deadline March 10, 2027.</p>
         </article>
       </body>
     </html>
@@ -848,8 +848,8 @@ async def test_unwomen_connector_parses_multiple_cards_fixture() -> None:
     <html>
       <body>
         <article class="card">
-          <h3><a href="/en/how-we-work/innovation-and-technology/open-call-2026">Open Call 2026</a></h3>
-          <p>UN Women innovation challenge for women-led digital solutions. Deadline March 10, 2026.</p>
+          <h3><a href="/en/how-we-work/innovation-and-technology/closed-call-2024">Closed Call 2024</a></h3>
+          <p>UN Women innovation challenge for women-led digital solutions. This call is closed. Deadline March 10, 2024.</p>
         </article>
         <article class="card">
           <h3><a href="/en/how-we-work/innovation-and-technology/open-call-2027">Open Call 2027</a></h3>
@@ -868,9 +868,38 @@ async def test_unwomen_connector_parses_multiple_cards_fixture() -> None:
 
     candidates = await connector.parse(raw)
 
-    assert len(candidates) == 2
-    assert candidates[0].official_url.endswith("/open-call-2026")
-    assert candidates[1].official_url.endswith("/open-call-2027")
+    assert len(candidates) == 1
+    assert candidates[0].official_url.endswith("/open-call-2027")
+
+
+@pytest.mark.asyncio
+async def test_unwomen_connector_skips_closed_calls() -> None:
+    html = """
+    <html>
+      <body>
+        <article class="card">
+          <h3><a href="/en/how-we-work/innovation-and-technology/closed-call-2024">Closed Call 2024</a></h3>
+          <p>UN Women innovation challenge for women-led digital solutions. This call is closed. Deadline March 10, 2024.</p>
+        </article>
+        <article class="card">
+          <h3><a href="/en/how-we-work/innovation-and-technology/open-call-2027">Open Call 2027</a></h3>
+          <p>UN Women innovation challenge for women-led digital solutions. Deadline March 10, 2027.</p>
+        </article>
+      </body>
+    </html>
+    """
+    connector = UnwomenInnovateConnector("https://www.unwomen.org/en/how-we-work/innovation-and-technology")
+    raw = RawSourceResult(
+        source_key="unwomen-innovate",
+        url="https://www.unwomen.org/en/how-we-work/innovation-and-technology",
+        content=html,
+        content_type="text/html",
+    )
+
+    candidates = await connector.parse(raw)
+
+    assert len(candidates) == 1
+    assert candidates[0].official_url.endswith("/open-call-2027")
 
 
 @pytest.mark.asyncio
@@ -1295,7 +1324,7 @@ async def test_nsf_connector_parses_fixture() -> None:
       <body>
         <article class="card">
           <h3><a href="/awardsearch/showAward?AWD_ID=123">NSF Research Opportunity 2026</a></h3>
-          <p>Funding opportunity for innovative research proposals. Closing date March 10, 2026.</p>
+          <p>Funding opportunity for innovative research proposals. Closing date March 10, 2027.</p>
         </article>
       </body>
     </html>
@@ -1317,6 +1346,36 @@ async def test_nsf_connector_parses_fixture() -> None:
     assert candidate.official_url == "https://www.nsf.gov/awardsearch/showAward?AWD_ID=123"
     assert candidate.open_date is not None or candidate.close_date is not None
     assert (await connector.validate(candidate)).ok
+
+
+@pytest.mark.asyncio
+async def test_nsf_connector_skips_closed_calls() -> None:
+    html = """
+    <html>
+      <body>
+        <article class="card">
+          <h3><a href="/awardsearch/showAward?AWD_ID=999">NSF Archived Research Opportunity</a></h3>
+          <p>This solicitation is closed and archived. Closing date March 10, 2024.</p>
+        </article>
+        <article class="card">
+          <h3><a href="/awardsearch/showAward?AWD_ID=1000">NSF Open Research Opportunity</a></h3>
+          <p>Funding opportunity for innovative research proposals. Closing date March 10, 2027.</p>
+        </article>
+      </body>
+    </html>
+    """
+    connector = NSFFundingConnector("https://www.nsf.gov/funding")
+    raw = RawSourceResult(
+        source_key="nsf-funding",
+        url="https://www.nsf.gov/funding",
+        content=html,
+        content_type="text/html",
+    )
+
+    candidates = await connector.parse(raw)
+
+    assert len(candidates) == 1
+    assert candidates[0].official_url == "https://www.nsf.gov/awardsearch/showAward?AWD_ID=1000"
 
 
 @pytest.mark.asyncio
