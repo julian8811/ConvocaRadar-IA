@@ -544,16 +544,41 @@ def candidate_external_id(source: Source, url: str | None, title: str) -> str:
     return f"{source.key}-{fingerprint}"
 
 
-async def _scrape_source_candidates(source: Source) -> list[OpportunityCreate]:
+async def _scrape_source_candidates(source: Source, stats: dict[str, object] | None = None) -> list[OpportunityCreate]:
     connector = connector_for(source.key, source.base_url, source.source_type)
     raw = await connector.fetch()
+    if stats is not None:
+        stats["raw_url"] = raw.url
+        stats["raw_content_type"] = raw.content_type
+        stats["raw_content_length"] = len(raw.content or "")
     candidates = await connector.parse(raw)
+    if not candidates and source.key in {"grants-gov", "grants-gov-rss", "grants-gov-forecast", "simpler-grants"}:
+        fallback_connector = connector_for(source.key, None, source.source_type)
+        fallback_raw = await fallback_connector.fetch()
+        fallback_candidates = await fallback_connector.parse(fallback_raw)
+        if stats is not None:
+            stats["fallback_raw_url"] = fallback_raw.url
+            stats["fallback_raw_content_type"] = fallback_raw.content_type
+            stats["fallback_raw_content_length"] = len(fallback_raw.content or "")
+            stats["fallback_candidates_parsed"] = len(fallback_candidates)
+        if fallback_candidates:
+            connector = fallback_connector
+            candidates = fallback_candidates
+    if stats is not None:
+        stats["candidates_parsed"] = len(candidates)
     opportunities: list[OpportunityCreate] = []
+    noise_rejected = 0
+    validation_rejected = 0
+    validation_reasons: list[str] = []
     for candidate in candidates:
         if is_noise_payload(candidate.title, candidate.summary, candidate.raw_text):
+            noise_rejected += 1
             continue
         validation = await connector.validate(candidate)
         if not validation.ok:
+            validation_rejected += 1
+            if len(validation_reasons) < 5:
+                validation_reasons.append(validation.reason or "sin razon")
             continue
         opportunities.append(
             OpportunityCreate(
@@ -577,6 +602,11 @@ async def _scrape_source_candidates(source: Source) -> list[OpportunityCreate]:
                 confidence_score=candidate.confidence_score,
             )
         )
+    if stats is not None:
+        stats["noise_rejected"] = noise_rejected
+        stats["validation_rejected"] = validation_rejected
+        stats["validation_reasons"] = validation_reasons
+        stats["opportunities_normalized"] = len(opportunities)
     return opportunities
 
 
@@ -769,7 +799,8 @@ def execute_source_run_locally(db: Session, source: Source, organization_id: str
     db.flush()
     try:
         validate_source_url(source)
-        opportunities = asyncio.run(_scrape_source_candidates(source))
+        scrape_stats: dict[str, object] = {}
+        opportunities = asyncio.run(_scrape_source_candidates(source, scrape_stats))
         created = 0
         updated = 0
         failed_items = 0
@@ -801,6 +832,7 @@ def execute_source_run_locally(db: Session, source: Source, organization_id: str
         run.logs = [
             *run.logs,
             {"level": "info", "message": "Local connector executed", "task_id": task.id},
+            {"level": "info", "message": "Connector diagnostics", **scrape_stats},
             {"level": "info", "message": "Candidates normalized", "items_found": len(opportunities), "items_failed": failed_items},
         ]
         task.status = "success"
