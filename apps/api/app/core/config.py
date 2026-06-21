@@ -20,6 +20,7 @@ class Settings(BaseSettings):
     scraping_timeout_seconds: int = 30
     scraping_max_concurrency: int = 5
     scraping_closing_soon_days: int = 10
+    scraping_execution_mode: str = "inline"
     use_worker: bool = False
     internal_api_key: str = "change_me_internal"
     storage_backend: str = "local"
