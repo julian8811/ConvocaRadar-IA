@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import html
 import re
 from datetime import datetime
 import unicodedata
@@ -12,11 +13,14 @@ from worker.config import get_settings
 
 
 def clean_text(value: str | None) -> str:
-    return re.sub(r"\s+", " ", value or "").strip()
+    text = html.unescape(value or "")
+    text = re.sub(r"(?:[.#]?[A-Za-z][\w-]*\s*\{[^{}]*\}\s*)+", " ", text)
+    text = re.sub(r"\s+", " ", text)
+    return text.strip()
 
 
 def normalize_text(value: str | None) -> str:
-    normalized = unicodedata.normalize("NFKD", value or "")
+    normalized = unicodedata.normalize("NFKD", html.unescape(value or ""))
     return "".join(ch for ch in normalized if not unicodedata.combining(ch)).lower()
 
 

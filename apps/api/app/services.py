@@ -646,6 +646,39 @@ def create_opportunity(db: Session, data: OpportunityCreate, organization_id: st
         data = data.model_copy(update={"official_url": None})
     if data.application_url and not url_is_reachable(data.application_url):
         data = data.model_copy(update={"application_url": None})
+
+    def apply_scraped_values(opportunity: Opportunity) -> Opportunity:
+        opportunity.last_seen_at = datetime.now(UTC).replace(tzinfo=None)
+        opportunity.title = normalized_title
+        opportunity.entity = data.entity
+        opportunity.country = data.country
+        opportunity.region = data.region
+        opportunity.language = data.language
+        opportunity.categories = list(data.categories)
+        opportunity.topics = list(data.topics)
+        opportunity.description = data.description
+        opportunity.summary = data.summary or data.description or opportunity.summary
+        opportunity.raw_text = data.raw_text or opportunity.raw_text
+        opportunity.official_url = data.official_url
+        opportunity.application_url = data.application_url
+        opportunity.open_date = data.open_date
+        opportunity.close_date = data.close_date
+        opportunity.funding_amount_value = data.funding_amount_value
+        opportunity.funding_amount_currency = data.funding_amount_currency
+        opportunity.funding_amount_raw = data.funding_amount_raw
+        opportunity.eligible_applicants = list(data.eligible_applicants)
+        opportunity.requirements = list(data.requirements)
+        opportunity.documents_required = list(data.documents_required)
+        opportunity.evaluation_criteria = list(data.evaluation_criteria)
+        opportunity.restrictions = list(data.restrictions)
+        opportunity.risk_flags = list(data.risk_flags)
+        opportunity.confidence_score = data.confidence_score
+        opportunity.status = inferred_opportunity_status(
+            data.close_date,
+            " ".join([data.summary, data.raw_text]),
+        )
+        return opportunity
+
     if data.external_id and data.source_id:
         existing_by_external_id = db.scalar(
             select(Opportunity).where(
@@ -655,12 +688,7 @@ def create_opportunity(db: Session, data: OpportunityCreate, organization_id: st
             )
         )
         if existing_by_external_id:
-            existing_by_external_id.last_seen_at = datetime.now(UTC).replace(tzinfo=None)
-            existing_by_external_id.summary = data.summary or existing_by_external_id.summary
-            existing_by_external_id.status = inferred_opportunity_status(
-                data.close_date,
-                " ".join([data.summary, data.raw_text]),
-            )
+            apply_scraped_values(existing_by_external_id)
             score_organization_id = existing_by_external_id.organization_id or score_organization_id
             upsert_opportunity_embedding(db, existing_by_external_id)
             if score_organization_id:
@@ -668,6 +696,23 @@ def create_opportunity(db: Session, data: OpportunityCreate, organization_id: st
                 if profile:
                     calculate_score(db, existing_by_external_id, profile)
             return existing_by_external_id
+    if data.source_id and data.official_url:
+        existing_by_url = db.scalar(
+            select(Opportunity).where(
+                Opportunity.source_id == data.source_id,
+                Opportunity.official_url == data.official_url,
+                or_(Opportunity.organization_id == organization_id, Opportunity.organization_id.is_(None)),
+            )
+        )
+        if existing_by_url:
+            apply_scraped_values(existing_by_url)
+            score_organization_id = existing_by_url.organization_id or score_organization_id
+            upsert_opportunity_embedding(db, existing_by_url)
+            if score_organization_id:
+                profile = db.scalar(select(OrganizationProfile).where(OrganizationProfile.organization_id == score_organization_id))
+                if profile:
+                    calculate_score(db, existing_by_url, profile)
+            return existing_by_url
     existing = db.scalar(
         select(Opportunity).where(
             Opportunity.slug == slug,
@@ -676,9 +721,8 @@ def create_opportunity(db: Session, data: OpportunityCreate, organization_id: st
         )
     )
     if existing:
-        existing.last_seen_at = datetime.now(UTC).replace(tzinfo=None)
-        existing.summary = data.summary or existing.summary
-        existing.status = inferred_opportunity_status(data.close_date, " ".join([data.summary, data.raw_text]))
+        apply_scraped_values(existing)
+        upsert_opportunity_embedding(db, existing)
         return existing
     values = data.model_dump()
     values.pop("title", None)
