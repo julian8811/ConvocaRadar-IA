@@ -50,7 +50,12 @@ from app.models import (
     User,
 )
 from app.schemas import OpportunityCreate
-from worker.connectors.factory import connector_for
+
+
+def connector_for(source_key: str, base_url: str | None = None, source_type: str | None = None):
+    from worker.connectors.factory import connector_for as worker_connector_for
+
+    return worker_connector_for(source_key, base_url, source_type)
 
 
 def slugify(value: str) -> str:
