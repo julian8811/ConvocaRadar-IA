@@ -16,6 +16,7 @@ dependencies = [
   "sqlalchemy>=2.0.32",
   "psycopg[binary]>=3.2.1",
   "selectolax>=0.3.21",
+  "pypdf>=5.0.0",
   "python-dateutil>=2.9.0",
   "tenacity>=8.5.0"
 ]
