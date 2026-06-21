@@ -27,6 +27,8 @@ def main() -> None:
     port = int(os.getenv("PORT", "10000"))
     worker = subprocess.Popen(
         [
+            sys.executable,
+            "-m",
             "celery",
             "-A",
             "worker.app.celery_app",
