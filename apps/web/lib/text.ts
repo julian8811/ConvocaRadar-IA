@@ -6,69 +6,53 @@ const htmlEntityMap: Record<string, string> = {
   "&#39;": "'",
 };
 
-const mojibakeMap: Array<[RegExp, string]> = [
-  [/Ã¡/g, "á"],
-  [/Ã©/g, "é"],
-  [/Ã­/g, "í"],
-  [/Ã³/g, "ó"],
-  [/Ãº/g, "ú"],
-  [/Ã±/g, "ñ"],
-  [/Ã¼/g, "ü"],
-  [/Ã/g, "Á"],
-  [/Ã‰/g, "É"],
-  [/Ã/g, "Í"],
-  [/Ã“/g, "Ó"],
-  [/Ãš/g, "Ú"],
-  [/Ã‘/g, "Ñ"],
-  [/Â·/g, "·"],
-];
+function repairMojibake(value: string) {
+  if (!/[ÃÂ�]/.test(value)) return value;
+  try {
+    const bytes = Uint8Array.from(value, (char) => char.charCodeAt(0));
+    const repaired = new TextDecoder("utf-8", { fatal: false }).decode(bytes);
+    return repaired || value;
+  } catch {
+    return value;
+  }
+}
+
+function normalizeWhitespace(value: string) {
+  return value.replace(/\s+/g, " ").trim();
+}
+
+function looksLikeNoise(value: string) {
+  return (
+    /<style[\s\S]*?<\/style>|<script[\s\S]*?<\/script>|color:\s*white|background-color:|\.box-address|\.caja|display:\s*flex|justify-content:\s*center|font-weight:\s*bold|text-decoration:\s*underline|font-size:|padding:|margin:|border:/i.test(
+      value,
+    ) || value.includes("{") || value.includes("}") || value.includes("budgetYearsColumns")
+  );
+}
 
 export function decodeVisibleText(value: string | null | undefined, fallback = "Sin dato") {
   if (!value) return fallback;
+
   let text = value
     .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)))
     .replace(/&#x([0-9a-fA-F]+);/g, (_, code) => String.fromCharCode(Number.parseInt(code, 16)))
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
     .replace(/<[^>]*>/g, " ");
 
-  for (const [pattern, replacement] of mojibakeMap) {
-    text = text.replace(pattern, replacement);
-  }
   for (const [entity, replacement] of Object.entries(htmlEntityMap)) {
     text = text.replaceAll(entity, replacement);
   }
-  text = text.replace(/\s+/g, " ").trim();
+
+  text = normalizeWhitespace(repairMojibake(text));
   if (!text) return fallback;
+  if (looksLikeNoise(text)) return fallback;
 
-  if (
-    /color:\s*white|background-color:|\.box-address|\.caja|display:\s*flex|justify-content:\s*center|font-weight:\s*bold|text-decoration:\s*underline/i.test(
-      text,
-    )
-  ) {
-    return fallback;
+  const tail = text.slice(Math.max(text.lastIndexOf("}"), text.lastIndexOf(";")) + 1).trim();
+  if (tail.length > 20 && !looksLikeNoise(tail)) {
+    text = tail;
   }
 
-  const lastBrace = Math.max(text.lastIndexOf("}"), text.lastIndexOf(";"));
-  if (lastBrace > 0 && lastBrace < text.length - 1) {
-    const tail = text.slice(lastBrace + 1).trim();
-    if (tail.length > 20) {
-      text = tail;
-    }
-  }
-
-  if (
-    text.includes("color: white") ||
-    text.includes("background-color:") ||
-    text.includes(".caja") ||
-    text.includes(".box-address") ||
-    text.includes("display: flex") ||
-    text.includes("justify-content: center")
-  ) {
-    const sentenceStart = text.search(/(?:\.\s|[A-ZÁÉÍÓÚÑ][^{}]{20,})/);
-    if (sentenceStart > 0) {
-      text = text.slice(sentenceStart).trim();
-    }
-  }
-
+  if (looksLikeNoise(text)) return fallback;
   return text || fallback;
 }
 

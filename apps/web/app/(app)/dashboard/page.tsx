@@ -29,7 +29,7 @@ import { api } from "@/lib/api";
 import type { AdminMetrics, Opportunity, SourceHealth, SourceRunOverview } from "@/lib/types";
 
 const Plot = dynamic(async () => (await import("react-plotly.js")).default, { ssr: false }) as any;
-const plotConfig = { displayModeBar: false, responsive: true };
+const plotConfig = { displayModeBar: true, displaylogo: false, responsive: true, scrollZoom: true };
 
 type ThemeMode = "light" | "dark";
 
@@ -148,27 +148,32 @@ function buildBaseLayout(theme: ThemeMode, title: string, xTitle: string, yTitle
   const colors = plotColors(theme);
   return {
     autosize: true,
-    height: 360,
+    height: 420,
     title: { text: title, font: { size: 15, color: colors.title } },
     paper_bgcolor: colors.paper,
     plot_bgcolor: colors.plot,
-    margin: { l: 88, r: 28, t: 58, b: 86 },
+    margin: { l: 104, r: 40, t: 72, b: 120 },
     font: { color: colors.text, family: "Geist, sans-serif" },
     hovermode: "closest",
-    legend: { orientation: "h", y: -0.22, font: { color: colors.muted } },
+    showlegend: false,
+    uniformtext: { mode: "hide", minsize: 10 },
     xaxis: {
-      title: xTitle ? { text: xTitle, font: { color: colors.muted }, standoff: 18 } : undefined,
+      title: xTitle ? { text: xTitle, font: { color: colors.muted }, standoff: 24 } : undefined,
       tickfont: { color: colors.text },
       automargin: true,
       gridcolor: colors.grid,
       zeroline: false,
+      ticks: "outside",
+      ticklen: 6,
     },
     yaxis: {
-      title: yTitle ? { text: yTitle, font: { color: colors.muted }, standoff: 18 } : undefined,
+      title: yTitle ? { text: yTitle, font: { color: colors.muted }, standoff: 24 } : undefined,
       tickfont: { color: colors.text },
       automargin: true,
       gridcolor: colors.grid,
       zeroline: false,
+      ticks: "outside",
+      ticklen: 6,
     },
     ...extra,
   };
@@ -195,12 +200,7 @@ export default function DashboardPage() {
   });
 
   const runCapture = useMutation({
-    mutationFn: async () => {
-      const sourceItems = sources.data ?? [];
-      const prioritySource = sourceItems.find((source) => source.key === "simpler-grants");
-      if (prioritySource) return [await api.runSource(prioritySource.id)];
-      return api.runAllSources();
-    },
+    mutationFn: api.runAllSources,
     onSuccess: (resultRuns) => {
       const created = resultRuns.reduce((total, run) => total + run.items_created, 0);
       const found = resultRuns.reduce((total, run) => total + run.items_found, 0);
@@ -389,7 +389,7 @@ export default function DashboardPage() {
             </CardTitle>
             <CardDescription>Distribución entre abiertas, por cerrar, cerradas y sin validar.</CardDescription>
           </CardHeader>
-          <CardContent className="relative h-[360px] pt-5">
+          <CardContent className="relative h-[420px] pt-5">
             {total > 0 ? (
               <Plot
                 config={plotConfig}
@@ -435,9 +435,9 @@ export default function DashboardPage() {
               <MapPinned className="h-4 w-4" />
               Distribución por país
             </CardTitle>
-            <CardDescription>Lectura del volumen detectado por pa?s de origen o cobertura.</CardDescription>
+            <CardDescription>Lectura del volumen detectado por país de origen o cobertura.</CardDescription>
           </CardHeader>
-          <CardContent className="relative h-[360px] pt-5">
+          <CardContent className="relative h-[420px] pt-5">
             {countries.length > 0 ? (
               <Plot
                 config={plotConfig}
@@ -453,12 +453,12 @@ export default function DashboardPage() {
                     hovertemplate: "%{y}<br>%{x} convocatorias<extra></extra>",
                   },
                 ]}
-                layout={buildBaseLayout(theme, "Convocatorias por pa?s", "Número de convocatorias", "País", {
+                layout={buildBaseLayout(theme, "Convocatorias por país", "Número de convocatorias", "País", {
                   margin: { l: 120, r: 24, t: 56, b: 56 },
                 })}
               />
             ) : (
-              <ChartEmpty title="Sin datos por pa?s" detail="Apenas lleguen convocatorias, esta vista empezará a mostrar el origen de la captura." />
+              <ChartEmpty title="Sin datos por país" detail="Apenas lleguen convocatorias, esta vista empezará a mostrar el origen de la captura." />
             )}
           </CardContent>
         </Card>
@@ -471,7 +471,7 @@ export default function DashboardPage() {
             </CardTitle>
             <CardDescription>Los temas más frecuentes detectados por el motor de captura.</CardDescription>
           </CardHeader>
-          <CardContent className="relative h-[360px] pt-5">
+          <CardContent className="relative h-[420px] pt-5">
             {categories.length > 0 ? (
               <Plot
                 config={plotConfig}
@@ -505,7 +505,7 @@ export default function DashboardPage() {
             </CardTitle>
             <CardDescription>Qué porcentaje de cada oportunidad ya está enriquecido y listo para análisis.</CardDescription>
           </CardHeader>
-          <CardContent className="relative h-[360px] pt-5">
+          <CardContent className="relative h-[420px] pt-5">
             {total > 0 ? (
               <Plot
                 config={plotConfig}
@@ -550,15 +550,15 @@ export default function DashboardPage() {
           <CardHeader className="border-b border-border/70 pb-4">
             <CardTitle className="flex items-center gap-2 text-slate-950 dark:text-white">
               <Search className="h-4 w-4" />
-              Oportunidades recientes abiertas
+              Oportunidades recientes
             </CardTitle>
-            <CardDescription>T?tulo, fuente, entidad, estado, cierre y monto.</CardDescription>
+            <CardDescription>Título, fuente, entidad, estado, cierre y monto.</CardDescription>
           </CardHeader>
           <CardContent className="overflow-x-auto p-0">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>T?tulo</TableHead>
+                  <TableHead>Título</TableHead>
                   <TableHead>Fuente</TableHead>
                   <TableHead>Entidad</TableHead>
                   <TableHead>Estado</TableHead>
@@ -595,7 +595,7 @@ export default function DashboardPage() {
           <CardHeader className="border-b border-border/70 pb-4">
             <CardTitle className="flex items-center gap-2 text-slate-950 dark:text-white">
               <AlertTriangle className="h-4 w-4" />
-              Fuentes que piden atenci?n
+              Fuentes que piden atención
             </CardTitle>
             <CardDescription>Prioriza por fallos recientes, degradación y salud operativa.</CardDescription>
           </CardHeader>
@@ -677,7 +677,7 @@ export default function DashboardPage() {
               <BarChart3 className="h-4 w-4" />
               Salud de las fuentes
             </CardTitle>
-            <CardDescription>Distribuci?n de salud operativa del scraping programado.</CardDescription>
+            <CardDescription>Distribución de salud operativa del scraping programado.</CardDescription>
           </CardHeader>
           <CardContent className="relative h-[360px] pt-5">
             {healthCounts.healthy + healthCounts.degraded + healthCounts.failing + healthCounts.idle > 0 ? (
@@ -814,7 +814,7 @@ export default function DashboardPage() {
             <Sparkles className="h-4 w-4" />
             Actividad interna
           </CardTitle>
-          <CardDescription>Resumen de tareas, automatizaciones y procesos de soporte.</CardDescription>
+            <CardDescription>Resumen de tareas, automatizaciones y procesos de soporte.</CardDescription>
         </CardHeader>
         <CardContent className="overflow-x-auto p-0">
           <Table>

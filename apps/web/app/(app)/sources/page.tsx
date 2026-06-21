@@ -62,6 +62,8 @@ export default function SourcesPage() {
   const queryClient = useQueryClient();
   const sources = useQuery({ queryKey: ["sources"], queryFn: api.sources });
   const sourceHealth = useQuery({ queryKey: ["source-health"], queryFn: api.sourceHealth });
+  const actionLinkClass =
+    "inline-flex h-8 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-xs font-medium text-slate-900 shadow-sm transition-colors hover:bg-slate-50 hover:text-slate-950 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800";
 
   const healthItems = useMemo(() => sourceHealth.data ?? [], [sourceHealth.data]);
 
@@ -225,10 +227,7 @@ export default function SourcesPage() {
                         <Play className="h-4 w-4" />
                         Ejecutar
                       </Button>
-                      <Link
-                        href={`/sources/${source.id}/runs`}
-                        className="ml-2 inline-flex h-8 items-center justify-center gap-2 rounded-md border border-slate-200 bg-slate-50 px-3 text-xs font-medium text-slate-700 transition-colors hover:bg-slate-100 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800"
-                      >
+                      <Link href={`/sources/${source.id}/runs`} className={`ml-2 ${actionLinkClass}`}>
                         Ejecuciones
                       </Link>
                     </TableCell>
