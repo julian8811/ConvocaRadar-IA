@@ -2,7 +2,11 @@ from __future__ import annotations
 
 from typing import Any
 
+import structlog
+
 from app.core.config import get_settings
+
+logger = structlog.get_logger(__name__)
 
 
 def enqueue_scrape_source(
@@ -19,22 +23,27 @@ def enqueue_scrape_source(
         return None
     try:
         from celery import Celery
-    except ImportError:
+    except ImportError as exc:
+        logger.warning("celery_not_available_for_scraping", error=str(exc))
         return None
 
-    celery_app = Celery("convocaradar-api-producer", broker=settings.redis_url, backend=settings.redis_url)
-    result = celery_app.send_task(
-        "scrape_source",
-        kwargs={
-            "source_key": source_key,
-            "base_url": base_url,
-            "source_type": source_type,
-            "source_run_id": source_run_id,
-            "task_id": task_id,
-        },
-        countdown=countdown_seconds,
-    )
-    return str(result.id)
+    try:
+        celery_app = Celery("convocaradar-api-producer", broker=settings.redis_url, backend=settings.redis_url)
+        result = celery_app.send_task(
+            "scrape_source",
+            kwargs={
+                "source_key": source_key,
+                "base_url": base_url,
+                "source_type": source_type,
+                "source_run_id": source_run_id,
+                "task_id": task_id,
+            },
+            countdown=countdown_seconds,
+        )
+        return str(result.id)
+    except Exception as exc:
+        logger.warning("scrape_enqueue_failed_falling_back_to_local", source_key=source_key, error=str(exc))
+        return None
 
 
 def task_payload(**kwargs: Any) -> dict[str, Any]:
