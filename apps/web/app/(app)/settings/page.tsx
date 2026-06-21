@@ -4,12 +4,11 @@ import { Database, LockKeyhole, Mail, PlugZap, ShieldCheck } from "lucide-react"
 
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { API_URL } from "@/lib/api";
 
 export default function SettingsPage() {
-  const apiUrl = process.env.NEXT_PUBLIC_API_URL ?? "http://127.0.0.1:8000/api/v1";
-
   const settings = [
-    { icon: Database, title: "API", value: apiUrl },
+    { icon: Database, title: "API", value: API_URL },
     { icon: LockKeyhole, title: "Seguridad", value: "JWT, permisos por organización y protección SSRF" },
     { icon: Mail, title: "Alertas", value: "SMTP configurable; la ejecución local registra alertas sin correo real" },
     { icon: PlugZap, title: "Scraping", value: "Motor híbrido con conectores dedicados, reintentos y health checks" },

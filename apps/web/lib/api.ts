@@ -15,7 +15,17 @@ import type {
 } from "@/lib/types";
 
 export const API_URL =
-  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? "http://127.0.0.1:8000/api/v1";
+  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? getDefaultApiUrl();
+
+function getDefaultApiUrl() {
+  if (typeof window !== "undefined") {
+    const isLocalhost = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
+    if (isLocalhost) {
+      return "http://127.0.0.1:8000/api/v1";
+    }
+  }
+  return "https://convotracker-api.onrender.com/api/v1";
+}
 
 export function getToken() {
   if (typeof window === "undefined") return null;
