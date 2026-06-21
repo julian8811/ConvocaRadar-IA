@@ -8,7 +8,7 @@ from playwright.async_api import async_playwright
 from selectolax.parser import HTMLParser
 
 from worker.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
-from worker.connectors.common import clean_text, fetch_httpx_text, parse_date_text
+from worker.connectors.common import clean_text, fetch_httpx_text, launch_chromium, parse_date_text
 
 
 TITLE_KEYWORDS = (
@@ -90,7 +90,7 @@ class InnovamosConnector:
 
     async def _render_page(self, url: str) -> tuple[str, str, str]:
         async with async_playwright() as playwright:
-            browser = await playwright.chromium.launch(headless=True)
+            browser = await launch_chromium(playwright)
             try:
                 page = await browser.new_page()
                 await page.goto(url, wait_until="networkidle", timeout=60000)

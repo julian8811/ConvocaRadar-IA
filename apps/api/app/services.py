@@ -822,7 +822,7 @@ def execute_source_run_locally(db: Session, source: Source, organization_id: str
                 )
         db.flush()
         finished_at = datetime.now(UTC).replace(tzinfo=None)
-        run.status = "success"
+        run.status = "degraded" if len(opportunities) == 0 else "success"
         run.finished_at = finished_at
         run.items_found = len(opportunities)
         run.items_created = created
@@ -834,11 +834,12 @@ def execute_source_run_locally(db: Session, source: Source, organization_id: str
             {"level": "info", "message": "Connector diagnostics", **scrape_stats},
             {"level": "info", "message": "Candidates normalized", "items_found": len(opportunities), "items_failed": failed_items},
         ]
-        task.status = "success"
+        task.status = run.status
         task.finished_at = finished_at
         task.result = {"items_found": len(opportunities), "items_created": created, "items_updated": updated}
-        source.last_success_at = finished_at
-        source.last_error = None
+        if len(opportunities) > 0:
+            source.last_success_at = finished_at
+            source.last_error = None
         if len(opportunities) == 0:
             create_source_health_alert(
                 db,
@@ -1308,8 +1309,10 @@ tbody tr:hover {{ background: rgba(13, 78, 94, 0.03); }}
 async def _render_pdf_with_playwright(html: str) -> bytes:
     from playwright.async_api import async_playwright
 
+    from worker.connectors.common import launch_chromium
+
     async with async_playwright() as playwright:
-        browser = await playwright.chromium.launch(headless=True, args=["--no-sandbox"])
+        browser = await launch_chromium(playwright)
         try:
             page = await browser.new_page(viewport={"width": 1440, "height": 1800})
             await page.set_content(html, wait_until="load")

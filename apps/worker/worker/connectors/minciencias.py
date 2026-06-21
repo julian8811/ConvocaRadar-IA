@@ -8,7 +8,7 @@ from playwright.async_api import async_playwright
 from selectolax.parser import HTMLParser, Node
 
 from worker.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
-from worker.connectors.common import clean_text, fetch_httpx_text, normalize_text
+from worker.connectors.common import clean_text, fetch_httpx_text, launch_chromium, normalize_text
 
 
 MINCIENCIAS_URL = "https://minciencias.gov.co/convocatorias/todas"
@@ -81,7 +81,7 @@ class MincienciasConnector:
 
             settings = get_settings()
             async with async_playwright() as playwright:
-                browser = await playwright.chromium.launch(headless=True)
+                browser = await launch_chromium(playwright)
                 try:
                     page = await browser.new_page(user_agent=settings.scraping_user_agent)
                     await page.goto(self.base_url, wait_until="domcontentloaded", timeout=settings.scraping_timeout_seconds * 1000)

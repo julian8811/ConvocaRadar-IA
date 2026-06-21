@@ -1574,3 +1574,32 @@ async def test_unesco_connector_skips_closed_calls() -> None:
 
     assert len(candidates) == 1
     assert candidates[0].official_url.endswith("/open-call-2027")
+
+
+def test_launch_chromium_uses_container_args() -> None:
+    import asyncio
+
+    from worker.connectors.common import CHROMIUM_CONTAINER_ARGS, launch_chromium
+
+    assert "--no-sandbox" in CHROMIUM_CONTAINER_ARGS
+    assert "--disable-dev-shm-usage" in CHROMIUM_CONTAINER_ARGS
+
+    class FakeChromium:
+        def __init__(self) -> None:
+            self.last_kwargs: dict[str, object] | None = None
+
+        async def launch(self, **kwargs):
+            self.last_kwargs = kwargs
+            return "browser"
+
+    class FakePlaywright:
+        def __init__(self) -> None:
+            self.chromium = FakeChromium()
+
+    async def _run_with_capture() -> None:
+        fake = FakePlaywright()
+        browser = await launch_chromium(fake)
+        assert browser == "browser"
+        assert fake.chromium.last_kwargs == {"headless": True, "args": CHROMIUM_CONTAINER_ARGS}
+
+    asyncio.run(_run_with_capture())
