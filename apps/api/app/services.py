@@ -1,4 +1,4 @@
-﻿from __future__ import annotations
+from __future__ import annotations
 
 import asyncio
 import csv
@@ -745,23 +745,23 @@ def calculate_score(db: Session, opportunity: Opportunity, profile: Organization
 
     if opportunity.country == profile.country or profile.eligible_international:
         score += 15
-        reasons.append("La regiÃ³n de la convocatoria es compatible con el perfil.")
+        reasons.append("La región de la convocatoria es compatible con el perfil.")
     else:
         warnings.append("La convocatoria puede tener restricciones regionales.")
 
     if profile.organization_type in [item.lower() for item in opportunity.eligible_applicants] or not opportunity.eligible_applicants:
         score += 20
-        reasons.append("El tipo de organizaciÃ³n parece elegible.")
+        reasons.append("El tipo de organización parece elegible.")
     else:
-        warnings.append("El tipo de organizaciÃ³n no aparece explÃ­citamente como beneficiario.")
+        warnings.append("El tipo de organización no aparece explícitamente como beneficiario.")
 
     overlap = profile_areas.intersection(opp_topics)
     if overlap:
         score += 20
-        reasons.append(f"Coincidencia temÃ¡tica: {', '.join(sorted(overlap))}.")
+        reasons.append(f"Coincidencia temática: {', '.join(sorted(overlap))}.")
     elif not profile_areas:
         score += 8
-        warnings.append("El perfil no tiene Ã¡reas de interÃ©s suficientes para una comparaciÃ³n fuerte.")
+        warnings.append("El perfil no tiene áreas de interés suficientes para una comparación fuerte.")
 
     if opportunity.funding_amount_value:
         score += 10
@@ -773,14 +773,14 @@ def calculate_score(db: Session, opportunity: Opportunity, profile: Organization
 
     if opportunity.status == OpportunityStatus.open.value:
         score += 10
-        reasons.append("La convocatoria estÃ¡ abierta.")
+        reasons.append("La convocatoria está abierta.")
     elif opportunity.status == OpportunityStatus.closing_soon.value:
         score += 5
         warnings.append("La convocatoria cierra pronto.")
 
     if opportunity.requirements:
         score += 10
-        reasons.append("Hay requisitos identificados para planear la postulaciÃ³n.")
+        reasons.append("Hay requisitos identificados para planear la postulación.")
 
     if score < 40 and not warnings:
         warnings.append("La compatibilidad es baja con los datos disponibles.")
@@ -1252,15 +1252,15 @@ def export_pdf(title: str, organization: Organization, opportunities: list[Oppor
     styles = getSampleStyleSheet()
     story: list[object] = [
         Paragraph(title, styles["Title"]),
-        Paragraph(f"OrganizaciÃ³n: {organization.name}", styles["Normal"]),
+        Paragraph(f"Organización: {organization.name}", styles["Normal"]),
         Paragraph(f"Generado: {datetime.now(UTC).date().isoformat()}", styles["Normal"]),
         Spacer(1, 16),
         Paragraph("Resumen ejecutivo", styles["Heading2"]),
-        Paragraph(f"Se identificaron {len(opportunities)} oportunidades para revisiÃ³n institucional.", styles["BodyText"]),
+        Paragraph(f"Se identificaron {len(opportunities)} oportunidades para revisión institucional.", styles["BodyText"]),
         Spacer(1, 12),
         Paragraph("Convocatorias", styles["Heading2"]),
     ]
-    data = [["TÃ­tulo", "Entidad", "PaÃ­s", "Estado", "Cierre", "Monto"]]
+    data = [["Título", "Entidad", "País", "Estado", "Cierre", "Monto"]]
     for item in opportunities[:40]:
         data.append(
             [
@@ -1291,9 +1291,9 @@ def export_pdf(title: str, organization: Organization, opportunities: list[Oppor
     story.extend(
         [
             Spacer(1, 14),
-            Paragraph("MetodologÃ­a", styles["Heading2"]),
+            Paragraph("Metodología", styles["Heading2"]),
             Paragraph(
-                "Reporte generado desde fuentes configuradas, con normalizaciÃ³n, deduplicaciÃ³n y priorizaciÃ³n automÃ¡tica.",
+                "Reporte generado desde fuentes configuradas, con normalización, deduplicación y priorización automática.",
                 styles["BodyText"],
             ),
         ]

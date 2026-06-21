@@ -97,7 +97,7 @@ export default function SourcesPage() {
     mutationFn: api.runSource,
     onSuccess: (run) => {
       const status = typeof run === "object" && run && "status" in run ? String(run.status) : "success";
-      toast.success(status === "queued" ? "Ejecuci?n encolada" : "Ejecuci?n completada");
+      toast.success(status === "queued" ? "Ejecución encolada" : "Ejecución completada");
       queryClient.invalidateQueries({ queryKey: ["sources"] });
       queryClient.invalidateQueries({ queryKey: ["source-health"] });
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
@@ -219,7 +219,7 @@ export default function SourcesPage() {
                     <TableCell>
                       <Badge tone={source.enabled ? "open" : "closed"}>{source.enabled ? "activa" : "inactiva"}</Badge>
                     </TableCell>
-                    <TableCell>{source.last_run_at ? new Date(source.last_run_at).toLocaleString("es-CO") : "Sin ejecuci?n"}</TableCell>
+                    <TableCell>{source.last_run_at ? new Date(source.last_run_at).toLocaleString("es-CO") : "Sin ejecución"}</TableCell>
                     <TableCell>
                       <Button variant="outline" size="sm" onClick={() => runSource.mutate(source.id)} disabled={runSource.isPending}>
                         <Play className="h-4 w-4" />
