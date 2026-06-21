@@ -1,6 +1,6 @@
 "use client";
 
-import { Bell, Database, Gauge, LogOut, Menu, Radar, Search, Settings, Shield, Target, UserRound, FileText } from "lucide-react";
+import { Bell, Database, FileText, Gauge, LogOut, Menu, Radar, Search, Settings, Shield, Target, UserRound } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useMemo, useState, type ComponentType } from "react";
@@ -59,8 +59,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
-  const [hasToken, setHasToken] = useState(false);
-  const [authChecked, setAuthChecked] = useState(false);
+  const [hasToken] = useState(() => Boolean(getToken()));
 
   const me = useQuery({
     queryKey: ["me"],
@@ -70,23 +69,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   });
 
   useEffect(() => {
-    const token = getToken();
-    setHasToken(Boolean(token));
-    setAuthChecked(true);
-    if (!token) router.replace("/login");
+    if (!getToken()) router.replace("/login");
   }, [router]);
 
   useEffect(() => {
     if (me.isError) {
       clearToken();
-      setHasToken(false);
       router.replace("/login");
     }
   }, [me.isError, router]);
 
   function logout() {
     clearToken();
-    setHasToken(false);
     router.push("/login");
   }
 
@@ -177,7 +171,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
         </header>
 
-        <div className="mx-auto max-w-7xl px-4 py-6 lg:px-6">{!authChecked || !hasToken || me.isLoading ? <LoadingState label="Validando sesión" /> : children}</div>
+        <div className="mx-auto max-w-7xl px-4 py-6 lg:px-6">{!hasToken || me.isLoading ? <LoadingState label="Validando sesión" /> : children}</div>
       </main>
     </div>
   );
