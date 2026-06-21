@@ -159,7 +159,10 @@ export const api = {
   profile: () => request<Record<string, unknown>>("/organizations/current/profile"),
   updateProfile: (payload: Record<string, unknown>) =>
     request<Record<string, unknown>>("/organizations/current/profile", { method: "PUT", body: JSON.stringify(payload) }),
-  opportunities: (query = "") => request<OpportunityList>(`/opportunities${query}`),
+  opportunities: (query = "") => {
+    const normalized = query && !query.startsWith("?") ? `?${query}` : query;
+    return request<OpportunityList>(`/opportunities${normalized}`);
+  },
   opportunity: (id: string) => request<Opportunity>(`/opportunities/${id}`),
   favorite: (id: string) => request(`/opportunities/${id}/favorite`, { method: "POST" }),
   unfavorite: (id: string) => request(`/opportunities/${id}/favorite`, { method: "DELETE" }),
