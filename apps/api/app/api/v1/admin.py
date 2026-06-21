@@ -9,7 +9,7 @@ from app.db.session import get_db
 from app.core.task_queue import enqueue_scrape_source
 from app.models import Alert, AuditLog, Opportunity, OpportunityEmbedding, Organization, Report, Source, SourceRun, Task, User
 from app.schemas import AdminMetricsRead, AuditLogRead, SourceRunOverviewRead
-from app.services import rebuild_opportunity_embeddings
+from app.services import execute_source_run_locally, rebuild_opportunity_embeddings
 
 router = APIRouter()
 
@@ -42,7 +42,7 @@ def require_admin(user: User = Depends(get_current_user)) -> User:
 
 
 def _source_health_status(db: Session, source: Source) -> str:
-    recent_runs = list(
+    raw_recent_runs = list(
         db.scalars(
             select(SourceRun)
             .where(SourceRun.source_id == source.id)
@@ -50,9 +50,12 @@ def _source_health_status(db: Session, source: Source) -> str:
             .limit(10)
         )
     )
+    recent_runs = [run for run in raw_recent_runs if run.status in {"success", "failed"}]
     failures = sum(1 for run in recent_runs if run.status == "failed")
     days_since_last_success = _days_since_last_success(recent_runs, source)
     stale_days = _health_window_days(source)
+    if not raw_recent_runs:
+        return "idle"
     if not recent_runs:
         return "idle"
     if recent_runs[0].status == "failed":
@@ -65,7 +68,11 @@ def _source_health_status(db: Session, source: Source) -> str:
         or (days_since_last_success is not None and days_since_last_success >= stale_days * 2)
     ):
         return "failing"
-    if failures > 0 or (days_since_last_success is not None and days_since_last_success >= stale_days):
+    if (
+        success_rate < 60
+        or (average_items_found <= 0 and len(recent_runs) >= 2)
+        or (days_since_last_success is not None and days_since_last_success >= stale_days)
+    ):
         return "degraded"
     return "healthy"
 
@@ -254,6 +261,13 @@ def retry_degraded_sources_admin(
             task_id=task.id,
             countdown_seconds=900,
         )
+        if not external_id:
+            db.delete(task)
+            db.delete(run)
+            db.flush()
+            execute_source_run_locally(db, source, organization_id=source.organization_id)
+            scheduled += 1
+            continue
         task.external_id = external_id
         task.result = {"message": "Retry scheduled in 15 minutes", "health": health}
         db.add(
