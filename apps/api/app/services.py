@@ -507,8 +507,11 @@ def is_noise_title(title: str | None) -> bool:
 
 
 def is_noise_payload(*parts: str | None) -> bool:
+    title = parts[0] if parts else None
+    if is_noise_title(title):
+        return True
     text = " ".join(part.strip() for part in parts if part and part.strip())
-    return is_noise_title(text) or any(
+    return any(
         marker in text.lower()
         for marker in (
             "color: white",
@@ -517,10 +520,6 @@ def is_noise_payload(*parts: str | None) -> bool:
             "text-decoration: underline",
             "display: flex",
             "justify-content: center",
-            "budgetyearscolumns",
-            "plannedopeningdate",
-            "deadlinedate",
-            "expectedgrants",
         )
     )
 
