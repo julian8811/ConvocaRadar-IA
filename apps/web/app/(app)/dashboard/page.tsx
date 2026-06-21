@@ -29,7 +29,7 @@ import { api } from "@/lib/api";
 import type { AdminMetrics, Opportunity, SourceHealth, SourceRunOverview } from "@/lib/types";
 
 const Plot = dynamic(async () => (await import("react-plotly.js")).default, { ssr: false }) as any;
-const plotConfig = { displayModeBar: false, responsive: true };
+const plotConfig = { displayModeBar: true, responsive: true, scrollZoom: true };
 
 type ThemeMode = "light" | "dark";
 
@@ -148,23 +148,23 @@ function buildBaseLayout(theme: ThemeMode, title: string, xTitle: string, yTitle
   const colors = plotColors(theme);
   return {
     autosize: true,
-    height: 360,
+    height: 420,
     title: { text: title, font: { size: 15, color: colors.title } },
     paper_bgcolor: colors.paper,
     plot_bgcolor: colors.plot,
-    margin: { l: 88, r: 28, t: 58, b: 86 },
+    margin: { l: 96, r: 32, t: 64, b: 112 },
     font: { color: colors.text, family: "Geist, sans-serif" },
     hovermode: "closest",
-    legend: { orientation: "h", y: -0.22, font: { color: colors.muted } },
+    legend: { orientation: "h", y: -0.24, x: 0, xanchor: "left", font: { color: colors.muted } },
     xaxis: {
-      title: xTitle ? { text: xTitle, font: { color: colors.muted }, standoff: 18 } : undefined,
+      title: xTitle ? { text: xTitle, font: { color: colors.muted }, standoff: 24 } : undefined,
       tickfont: { color: colors.text },
       automargin: true,
       gridcolor: colors.grid,
       zeroline: false,
     },
     yaxis: {
-      title: yTitle ? { text: yTitle, font: { color: colors.muted }, standoff: 18 } : undefined,
+      title: yTitle ? { text: yTitle, font: { color: colors.muted }, standoff: 24 } : undefined,
       tickfont: { color: colors.text },
       automargin: true,
       gridcolor: colors.grid,
@@ -389,7 +389,7 @@ export default function DashboardPage() {
             </CardTitle>
             <CardDescription>Distribución entre abiertas, por cerrar, cerradas y sin validar.</CardDescription>
           </CardHeader>
-          <CardContent className="relative h-[360px] pt-5">
+          <CardContent className="relative h-[420px] pt-5">
             {total > 0 ? (
               <Plot
                 config={plotConfig}
@@ -437,7 +437,7 @@ export default function DashboardPage() {
             </CardTitle>
             <CardDescription>Lectura del volumen detectado por pa?s de origen o cobertura.</CardDescription>
           </CardHeader>
-          <CardContent className="relative h-[360px] pt-5">
+          <CardContent className="relative h-[420px] pt-5">
             {countries.length > 0 ? (
               <Plot
                 config={plotConfig}
@@ -471,7 +471,7 @@ export default function DashboardPage() {
             </CardTitle>
             <CardDescription>Los temas más frecuentes detectados por el motor de captura.</CardDescription>
           </CardHeader>
-          <CardContent className="relative h-[360px] pt-5">
+          <CardContent className="relative h-[420px] pt-5">
             {categories.length > 0 ? (
               <Plot
                 config={plotConfig}
@@ -505,7 +505,7 @@ export default function DashboardPage() {
             </CardTitle>
             <CardDescription>Qué porcentaje de cada oportunidad ya está enriquecido y listo para análisis.</CardDescription>
           </CardHeader>
-          <CardContent className="relative h-[360px] pt-5">
+          <CardContent className="relative h-[420px] pt-5">
             {total > 0 ? (
               <Plot
                 config={plotConfig}
