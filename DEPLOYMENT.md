@@ -59,6 +59,9 @@ Variables privadas:
 - `OPENAI_API_KEY`
 - `EMBEDDING_MODEL`
 - `CHAT_MODEL`
+- `SCRAPING_EXECUTION_MODE`
+- `USE_WORKER`
+- `SCRAPING_TIMEOUT_SECONDS`
 
 Valores sugeridos:
 
@@ -84,6 +87,34 @@ Valores sugeridos:
 - `OPENAI_API_KEY=<api-key>`
 - `EMBEDDING_MODEL=text-embedding-3-small`
 - `CHAT_MODEL=gpt-4.1-mini`
+- `SCRAPING_EXECUTION_MODE=inline`
+- `USE_WORKER=false`
+- `SCRAPING_TIMEOUT_SECONDS=30`
+
+`SCRAPING_EXECUTION_MODE=inline` ejecuta las capturas manuales dentro del servicio API. Es la opcion mas estable en Render Free. Si el worker esta siempre activo, puedes usar `worker` y mantener `USE_WORKER=true` en el worker.
+
+### Render worker y worker-beat
+
+El blueprint incluye:
+
+- `convocaradar-worker`: ejecuta tareas Celery de scraping.
+- `convocaradar-worker-beat`: dispara capturas programadas cada 30 minutos y alertas cada 5 minutos.
+
+Variables minimas compartidas entre worker y beat:
+
+- `DATABASE_URL`
+- `REDIS_URL`
+- `BACKEND_URL` (URL publica del API, por ejemplo `https://api.convocaradar.com`)
+- `INTERNAL_API_KEY` (debe coincidir con el servicio API)
+
+Para diagnosticar conectores en produccion sin persistir datos:
+
+```bash
+curl -X POST "$BACKEND_URL/api/v1/internal/connectors/probe" \
+  -H "X-Internal-API-Key: $INTERNAL_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"source_key":"minciencias","base_url":"https://minciencias.gov.co/convocatorias/todas"}'
+```
 
 ### Render worker
 

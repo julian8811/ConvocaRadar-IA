@@ -9,8 +9,8 @@ from app.core.email import send_email
 from app.core.task_queue import enqueue_scrape_source
 from app.db.session import get_db
 from app.models import Alert, AuditLog, Opportunity, Source, SourceRun, Task
-from app.schemas import OpportunityCreate, SourceRunComplete
-from app.services import candidate_external_id, create_opportunity, create_source_health_alert, execute_source_run_locally, validate_source_url
+from app.schemas import ConnectorProbeRequest, OpportunityCreate, SourceRunComplete
+from app.services import candidate_external_id, connector_for, create_opportunity, create_source_health_alert, execute_source_run_locally, validate_source_url
 
 router = APIRouter(prefix="/internal", tags=["internal"])
 
@@ -108,7 +108,7 @@ def complete_source_run(
                 },
             ]
 
-    run.status = "success"
+    run.status = "degraded" if payload.items_found == 0 else "success"
     run.finished_at = finished_at
     run.items_found = payload.items_found
     run.items_created = created
@@ -126,12 +126,13 @@ def complete_source_run(
             "items_failed": run.items_failed,
         },
     ]
-    source.last_success_at = finished_at
-    source.last_error = None
+    if payload.items_found > 0:
+        source.last_success_at = finished_at
+        source.last_error = None
     if payload.items_found == 0:
         create_source_health_alert(db, source, reason="no se detectaron oportunidades nuevas en la corrida del worker")
     if task:
-        task.status = "success"
+        task.status = run.status
         task.finished_at = finished_at
         task.result = {**payload.model_dump(), "items_created": created, "items_updated": updated}
     db.add(
@@ -143,7 +144,42 @@ def complete_source_run(
         )
     )
     db.commit()
-    return {"status": "success", "items_created": created, "items_updated": updated}
+    return {"status": run.status, "items_created": created, "items_updated": updated}
+
+
+@router.post("/connectors/probe", dependencies=[Depends(verify_internal_key)])
+async def probe_connector(payload: ConnectorProbeRequest) -> dict[str, object]:
+    connector = connector_for(payload.source_key, payload.base_url, payload.source_type)
+    stats: dict[str, object] = {
+        "source_key": payload.source_key,
+        "base_url": payload.base_url,
+        "source_type": payload.source_type,
+    }
+    try:
+        raw = await connector.fetch()
+        stats["raw_url"] = raw.url
+        stats["raw_content_type"] = raw.content_type
+        stats["raw_content_length"] = len(raw.content or "")
+        candidates = await connector.parse(raw)
+        stats["candidates_parsed"] = len(candidates)
+        valid = 0
+        validation_rejected = 0
+        validation_reasons: list[str] = []
+        for candidate in candidates:
+            result = await connector.validate(candidate)
+            if result.ok:
+                valid += 1
+                continue
+            validation_rejected += 1
+            if len(validation_reasons) < 5:
+                validation_reasons.append(result.reason or "sin razon")
+        stats["candidates_valid"] = valid
+        stats["validation_rejected"] = validation_rejected
+        stats["validation_reasons"] = validation_reasons
+        return {"status": "ok", **stats}
+    except Exception as exc:
+        stats["error"] = str(exc)
+        return {"status": "error", **stats}
 
 
 @router.post("/scheduler/sources/run-enabled", dependencies=[Depends(verify_internal_key)])

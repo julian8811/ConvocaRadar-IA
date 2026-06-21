@@ -7,7 +7,7 @@ from playwright.async_api import async_playwright
 from selectolax.parser import HTMLParser, Node
 
 from worker.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
-from worker.connectors.common import clean_text, fetch_httpx_text, parse_date_text
+from worker.connectors.common import clean_text, fetch_httpx_text, launch_chromium, parse_date_text
 
 
 INNPULSA_API_URL = "https://convocatorias.innpulsacolombia.com/api/convocatorias?active_only=true&include_private=false&include_archive=false"
@@ -159,7 +159,7 @@ class InnpulsaConnector:
             final_url, content, content_type = await fetch_httpx_text(self.base_url, fallback_content_type="text/html")
             cards: list[dict[str, str]] = []
             async with async_playwright() as playwright:
-                browser = await playwright.chromium.launch(headless=True)
+                browser = await launch_chromium(playwright)
                 try:
                     from worker.config import get_settings
 
