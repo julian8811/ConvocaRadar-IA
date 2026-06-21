@@ -61,50 +61,12 @@ function formatAmount(value: string | null) {
   return trimmed;
 }
 
-function displayText(value: string | null | undefined, fallback = "Sin dato") {
-  if (!value) return fallback;
-  const raw = value
-    .replace(/<[^>]*>/g, " ")
-    .replace(/&(#\w+);/g, (match, entity) => {
-      if (typeof document === "undefined") return match;
-      const textarea = document.createElement("textarea");
-      textarea.innerHTML = match;
-      return textarea.value || entity;
-    })
-    .replace(/\s+/g, " ")
-    .trim();
-  if (!raw) return fallback;
-  if (
-    raw.length > 140 ||
-    raw.startsWith("{") ||
-    raw.startsWith("[") ||
-    raw.includes('"budgetYearsColumns"') ||
-    raw.includes('"plannedOpeningDate"') ||
-    raw.includes('"deadlineDate"') ||
-    raw.includes("expectedGrants") ||
-    raw.includes("action")
-  ) {
-    return fallback;
-  }
-  return raw;
-}
-
 function cleanSummary(value: string | null | undefined) {
   const text = decodeVisibleText(value, "Sin resumen.");
   if (/color: white|\.box-address|\.caja|display: flex|justify-content: center|font-weight: bold|text-decoration: underline/i.test(text)) {
     return "Sin resumen.";
   }
   return text;
-}
-
-function isNoiseTitle(title: string) {
-  const normalized = title
-    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)))
-    .replace(/&#x([0-9a-fA-F]+);/g, (_, code) => String.fromCharCode(Number.parseInt(code, 16)))
-    .replace(/&amp;/g, "&")
-    .replace(/\s+/g, " ")
-    .trim();
-  return normalized.includes("@") || normalized.toLowerCase().startsWith("http://") || normalized.toLowerCase().startsWith("https://");
 }
 
 function sortItems(items: Opportunity[]) {
@@ -141,6 +103,8 @@ export default function OpportunitiesPage() {
   }, [category, country, page, search, status]);
 
   const opportunities = useQuery({ queryKey: ["opportunities", query], queryFn: () => api.opportunities(query) });
+  const actionLinkClass =
+    "inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-300 bg-slate-100 text-slate-800 transition-colors hover:bg-slate-200 hover:text-slate-950 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800";
 
   const favorite = useMutation({
     mutationFn: api.favorite,
@@ -165,7 +129,15 @@ export default function OpportunitiesPage() {
   });
 
   const sourceItems = sources.data ?? [];
-  const items = useMemo(() => sortItems((opportunities.data?.items ?? []).filter((item) => !isNoiseVisibleText(item.title))), [opportunities.data?.items]);
+  const items = useMemo(() => {
+    const visibleItems = (opportunities.data?.items ?? []).filter((item) => !isNoiseVisibleText(item.title));
+    const filteredByStatus = visibleItems.filter((item) => {
+      if (!status) return true;
+      if (status === "open") return item.status !== "closed";
+      return item.status === status;
+    });
+    return sortItems(filteredByStatus);
+  }, [opportunities.data?.items, status]);
   const total = opportunities.data?.total ?? 0;
   const totalPages = Math.max(Math.ceil(total / pageSize), 1);
   const openCount = items.filter((item) => item.status === "open").length;
@@ -323,11 +295,7 @@ export default function OpportunitiesPage() {
                         <Button variant="outline" size="icon" title="Guardar" onClick={() => favorite.mutate(item.id)}>
                           <Star className="h-4 w-4" />
                         </Button>
-                        <Link
-                          href={`/opportunities/${item.id}`}
-                          className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-300 bg-slate-50 text-slate-900 transition-colors hover:bg-slate-100 hover:text-slate-950 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
-                          aria-label="Ver convocatoria"
-                        >
+                        <Link href={`/opportunities/${item.id}`} className={actionLinkClass} aria-label="Ver convocatoria">
                           <Eye className="h-4 w-4" />
                         </Link>
                       </div>

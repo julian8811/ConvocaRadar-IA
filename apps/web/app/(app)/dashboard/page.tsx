@@ -435,7 +435,7 @@ export default function DashboardPage() {
               <MapPinned className="h-4 w-4" />
               Distribución por país
             </CardTitle>
-            <CardDescription>Lectura del volumen detectado por pa?s de origen o cobertura.</CardDescription>
+            <CardDescription>Lectura del volumen detectado por país de origen o cobertura.</CardDescription>
           </CardHeader>
           <CardContent className="relative h-[420px] pt-5">
             {countries.length > 0 ? (
@@ -453,12 +453,12 @@ export default function DashboardPage() {
                     hovertemplate: "%{y}<br>%{x} convocatorias<extra></extra>",
                   },
                 ]}
-                layout={buildBaseLayout(theme, "Convocatorias por pa?s", "Número de convocatorias", "País", {
+                layout={buildBaseLayout(theme, "Convocatorias por país", "Número de convocatorias", "País", {
                   margin: { l: 120, r: 24, t: 56, b: 56 },
                 })}
               />
             ) : (
-              <ChartEmpty title="Sin datos por pa?s" detail="Apenas lleguen convocatorias, esta vista empezará a mostrar el origen de la captura." />
+              <ChartEmpty title="Sin datos por país" detail="Apenas lleguen convocatorias, esta vista empezará a mostrar el origen de la captura." />
             )}
           </CardContent>
         </Card>
@@ -550,15 +550,15 @@ export default function DashboardPage() {
           <CardHeader className="border-b border-border/70 pb-4">
             <CardTitle className="flex items-center gap-2 text-slate-950 dark:text-white">
               <Search className="h-4 w-4" />
-              Oportunidades recientes abiertas
+              Oportunidades recientes
             </CardTitle>
-            <CardDescription>T?tulo, fuente, entidad, estado, cierre y monto.</CardDescription>
+            <CardDescription>Título, fuente, entidad, estado, cierre y monto.</CardDescription>
           </CardHeader>
           <CardContent className="overflow-x-auto p-0">
             <Table>
               <TableHeader>
                 <TableRow>
-                  <TableHead>T?tulo</TableHead>
+                  <TableHead>Título</TableHead>
                   <TableHead>Fuente</TableHead>
                   <TableHead>Entidad</TableHead>
                   <TableHead>Estado</TableHead>
@@ -595,7 +595,7 @@ export default function DashboardPage() {
           <CardHeader className="border-b border-border/70 pb-4">
             <CardTitle className="flex items-center gap-2 text-slate-950 dark:text-white">
               <AlertTriangle className="h-4 w-4" />
-              Fuentes que piden atenci?n
+              Fuentes que piden atención
             </CardTitle>
             <CardDescription>Prioriza por fallos recientes, degradación y salud operativa.</CardDescription>
           </CardHeader>
@@ -677,7 +677,7 @@ export default function DashboardPage() {
               <BarChart3 className="h-4 w-4" />
               Salud de las fuentes
             </CardTitle>
-            <CardDescription>Distribuci?n de salud operativa del scraping programado.</CardDescription>
+            <CardDescription>Distribución de salud operativa del scraping programado.</CardDescription>
           </CardHeader>
           <CardContent className="relative h-[360px] pt-5">
             {healthCounts.healthy + healthCounts.degraded + healthCounts.failing + healthCounts.idle > 0 ? (
@@ -814,7 +814,7 @@ export default function DashboardPage() {
             <Sparkles className="h-4 w-4" />
             Actividad interna
           </CardTitle>
-          <CardDescription>Resumen de tareas, automatizaciones y procesos de soporte.</CardDescription>
+            <CardDescription>Resumen de tareas, automatizaciones y procesos de soporte.</CardDescription>
         </CardHeader>
         <CardContent className="overflow-x-auto p-0">
           <Table>

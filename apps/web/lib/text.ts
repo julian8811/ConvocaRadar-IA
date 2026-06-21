@@ -23,7 +23,7 @@ function normalizeWhitespace(value: string) {
 
 function looksLikeNoise(value: string) {
   return (
-    /color:\s*white|background-color:|\.box-address|\.caja|display:\s*flex|justify-content:\s*center|font-weight:\s*bold|text-decoration:\s*underline/i.test(
+    /<style[\s\S]*?<\/style>|<script[\s\S]*?<\/script>|color:\s*white|background-color:|\.box-address|\.caja|display:\s*flex|justify-content:\s*center|font-weight:\s*bold|text-decoration:\s*underline|font-size:|padding:|margin:|border:/i.test(
       value,
     ) || value.includes("{") || value.includes("}") || value.includes("budgetYearsColumns")
   );
@@ -35,6 +35,8 @@ export function decodeVisibleText(value: string | null | undefined, fallback = "
   let text = value
     .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)))
     .replace(/&#x([0-9a-fA-F]+);/g, (_, code) => String.fromCharCode(Number.parseInt(code, 16)))
+    .replace(/<style[\s\S]*?<\/style>/gi, " ")
+    .replace(/<script[\s\S]*?<\/script>/gi, " ")
     .replace(/<[^>]*>/g, " ");
 
   for (const [entity, replacement] of Object.entries(htmlEntityMap)) {

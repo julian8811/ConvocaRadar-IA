@@ -90,7 +90,7 @@ function AlertCard({ alert }: { alert: Alert }) {
           <div className="flex flex-wrap items-center justify-between gap-2 pt-1">
             <p className="text-xs text-slate-500 dark:text-slate-400">
               Creada {new Date(alert.created_at).toLocaleString("es-CO")}
-              {alert.sent_at ? ` ? enviada ${new Date(alert.sent_at).toLocaleString("es-CO")}` : ""}
+              {alert.sent_at ? ` · enviada ${new Date(alert.sent_at).toLocaleString("es-CO")}` : ""}
             </p>
             <div className="flex gap-2">
               <Button
