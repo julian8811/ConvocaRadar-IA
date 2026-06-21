@@ -30,7 +30,7 @@ def get_db() -> Generator[Session, None, None]:
 def create_all() -> None:
     from app import models  # noqa: F401
 
-    Base.metadata.create_all(bind=engine)
     if engine.dialect.name == "postgresql":
         with engine.begin() as connection:
             connection.execute(text("CREATE EXTENSION IF NOT EXISTS vector"))
+    Base.metadata.create_all(bind=engine)
