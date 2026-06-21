@@ -281,6 +281,13 @@ def retry_degraded_sources(db: Session = Depends(get_db)) -> dict[str, int]:
             task_id=task.id,
             countdown_seconds=900,
         )
+        if not external_id:
+            db.delete(task)
+            db.delete(run)
+            db.flush()
+            execute_source_run_locally(db, source, organization_id=source.organization_id)
+            scheduled += 1
+            continue
         task.external_id = external_id
         task.result = {"message": "Retry scheduled in 15 minutes", "health": health}
         create_source_health_alert(db, source, reason=f"fuente {health}; reintento programado en 15 minutos")
