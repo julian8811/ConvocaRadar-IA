@@ -1,0 +1,101 @@
+"use client";
+
+import { Radar } from "lucide-react";
+import { useRouter } from "next/navigation";
+import { FormEvent, useState } from "react";
+import { toast } from "sonner";
+
+import { Button } from "@/components/ui/button";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Input } from "@/components/ui/input";
+import { ThemeToggle } from "@/components/theme-toggle";
+import { API_URL, api, setToken } from "@/lib/api";
+
+const LOCAL_EMAIL = "admin@convocaradar.io";
+const LOCAL_PASSWORD = "ConvocaRadarLocal123!";
+
+export default function LoginPage() {
+  const router = useRouter();
+  const [loading, setLoading] = useState(false);
+  const [email, setEmail] = useState(LOCAL_EMAIL);
+  const [password, setPassword] = useState(LOCAL_PASSWORD);
+  const [error, setError] = useState<string | null>(null);
+
+  async function onSubmit(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    await signIn(email, password);
+  }
+
+  async function signIn(nextEmail: string, nextPassword: string) {
+    setLoading(true);
+    setError(null);
+    try {
+      const response = await api.login(nextEmail.trim(), nextPassword);
+      setToken(response.access_token);
+      toast.success("Sesión iniciada");
+      router.push("/dashboard");
+      router.refresh();
+    } catch (error) {
+      const message = error instanceof Error ? error.message : "No se pudo iniciar sesión";
+      setError(message);
+      toast.error(message);
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  return (
+    <main className="relative flex min-h-screen items-center justify-center px-4">
+      <div className="absolute right-4 top-4">
+        <ThemeToggle />
+      </div>
+      <Card className="w-full max-w-md border-slate-200 bg-white/95 shadow-2xl shadow-slate-900/10 backdrop-blur dark:border-slate-800 dark:bg-slate-950/90">
+        <CardHeader className="space-y-4 border-b border-slate-200 pb-6 dark:border-slate-800">
+          <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-cyan-200 bg-cyan-50 text-cyan-700 dark:border-cyan-400/20 dark:bg-cyan-400/10 dark:text-cyan-200">
+            <Radar className="h-6 w-6" />
+          </div>
+          <div>
+            <CardTitle className="text-2xl text-slate-900 dark:text-white">ConvocaRadar IA</CardTitle>
+            <CardDescription>Ingresa al tablero de vigilancia de convocatorias.</CardDescription>
+          </div>
+        </CardHeader>
+        <CardContent className="pt-6">
+          <form className="space-y-4" onSubmit={onSubmit}>
+            <Input
+              name="email"
+              type="email"
+              value={email}
+              onChange={(event) => setEmail(event.target.value)}
+              aria-label="Correo electrónico"
+              data-testid="login-email"
+              autoComplete="email"
+            />
+            <Input
+              name="password"
+              type="password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+              aria-label="Contraseña"
+              data-testid="login-password"
+              autoComplete="current-password"
+            />
+            {error ? (
+              <div className="rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2 text-sm text-destructive">
+                {error}
+              </div>
+            ) : null}
+            <Button className="w-full" disabled={loading} type="button" data-testid="login-submit" onClick={() => signIn(email, password)}>
+              {loading ? "Ingresando..." : "Ingresar"}
+            </Button>
+            <Button className="w-full" disabled={loading} type="button" variant="outline" onClick={() => signIn(LOCAL_EMAIL, LOCAL_PASSWORD)}>
+              Entrar con cuenta local
+            </Button>
+          </form>
+          <p className="mt-4 text-xs text-slate-500">
+            API configurada: <span className="font-mono">{API_URL}</span>
+          </p>
+        </CardContent>
+      </Card>
+    </main>
+  );
+}

@@ -1,0 +1,22 @@
+{
+  "name": "convocaradar",
+  "private": true,
+  "version": "0.1.0",
+  "workspaces": [
+    "apps/web",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev:web": "npm --workspace apps/web run dev",
+    "build:web": "npm --workspace apps/web run build",
+    "lint:web": "npm --workspace apps/web run lint",
+    "test:web": "npm --workspace apps/web run test",
+    "build": "npm run build:web",
+    "lint": "npm run lint:web",
+    "test": "npm run test:web && npm run test:api",
+    "dev:api": "cd apps/api && uvicorn app.main:app --reload --host 0.0.0.0 --port 8000",
+    "test:api": "cd apps/api && pytest",
+    "migrate:api": "cd apps/api && python -m alembic upgrade head",
+    "seed:api": "cd apps/api && python -m app.db.seed"
+  }
+}

@@ -1,0 +1,278 @@
+from datetime import UTC, datetime
+
+from fastapi import APIRouter, Depends, Header, HTTPException, status
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.core.config import get_settings
+from app.core.email import send_email
+from app.core.task_queue import enqueue_scrape_source
+from app.db.session import get_db
+from app.models import Alert, AuditLog, Opportunity, Source, SourceRun, Task
+from app.schemas import OpportunityCreate, SourceRunComplete
+from app.services import candidate_external_id, create_opportunity, create_source_health_alert, execute_source_run_locally
+
+router = APIRouter(prefix="/internal", tags=["internal"])
+
+
+def verify_internal_key(x_internal_api_key: str | None = Header(default=None)) -> None:
+    if x_internal_api_key != get_settings().internal_api_key:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid internal API key")
+
+
+@router.post("/source-runs/{run_id}/complete", dependencies=[Depends(verify_internal_key)])
+def complete_source_run(
+    run_id: str,
+    payload: SourceRunComplete,
+    db: Session = Depends(get_db),
+) -> dict[str, int | str]:
+    run = db.get(SourceRun, run_id)
+    if not run:
+        raise HTTPException(status_code=404, detail="Source run not found")
+    source = db.get(Source, run.source_id)
+    if not source:
+        raise HTTPException(status_code=404, detail="Source not found")
+    task = db.get(Task, payload.task_id) if payload.task_id else None
+    finished_at = datetime.now(UTC).replace(tzinfo=None)
+
+    if payload.status == "failed":
+        run.status = "failed"
+        run.finished_at = finished_at
+        run.error_message = payload.error_message or "Worker failed"
+        run.items_found = payload.items_found
+        run.items_failed = max(payload.items_found, 1)
+        run.logs = [*run.logs, *payload.logs, {"level": "error", "message": run.error_message}]
+        source.last_error = run.error_message
+        if task:
+            task.status = "failed"
+            task.finished_at = finished_at
+            task.error_message = run.error_message
+            task.result = payload.model_dump()
+        create_source_health_alert(db, source, reason=run.error_message)
+        db.commit()
+        return {"status": "failed", "items_created": 0, "items_updated": 0}
+
+    created = 0
+    updated = 0
+    for candidate in payload.items:
+        external_id = candidate_external_id(source, candidate.official_url, candidate.title)
+        existing_opportunity = db.scalar(
+            select(Opportunity).where(
+                Opportunity.source_id == source.id,
+                Opportunity.external_id == external_id,
+                (
+                    (Opportunity.organization_id == source.organization_id)
+                    if source.organization_id
+                    else Opportunity.organization_id.is_(None)
+                ),
+            )
+        )
+        opportunity = create_opportunity(
+            db,
+            OpportunityCreate(
+                source_id=source.id,
+                external_id=external_id,
+                title=candidate.title,
+                entity=candidate.entity or source.name,
+                country=candidate.country or source.country,
+                categories=candidate.categories or source.category,
+                topics=candidate.topics,
+                summary=candidate.summary,
+                description=candidate.summary,
+                raw_text=candidate.raw_text,
+                official_url=candidate.official_url,
+                open_date=candidate.open_date,
+                close_date=candidate.close_date,
+                funding_amount_raw=candidate.funding_amount_raw,
+                requirements=candidate.requirements,
+                confidence_score=candidate.confidence_score,
+            ),
+            organization_id=source.organization_id,
+        )
+        db.flush()
+        if existing_opportunity:
+            updated += 1
+        else:
+            created += 1
+
+    run.status = "success"
+    run.finished_at = finished_at
+    run.items_found = payload.items_found
+    run.items_created = created
+    run.items_updated = updated
+    run.items_failed = max(payload.items_invalid or (payload.items_found - payload.items_valid), 0)
+    run.logs = [
+        *run.logs,
+        *payload.logs,
+        {
+            "level": "info",
+            "message": "Worker scrape completed",
+            "items_valid": payload.items_valid,
+            "items_created": created,
+            "items_updated": updated,
+        },
+    ]
+    source.last_success_at = finished_at
+    source.last_error = None
+    if payload.items_found == 0:
+        create_source_health_alert(db, source, reason="no se detectaron oportunidades nuevas en la corrida del worker")
+    if task:
+        task.status = "success"
+        task.finished_at = finished_at
+        task.result = {**payload.model_dump(), "items_created": created, "items_updated": updated}
+    db.add(
+        AuditLog(
+            organization_id=source.organization_id,
+            action="complete_source_run",
+            resource_type="source_run",
+            resource_id=run.id,
+        )
+    )
+    db.commit()
+    return {"status": "success", "items_created": created, "items_updated": updated}
+
+
+@router.post("/scheduler/sources/run-enabled", dependencies=[Depends(verify_internal_key)])
+def run_enabled_sources(db: Session = Depends(get_db)) -> dict[str, int]:
+    sources = list(db.scalars(select(Source).where(Source.enabled.is_(True))))
+    runs_created = 0
+    failed = 0
+    for source in sources:
+        run = execute_source_run_locally(db, source, organization_id=source.organization_id)
+        runs_created += 1
+        if run.status == "failed":
+            failed += 1
+        db.add(
+            AuditLog(
+                organization_id=source.organization_id,
+                action="scheduled_source_run",
+                resource_type="source_run",
+                resource_id=run.id,
+            )
+        )
+    db.commit()
+    return {"sources_checked": len(sources), "runs_created": runs_created, "failed": failed}
+
+
+@router.post("/scheduler/sources/retry-degraded", dependencies=[Depends(verify_internal_key)])
+def retry_degraded_sources(db: Session = Depends(get_db)) -> dict[str, int]:
+    sources = list(db.scalars(select(Source).where(Source.enabled.is_(True))))
+    scheduled = 0
+    skipped = 0
+    for source in sources:
+        recent_runs = list(
+            db.scalars(
+                select(SourceRun)
+                .where(SourceRun.source_id == source.id)
+                .order_by(SourceRun.created_at.desc())
+                .limit(5)
+            )
+        )
+        if not recent_runs:
+            continue
+        failures = sum(1 for run in recent_runs if run.status == "failed")
+        health = "failing" if recent_runs[0].status == "failed" or failures >= 3 else "degraded" if failures > 0 else "healthy"
+        if health == "healthy":
+            continue
+        pending_task = db.scalar(
+            select(Task)
+            .join(SourceRun, SourceRun.id == Task.source_run_id)
+            .where(
+                SourceRun.source_id == source.id,
+                Task.source_run_id.is_not(None),
+                Task.task_type == "scrape_source",
+                Task.status.in_(["running", "queued", "scheduled"]),
+            )
+        )
+        if pending_task:
+            skipped += 1
+            continue
+        started_at = datetime.now(UTC).replace(tzinfo=None)
+        run = SourceRun(
+            source_id=source.id,
+            status="scheduled",
+            started_at=None,
+            logs=[{"level": "info", "message": "Retry scheduled after degraded source health", "health": health}],
+        )
+        db.add(run)
+        db.flush()
+        task = Task(
+            organization_id=source.organization_id,
+            source_run_id=run.id,
+            task_type="scrape_source",
+            provider="celery",
+            status="scheduled",
+            started_at=started_at,
+            payload={"source_key": source.key, "base_url": source.base_url, "source_type": source.source_type},
+        )
+        db.add(task)
+        db.flush()
+        external_id = enqueue_scrape_source(
+            source.key,
+            source.base_url,
+            source.source_type,
+            source_run_id=run.id,
+            task_id=task.id,
+            countdown_seconds=900,
+        )
+        task.external_id = external_id
+        task.result = {"message": "Retry scheduled in 15 minutes", "health": health}
+        create_source_health_alert(db, source, reason=f"fuente {health}; reintento programado en 15 minutos")
+        db.add(
+            AuditLog(
+                organization_id=source.organization_id,
+                action="schedule_source_retry",
+                resource_type="source_run",
+                resource_id=run.id,
+            )
+        )
+        scheduled += 1
+    db.commit()
+    return {"sources_checked": len(sources), "scheduled": scheduled, "skipped": skipped}
+
+
+@router.post("/scheduler/alerts/send-due", dependencies=[Depends(verify_internal_key)])
+def send_due_alerts(db: Session = Depends(get_db)) -> dict[str, int]:
+    now = datetime.now(UTC).replace(tzinfo=None)
+    alerts = list(
+        db.scalars(
+            select(Alert).where(
+                Alert.status == "pending",
+                Alert.channel == "email",
+                Alert.scheduled_at.is_not(None),
+                Alert.scheduled_at <= now,
+            )
+        )
+    )
+    sent = 0
+    failed = 0
+    for alert in alerts:
+        try:
+            send_email(recipient=alert.recipient, subject=alert.subject, message=alert.message)
+            alert.status = "sent"
+            alert.sent_at = now
+            sent += 1
+        except Exception as exc:
+            alert.status = "failed"
+            alert.sent_at = None
+            failed += 1
+            db.add(
+                AuditLog(
+                    organization_id=alert.organization_id,
+                    action="scheduled_alert_failed",
+                    resource_type="alert",
+                    resource_id=alert.id,
+                    metadata_json={"error": str(exc)},
+                )
+            )
+            continue
+        db.add(
+            AuditLog(
+                organization_id=alert.organization_id,
+                action="scheduled_alert_sent",
+                resource_type="alert",
+                resource_id=alert.id,
+            )
+        )
+    db.commit()
+    return {"alerts_checked": len(alerts), "sent": sent, "failed": failed}

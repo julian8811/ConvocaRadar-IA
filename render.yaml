@@ -1,0 +1,98 @@
+services:
+  - type: web
+    name: convocaradar-api
+    runtime: docker
+    rootDir: apps/api
+    dockerfilePath: Dockerfile
+    healthCheckPath: /health
+    autoDeployTrigger: commit
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: JWT_SECRET
+        sync: false
+      - key: INTERNAL_API_KEY
+        sync: false
+      - key: BACKEND_URL
+        sync: false
+      - key: FRONTEND_URL
+        sync: false
+      - key: STORAGE_BACKEND
+        value: s3
+      - key: S3_ENDPOINT_URL
+        sync: false
+      - key: S3_ACCESS_KEY
+        sync: false
+      - key: S3_SECRET_KEY
+        sync: false
+      - key: S3_BUCKET
+        sync: false
+      - key: S3_REGION
+        value: auto
+      - key: SMTP_HOST
+        sync: false
+      - key: SMTP_PORT
+        sync: false
+      - key: SMTP_USER
+        sync: false
+      - key: SMTP_PASSWORD
+        sync: false
+      - key: SMTP_FROM
+        sync: false
+      - key: SMTP_USE_TLS
+        value: "true"
+      - key: LLM_PROVIDER
+        value: mock
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: EMBEDDING_MODEL
+        sync: false
+      - key: CHAT_MODEL
+        sync: false
+
+  - type: worker
+    name: convocaradar-worker
+    runtime: docker
+    rootDir: apps/worker
+    dockerfilePath: Dockerfile
+    autoDeployTrigger: commit
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: BACKEND_URL
+        sync: false
+      - key: INTERNAL_API_KEY
+        sync: false
+      - key: STORAGE_BACKEND
+        value: s3
+      - key: S3_ENDPOINT_URL
+        sync: false
+      - key: S3_ACCESS_KEY
+        sync: false
+      - key: S3_SECRET_KEY
+        sync: false
+      - key: S3_BUCKET
+        sync: false
+      - key: S3_REGION
+        value: auto
+
+  - type: worker
+    name: convocaradar-worker-beat
+    runtime: docker
+    rootDir: apps/worker
+    dockerfilePath: Dockerfile
+    dockerCommand: celery -A worker.app.celery_app beat --loglevel=info
+    autoDeployTrigger: commit
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: BACKEND_URL
+        sync: false
+      - key: INTERNAL_API_KEY
+        sync: false

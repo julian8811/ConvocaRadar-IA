@@ -1,0 +1,109 @@
+services:
+  postgres:
+    image: pgvector/pgvector:pg16
+    environment:
+      POSTGRES_DB: convocaradar
+      POSTGRES_USER: convocaradar
+      POSTGRES_PASSWORD: convocaradar
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U convocaradar -d convocaradar"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  redis:
+    image: redis:7-alpine
+    ports:
+      - "6379:6379"
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  minio:
+    image: minio/minio:latest
+    command: server /data --console-address ":9001"
+    environment:
+      MINIO_ROOT_USER: minio
+      MINIO_ROOT_PASSWORD: minio123
+    ports:
+      - "9000:9000"
+      - "9001:9001"
+    volumes:
+      - minio-data:/data
+
+  api:
+    build:
+      context: ./apps/api
+    env_file: .env.example
+    environment:
+      DATABASE_URL: postgresql+psycopg://convocaradar:convocaradar@postgres:5432/convocaradar
+      REDIS_URL: redis://redis:6379/0
+      STORAGE_BACKEND: s3
+      S3_ENDPOINT_URL: http://minio:9000
+      INTERNAL_API_KEY: change_me_internal
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_started
+
+  worker:
+    build:
+      context: ./apps/worker
+    env_file: .env.example
+    environment:
+      DATABASE_URL: postgresql+psycopg://convocaradar:convocaradar@postgres:5432/convocaradar
+      REDIS_URL: redis://redis:6379/0
+      STORAGE_BACKEND: s3
+      S3_ENDPOINT_URL: http://minio:9000
+      BACKEND_URL: http://api:8000
+      INTERNAL_API_KEY: change_me_internal
+    command: celery -A worker.app.celery_app worker --loglevel=info
+    depends_on:
+      api:
+        condition: service_started
+      redis:
+        condition: service_healthy
+      minio:
+        condition: service_started
+
+  worker-beat:
+    build:
+      context: ./apps/worker
+    env_file: .env.example
+    environment:
+      DATABASE_URL: postgresql+psycopg://convocaradar:convocaradar@postgres:5432/convocaradar
+      REDIS_URL: redis://redis:6379/0
+      BACKEND_URL: http://api:8000
+      INTERNAL_API_KEY: change_me_internal
+    command: celery -A worker.app.celery_app beat --loglevel=info
+    depends_on:
+      api:
+        condition: service_started
+      redis:
+        condition: service_healthy
+
+  web:
+    build:
+      context: ./apps/web
+    environment:
+      NEXT_PUBLIC_API_URL: http://localhost:8000/api/v1
+    ports:
+      - "3000:3000"
+    depends_on:
+      api:
+        condition: service_started
+
+volumes:
+  postgres-data:
+  minio-data:
