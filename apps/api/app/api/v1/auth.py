@@ -5,6 +5,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_user
 from app.core.security import create_access_token, hash_password, verify_password
 from app.db.session import get_db
+from app.db.seed import seed_default_sources
 from app.models import Organization, OrganizationProfile, User
 from app.schemas import LoginRequest, RegisterRequest, Token, UserRead
 from app.services import slugify
@@ -43,6 +44,7 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)) -> Token:
         role="admin",
     )
     db.add(user)
+    seed_default_sources(db, organization)
     db.commit()
     return Token(access_token=create_access_token(user.id, {"organization_id": organization.id}))
 

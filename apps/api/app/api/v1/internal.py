@@ -10,7 +10,7 @@ from app.core.task_queue import enqueue_scrape_source
 from app.db.session import get_db
 from app.models import Alert, AuditLog, Opportunity, Source, SourceRun, Task
 from app.schemas import OpportunityCreate, SourceRunComplete
-from app.services import candidate_external_id, create_opportunity, create_source_health_alert, execute_source_run_locally
+from app.services import candidate_external_id, create_opportunity, create_source_health_alert, execute_source_run_locally, validate_source_url
 
 router = APIRouter(prefix="/internal", tags=["internal"])
 
@@ -138,10 +138,62 @@ def run_enabled_sources(db: Session = Depends(get_db)) -> dict[str, int]:
     runs_created = 0
     failed = 0
     for source in sources:
-        run = execute_source_run_locally(db, source, organization_id=source.organization_id)
-        runs_created += 1
-        if run.status == "failed":
+        started_at = datetime.now(UTC).replace(tzinfo=None)
+        run = SourceRun(
+            source_id=source.id,
+            status="running",
+            started_at=started_at,
+            logs=[{"level": "info", "message": "Scraping MVP started"}],
+        )
+        source.last_run_at = started_at
+        db.add(run)
+        db.flush()
+        task = Task(
+            organization_id=source.organization_id,
+            source_run_id=run.id,
+            task_type="scrape_source",
+            provider="local",
+            status="running",
+            started_at=started_at,
+            payload={"source_key": source.key, "base_url": source.base_url, "source_type": source.source_type},
+        )
+        db.add(task)
+        db.flush()
+        try:
+            validate_source_url(source)
+            external_id = enqueue_scrape_source(
+                source.key,
+                source.base_url,
+                source.source_type,
+                source_run_id=run.id,
+                task_id=task.id,
+            )
+            if external_id:
+                task.provider = "celery"
+                task.status = "queued"
+                task.external_id = external_id
+                task.result = {"message": "Scrape task queued for worker"}
+                run.status = "queued"
+                run.logs = [*run.logs, {"level": "info", "message": "Scrape task queued", "task_id": task.id}]
+            else:
+                db.delete(task)
+                db.delete(run)
+                db.flush()
+                run = execute_source_run_locally(db, source, organization_id=source.organization_id)
+        except Exception as exc:
+            finished_at = datetime.now(UTC).replace(tzinfo=None)
+            run.status = "failed"
+            run.finished_at = finished_at
+            run.items_failed = 1
+            run.error_message = str(exc)
+            run.logs = [*run.logs, {"level": "error", "message": str(exc)}]
+            task.status = "failed"
+            task.finished_at = finished_at
+            task.error_message = str(exc)
+            task.result = {"items_failed": 1}
+            source.last_error = str(exc)
             failed += 1
+        runs_created += 1
         db.add(
             AuditLog(
                 organization_id=source.organization_id,

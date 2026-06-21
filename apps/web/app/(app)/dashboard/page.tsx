@@ -200,12 +200,7 @@ export default function DashboardPage() {
   });
 
   const runCapture = useMutation({
-    mutationFn: async () => {
-      const sourceItems = sources.data ?? [];
-      const prioritySource = sourceItems.find((source) => source.key === "simpler-grants");
-      if (prioritySource) return [await api.runSource(prioritySource.id)];
-      return api.runAllSources();
-    },
+    mutationFn: api.runAllSources,
     onSuccess: (resultRuns) => {
       const created = resultRuns.reduce((total, run) => total + run.items_created, 0);
       const found = resultRuns.reduce((total, run) => total + run.items_found, 0);
