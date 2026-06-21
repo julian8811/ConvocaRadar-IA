@@ -435,7 +435,7 @@ async def test_innpulsa_connector_parses_listing_fixture() -> None:
           </h3>
           <p>
             Abiertas. Programa para fortalecer emprendimientos liderados por mujeres.
-            Fecha de cierre: marzo 10, 2026.
+            Fecha de cierre: marzo 10, 2027.
             Monto estimado: $120.000.000 COP.
             <a href="/convocatorias/innpulsa-mujeres">Conoce mas</a>
           </p>
@@ -464,6 +464,36 @@ async def test_innpulsa_connector_parses_listing_fixture() -> None:
     assert candidate.open_date is not None
     assert (await connector.validate(candidate)).ok
 
+@pytest.mark.asyncio
+async def test_innpulsa_connector_skips_closed_listing_fixture() -> None:
+    html = """
+    <html>
+      <body>
+        <article class="card">
+          <h3>
+            <a href="/convocatorias/innpulsa-cerrada">Convocatoria iNNpulsa Cerrada</a>
+          </h3>
+          <p>
+            Cerrada. Programa finalizado.
+            Fecha de cierre: marzo 10, 2024.
+            <a href="/convocatorias/innpulsa-cerrada">Conoce mas</a>
+          </p>
+        </article>
+      </body>
+    </html>
+    """
+    connector = InnpulsaConnector("https://convocatorias.innpulsacolombia.com/api/convocatorias?active_only=true&include_private=false&include_archive=false")
+    raw = RawSourceResult(
+        source_key="innpulsa",
+        url="https://www.innpulsacolombia.com/convocatorias.html",
+        content=html,
+        content_type="text/html",
+    )
+
+    candidates = await connector.parse(raw)
+
+    assert candidates == []
+
 
 def test_connector_factory_selects_innpulsa() -> None:
     connector = connector_for("innpulsa", "https://convocatorias.innpulsacolombia.com/api/convocatorias?active_only=true&include_private=false&include_archive=false")
@@ -482,7 +512,7 @@ async def test_apc_colombia_connector_parses_teaser_fixture() -> None:
             </a>
           </h2>
           <div class="content">
-            <p>Convocatoria abierta para proyectos de cooperación triangular. Modificado el 11/04/2023.</p>
+            <p>Convocatoria abierta para proyectos de cooperación triangular. Modificado el 11/04/2027.</p>
           </div>
         </article>
       </body>
@@ -505,6 +535,35 @@ async def test_apc_colombia_connector_parses_teaser_fixture() -> None:
     assert candidate.country == "Colombia"
     assert (await connector.validate(candidate)).ok
 
+@pytest.mark.asyncio
+async def test_apc_colombia_connector_skips_closed_fixture() -> None:
+    html = """
+    <html>
+      <body>
+        <article class="page teaser clearfix">
+          <h2><a href="/modalidades-de-cooperacion/convocatorias/convocatoria-cerrada">Convocatoria Cerrada</a></h2>
+          <div class="content"><p>Convocatoria cerrada para cooperaci?n. 12/04/2027</p></div>
+        </article>
+        <article class="page teaser clearfix">
+          <h2><a href="/modalidades-de-cooperacion/convocatorias/convocatoria-vigente">Convocatoria Vigente</a></h2>
+          <div class="content"><p>Convocatoria abierta para cooperaci?n. 13/04/2027</p></div>
+        </article>
+      </body>
+    </html>
+    """
+    connector = ApcColombiaConnector("https://www.apccolombia.gov.co/seccion/modalidades-de-cooperacion")
+    raw = RawSourceResult(
+        source_key="apc-colombia",
+        url="https://www.apccolombia.gov.co/seccion/modalidades-de-cooperacion",
+        content=html,
+        content_type="text/html",
+    )
+
+    candidates = await connector.parse(raw)
+
+    assert len(candidates) == 1
+    assert candidates[0].official_url.endswith("/convocatoria-vigente")
+
 
 @pytest.mark.asyncio
 async def test_apc_colombia_connector_parses_multiple_cards_fixture() -> None:
@@ -513,11 +572,11 @@ async def test_apc_colombia_connector_parses_multiple_cards_fixture() -> None:
       <body>
         <article class="page teaser clearfix">
           <h2><a href="/modalidades-de-cooperacion/convocatorias/convocatoria-uno">Convocatoria Uno</a></h2>
-          <div class="content"><p>Convocatoria abierta. 11/04/2023</p></div>
+          <div class="content"><p>Convocatoria abierta. 11/04/2027</p></div>
         </article>
         <article class="page teaser clearfix">
           <h2><a href="/modalidades-de-cooperacion/convocatorias/convocatoria-dos">Convocatoria Dos</a></h2>
-          <div class="content"><p>Convocatoria abierta para cooperacion. 12/04/2023</p></div>
+          <div class="content"><p>Convocatoria abierta para cooperacion. 12/04/2027</p></div>
         </article>
       </body>
     </html>

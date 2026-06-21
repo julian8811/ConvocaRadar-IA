@@ -1,6 +1,6 @@
 import json
 import re
-from datetime import datetime
+from datetime import UTC, datetime
 from urllib.parse import urljoin
 
 from playwright.async_api import async_playwright
@@ -13,6 +13,7 @@ from worker.connectors.common import clean_text, fetch_httpx_text, parse_date_te
 INNPULSA_API_URL = "https://convocatorias.innpulsacolombia.com/api/convocatorias?active_only=true&include_private=false&include_archive=false"
 INNPULSA_SITE_URL = "https://www.innpulsacolombia.com/convocatorias.html"
 INNPULSA_DETAIL_BASE = "https://convocatorias.innpulsacolombia.com/convocatoria/"
+INNPULSA_CLOSED_KEYWORDS = ("cerrada", "cerrado", "closed", "archivada", "archived", "finalizada", "finalized")
 
 
 def _clean(value: str | None) -> str:
@@ -30,6 +31,15 @@ def _extract_money(text: str) -> str | None:
         if match:
             return _clean(match.group(0))
     return None
+
+
+def _is_closed_text(text: str) -> bool:
+    lowered = _clean(text).lower()
+    return any(keyword in lowered for keyword in INNPULSA_CLOSED_KEYWORDS)
+
+
+def _is_past(date_value: datetime | None) -> bool:
+    return bool(date_value and date_value.date() < datetime.now(UTC).date())
 
 
 class InnpulsaConnector:
@@ -103,6 +113,13 @@ class InnpulsaConnector:
         )
         topics = self._unique(["iNNpulsa", category, status])
         requirements = self._unique([target_audience, purpose]) or ["Revisar la convocatoria oficial"]
+        status_lower = status.lower()
+        if (
+            status_lower in {"closed", "cerrada", "cerrado", "archived", "finalizada", "finished"}
+            or _is_closed_text(f"{title} {description} {status} {category} {purpose} {benefits}")
+            or _is_past(parse_date_text(str(item.get("end_date") or "")))
+        ):
+            return None
         return OpportunityCandidate(
             title=title[:180],
             entity="iNNpulsa Colombia",
@@ -216,6 +233,8 @@ class InnpulsaConnector:
         summary = text.replace(title, "", 1).strip(" -")
         date = parse_date_text(text)
         money = _extract_money(text)
+        if _is_closed_text(text) or _is_past(date):
+            return None
         if title.lower() in {"conoce mas", "ver detalles", "postulate", "postulate ahora"}:
             for separator in ("Conoce mas", "Ver detalles", "Postulate", "Postulate ahora"):
                 if separator in text:
@@ -316,4 +335,6 @@ class InnpulsaConnector:
             return ValidationResult(ok=False, reason="Missing title or URL")
         if "innpulsacolombia.com" not in candidate.official_url and "convocatorias.innpulsacolombia.com" not in candidate.official_url:
             return ValidationResult(ok=False, reason="URL is outside iNNpulsa")
+        if _is_closed_text(f"{candidate.title} {candidate.summary} {candidate.raw_text}") or _is_past(candidate.close_date):
+            return ValidationResult(ok=False, reason="Opportunity appears closed")
         return ValidationResult(ok=True)

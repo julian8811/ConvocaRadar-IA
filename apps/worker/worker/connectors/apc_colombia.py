@@ -1,7 +1,6 @@
 from __future__ import annotations
 
 import re
-from datetime import datetime
 from urllib.parse import urljoin, urlparse
 
 from selectolax.parser import HTMLParser
@@ -18,6 +17,7 @@ APC_URLS = [
 ]
 
 TITLE_KEYWORDS = ("convocatoria", "cooperacion", "voluntariado", "ayuda", "grant", "call")
+CLOSED_KEYWORDS = ("cerrada", "cerrado", "closed", "archivada", "archived", "finalizada")
 
 
 def _clean(value: str | None) -> str:
@@ -27,6 +27,11 @@ def _clean(value: str | None) -> str:
 def _is_candidate_text(value: str) -> bool:
     lowered = normalize_text(value)
     return any(keyword in lowered for keyword in TITLE_KEYWORDS)
+
+
+def _is_closed_text(value: str) -> bool:
+    lowered = normalize_text(value)
+    return any(keyword in lowered for keyword in CLOSED_KEYWORDS)
 
 
 class ApcColombiaConnector:
@@ -59,6 +64,9 @@ class ApcColombiaConnector:
         if status and status.lower() not in summary.lower():
             summary = f"{status}. {summary}".strip()
         date_match = re.search(r"(\d{2}/\d{2}/\d{4}|\d{4}-\d{2}-\d{2})", container_text)
+        open_date = parse_date_text(date_match.group(1) if date_match else container_text)
+        if _is_closed_text(f"{title} {container_text}"):
+            return None
         return OpportunityCandidate(
             title=title[:180],
             entity="APC Colombia",
@@ -69,7 +77,7 @@ class ApcColombiaConnector:
             topics=["apc-colombia"],
             raw_text=container_text[:3000],
             confidence_score=0.82,
-            open_date=parse_date_text(date_match.group(1) if date_match else container_text),
+            open_date=open_date,
             language="es",
         )
 
@@ -106,6 +114,8 @@ class ApcColombiaConnector:
                 if urlparse(official_url).netloc not in {"www.apccolombia.gov.co", "portalservicios-apccolombia.gov.co"}:
                     continue
                 seen.add(official_url)
+                if _is_closed_text(title):
+                    continue
                 candidates.append(
                     OpportunityCandidate(
                         title=title[:180],
@@ -127,4 +137,6 @@ class ApcColombiaConnector:
             return ValidationResult(ok=False, reason="Missing title or URL")
         if "apccolombia.gov.co" not in candidate.official_url and "portalservicios-apccolombia.gov.co" not in candidate.official_url:
             return ValidationResult(ok=False, reason="URL is outside APC Colombia")
+        if _is_closed_text(f"{candidate.title} {candidate.summary} {candidate.raw_text}"):
+            return ValidationResult(ok=False, reason="Opportunity appears closed")
         return ValidationResult(ok=True)
