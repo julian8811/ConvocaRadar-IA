@@ -24,7 +24,7 @@ function getDefaultApiUrl() {
       return "http://127.0.0.1:8000/api/v1";
     }
   }
-  return "https://convotracker-api.onrender.com/api/v1";
+  return "https://api.convocaradar.com/api/v1";
 }
 
 export function getToken() {

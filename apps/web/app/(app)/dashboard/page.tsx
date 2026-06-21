@@ -259,7 +259,7 @@ export default function DashboardPage() {
         .reduce((sum, item) => sum + (item.last_run_duration_seconds ?? 0), 0) /
       Math.max(healthItems.filter((item) => item.last_run_duration_seconds !== null).length, 1)
     : 0;
-  const recentSuccessfulRuns = runItems.filter((run) => run.status === "success").length;
+  const recentSuccessfulRuns = runItems.filter((run) => run.status === "success" || run.status === "degraded").length;
   const sourcesWithRuns = healthItems.filter((item) => item.recent_runs > 0).length;
   const topActiveSources = [...healthItems].sort((a, b) => b.recent_items_found - a.recent_items_found).slice(0, 5);
 

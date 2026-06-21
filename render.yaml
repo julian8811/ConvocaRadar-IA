@@ -56,6 +56,24 @@ services:
         value: inline
 
   - type: worker
+    name: convocaradar-worker-beat
+    env: docker
+    rootDir: .
+    dockerfilePath: apps/worker/Dockerfile
+    plan: free
+    autoDeploy: true
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: REDIS_URL
+        sync: false
+      - key: BACKEND_URL
+        sync: false
+      - key: INTERNAL_API_KEY
+        sync: false
+    dockerCommand: celery -A worker.app.celery_app beat --loglevel=info
+
+  - type: worker
     name: convocaradar-worker
     env: docker
     rootDir: .

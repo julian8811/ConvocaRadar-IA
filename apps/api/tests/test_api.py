@@ -945,3 +945,104 @@ def test_admin_rebuild_embeddings() -> None:
         db.close()
     assert embedding is not None
     assert embedding.model_version == EMBEDDING_MODEL_VERSION
+
+
+def test_source_run_marks_degraded_when_no_candidates(monkeypatch) -> None:
+    c = client()
+    auth = {"Authorization": f"Bearer {token(c)}"}
+    from app import services as app_services
+
+    class EmptyConnector:
+        source_key = "grants-gov"
+
+        async def fetch(self):
+            return type(
+                "Raw",
+                (),
+                {
+                    "source_key": "grants-gov",
+                    "url": "https://www.grants.gov/search-results-detail/empty",
+                    "content": "<html></html>",
+                    "content_type": "text/html",
+                },
+            )()
+
+        async def parse(self, raw):
+            return []
+
+        async def validate(self, candidate):
+            from worker.connectors.base import ValidationResult
+
+            return ValidationResult(ok=True)
+
+    monkeypatch.setattr(app_services, "connector_for", lambda *_args, **_kwargs: EmptyConnector())
+    sources = c.get("/api/v1/sources", headers=auth)
+    source_id = [item for item in sources.json() if item["key"] == "grants-gov"][0]["id"]
+    run = c.post(f"/api/v1/sources/{source_id}/run", headers=auth)
+    assert run.status_code == 200
+    payload = run.json()
+    assert payload["status"] == "degraded"
+    assert payload["items_found"] == 0
+    diag = next(log for log in payload["logs"] if log.get("message") == "Connector diagnostics")
+    assert diag["candidates_parsed"] == 0
+
+
+def test_internal_connector_probe_requires_key() -> None:
+    c = client()
+    response = c.post(
+        "/api/v1/internal/connectors/probe",
+        headers={"X-Internal-API-Key": "wrong"},
+        json={"source_key": "grants-gov-rss"},
+    )
+    assert response.status_code == 401
+
+
+def test_internal_connector_probe_returns_diagnostics(monkeypatch) -> None:
+    c = client()
+    import app.api.v1.internal as internal_api
+
+    class StubConnector:
+        source_key = "grants-gov-rss"
+
+        async def fetch(self):
+            return type(
+                "Raw",
+                (),
+                {
+                    "source_key": "grants-gov-rss",
+                    "url": "https://example.com/feed.xml",
+                    "content": "<rss><channel><item><title>Call</title></item></channel></rss>",
+                    "content_type": "application/rss+xml",
+                },
+            )()
+
+        async def parse(self, raw):
+            from worker.connectors.base import OpportunityCandidate
+
+            return [
+                OpportunityCandidate(
+                    title="Research Call",
+                    entity="Example",
+                    country="United States",
+                    official_url="https://example.com/call",
+                    confidence_score=0.9,
+                )
+            ]
+
+        async def validate(self, candidate):
+            from worker.connectors.base import ValidationResult
+
+            return ValidationResult(ok=True)
+
+    monkeypatch.setattr(internal_api, "connector_for", lambda *_args, **_kwargs: StubConnector())
+    response = c.post(
+        "/api/v1/internal/connectors/probe",
+        headers={"X-Internal-API-Key": "test_internal_key"},
+        json={"source_key": "grants-gov-rss"},
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] == "ok"
+    assert payload["raw_content_length"] > 0
+    assert payload["candidates_parsed"] == 1
+    assert payload["candidates_valid"] == 1

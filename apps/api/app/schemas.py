@@ -186,6 +186,12 @@ class SourceRunComplete(BaseModel):
     logs: list[dict[str, Any]] = Field(default_factory=list)
 
 
+class ConnectorProbeRequest(BaseModel):
+    source_key: str
+    base_url: str | None = None
+    source_type: str | None = None
+
+
 class TaskRead(BaseModel):
     id: str
     organization_id: str | None
