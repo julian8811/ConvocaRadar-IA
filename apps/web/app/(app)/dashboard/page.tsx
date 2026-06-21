@@ -222,7 +222,8 @@ export default function DashboardPage() {
   const runItems = useMemo(() => sourceRunsOverview.data ?? [], [sourceRunsOverview.data]);
   const metrics = adminMetrics.data as AdminMetrics | undefined;
 
-  const total = opportunityItems.length;
+  const total = opportunities.data?.total ?? opportunityItems.length;
+  const loadedCount = opportunityItems.length;
   const open = opportunityItems.filter((item) => item.status === "open").length;
   const closingSoon = opportunityItems.filter((item) => item.status === "closing_soon").length;
   const recentOpportunityItems = opportunityItems.filter((item) => item.status !== "closed").slice(0, 6);
@@ -363,9 +364,9 @@ export default function DashboardPage() {
               <>
                 <p>Las convocatorias ya están entrando y el tablero muestra el volumen operativo en paralelo.</p>
                 <p className="text-slate-500 dark:text-slate-400">
-                  Cobertura actual: {formatPercent(total ? Math.round((withSummary / total) * 100) : 0)} de resúmenes,{" "}
-                  {formatPercent(total ? Math.round((withDate / total) * 100) : 0)} de fechas y{" "}
-                  {formatPercent(total ? Math.round((withSource / total) * 100) : 0)} de trazabilidad por fuente.
+                  Cobertura actual: {formatPercent(loadedCount ? Math.round((withSummary / loadedCount) * 100) : 0)} de resúmenes,{" "}
+                  {formatPercent(loadedCount ? Math.round((withDate / loadedCount) * 100) : 0)} de fechas y{" "}
+                  {formatPercent(loadedCount ? Math.round((withSource / loadedCount) * 100) : 0)} de trazabilidad por fuente.
                 </p>
               </>
             ) : (
