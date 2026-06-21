@@ -29,7 +29,7 @@ import { api } from "@/lib/api";
 import type { AdminMetrics, Opportunity, SourceHealth, SourceRunOverview } from "@/lib/types";
 
 const Plot = dynamic(async () => (await import("react-plotly.js")).default, { ssr: false }) as any;
-const plotConfig = { displayModeBar: true, responsive: true, scrollZoom: true };
+const plotConfig = { displayModeBar: true, displaylogo: false, responsive: true, scrollZoom: true };
 
 type ThemeMode = "light" | "dark";
 
@@ -152,16 +152,19 @@ function buildBaseLayout(theme: ThemeMode, title: string, xTitle: string, yTitle
     title: { text: title, font: { size: 15, color: colors.title } },
     paper_bgcolor: colors.paper,
     plot_bgcolor: colors.plot,
-    margin: { l: 96, r: 32, t: 64, b: 112 },
+    margin: { l: 104, r: 40, t: 72, b: 120 },
     font: { color: colors.text, family: "Geist, sans-serif" },
     hovermode: "closest",
-    legend: { orientation: "h", y: -0.24, x: 0, xanchor: "left", font: { color: colors.muted } },
+    showlegend: false,
+    uniformtext: { mode: "hide", minsize: 10 },
     xaxis: {
       title: xTitle ? { text: xTitle, font: { color: colors.muted }, standoff: 24 } : undefined,
       tickfont: { color: colors.text },
       automargin: true,
       gridcolor: colors.grid,
       zeroline: false,
+      ticks: "outside",
+      ticklen: 6,
     },
     yaxis: {
       title: yTitle ? { text: yTitle, font: { color: colors.muted }, standoff: 24 } : undefined,
@@ -169,6 +172,8 @@ function buildBaseLayout(theme: ThemeMode, title: string, xTitle: string, yTitle
       automargin: true,
       gridcolor: colors.grid,
       zeroline: false,
+      ticks: "outside",
+      ticklen: 6,
     },
     ...extra,
   };

@@ -104,7 +104,7 @@ export default function OpportunitiesPage() {
 
   const opportunities = useQuery({ queryKey: ["opportunities", query], queryFn: () => api.opportunities(query) });
   const actionLinkClass =
-    "inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-300 bg-slate-100 text-slate-800 transition-colors hover:bg-slate-200 hover:text-slate-950 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-200 dark:hover:bg-slate-800";
+    "inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-900 shadow-sm transition-colors hover:bg-slate-50 hover:text-slate-950 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800";
 
   const favorite = useMutation({
     mutationFn: api.favorite,

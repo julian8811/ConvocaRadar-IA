@@ -20,6 +20,21 @@ def normalize_text(value: str | None) -> str:
     return "".join(ch for ch in normalized if not unicodedata.combining(ch)).lower()
 
 
+def looks_like_noise_text(value: str | None) -> bool:
+    text = clean_text(value).lower()
+    if not text:
+        return False
+    if "{" in text or "}" in text:
+        return True
+    return bool(
+        re.search(
+            r"(<style[\s\S]*?</style>|<script[\s\S]*?</script>|color:\s*white|background-color:|\.box-address|\.caja|display:\s*flex|justify-content:\s*center|font-weight:\s*bold|text-decoration:\s*underline|font-size:|padding:|margin:|border:|budgetyearscolumns|plannedopeningdate|deadlinedate|action:|action\"?:|action'?:)",
+            text,
+            flags=re.IGNORECASE,
+        )
+    )
+
+
 def _is_private_host(hostname: str) -> bool:
     host = hostname.lower()
     if host in {"localhost", "127.0.0.1", "0.0.0.0", "::1"}:
