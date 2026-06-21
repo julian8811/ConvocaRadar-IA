@@ -26,7 +26,11 @@ def enqueue_scrape_source(
     countdown_seconds: int | None = None,
 ) -> str | None:
     settings = get_settings()
-    if not settings.use_worker:
+    execution_mode = settings.scraping_execution_mode.lower().strip()
+    if execution_mode not in {"inline", "worker", "auto"}:
+        logger.warning("invalid_scraping_execution_mode_using_inline", mode=settings.scraping_execution_mode)
+        execution_mode = "inline"
+    if execution_mode == "inline" or (execution_mode == "auto" and not settings.use_worker):
         return None
     try:
         from celery import Celery

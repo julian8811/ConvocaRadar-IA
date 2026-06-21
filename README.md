@@ -87,8 +87,15 @@ Docker Compose includes a Celery worker and `worker-beat`. Beat triggers interna
 - enabled source checks every 30 minutes;
 - due scheduled email alerts every 5 minutes.
 
-When `USE_WORKER=true`, manual source runs are queued in Celery and completed through the protected internal callback
-`/api/v1/internal/source-runs/{run_id}/complete`. When `USE_WORKER=false`, the API keeps the local development fallback.
+Scraping can run in two modes:
+
+- `SCRAPING_EXECUTION_MODE=inline` runs manual source captures inside the API request. This is the safest option for
+  free deployments where a background worker might sleep or be unavailable.
+- `SCRAPING_EXECUTION_MODE=worker` queues source runs in Celery and completes them through the protected internal callback
+  `/api/v1/internal/source-runs/{run_id}/complete`. Use it only when the worker service is confirmed healthy.
+
+`SCRAPING_EXECUTION_MODE=auto` keeps the legacy behavior: it queues only when `USE_WORKER=true`; otherwise it falls back
+to inline execution.
 
 ## Source Connectors
 

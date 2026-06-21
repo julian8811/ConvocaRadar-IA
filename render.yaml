@@ -52,6 +52,8 @@ services:
         sync: false
       - key: CHAT_MODEL
         sync: false
+      - key: SCRAPING_EXECUTION_MODE
+        value: inline
 
   - type: worker
     name: convocaradar-worker
