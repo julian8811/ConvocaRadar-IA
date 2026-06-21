@@ -1603,3 +1603,108 @@ def test_launch_chromium_uses_container_args() -> None:
         assert fake.chromium.last_kwargs == {"headless": True, "args": CHROMIUM_CONTAINER_ARGS}
 
     asyncio.run(_run_with_capture())
+
+
+@pytest.mark.asyncio
+async def test_innovamos_fetch_uses_fast_render_path(monkeypatch) -> None:
+    calls = {"httpx": 0, "render": 0}
+
+    async def fake_httpx(*_args, **kwargs):
+        calls["httpx"] += 1
+        assert kwargs.get("playwright_fallback") is False
+        return "https://www.innovamos.gov.co/test", '<html ng-app="nosune"></html>', "text/html"
+
+    async def fake_render(url, **kwargs):
+        calls["render"] += 1
+        assert kwargs.get("wait_selector")
+        return (
+            url,
+            "<html><h1>Convocatoria Fondo Innovacion</h1><p>Subvencion para proyectos en alianza.</p></html>",
+            "text/html",
+        )
+
+    monkeypatch.setattr("worker.connectors.innovamos.fetch_httpx_text", fake_httpx)
+    monkeypatch.setattr("worker.connectors.innovamos.render_page_html", fake_render)
+
+    connector = InnovamosConnector("innovamos-fid", "https://www.innovamos.gov.co/test")
+    raw = await connector.fetch()
+
+    assert calls["httpx"] == 1
+    assert calls["render"] == 1
+    assert "Convocatoria" in raw.content
+
+
+@pytest.mark.asyncio
+async def test_innovamos_fetch_keeps_partial_html_when_render_fails(monkeypatch) -> None:
+    partial_html = (
+        "<html><title>Convocatoria Fondo Innovacion</title><p>Subvencion para alianzas.</p>"
+        + (" detalle " * 60)
+        + "</html>"
+    )
+
+    async def fake_httpx(*_args, **_kwargs):
+        return "https://www.innovamos.gov.co/test", partial_html, "text/html"
+
+    async def fake_render(*_args, **_kwargs):
+        raise TimeoutError("render timed out")
+
+    monkeypatch.setattr("worker.connectors.innovamos.fetch_httpx_text", fake_httpx)
+    monkeypatch.setattr("worker.connectors.innovamos.render_page_html", fake_render)
+
+    connector = InnovamosConnector("innovamos-fid", "https://www.innovamos.gov.co/test")
+    raw = await connector.fetch()
+
+    assert raw.content == partial_html
+
+
+def test_render_page_html_uses_container_safe_launch(monkeypatch) -> None:
+    import asyncio
+
+    from worker.connectors.common import render_page_html
+
+    captured: dict[str, object] = {}
+
+    class FakePage:
+        async def route(self, *_args, **_kwargs):
+            return None
+
+        async def goto(self, url, **kwargs):
+            captured["goto_kwargs"] = kwargs
+            captured["url"] = url
+
+        async def wait_for_selector(self, *_args, **_kwargs):
+            return None
+
+        async def wait_for_timeout(self, *_args, **_kwargs):
+            return None
+
+        @property
+        def url(self):
+            return captured["url"]
+
+        async def content(self):
+            return "<html><body>ok</body></html>"
+
+    class FakeBrowser:
+        async def new_page(self, **_kwargs):
+            return FakePage()
+
+        async def close(self):
+            return None
+
+    async def fake_launch_chromium(_playwright, *, headless: bool = True):
+        captured["headless"] = headless
+        return FakeBrowser()
+
+    monkeypatch.setattr("worker.connectors.common.launch_chromium", fake_launch_chromium)
+
+    final_url, content, content_type = asyncio.run(
+        render_page_html("https://example.com/page", wait_selector="h1", timeout_ms=12000)
+    )
+
+    assert final_url == "https://example.com/page"
+    assert "ok" in content
+    assert content_type == "text/html"
+    assert captured["headless"] is True
+    assert captured["goto_kwargs"]["wait_until"] == "domcontentloaded"
+    assert captured["goto_kwargs"]["timeout"] == 12000
