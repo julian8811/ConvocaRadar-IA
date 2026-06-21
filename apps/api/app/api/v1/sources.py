@@ -5,7 +5,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_organization, get_current_user
-from app.core.task_queue import enqueue_scrape_source, task_payload
+from app.core.task_queue import task_payload
 from app.db.session import get_db
 from app.models import Organization, Source, SourceRun, Task, User
 from app.schemas import SourceCreate, SourceHealthRead, SourceRead, SourceRunRead, SourceUpdate
@@ -239,25 +239,10 @@ def run_source(
     db.flush()
     try:
         validate_source_url(source)
-        external_task_id = enqueue_scrape_source(
-            source.key,
-            source.base_url,
-            source.source_type,
-            source_run_id=run.id,
-            task_id=task.id,
-        )
-        if external_task_id:
-            task.provider = "celery"
-            task.status = "queued"
-            task.external_id = external_task_id
-            task.result = {"message": "Scrape task queued for worker"}
-            run.status = "queued"
-            run.logs = [*run.logs, {"level": "info", "message": "Scrape task queued", "task_id": task.id}]
-        else:
-            db.delete(task)
-            db.delete(run)
-            db.flush()
-            run = execute_source_run_locally(db, source, organization_id=organization.id)
+        db.delete(task)
+        db.delete(run)
+        db.flush()
+        run = execute_source_run_locally(db, source, organization_id=organization.id)
     except Exception as exc:
         finished_at = datetime.now(UTC).replace(tzinfo=None)
         run.status = "failed"
@@ -315,25 +300,10 @@ def run_all_sources(
         db.flush()
         try:
             validate_source_url(source)
-            external_task_id = enqueue_scrape_source(
-                source.key,
-                source.base_url,
-                source.source_type,
-                source_run_id=run.id,
-                task_id=task.id,
-            )
-            if external_task_id:
-                task.provider = "celery"
-                task.status = "queued"
-                task.external_id = external_task_id
-                task.result = {"message": "Scrape task queued for worker"}
-                run.status = "queued"
-                run.logs = [*run.logs, {"level": "info", "message": "Scrape task queued", "task_id": task.id}]
-            else:
-                db.delete(task)
-                db.delete(run)
-                db.flush()
-                run = execute_source_run_locally(db, source, organization_id=organization.id)
+            db.delete(task)
+            db.delete(run)
+            db.flush()
+            run = execute_source_run_locally(db, source, organization_id=organization.id)
         except Exception as exc:
             finished_at = datetime.now(UTC).replace(tzinfo=None)
             run.status = "failed"
