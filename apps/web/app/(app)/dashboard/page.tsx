@@ -215,11 +215,11 @@ export default function DashboardPage() {
     onError: (error) => toast.error(error instanceof Error ? error.message : "No se pudo ejecutar el scraping"),
   });
 
-  const opportunityItems = opportunities.data?.items ?? [];
-  const sourceItems = sources.data ?? [];
-  const healthItems = sourceHealth.data ?? [];
-  const taskItems = tasks.data ?? [];
-  const runItems = sourceRunsOverview.data ?? [];
+  const opportunityItems = useMemo(() => opportunities.data?.items ?? [], [opportunities.data?.items]);
+  const sourceItems = useMemo(() => sources.data ?? [], [sources.data]);
+  const healthItems = useMemo(() => sourceHealth.data ?? [], [sourceHealth.data]);
+  const taskItems = useMemo(() => tasks.data ?? [], [tasks.data]);
+  const runItems = useMemo(() => sourceRunsOverview.data ?? [], [sourceRunsOverview.data]);
   const metrics = adminMetrics.data as AdminMetrics | undefined;
 
   const total = opportunityItems.length;

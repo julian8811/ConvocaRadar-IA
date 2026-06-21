@@ -63,7 +63,7 @@ export default function SourcesPage() {
   const sources = useQuery({ queryKey: ["sources"], queryFn: api.sources });
   const sourceHealth = useQuery({ queryKey: ["source-health"], queryFn: api.sourceHealth });
 
-  const healthItems = sourceHealth.data ?? [];
+  const healthItems = useMemo(() => sourceHealth.data ?? [], [sourceHealth.data]);
 
   const healthSummary = useMemo(() => {
     if (!healthItems.length) {
