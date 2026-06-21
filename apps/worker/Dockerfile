@@ -5,4 +5,4 @@ COPY apps/worker/pyproject.toml .
 COPY apps/worker/worker ./worker
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel && pip install --no-cache-dir .
 RUN python -m playwright install --with-deps chromium
-CMD ["python", "-m", "worker.entrypoint"]
+CMD ["celery", "-A", "worker.app.celery_app", "worker", "--loglevel=info"]

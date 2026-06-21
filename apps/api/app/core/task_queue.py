@@ -1,12 +1,19 @@
 from __future__ import annotations
 
 from typing import Any
+import ssl
 
 import structlog
 
 from app.core.config import get_settings
 
 logger = structlog.get_logger(__name__)
+
+
+def _redis_ssl_options(redis_url: str) -> dict[str, object]:
+    if not redis_url.startswith("rediss://"):
+        return {}
+    return {"ssl_cert_reqs": ssl.CERT_NONE}
 
 
 def enqueue_scrape_source(
@@ -28,7 +35,10 @@ def enqueue_scrape_source(
         return None
 
     try:
+        ssl_options = _redis_ssl_options(settings.redis_url)
         celery_app = Celery("convocaradar-api-producer", broker=settings.redis_url, backend=settings.redis_url)
+        if ssl_options:
+            celery_app.conf.update(broker_use_ssl=ssl_options, redis_backend_use_ssl=ssl_options)
         result = celery_app.send_task(
             "scrape_source",
             kwargs={
