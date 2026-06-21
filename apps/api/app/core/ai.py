@@ -73,7 +73,17 @@ class AIExtraction:
 
 def normalize_text(value: str | None) -> str:
     text = unescape(value or "")
+    text = re.sub(r"<style[\s\S]*?</style>", " ", text, flags=re.IGNORECASE)
+    text = re.sub(r"<script[\s\S]*?</script>", " ", text, flags=re.IGNORECASE)
+    text = re.sub(r"```[\s\S]*?```", " ", text)
     text = re.sub(r"<[^>]+>", " ", text)
+    text = re.sub(
+        r"(?im)^\s*(?:color|background-color|font-weight|font-size|display|justify-content|text-decoration|margin|padding)\s*:\s*[^;]+;?\s*$",
+        " ",
+        text,
+    )
+    text = re.sub(r"(?im)^\s*[.#][\w-]+\s*\{[^}]*\}\s*$", " ", text)
+    text = re.sub(r"(?im)^\s*\{[^}]*\}\s*$", " ", text)
     return re.sub(r"\s+", " ", text).strip()
 
 
@@ -85,6 +95,32 @@ def _normalize_for_rules(value: str | None) -> str:
 
 def _split_lines(text: str) -> list[str]:
     return [normalize_text(line) for line in text.splitlines() if normalize_text(line)]
+
+
+def _looks_like_noise_line(value: str) -> bool:
+    lowered = _normalize_for_rules(value)
+    return (
+        lowered.startswith("http://")
+        or lowered.startswith("https://")
+        or any(
+            marker in lowered
+            for marker in (
+                "color:",
+                "background-color:",
+                "font-weight:",
+                "font-size:",
+                "display:",
+                "justify-content:",
+                "text-decoration:",
+                "budgetyearscolumns",
+                "plannedopeningdate",
+                "deadlinedate",
+                "expectedgrants",
+            )
+        )
+        or "{" in value
+        or "}" in value
+    )
 
 
 def _extract_keyword_matches(text: str) -> list[str]:
@@ -128,15 +164,21 @@ def _extract_country(text: str) -> str:
 def _extract_title(text: str) -> str:
     lines = _split_lines(text)
     if lines:
-        first = lines[0]
-        if 8 <= len(first) <= 160:
-            return first
+        for line in lines[:8]:
+            if 8 <= len(line) <= 160 and not _looks_like_noise_line(line):
+                return line
     for pattern in [r"^#{1,3}\s+(.+)$", r"^[A-Z][^\n]{10,150}$"]:
         match = re.search(pattern, text, flags=re.MULTILINE)
         if match:
-            return normalize_text(match.group(1) if match.lastindex else match.group(0))[:160]
+            candidate = normalize_text(match.group(1) if match.lastindex else match.group(0))
+            if candidate and not _looks_like_noise_line(candidate):
+                return candidate[:160]
     sentences = re.split(r"(?<=[.!?])\s+", normalize_text(text))
-    return (sentences[0] if sentences else "Convocatoria detectada")[:160]
+    for sentence in sentences:
+        candidate = normalize_text(sentence)
+        if candidate and not _looks_like_noise_line(candidate):
+            return candidate[:160]
+    return "Convocatoria detectada"
 
 
 def _extract_date(text: str) -> str | None:
@@ -179,8 +221,10 @@ def _extract_summary(text: str) -> str:
     normalized = normalize_text(text)
     if not normalized:
         return "Resumen pendiente de contenido suficiente."
-    sentences = re.split(r"(?<=[.!?])\s+", normalized)
-    return " ".join(sentence for sentence in sentences[:3] if sentence)[:600]
+    sentences = [sentence for sentence in re.split(r"(?<=[.!?])\s+", normalized) if sentence and not _looks_like_noise_line(sentence)]
+    if not sentences:
+        return "Resumen pendiente de contenido suficiente."
+    return " ".join(sentences[:3])[:600]
 
 
 def _risk_flags(text: str, confidence: float) -> list[str]:
@@ -306,7 +350,7 @@ async def _call_llm(text: str) -> dict[str, Any] | None:
 
 def build_local_extraction(text: str) -> dict[str, Any]:
     normalized = normalize_text(text)
-    title = _extract_title(normalized)
+    title = _extract_title(text)
     categories = _extract_keyword_matches(normalized) or ["innovation"]
     requirements = _extract_bullets(normalized, REQUIREMENT_PATTERNS)
     documents_required = _extract_bullets(normalized, DOCUMENT_PATTERNS)

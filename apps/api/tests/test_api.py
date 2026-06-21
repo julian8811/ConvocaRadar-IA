@@ -393,6 +393,32 @@ def test_ai_structured_extraction_and_scoring() -> None:
     assert score.json()["score"] >= 50
 
 
+def test_ai_structured_extraction_ignores_scraping_noise() -> None:
+    c = client()
+    auth = {"Authorization": f"Bearer {token(c)}"}
+    response = c.post(
+        "/api/v1/ai/extract-opportunity",
+        headers=auth,
+        json={
+            "text": """
+            <style>
+              a { color: white; }
+              .box-address { display: flex; justify-content: center; }
+            </style>
+            UNESCO Call for Proposals 2027
+            International call for proposals in education and science.
+            Deadline April 8, 2027.
+            """,
+        },
+    )
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["title"] == "UNESCO Call for Proposals 2027"
+    assert "color:" not in payload["summary"]
+    assert payload["summary"]
+    assert payload["confidence"] >= 0.5
+
+
 def test_create_opportunity_enriches_incomplete_payload() -> None:
     db = SessionLocal()
     try:
