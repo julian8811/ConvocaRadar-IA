@@ -1,11 +1,34 @@
 import json
 import re
+from datetime import UTC, datetime
 from urllib.parse import urljoin
 
 from selectolax.parser import HTMLParser
 
-from worker.connectors.common import clean_text, fetch_httpx_text
+from worker.connectors.common import clean_text, fetch_httpx_text, parse_date_text
 from worker.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
+
+
+CLOSED_KEYWORDS = (
+    "closed",
+    "cerrado",
+    "application closed",
+    "call closed",
+    "closed call",
+    "cierre cerrado",
+)
+DATE_FIELDS = (
+    "close_date",
+    "closeDate",
+    "deadline",
+    "deadlineDate",
+    "deadline_date",
+    "closing_date",
+    "closingDate",
+    "endDate",
+    "dueDate",
+    "application_deadline",
+)
 
 
 class GenericHtmlConnector:
@@ -48,6 +71,33 @@ class GenericHtmlConnector:
             return json.loads(text)
         except json.JSONDecodeError:
             return None
+
+    def _candidate_close_date(self, item: dict, text: str | None = None) -> datetime | None:
+        for key in DATE_FIELDS:
+            value = item.get(key)
+            if isinstance(value, list):
+                for entry in value:
+                    parsed = parse_date_text(str(entry))
+                    if parsed:
+                        return parsed
+            elif isinstance(value, dict):
+                for nested_key in ("value", "date", "content"):
+                    nested_value = value.get(nested_key)
+                    if nested_value:
+                        parsed = parse_date_text(str(nested_value))
+                        if parsed:
+                            return parsed
+            elif value:
+                parsed = parse_date_text(str(value))
+                if parsed:
+                    return parsed
+        return parse_date_text(text)
+
+    def _is_closed(self, title: str, summary: str, raw_text: str, close_date: datetime | None) -> bool:
+        if close_date and close_date.date() < datetime.now(UTC).date():
+            return True
+        normalized = f"{title} {summary} {raw_text}".lower()
+        return any(keyword in normalized for keyword in CLOSED_KEYWORDS)
 
     def _iter_items(self, payload: object, _depth: int = 0) -> list[dict]:
         if _depth > 5:
@@ -157,6 +207,10 @@ class GenericHtmlConnector:
                 if not title or not link:
                     continue
                 summary = str(item.get("summary") or item.get("description") or title).strip()
+                close_date = self._candidate_close_date(item, summary)
+                raw_text = summary[:2500]
+                if self._is_closed(title, summary, raw_text, close_date):
+                    continue
                 candidates.append(
                     OpportunityCandidate(
                         title=title[:180],
@@ -166,8 +220,9 @@ class GenericHtmlConnector:
                         summary=summary[:700] or title,
                         categories=[str(value) for value in (item.get("categories") or [])[:4] if isinstance(value, str)],
                         topics=[str(value) for value in (item.get("topics") or [])[:4] if isinstance(value, str)],
-                        raw_text=summary[:2500],
+                        raw_text=raw_text,
                         confidence_score=0.55,
+                        close_date=close_date,
                     )
                 )
             return candidates[:50]
@@ -189,6 +244,10 @@ class GenericHtmlConnector:
                     continue
                 seen.add(link)
                 summary = str(item.get("description") or item.get("summary") or title).strip()
+                close_date = self._candidate_close_date(item, summary)
+                raw_text = summary[:2500]
+                if self._is_closed(title, summary, raw_text, close_date):
+                    continue
                 candidates.append(
                     OpportunityCandidate(
                         title=title[:180],
@@ -198,8 +257,9 @@ class GenericHtmlConnector:
                         summary=summary[:700] or title,
                         categories=[str(value) for value in (item.get("categories") or [])[:4] if isinstance(value, str)] or ["opportunity"],
                         topics=[str(value) for value in (item.get("topics") or [])[:4] if isinstance(value, str)],
-                        raw_text=summary[:2500],
+                        raw_text=raw_text,
                         confidence_score=0.72,
+                        close_date=close_date,
                     )
                 )
             if candidates:
@@ -256,6 +316,9 @@ class GenericHtmlConnector:
                 if official_url in candidates_seen:
                     continue
                 candidates_seen.add(official_url)
+                close_date = parse_date_text(text)
+                if self._is_closed(title, text, text[:2500], close_date):
+                    continue
                 candidates.append(
                     OpportunityCandidate(
                         title=title[:180],
@@ -265,6 +328,7 @@ class GenericHtmlConnector:
                         summary=text[:700] or title,
                         raw_text=text[:2500],
                         confidence_score=0.55,
+                        close_date=close_date,
                     )
                 )
         if not candidates:
@@ -299,6 +363,9 @@ class GenericHtmlConnector:
                     if official_url in candidates_seen:
                         continue
                     candidates_seen.add(official_url)
+                    close_date = parse_date_text(text)
+                    if self._is_closed(text, text, text[:2500], close_date):
+                        continue
                     candidates.append(
                         OpportunityCandidate(
                             title=text[:180],
@@ -308,9 +375,14 @@ class GenericHtmlConnector:
                             summary=text,
                             raw_text=text,
                             confidence_score=0.45,
+                            close_date=close_date,
                         )
                     )
         return candidates[:50]
 
     async def validate(self, candidate: OpportunityCandidate) -> ValidationResult:
-        return ValidationResult(ok=bool(candidate.title and candidate.official_url))
+        if not candidate.title or not candidate.official_url:
+            return ValidationResult(ok=False, reason="Missing title or URL")
+        if self._is_closed(candidate.title, candidate.summary, candidate.raw_text, candidate.close_date):
+            return ValidationResult(ok=False, reason="Opportunity appears closed")
+        return ValidationResult(ok=True)

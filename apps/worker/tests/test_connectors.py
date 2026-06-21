@@ -775,7 +775,7 @@ async def test_generic_html_connector_parses_bento_card_fixture() -> None:
       <body>
         <article class="card">
           <h3><a href="/calls/open-call-2026">Open Call 2026</a></h3>
-          <p>Funding for research and innovation projects. Deadline March 10, 2026.</p>
+          <p>Funding for research and innovation projects. Deadline March 10, 2027.</p>
         </article>
       </body>
     </html>
@@ -795,6 +795,36 @@ async def test_generic_html_connector_parses_bento_card_fixture() -> None:
     assert candidate.title == "Open Call 2026"
     assert candidate.official_url == "https://example.org/calls/open-call-2026"
     assert (await connector.validate(candidate)).ok
+
+
+@pytest.mark.asyncio
+async def test_generic_html_connector_skips_closed_calls() -> None:
+    html = """
+    <html>
+      <body>
+        <article class="card">
+          <h3><a href="/calls/closed-call-2024">Closed Call 2024</a></h3>
+          <p>This call is closed. Deadline March 10, 2024.</p>
+        </article>
+        <article class="card">
+          <h3><a href="/calls/open-call-2027">Open Call 2027</a></h3>
+          <p>Funding for research and innovation projects. Deadline March 10, 2027.</p>
+        </article>
+      </body>
+    </html>
+    """
+    connector = GenericHtmlConnector("generic-html", "https://example.org/calls")
+    raw = RawSourceResult(
+        source_key="generic-html",
+        url="https://example.org/calls",
+        content=html,
+        content_type="text/html",
+    )
+
+    candidates = await connector.parse(raw)
+
+    assert len(candidates) == 1
+    assert candidates[0].official_url == "https://example.org/calls/open-call-2027"
 
 
 @pytest.mark.asyncio
