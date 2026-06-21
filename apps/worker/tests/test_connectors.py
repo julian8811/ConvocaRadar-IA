@@ -387,6 +387,52 @@ async def test_minciencias_connector_parses_listing_fixture() -> None:
 
 
 @pytest.mark.asyncio
+async def test_minciencias_connector_skips_closed_fixture() -> None:
+    html = """
+    <html>
+      <body>
+        <table>
+          <tr>
+            <td>
+              <a href="/convocatorias/convocatoria-cerrada-2026">
+                CONVOCATORIA CERRADA 2026
+              </a>
+            </td>
+            <td>
+              Convocatoria cerrada para investigaci?n aplicada.
+              $100.000.000 Martes, Junio 16, 2026
+            </td>
+          </tr>
+          <tr>
+            <td>
+              <a href="/convocatorias/convocatoria-abierta-2027">
+                CONVOCATORIA ABIERTA 2027
+              </a>
+            </td>
+            <td>
+              Convocatoria abierta para investigaci?n aplicada.
+              $200.000.000 Martes, Junio 16, 2027
+            </td>
+          </tr>
+        </table>
+      </body>
+    </html>
+    """
+    connector = MincienciasConnector("https://minciencias.gov.co/convocatorias/todas")
+    raw = RawSourceResult(
+        source_key="minciencias",
+        url="https://minciencias.gov.co/convocatorias/todas",
+        content=html,
+        content_type="text/html",
+    )
+
+    candidates = await connector.parse(raw)
+
+    assert len(candidates) == 1
+    assert candidates[0].official_url == "https://minciencias.gov.co/convocatorias/convocatoria-abierta-2027"
+
+
+@pytest.mark.asyncio
 async def test_minciencias_connector_parses_multiple_rows_fixture() -> None:
     html = """
     <html>

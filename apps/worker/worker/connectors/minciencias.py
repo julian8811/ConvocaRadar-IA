@@ -14,6 +14,7 @@ from worker.connectors.common import clean_text, fetch_httpx_text, normalize_tex
 MINCIENCIAS_URL = "https://minciencias.gov.co/convocatorias/todas"
 TITLE_KEYWORDS = ("convocatoria", "convocatorias", "ciencia", "innovacion", "investigacion", "fondo", "programa")
 STOP_TITLES = {"inicio", "convocatorias", "convocatorias todas", "todas las convocatorias"}
+CLOSED_KEYWORDS = ("cerrada", "cerrado", "closed", "archivada", "archived", "finalizada", "finalizado")
 MONTHS_ES = {
     "enero": 1,
     "febrero": 2,
@@ -61,6 +62,11 @@ def _is_candidate_text(text: str) -> bool:
     return any(keyword in lowered for keyword in TITLE_KEYWORDS)
 
 
+def _is_closed_text(text: str) -> bool:
+    lowered = normalize_text(text)
+    return any(keyword in lowered for keyword in CLOSED_KEYWORDS)
+
+
 class MincienciasConnector:
     source_key = "minciencias"
 
@@ -105,6 +111,8 @@ class MincienciasConnector:
             summary = title
         if not _is_candidate_text(title):
             return None
+        if _is_closed_text(f"{title} {text}"):
+            return None
         return OpportunityCandidate(
             title=title[:180],
             entity="Minciencias",
@@ -146,6 +154,8 @@ class MincienciasConnector:
                 continue
             seen.add(official_url)
             text = _clean(link.parent.text() if link.parent else title)
+            if _is_closed_text(f"{title} {text}"):
+                continue
             candidates.append(
                 OpportunityCandidate(
                     title=title[:180],
@@ -169,4 +179,6 @@ class MincienciasConnector:
             return ValidationResult(ok=False, reason="Missing title or URL")
         if urlparse(candidate.official_url).netloc not in {"minciencias.gov.co", "www.minciencias.gov.co"}:
             return ValidationResult(ok=False, reason="URL is outside Minciencias")
+        if _is_closed_text(f"{candidate.title} {candidate.summary} {candidate.raw_text}"):
+            return ValidationResult(ok=False, reason="Opportunity appears closed")
         return ValidationResult(ok=True)
