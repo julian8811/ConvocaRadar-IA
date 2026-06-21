@@ -4,11 +4,11 @@ import re
 from datetime import datetime
 from urllib.parse import urljoin, urlparse
 
-from playwright.async_api import async_playwright
 from selectolax.parser import HTMLParser
 
+from worker.config import get_settings
 from worker.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
-from worker.connectors.common import clean_text, fetch_httpx_text, launch_chromium, parse_date_text
+from worker.connectors.common import clean_text, fetch_httpx_text, render_page_html
 
 
 TITLE_KEYWORDS = (
@@ -26,6 +26,9 @@ SOURCE_ENTITIES = {
     "innovamos-global-innovation-fund": "Innovamos - Global Innovation Fund",
     "innovamos-fid": "Innovamos - Fondo para la Innovacion en el Desarrollo",
 }
+JS_RENDER_MARKERS = ('ng-app="nosune"', "call.model")
+RENDERED_MARKERS = ("txt-organization", "openClose-deadline", "wrap-deadline", "carousel-content", "globalinnovation.fund")
+INNOVAMOS_RENDER_SELECTOR = "h1, .txt-organization, .openClose-deadline, .wrap-deadline"
 
 
 def _clean(value: str | None) -> str:
@@ -80,6 +83,20 @@ def _categories_from_text(text: str) -> list[str]:
     return categories[:4]
 
 
+def _content_is_rendered(content: str) -> bool:
+    return any(marker in content for marker in RENDERED_MARKERS)
+
+
+def _content_needs_js_render(content: str) -> bool:
+    if not content:
+        return True
+    if _content_is_rendered(content):
+        return False
+    if len(content) < 5000:
+        return True
+    return any(marker in content for marker in JS_RENDER_MARKERS)
+
+
 class InnovamosConnector:
     def __init__(self, source_key: str, base_url: str | None = None) -> None:
         self.source_key = source_key
@@ -88,21 +105,37 @@ class InnovamosConnector:
     def _source_entity(self) -> str:
         return SOURCE_ENTITIES.get(self.source_key, "Innovamos")
 
-    async def _render_page(self, url: str) -> tuple[str, str, str]:
-        async with async_playwright() as playwright:
-            browser = await launch_chromium(playwright)
-            try:
-                page = await browser.new_page()
-                await page.goto(url, wait_until="networkidle", timeout=60000)
-                await page.wait_for_timeout(2000)
-                return page.url, await page.content(), "text/html"
-            finally:
-                await browser.close()
-
     async def fetch(self) -> RawSourceResult:
-        final_url, content, content_type = await fetch_httpx_text(self.base_url, fallback_content_type="text/html")
-        if len(content) < 5000 or "ng-app=\"nosune\"" in content or "call.model" in content:
-            final_url, content, content_type = await self._render_page(self.base_url)
+        settings = get_settings()
+        final_url = self.base_url
+        content = ""
+        content_type = "text/html"
+        try:
+            final_url, content, content_type = await fetch_httpx_text(
+                self.base_url,
+                fallback_content_type="text/html",
+                playwright_fallback=False,
+                retries=1,
+                timeout_seconds=min(settings.scraping_timeout_seconds, 20),
+            )
+        except Exception:
+            content = ""
+
+        if _content_needs_js_render(content):
+            try:
+                final_url, content, content_type = await render_page_html(
+                    self.base_url,
+                    wait_selector=INNOVAMOS_RENDER_SELECTOR,
+                    timeout_ms=min(settings.scraping_timeout_seconds * 1500, 45000),
+                    wait_selector_timeout_ms=8000,
+                    post_wait_ms=800,
+                )
+            except Exception:
+                if content and len(content) > 300:
+                    pass
+                else:
+                    raise
+
         return RawSourceResult(source_key=self.source_key, url=final_url, content=content, content_type=content_type)
 
     def _candidate_from_rendered_page(self, raw: RawSourceResult) -> OpportunityCandidate | None:
@@ -232,8 +265,7 @@ class InnovamosConnector:
         )
 
     async def parse(self, raw: RawSourceResult) -> list[OpportunityCandidate]:
-        rendered_markers = ("txt-organization", "openClose-deadline", "wrap-deadline", "carousel-content", "globalinnovation.fund")
-        if any(marker in raw.content for marker in rendered_markers):
+        if _content_is_rendered(raw.content):
             candidate = self._candidate_from_rendered_page(raw)
             if candidate:
                 return [candidate]
