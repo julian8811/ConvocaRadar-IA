@@ -12,10 +12,57 @@ import httpx
 from worker.config import get_settings
 
 CHROMIUM_CONTAINER_ARGS = ["--no-sandbox", "--disable-dev-shm-usage"]
+PLAYWRIGHT_BLOCKED_RESOURCE_TYPES = {"image", "media", "font"}
 
 
 async def launch_chromium(playwright, *, headless: bool = True):
     return await playwright.chromium.launch(headless=headless, args=CHROMIUM_CONTAINER_ARGS)
+
+
+async def render_page_html(
+    url: str,
+    *,
+    wait_until: str = "domcontentloaded",
+    timeout_ms: int | None = None,
+    wait_selector: str | None = None,
+    wait_selector_timeout_ms: int = 8000,
+    post_wait_ms: int = 500,
+    user_agent: str | None = None,
+) -> tuple[str, str, str]:
+    settings = get_settings()
+    parsed_url = urlparse(url)
+    if parsed_url.scheme not in {"http", "https"} or _is_private_host(parsed_url.hostname or ""):
+        raise ValueError(f"Blocked unsafe URL: {url}")
+    request_user_agent = user_agent or settings.scraping_user_agent
+    navigation_timeout_ms = timeout_ms or settings.scraping_timeout_seconds * 1000
+    from playwright.async_api import async_playwright
+
+    async with async_playwright() as playwright:
+        browser = await launch_chromium(playwright)
+        try:
+            page = await browser.new_page(user_agent=request_user_agent)
+
+            async def _route_handler(route) -> None:
+                if route.request.resource_type in PLAYWRIGHT_BLOCKED_RESOURCE_TYPES:
+                    await route.abort()
+                    return
+                await route.continue_()
+
+            await page.route("**/*", _route_handler)
+            await page.goto(url, wait_until=wait_until, timeout=navigation_timeout_ms)
+            if wait_selector:
+                try:
+                    await page.wait_for_selector(wait_selector, timeout=wait_selector_timeout_ms)
+                except Exception:
+                    pass
+            if post_wait_ms > 0:
+                await page.wait_for_timeout(post_wait_ms)
+            final_url = page.url
+            if _is_private_host(urlparse(final_url).hostname or ""):
+                raise ValueError(f"Blocked redirect to unsafe URL: {final_url}")
+            return final_url, await page.content(), "text/html"
+        finally:
+            await browser.close()
 
 
 def clean_text(value: str | None) -> str:
@@ -167,6 +214,8 @@ async def fetch_httpx_text(
     payload: dict[str, object] | None = None,
     retries: int = 2,
     fallback_content_type: str = "text/html",
+    playwright_fallback: bool = True,
+    timeout_seconds: int | None = None,
 ) -> tuple[str, str, str]:
     settings = get_settings()
     request_headers = {"User-Agent": settings.scraping_user_agent}
@@ -175,11 +224,12 @@ async def fetch_httpx_text(
     parsed_url = urlparse(url)
     if parsed_url.scheme not in {"http", "https"} or _is_private_host(parsed_url.hostname or ""):
         raise ValueError(f"Blocked unsafe URL: {url}")
+    request_timeout = timeout_seconds or settings.scraping_timeout_seconds
     last_error: Exception | None = None
     for attempt in range(max(retries, 1)):
         try:
             async with httpx.AsyncClient(
-                timeout=settings.scraping_timeout_seconds,
+                timeout=request_timeout,
                 headers=request_headers,
                 follow_redirects=True,
             ) as client:
@@ -193,23 +243,15 @@ async def fetch_httpx_text(
             last_error = exc
             if attempt + 1 >= retries:
                 break
+    if not playwright_fallback:
+        raise last_error or RuntimeError(f"Failed to fetch {url}")
     if _is_private_host(parsed_url.hostname or ""):
         raise last_error or ValueError(f"Blocked unsafe URL: {url}")
-    from playwright.async_api import async_playwright
-
-    async with async_playwright() as playwright:
-        browser = await launch_chromium(playwright)
-        try:
-            page = await browser.new_page(user_agent=request_headers["User-Agent"])
-            await page.goto(url, wait_until="domcontentloaded", timeout=settings.scraping_timeout_seconds * 1000)
-            await page.wait_for_timeout(1500)
-            final_url = page.url
-            if _is_private_host(urlparse(final_url).hostname or ""):
-                raise ValueError(f"Blocked redirect to unsafe URL: {final_url}")
-            return final_url, await page.content(), fallback_content_type
-        finally:
-            await browser.close()
-    raise last_error or RuntimeError(f"Failed to fetch {url}")
+    return await render_page_html(
+        url,
+        user_agent=request_headers["User-Agent"],
+        timeout_ms=request_timeout * 1000,
+    )
 
 
 async def fetch_httpx_bytes(
