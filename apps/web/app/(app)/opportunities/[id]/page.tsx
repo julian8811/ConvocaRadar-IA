@@ -25,6 +25,7 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ErrorState, LoadingState } from "@/components/ui/state";
 import { api, downloadOpportunityDocument, uploadOpportunityDocument } from "@/lib/api";
+import { decodeVisibleText } from "@/lib/text";
 import type { OpportunityDocument } from "@/lib/types";
 
 const workflowStatuses = ["review", "apply", "discarded", "submitted", "won", "lost"];
@@ -55,19 +56,6 @@ function isValidExternalUrl(value: string | null | undefined) {
   } catch {
     return false;
   }
-}
-
-function decodeText(value: string) {
-  return value
-    .replace(/&#(\d+);/g, (_, code) => String.fromCharCode(Number(code)))
-    .replace(/&#x([0-9a-fA-F]+);/g, (_, code) => String.fromCharCode(Number.parseInt(code, 16)))
-    .replace(/&amp;/g, "&")
-    .replace(/&lt;/g, "<")
-    .replace(/&gt;/g, ">")
-    .replace(/&quot;/g, '"')
-    .replace(/&#39;/g, "'")
-    .replace(/\s+/g, " ")
-    .trim();
 }
 
 function isNoiseTitle(title: string) {
@@ -191,7 +179,7 @@ export default function OpportunityDetailPage() {
               </Badge>
             ))}
           </div>
-          <h1 className="max-w-4xl text-3xl font-semibold tracking-tight text-slate-950 dark:text-white">{decodeText(item.title)}</h1>
+          <h1 className="max-w-4xl text-3xl font-semibold tracking-tight text-slate-950 dark:text-white">{decodeVisibleText(item.title, "Convocatoria sin título")}</h1>
           <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
             {item.entity} · {item.country} · Fuente: {item.source_id ? "Con fuente" : "Sin fuente"} · Cierre:{" "}
             {item.close_date ? new Date(item.close_date).toLocaleDateString("es-CO") : "Sin fecha"}
@@ -234,7 +222,9 @@ export default function OpportunityDetailPage() {
                 Resumen de IA
               </CardTitle>
             </CardHeader>
-            <CardContent className="pt-5 text-sm leading-6 text-slate-700 dark:text-slate-300">{decodeText(item.summary || "Sin resumen disponible.")}</CardContent>
+            <CardContent className="pt-5 text-sm leading-6 text-slate-700 dark:text-slate-300">
+              {decodeVisibleText(item.summary, "Sin resumen disponible.")}
+            </CardContent>
           </Card>
 
           <InfoList title="Requisitos" icon={FileCheck} items={item.requirements} empty="No se han identificado requisitos." />
@@ -361,7 +351,7 @@ function DocumentsCard({
           {documents.map((document) => (
             <div key={document.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card p-3">
               <div className="min-w-0">
-                <p className="truncate text-sm font-medium text-slate-950 dark:text-white">{decodeText(document.file_name)}</p>
+                <p className="truncate text-sm font-medium text-slate-950 dark:text-white">{decodeVisibleText(document.file_name, "Documento")}</p>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
                   {document.file_type} · {new Date(document.created_at).toLocaleString("es-CO")}
                 </p>

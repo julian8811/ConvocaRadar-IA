@@ -18,10 +18,27 @@ APC_URLS = [
 
 TITLE_KEYWORDS = ("convocatoria", "cooperacion", "voluntariado", "ayuda", "grant", "call")
 CLOSED_KEYWORDS = ("cerrada", "cerrado", "closed", "archivada", "archived", "finalizada")
+GENERIC_TITLE_KEYWORDS = {
+    normalize_text(value)
+    for value in (
+        "aqui",
+        "aquí",
+        "lee mas sobre",
+        "lee más sobre",
+        "formato de postulación",
+        "preguntas frecuentes",
+        "siguiente página",
+        "convocatorias",
+        "cooperación triangular",
+        "aviso de confidencialidad",
+        "mapa del sitio",
+        "suscribirse",
+    )
+}
 
 
 def _clean(value: str | None) -> str:
-    return re.sub(r"\s+", " ", value or "").strip()
+    return clean_text(value)
 
 
 def _is_candidate_text(value: str) -> bool:
@@ -32,6 +49,15 @@ def _is_candidate_text(value: str) -> bool:
 def _is_closed_text(value: str) -> bool:
     lowered = normalize_text(value)
     return any(keyword in lowered for keyword in CLOSED_KEYWORDS)
+
+
+def _is_generic_title(value: str) -> bool:
+    lowered = normalize_text(value)
+    if not lowered:
+        return True
+    if lowered in GENERIC_TITLE_KEYWORDS:
+        return True
+    return any(lowered.startswith(keyword) for keyword in GENERIC_TITLE_KEYWORDS)
 
 
 class ApcColombiaConnector:
@@ -52,6 +78,10 @@ class ApcColombiaConnector:
         title = clean_text(anchor.text())
         href = anchor.attributes.get("href") or ""
         if not title or not href:
+            return None
+        if _is_generic_title(title):
+            return None
+        if "color:" in normalize_text(title) or "background-color:" in normalize_text(title):
             return None
         lowered = normalize_text(f"{title} {container_text}")
         if not _is_candidate_text(lowered):
@@ -106,7 +136,7 @@ class ApcColombiaConnector:
             tree = HTMLParser(str(page["content"]))
             for link in tree.css("a[href]"):
                 title = clean_text(link.text())
-                if not title or not _is_candidate_text(title):
+                if not title or _is_generic_title(title) or not _is_candidate_text(title):
                     continue
                 official_url = urljoin(page_url, link.attributes.get("href") or "")
                 if official_url in seen:

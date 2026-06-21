@@ -284,12 +284,66 @@ def run_all_sources(
     )
     runs: list[SourceRun] = []
     for source in sources:
-        run = execute_source_run_locally(db, source, organization_id=organization.id)
+        started_at = datetime.now(UTC).replace(tzinfo=None)
+        run = SourceRun(
+            source_id=source.id,
+            status="running",
+            started_at=started_at,
+            logs=[{"level": "info", "message": "Scraping MVP started"}],
+        )
+        source.last_run_at = started_at
+        db.add(run)
+        db.flush()
+        task = Task(
+            organization_id=organization.id,
+            source_run_id=run.id,
+            task_type="scrape_source",
+            provider="local",
+            status="running",
+            started_at=started_at,
+            payload=task_payload(source_key=source.key, base_url=source.base_url, source_type=source.source_type),
+        )
+        db.add(task)
+        db.flush()
+        try:
+            validate_source_url(source)
+            external_task_id = enqueue_scrape_source(
+                source.key,
+                source.base_url,
+                source.source_type,
+                source_run_id=run.id,
+                task_id=task.id,
+            )
+            if external_task_id:
+                task.provider = "celery"
+                task.status = "queued"
+                task.external_id = external_task_id
+                task.result = {"message": "Scrape task queued for worker"}
+                run.status = "queued"
+                run.logs = [*run.logs, {"level": "info", "message": "Scrape task queued", "task_id": task.id}]
+            else:
+                db.delete(task)
+                db.delete(run)
+                db.flush()
+                run = execute_source_run_locally(db, source, organization_id=organization.id)
+        except Exception as exc:
+            finished_at = datetime.now(UTC).replace(tzinfo=None)
+            run.status = "failed"
+            run.finished_at = finished_at
+            run.items_failed = 1
+            run.error_message = str(exc)
+            run.logs = [*run.logs, {"level": "error", "message": str(exc)}]
+            task.status = "failed"
+            task.finished_at = finished_at
+            task.error_message = str(exc)
+            task.result = {"items_failed": 1}
+            source.last_error = str(exc)
         audit(db, "run_source", "source_run", user, run.id)
         runs.append(run)
     db.commit()
     for run in runs:
         db.refresh(run)
+    db.commit()
     return runs
 
 

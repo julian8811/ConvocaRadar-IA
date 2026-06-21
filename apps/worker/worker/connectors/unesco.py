@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 from urllib.parse import urljoin, urlparse
+from urllib.parse import unquote
 
 from selectolax.parser import HTMLParser
 
@@ -16,10 +17,17 @@ UNESCO_HOSTS = {"unesco.org", "www.unesco.org"}
 def _title_from(container) -> str:
     heading = container.css_first("h1, h2, h3, h4")
     if heading:
-        return clean_text(heading.text())
+        title = clean_text(heading.text())
+        if "@" in title or title.lower().startswith("mailto:"):
+            return ""
+        return title
     anchor = container.css_first("a[href]")
     if anchor:
-        return clean_text(anchor.text())
+        href = anchor.attributes.get("href") or ""
+        title = clean_text(anchor.text())
+        if href.lower().startswith("mailto:") or "@" in title:
+            return ""
+        return title
     return ""
 
 
@@ -52,10 +60,12 @@ class UNESCOConnector:
                 title = clean_text(anchor.text()) if anchor else _title_from(container)
                 href = anchor.attributes.get("href") if anchor else ""
                 text = clean_text(container.text())
+                if not title or "@" in title or href.lower().startswith("mailto:"):
+                    continue
                 lowered = f"{title} {text}".lower()
                 if not title or not href or not any(keyword in lowered for keyword in keywords):
                     continue
-                official_url = urljoin(raw.url, href)
+                official_url = urljoin(raw.url, unquote(href))
                 if official_url in seen:
                     continue
                 seen.add(official_url)
@@ -81,6 +91,8 @@ class UNESCOConnector:
             page_text = clean_text(tree.text())
             if any(keyword in page_text.lower() for keyword in keywords):
                 title = clean_text(_title_from(tree) if hasattr(tree, "css_first") else "") or "UNESCO Call for Proposals"
+                if "@" in title or title.lower().startswith("mailto:"):
+                    title = "UNESCO Call for Proposals"
                 close_date = parse_date_text(page_text)
                 if close_date and close_date.date() < datetime.now(UTC).date():
                     return []

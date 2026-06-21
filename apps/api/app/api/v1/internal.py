@@ -10,7 +10,7 @@ from app.core.task_queue import enqueue_scrape_source
 from app.db.session import get_db
 from app.models import Alert, AuditLog, Opportunity, Source, SourceRun, Task
 from app.schemas import OpportunityCreate, SourceRunComplete
-from app.services import candidate_external_id, create_opportunity, create_source_health_alert, execute_source_run_locally
+from app.services import candidate_external_id, create_opportunity, create_source_health_alert, execute_source_run_locally, validate_source_url
 
 router = APIRouter(prefix="/internal", tags=["internal"])
 
@@ -54,53 +54,66 @@ def complete_source_run(
 
     created = 0
     updated = 0
+    failed_items = 0
     for candidate in payload.items:
-        external_id = candidate_external_id(source, candidate.official_url, candidate.title)
-        existing_opportunity = db.scalar(
-            select(Opportunity).where(
-                Opportunity.source_id == source.id,
-                Opportunity.external_id == external_id,
-                (
-                    (Opportunity.organization_id == source.organization_id)
-                    if source.organization_id
-                    else Opportunity.organization_id.is_(None)
-                ),
+        try:
+            external_id = candidate_external_id(source, candidate.official_url, candidate.title)
+            existing_opportunity = db.scalar(
+                select(Opportunity).where(
+                    Opportunity.source_id == source.id,
+                    Opportunity.external_id == external_id,
+                    (
+                        (Opportunity.organization_id == source.organization_id)
+                        if source.organization_id
+                        else Opportunity.organization_id.is_(None)
+                    ),
+                )
             )
-        )
-        opportunity = create_opportunity(
-            db,
-            OpportunityCreate(
-                source_id=source.id,
-                external_id=external_id,
-                title=candidate.title,
-                entity=candidate.entity or source.name,
-                country=candidate.country or source.country,
-                categories=candidate.categories or source.category,
-                topics=candidate.topics,
-                summary=candidate.summary,
-                description=candidate.summary,
-                raw_text=candidate.raw_text,
-                official_url=candidate.official_url,
-                open_date=candidate.open_date,
-                close_date=candidate.close_date,
-                funding_amount_raw=candidate.funding_amount_raw,
-                requirements=candidate.requirements,
-                confidence_score=candidate.confidence_score,
+            create_opportunity(
+                db,
+                OpportunityCreate(
+                    source_id=source.id,
+                    external_id=external_id,
+                    title=candidate.title,
+                    entity=candidate.entity or source.name,
+                    country=candidate.country or source.country,
+                    categories=candidate.categories or source.category,
+                    topics=candidate.topics,
+                    summary=candidate.summary,
+                    description=candidate.summary,
+                    raw_text=candidate.raw_text,
+                    official_url=candidate.official_url,
+                    open_date=candidate.open_date,
+                    close_date=candidate.close_date,
+                    funding_amount_raw=candidate.funding_amount_raw,
+                    requirements=candidate.requirements,
+                    confidence_score=candidate.confidence_score,
+                ),
+                organization_id=source.organization_id,
             ),
-            organization_id=source.organization_id,
-        )
-        db.flush()
-        if existing_opportunity:
-            updated += 1
-        else:
-            created += 1
+            db.flush()
+            if existing_opportunity:
+                updated += 1
+            else:
+                created += 1
+        except Exception as exc:
+            failed_items += 1
+            run.logs = [
+                *run.logs,
+                {
+                    "level": "warning",
+                    "message": "Candidate skipped during persistence",
+                    "title": candidate.title,
+                    "error": str(exc),
+                },
+            ]
 
     run.status = "success"
     run.finished_at = finished_at
     run.items_found = payload.items_found
     run.items_created = created
     run.items_updated = updated
-    run.items_failed = max(payload.items_invalid or (payload.items_found - payload.items_valid), 0)
+    run.items_failed = max(payload.items_invalid or (payload.items_found - payload.items_valid), 0) + failed_items
     run.logs = [
         *run.logs,
         *payload.logs,
@@ -110,6 +123,7 @@ def complete_source_run(
             "items_valid": payload.items_valid,
             "items_created": created,
             "items_updated": updated,
+            "items_failed": run.items_failed,
         },
     ]
     source.last_success_at = finished_at
@@ -138,10 +152,62 @@ def run_enabled_sources(db: Session = Depends(get_db)) -> dict[str, int]:
     runs_created = 0
     failed = 0
     for source in sources:
-        run = execute_source_run_locally(db, source, organization_id=source.organization_id)
-        runs_created += 1
-        if run.status == "failed":
+        started_at = datetime.now(UTC).replace(tzinfo=None)
+        run = SourceRun(
+            source_id=source.id,
+            status="running",
+            started_at=started_at,
+            logs=[{"level": "info", "message": "Scraping MVP started"}],
+        )
+        source.last_run_at = started_at
+        db.add(run)
+        db.flush()
+        task = Task(
+            organization_id=source.organization_id,
+            source_run_id=run.id,
+            task_type="scrape_source",
+            provider="local",
+            status="running",
+            started_at=started_at,
+            payload={"source_key": source.key, "base_url": source.base_url, "source_type": source.source_type},
+        )
+        db.add(task)
+        db.flush()
+        try:
+            validate_source_url(source)
+            external_id = enqueue_scrape_source(
+                source.key,
+                source.base_url,
+                source.source_type,
+                source_run_id=run.id,
+                task_id=task.id,
+            )
+            if external_id:
+                task.provider = "celery"
+                task.status = "queued"
+                task.external_id = external_id
+                task.result = {"message": "Scrape task queued for worker"}
+                run.status = "queued"
+                run.logs = [*run.logs, {"level": "info", "message": "Scrape task queued", "task_id": task.id}]
+            else:
+                db.delete(task)
+                db.delete(run)
+                db.flush()
+                run = execute_source_run_locally(db, source, organization_id=source.organization_id)
+        except Exception as exc:
+            finished_at = datetime.now(UTC).replace(tzinfo=None)
+            run.status = "failed"
+            run.finished_at = finished_at
+            run.items_failed = 1
+            run.error_message = str(exc)
+            run.logs = [*run.logs, {"level": "error", "message": str(exc)}]
+            task.status = "failed"
+            task.finished_at = finished_at
+            task.error_message = str(exc)
+            task.result = {"items_failed": 1}
+            source.last_error = str(exc)
             failed += 1
+        runs_created += 1
         db.add(
             AuditLog(
                 organization_id=source.organization_id,

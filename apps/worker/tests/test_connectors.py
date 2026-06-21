@@ -962,6 +962,36 @@ async def test_generic_html_connector_skips_closed_calls() -> None:
 
 
 @pytest.mark.asyncio
+async def test_generic_html_connector_skips_css_noise_cards() -> None:
+    html = """
+    <html>
+      <body>
+        <article class="card">
+          <h3><a href="/calls/noise">a { color: white; } .box-address { display: flex; }</a></h3>
+          <p>.caja1:hover, .caja2:hover { border: white 10px double; }</p>
+        </article>
+        <article class="card">
+          <h3><a href="/calls/open-call-2027">Open Call 2027</a></h3>
+          <p>Funding for research and innovation projects. Deadline March 10, 2027.</p>
+        </article>
+      </body>
+    </html>
+    """
+    connector = GenericHtmlConnector("generic-html", "https://example.org/calls")
+    raw = RawSourceResult(
+        source_key="generic-html",
+        url="https://example.org/calls",
+        content=html,
+        content_type="text/html",
+    )
+
+    candidates = await connector.parse(raw)
+
+    assert len(candidates) == 1
+    assert candidates[0].official_url == "https://example.org/calls/open-call-2027"
+
+
+@pytest.mark.asyncio
 async def test_generic_html_connector_parses_opportunity_card_fixture() -> None:
     html = """
     <html>

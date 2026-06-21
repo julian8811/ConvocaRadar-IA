@@ -5,7 +5,7 @@ from urllib.parse import urljoin
 
 from selectolax.parser import HTMLParser
 
-from worker.connectors.common import clean_text, fetch_httpx_text, parse_date_text
+from worker.connectors.common import clean_text, fetch_httpx_text, looks_like_noise_text, parse_date_text
 from worker.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
 
 
@@ -97,7 +97,7 @@ class GenericHtmlConnector:
         if close_date and close_date.date() < datetime.now(UTC).date():
             return True
         normalized = f"{title} {summary} {raw_text}".lower()
-        return any(keyword in normalized for keyword in CLOSED_KEYWORDS)
+        return any(keyword in normalized for keyword in CLOSED_KEYWORDS) or looks_like_noise_text(normalized)
 
     def _iter_items(self, payload: object, _depth: int = 0) -> list[dict]:
         if _depth > 5:
@@ -290,6 +290,8 @@ class GenericHtmlConnector:
                 lowered = f"{title} {text}".lower()
                 if not title or not href:
                     continue
+                if looks_like_noise_text(title) or looks_like_noise_text(text):
+                    continue
                 if not any(
                     word in lowered
                     for word in [
@@ -338,6 +340,8 @@ class GenericHtmlConnector:
                 if not text or not href:
                     continue
                 lowered = text.lower()
+                if looks_like_noise_text(text):
+                    continue
                 if any(
                     word in lowered
                     for word in [
