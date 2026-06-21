@@ -5,9 +5,8 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_organization, get_current_user
-from app.core.task_queue import task_payload
 from app.db.session import get_db
-from app.models import Organization, Source, SourceRun, Task, User
+from app.models import Organization, Source, SourceRun, User
 from app.schemas import SourceCreate, SourceHealthRead, SourceRead, SourceRunRead, SourceUpdate
 from app.services import audit, execute_source_run_locally, validate_source_url
 
@@ -216,45 +215,7 @@ def run_source(
     db: Session = Depends(get_db),
 ) -> SourceRun:
     source = _get_source_for_org(db, source_id, organization)
-    started_at = datetime.now(UTC).replace(tzinfo=None)
-    run = SourceRun(
-        source_id=source.id,
-        status="running",
-        started_at=started_at,
-        logs=[{"level": "info", "message": "Scraping MVP started"}],
-    )
-    source.last_run_at = started_at
-    db.add(run)
-    db.flush()
-    task = Task(
-        organization_id=organization.id,
-        source_run_id=run.id,
-        task_type="scrape_source",
-        provider="local",
-        status="running",
-        started_at=started_at,
-        payload=task_payload(source_key=source.key, base_url=source.base_url, source_type=source.source_type),
-    )
-    db.add(task)
-    db.flush()
-    try:
-        validate_source_url(source)
-        db.delete(task)
-        db.delete(run)
-        db.flush()
-        run = execute_source_run_locally(db, source, organization_id=organization.id)
-    except Exception as exc:
-        finished_at = datetime.now(UTC).replace(tzinfo=None)
-        run.status = "failed"
-        run.finished_at = finished_at
-        run.items_failed = 1
-        run.error_message = str(exc)
-        run.logs = [*run.logs, {"level": "error", "message": str(exc)}]
-        task.status = "failed"
-        task.finished_at = finished_at
-        task.error_message = str(exc)
-        task.result = {"items_failed": 1}
-        source.last_error = str(exc)
+    run = execute_source_run_locally(db, source, organization_id=organization.id)
     audit(db, "run_source", "source_run", user, run.id)
     db.commit()
     db.refresh(run)
@@ -277,45 +238,7 @@ def run_all_sources(
     )
     runs: list[SourceRun] = []
     for source in sources:
-        started_at = datetime.now(UTC).replace(tzinfo=None)
-        run = SourceRun(
-            source_id=source.id,
-            status="running",
-            started_at=started_at,
-            logs=[{"level": "info", "message": "Scraping MVP started"}],
-        )
-        source.last_run_at = started_at
-        db.add(run)
-        db.flush()
-        task = Task(
-            organization_id=organization.id,
-            source_run_id=run.id,
-            task_type="scrape_source",
-            provider="local",
-            status="running",
-            started_at=started_at,
-            payload=task_payload(source_key=source.key, base_url=source.base_url, source_type=source.source_type),
-        )
-        db.add(task)
-        db.flush()
-        try:
-            validate_source_url(source)
-            db.delete(task)
-            db.delete(run)
-            db.flush()
-            run = execute_source_run_locally(db, source, organization_id=organization.id)
-        except Exception as exc:
-            finished_at = datetime.now(UTC).replace(tzinfo=None)
-            run.status = "failed"
-            run.finished_at = finished_at
-            run.items_failed = 1
-            run.error_message = str(exc)
-            run.logs = [*run.logs, {"level": "error", "message": str(exc)}]
-            task.status = "failed"
-            task.finished_at = finished_at
-            task.error_message = str(exc)
-            task.result = {"items_failed": 1}
-            source.last_error = str(exc)
+        run = execute_source_run_locally(db, source, organization_id=organization.id)
         audit(db, "run_source", "source_run", user, run.id)
         runs.append(run)
     db.commit()
