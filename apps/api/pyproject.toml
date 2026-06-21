@@ -35,7 +35,7 @@ dev = [
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]
-pythonpath = ["."]
+pythonpath = [".", "../worker"]
 
 [tool.ruff]
 line-length = 100
