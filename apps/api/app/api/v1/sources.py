@@ -80,7 +80,7 @@ def _get_source_for_org(db: Session, source_id: str, organization: Organization)
 
 
 def _source_health(db: Session, source: Source) -> SourceHealthRead:
-    recent_runs = list(
+    raw_recent_runs = list(
         db.scalars(
             select(SourceRun)
             .where(SourceRun.source_id == source.id)
@@ -88,14 +88,16 @@ def _source_health(db: Session, source: Source) -> SourceHealthRead:
             .limit(10)
         )
     )
+    recent_runs = [run for run in raw_recent_runs if run.status in {"success", "failed"}]
     failures = sum(1 for run in recent_runs if run.status == "failed")
     recent_items_found = sum(run.items_found for run in recent_runs)
     recent_items_created = sum(run.items_created for run in recent_runs)
     recent_items_updated = sum(run.items_updated for run in recent_runs)
-    last_run_status = recent_runs[0].status if recent_runs else None
+    last_run_status = raw_recent_runs[0].status if raw_recent_runs else None
     last_run_duration_seconds = None
-    if recent_runs and recent_runs[0].started_at and recent_runs[0].finished_at:
-        last_run_duration_seconds = max((recent_runs[0].finished_at - recent_runs[0].started_at).total_seconds(), 0.0)
+    last_completed_run = recent_runs[0] if recent_runs else None
+    if last_completed_run and last_completed_run.started_at and last_completed_run.finished_at:
+        last_run_duration_seconds = max((last_completed_run.finished_at - last_completed_run.started_at).total_seconds(), 0.0)
     successful_runs = sum(1 for run in recent_runs if run.status == "success")
     run_count = len(recent_runs)
     success_rate = round((successful_runs / run_count) * 100, 2) if run_count else 0.0
@@ -103,7 +105,9 @@ def _source_health(db: Session, source: Source) -> SourceHealthRead:
     average_items_found = round(recent_items_found / run_count, 2) if run_count else 0.0
     days_since_last_success = _days_since_last_success(recent_runs, source)
     stale_days = _health_window_days(source)
-    if not recent_runs:
+    if not raw_recent_runs:
+        status = "idle"
+    elif not recent_runs:
         status = "idle"
     elif recent_runs[0].status == "failed":
         status = "failing"
@@ -112,7 +116,11 @@ def _source_health(db: Session, source: Source) -> SourceHealthRead:
         or (days_since_last_success is not None and days_since_last_success >= stale_days * 2)
     ):
         status = "failing"
-    elif failures > 0 or (days_since_last_success is not None and days_since_last_success >= stale_days):
+    elif (
+        success_rate < 60
+        or (average_items_found <= 0 and run_count >= 2)
+        or (days_since_last_success is not None and days_since_last_success >= stale_days)
+    ):
         status = "degraded"
     else:
         status = "healthy"

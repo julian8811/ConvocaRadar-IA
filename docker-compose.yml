@@ -39,7 +39,8 @@ services:
 
   api:
     build:
-      context: ./apps/api
+      context: .
+      dockerfile: apps/api/Dockerfile
     env_file: .env.example
     environment:
       DATABASE_URL: postgresql+psycopg://convocaradar:convocaradar@postgres:5432/convocaradar
@@ -59,7 +60,8 @@ services:
 
   worker:
     build:
-      context: ./apps/worker
+      context: .
+      dockerfile: apps/worker/Dockerfile
     env_file: .env.example
     environment:
       DATABASE_URL: postgresql+psycopg://convocaradar:convocaradar@postgres:5432/convocaradar
@@ -79,7 +81,8 @@ services:
 
   worker-beat:
     build:
-      context: ./apps/worker
+      context: .
+      dockerfile: apps/worker/Dockerfile
     env_file: .env.example
     environment:
       DATABASE_URL: postgresql+psycopg://convocaradar:convocaradar@postgres:5432/convocaradar

@@ -2,7 +2,8 @@ services:
   - type: web
     name: convocaradar-api
     env: docker
-    rootDir: apps/api
+    rootDir: .
+    dockerfilePath: apps/api/Dockerfile
     plan: free
     autoDeploy: true
     healthCheckPath: /api/v1/health
@@ -55,7 +56,8 @@ services:
   - type: worker
     name: convocaradar-worker
     env: docker
-    rootDir: apps/worker
+    rootDir: .
+    dockerfilePath: apps/worker/Dockerfile
     plan: free
     autoDeploy: true
     envVars:
