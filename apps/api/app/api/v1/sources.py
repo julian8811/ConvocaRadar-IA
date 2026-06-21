@@ -87,7 +87,7 @@ def _source_health(db: Session, source: Source) -> SourceHealthRead:
             .limit(10)
         )
     )
-    recent_runs = [run for run in raw_recent_runs if run.status in {"success", "failed"}]
+    recent_runs = [run for run in raw_recent_runs if run.status in {"success", "failed", "degraded"}]
     failures = sum(1 for run in recent_runs if run.status == "failed")
     recent_items_found = sum(run.items_found for run in recent_runs)
     recent_items_created = sum(run.items_created for run in recent_runs)
@@ -110,6 +110,8 @@ def _source_health(db: Session, source: Source) -> SourceHealthRead:
         status = "idle"
     elif recent_runs[0].status == "failed":
         status = "failing"
+    elif recent_runs[0].status == "degraded":
+        status = "degraded"
     elif (
         (failure_rate >= 60 and average_items_found <= 1)
         or (days_since_last_success is not None and days_since_last_success >= stale_days * 2)

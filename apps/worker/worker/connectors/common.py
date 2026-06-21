@@ -11,6 +11,12 @@ import httpx
 
 from worker.config import get_settings
 
+CHROMIUM_CONTAINER_ARGS = ["--no-sandbox", "--disable-dev-shm-usage"]
+
+
+async def launch_chromium(playwright, *, headless: bool = True):
+    return await playwright.chromium.launch(headless=headless, args=CHROMIUM_CONTAINER_ARGS)
+
 
 def clean_text(value: str | None) -> str:
     text = html.unescape(value or "")
@@ -192,7 +198,7 @@ async def fetch_httpx_text(
     from playwright.async_api import async_playwright
 
     async with async_playwright() as playwright:
-        browser = await playwright.chromium.launch(headless=True, args=["--no-sandbox"])
+        browser = await launch_chromium(playwright)
         try:
             page = await browser.new_page(user_agent=request_headers["User-Agent"])
             await page.goto(url, wait_until="domcontentloaded", timeout=settings.scraping_timeout_seconds * 1000)
