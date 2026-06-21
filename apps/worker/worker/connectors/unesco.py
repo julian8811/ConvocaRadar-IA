@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-import re
-from datetime import datetime
+from datetime import UTC, datetime
 from urllib.parse import urljoin, urlparse
 
 from selectolax.parser import HTMLParser
@@ -22,6 +21,13 @@ def _title_from(container) -> str:
     if anchor:
         return clean_text(anchor.text())
     return ""
+
+
+def _is_closed(candidate: OpportunityCandidate) -> bool:
+    if candidate.close_date and candidate.close_date.date() < datetime.now(UTC).date():
+        return True
+    normalized = f"{candidate.title} {candidate.summary} {candidate.raw_text}".lower()
+    return "closed" in normalized or "cerrado" in normalized or "closed call" in normalized
 
 
 class UNESCOConnector:
@@ -53,6 +59,9 @@ class UNESCOConnector:
                 if official_url in seen:
                     continue
                 seen.add(official_url)
+                close_date = parse_date_text(text)
+                if close_date and close_date.date() < datetime.now(UTC).date():
+                    continue
                 candidates.append(
                     OpportunityCandidate(
                         title=title[:180],
@@ -64,7 +73,7 @@ class UNESCOConnector:
                         topics=["UNESCO", "proposals"],
                         raw_text=text[:2500],
                         confidence_score=0.68,
-                        close_date=parse_date_text(text),
+                        close_date=close_date,
                     )
                 )
 
@@ -72,6 +81,9 @@ class UNESCOConnector:
             page_text = clean_text(tree.text())
             if any(keyword in page_text.lower() for keyword in keywords):
                 title = clean_text(_title_from(tree) if hasattr(tree, "css_first") else "") or "UNESCO Call for Proposals"
+                close_date = parse_date_text(page_text)
+                if close_date and close_date.date() < datetime.now(UTC).date():
+                    return []
                 candidates.append(
                     OpportunityCandidate(
                         title=title[:180],
@@ -83,7 +95,7 @@ class UNESCOConnector:
                         topics=["UNESCO", "proposals"],
                         raw_text=page_text[:2500],
                         confidence_score=0.62,
-                        close_date=parse_date_text(page_text),
+                        close_date=close_date,
                     )
                 )
 
@@ -94,4 +106,6 @@ class UNESCOConnector:
             return ValidationResult(ok=False, reason="Missing title or URL")
         if urlparse(candidate.official_url).netloc not in UNESCO_HOSTS:
             return ValidationResult(ok=False, reason="URL is outside UNESCO")
+        if _is_closed(candidate):
+            return ValidationResult(ok=False, reason="Call appears closed")
         return ValidationResult(ok=True)

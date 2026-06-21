@@ -1234,8 +1234,8 @@ async def test_ukri_and_unesco_connectors_parse_fixture() -> None:
     <html>
       <body>
         <article>
-          <h1><a href="/en/articles/call-proposals-2026">UNESCO Call for Proposals 2026</a></h1>
-          <p>International call for proposals. Deadline April 8, 2026.</p>
+          <h1><a href="/en/articles/call-proposals-2027">UNESCO Call for Proposals 2027</a></h1>
+          <p>International call for proposals. Deadline April 8, 2027.</p>
         </article>
       </body>
     </html>
@@ -1286,12 +1286,12 @@ async def test_ukri_and_unesco_multiple_results_fixture() -> None:
     <html>
       <body>
         <article>
-          <h1><a href="/en/articles/call-proposals-2026">UNESCO Call for Proposals 2026</a></h1>
-          <p>International call for proposals. Deadline April 8, 2026.</p>
+          <h1><a href="/en/articles/call-proposals-2027">UNESCO Call for Proposals 2027</a></h1>
+          <p>International call for proposals. Deadline April 8, 2027.</p>
         </article>
         <article>
-          <h1><a href="/en/articles/call-proposals-2027">UNESCO Call for Proposals 2027</a></h1>
-          <p>International call for proposals. Deadline May 8, 2027.</p>
+          <h1><a href="/en/articles/call-proposals-2028">UNESCO Call for Proposals 2028</a></h1>
+          <p>International call for proposals. Deadline May 8, 2028.</p>
         </article>
       </body>
     </html>
@@ -1318,5 +1318,35 @@ async def test_ukri_and_unesco_multiple_results_fixture() -> None:
     assert ukri_candidates[0].official_url.endswith("/ukri-research-call")
     assert ukri_candidates[1].official_url.endswith("/ukri-innovation-call")
     assert len(unesco_candidates) == 2
-    assert unesco_candidates[0].official_url.endswith("/call-proposals-2026")
-    assert unesco_candidates[1].official_url.endswith("/call-proposals-2027")
+    assert unesco_candidates[0].official_url.endswith("/call-proposals-2027")
+    assert unesco_candidates[1].official_url.endswith("/call-proposals-2028")
+
+
+@pytest.mark.asyncio
+async def test_unesco_connector_skips_closed_calls() -> None:
+    html = """
+    <html>
+      <body>
+        <article>
+          <h1><a href="/en/articles/closed-call-2024">UNESCO Closed Call 2024</a></h1>
+          <p>International call for proposals. Deadline April 8, 2024.</p>
+        </article>
+        <article>
+          <h1><a href="/en/articles/open-call-2027">UNESCO Open Call 2027</a></h1>
+          <p>International call for proposals. Deadline May 8, 2027.</p>
+        </article>
+      </body>
+    </html>
+    """
+    connector = UNESCOConnector("https://www.unesco.org/en/articles/call-proposals")
+    raw = RawSourceResult(
+        source_key="unesco-call-for-proposals",
+        url="https://www.unesco.org/en/articles/call-proposals",
+        content=html,
+        content_type="text/html",
+    )
+
+    candidates = await connector.parse(raw)
+
+    assert len(candidates) == 1
+    assert candidates[0].official_url.endswith("/open-call-2027")
