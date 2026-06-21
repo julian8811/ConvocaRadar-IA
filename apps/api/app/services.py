@@ -774,6 +774,17 @@ def create_opportunity(db: Session, data: OpportunityCreate, organization_id: st
     return opportunity
 
 
+async def _scrape_source_candidates_with_timeout(
+    source: Source, stats: dict[str, object] | None = None
+) -> list[OpportunityCreate]:
+    settings = get_settings()
+    timeout_seconds = max(settings.scraping_max_source_seconds, 30)
+    try:
+        return await asyncio.wait_for(_scrape_source_candidates(source, stats), timeout=timeout_seconds)
+    except TimeoutError as exc:
+        raise TimeoutError(f"Scrape for source {source.key} exceeded {timeout_seconds}s") from exc
+
+
 def execute_source_run_locally(db: Session, source: Source, organization_id: str | None = None) -> SourceRun:
     started_at = datetime.now(UTC).replace(tzinfo=None)
     run = SourceRun(
@@ -799,7 +810,7 @@ def execute_source_run_locally(db: Session, source: Source, organization_id: str
     try:
         validate_source_url(source)
         scrape_stats: dict[str, object] = {}
-        opportunities = asyncio.run(_scrape_source_candidates(source, scrape_stats))
+        opportunities = asyncio.run(_scrape_source_candidates_with_timeout(source, scrape_stats))
         created = 0
         updated = 0
         failed_items = 0
