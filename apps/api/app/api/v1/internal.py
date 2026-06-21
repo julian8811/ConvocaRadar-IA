@@ -54,53 +54,66 @@ def complete_source_run(
 
     created = 0
     updated = 0
+    failed_items = 0
     for candidate in payload.items:
-        external_id = candidate_external_id(source, candidate.official_url, candidate.title)
-        existing_opportunity = db.scalar(
-            select(Opportunity).where(
-                Opportunity.source_id == source.id,
-                Opportunity.external_id == external_id,
-                (
-                    (Opportunity.organization_id == source.organization_id)
-                    if source.organization_id
-                    else Opportunity.organization_id.is_(None)
-                ),
+        try:
+            external_id = candidate_external_id(source, candidate.official_url, candidate.title)
+            existing_opportunity = db.scalar(
+                select(Opportunity).where(
+                    Opportunity.source_id == source.id,
+                    Opportunity.external_id == external_id,
+                    (
+                        (Opportunity.organization_id == source.organization_id)
+                        if source.organization_id
+                        else Opportunity.organization_id.is_(None)
+                    ),
+                )
             )
-        )
-        opportunity = create_opportunity(
-            db,
-            OpportunityCreate(
-                source_id=source.id,
-                external_id=external_id,
-                title=candidate.title,
-                entity=candidate.entity or source.name,
-                country=candidate.country or source.country,
-                categories=candidate.categories or source.category,
-                topics=candidate.topics,
-                summary=candidate.summary,
-                description=candidate.summary,
-                raw_text=candidate.raw_text,
-                official_url=candidate.official_url,
-                open_date=candidate.open_date,
-                close_date=candidate.close_date,
-                funding_amount_raw=candidate.funding_amount_raw,
-                requirements=candidate.requirements,
-                confidence_score=candidate.confidence_score,
+            create_opportunity(
+                db,
+                OpportunityCreate(
+                    source_id=source.id,
+                    external_id=external_id,
+                    title=candidate.title,
+                    entity=candidate.entity or source.name,
+                    country=candidate.country or source.country,
+                    categories=candidate.categories or source.category,
+                    topics=candidate.topics,
+                    summary=candidate.summary,
+                    description=candidate.summary,
+                    raw_text=candidate.raw_text,
+                    official_url=candidate.official_url,
+                    open_date=candidate.open_date,
+                    close_date=candidate.close_date,
+                    funding_amount_raw=candidate.funding_amount_raw,
+                    requirements=candidate.requirements,
+                    confidence_score=candidate.confidence_score,
+                ),
+                organization_id=source.organization_id,
             ),
-            organization_id=source.organization_id,
-        )
-        db.flush()
-        if existing_opportunity:
-            updated += 1
-        else:
-            created += 1
+            db.flush()
+            if existing_opportunity:
+                updated += 1
+            else:
+                created += 1
+        except Exception as exc:
+            failed_items += 1
+            run.logs = [
+                *run.logs,
+                {
+                    "level": "warning",
+                    "message": "Candidate skipped during persistence",
+                    "title": candidate.title,
+                    "error": str(exc),
+                },
+            ]
 
     run.status = "success"
     run.finished_at = finished_at
     run.items_found = payload.items_found
     run.items_created = created
     run.items_updated = updated
-    run.items_failed = max(payload.items_invalid or (payload.items_found - payload.items_valid), 0)
+    run.items_failed = max(payload.items_invalid or (payload.items_found - payload.items_valid), 0) + failed_items
     run.logs = [
         *run.logs,
         *payload.logs,
@@ -110,6 +123,7 @@ def complete_source_run(
             "items_valid": payload.items_valid,
             "items_created": created,
             "items_updated": updated,
+            "items_failed": run.items_failed,
         },
     ]
     source.last_success_at = finished_at

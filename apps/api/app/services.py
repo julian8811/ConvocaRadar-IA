@@ -728,12 +728,24 @@ def execute_source_run_locally(db: Session, source: Source, organization_id: str
         opportunities = asyncio.run(_scrape_source_candidates(source))
         created = 0
         updated = 0
+        failed_items = 0
         for opportunity_data in opportunities:
-            opportunity = create_opportunity(db, opportunity_data, organization_id=organization_id)
-            if opportunity.first_seen_at == opportunity.last_seen_at:
-                created += 1
-            else:
-                updated += 1
+            try:
+                opportunity = create_opportunity(db, opportunity_data, organization_id=organization_id)
+                if opportunity.first_seen_at == opportunity.last_seen_at:
+                    created += 1
+                else:
+                    updated += 1
+            except Exception as exc:
+                failed_items += 1
+                run.logs.append(
+                    {
+                        "level": "warning",
+                        "message": "Candidate skipped during local persistence",
+                        "title": getattr(opportunity_data, "title", ""),
+                        "error": str(exc),
+                    }
+                )
         db.flush()
         finished_at = datetime.now(UTC).replace(tzinfo=None)
         run.status = "success"
@@ -741,10 +753,11 @@ def execute_source_run_locally(db: Session, source: Source, organization_id: str
         run.items_found = len(opportunities)
         run.items_created = created
         run.items_updated = updated
+        run.items_failed = failed_items
         run.logs = [
             *run.logs,
             {"level": "info", "message": "Local connector executed", "task_id": task.id},
-            {"level": "info", "message": "Candidates normalized", "items_found": len(opportunities)},
+            {"level": "info", "message": "Candidates normalized", "items_found": len(opportunities), "items_failed": failed_items},
         ]
         task.status = "success"
         task.finished_at = finished_at
