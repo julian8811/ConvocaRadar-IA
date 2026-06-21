@@ -50,7 +50,16 @@ async def rate_limit_middleware(request: Request, call_next):
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[settings.frontend_url, "http://localhost:3000", "http://127.0.0.1:3000"],
+    allow_origins=[
+        settings.frontend_url,
+        "https://convocaradar-web.vercel.app",
+        "http://localhost:3000",
+        "http://127.0.0.1:3000",
+        "http://localhost:3004",
+        "http://127.0.0.1:3004",
+        "http://localhost:3006",
+        "http://127.0.0.1:3006",
+    ],
     allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
     allow_credentials=True,
     allow_methods=["*"],
@@ -61,6 +70,11 @@ app.add_middleware(
 @app.get("/health")
 def health() -> dict[str, str]:
     return {"status": "ok", "service": "convocaradar-api"}
+
+
+@app.get("/api/v1/health")
+def health_v1() -> dict[str, str]:
+    return health()
 
 
 app.include_router(api_router)
