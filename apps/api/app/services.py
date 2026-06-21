@@ -492,13 +492,37 @@ def is_noise_title(title: str | None) -> bool:
     cleaned = title.strip()
     if not cleaned:
         return True
+    lowered = cleaned.lower()
     if "@" in cleaned:
         return True
-    if cleaned.lower().startswith("http://") or cleaned.lower().startswith("https://"):
+    if lowered.startswith("http://") or lowered.startswith("https://"):
         return True
     if len(cleaned) < 6 and " " not in cleaned:
         return True
+    if any(marker in lowered for marker in ("color:", "background-color:", "font-weight:", "display:", "justify-content:", ".box-address", ".caja", "budgetyearscolumns")):
+        return True
+    if "{" in cleaned or "}" in cleaned or "<style" in lowered or "<script" in lowered:
+        return True
     return False
+
+
+def is_noise_payload(*parts: str | None) -> bool:
+    text = " ".join(part.strip() for part in parts if part and part.strip())
+    return is_noise_title(text) or any(
+        marker in text.lower()
+        for marker in (
+            "color: white",
+            "background-color:",
+            "font-weight: bold",
+            "text-decoration: underline",
+            "display: flex",
+            "justify-content: center",
+            "budgetyearscolumns",
+            "plannedopeningdate",
+            "deadlinedate",
+            "expectedgrants",
+        )
+    )
 
 
 @lru_cache(maxsize=4096)
@@ -526,7 +550,7 @@ async def _scrape_source_candidates(source: Source) -> list[OpportunityCreate]:
     candidates = await connector.parse(raw)
     opportunities: list[OpportunityCreate] = []
     for candidate in candidates:
-        if is_noise_title(candidate.title):
+        if is_noise_payload(candidate.title, candidate.summary, candidate.raw_text):
             continue
         validation = await connector.validate(candidate)
         if not validation.ok:
@@ -597,12 +621,25 @@ def build_opportunity_query(
             OpportunityScore.organization_id == organization_id,
             OpportunityScore.priority == priority,
         )
+    stmt = stmt.where(
+        ~Opportunity.title.ilike("%color:%"),
+        ~Opportunity.title.ilike("%background-color:%"),
+        ~Opportunity.title.ilike("%font-weight:%"),
+        ~Opportunity.title.ilike("%display:%"),
+        ~Opportunity.title.ilike("%justify-content:%"),
+        ~Opportunity.title.ilike("%budgetYearsColumns%"),
+        ~Opportunity.title.ilike("%plannedOpeningDate%"),
+        ~Opportunity.title.ilike("%deadlineDate%"),
+        ~Opportunity.title.ilike("%expectedGrants%"),
+    )
     return stmt.order_by(Opportunity.close_date.asc().nullslast(), Opportunity.created_at.desc())
 
 
 def create_opportunity(db: Session, data: OpportunityCreate, organization_id: str | None = None) -> Opportunity:
     data = enrich_opportunity_payload(data)
     normalized_title = data.title.strip()
+    if is_noise_payload(normalized_title, data.summary, data.raw_text):
+        raise ValueError("Opportunity title looks like scraping noise")
     slug = slugify(f"{normalized_title}-{data.entity}")
     score_organization_id = organization_id
     if data.official_url and not url_is_reachable(data.official_url):

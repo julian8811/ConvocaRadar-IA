@@ -24,7 +24,7 @@ from app.services import (
     build_opportunity_query,
     calculate_score,
     count_query,
-    is_noise_title,
+    is_noise_payload,
     reanalyze_opportunity,
     semantic_search_opportunities,
     upsert_opportunity_embedding,
@@ -49,7 +49,7 @@ def _get_opportunity_for_org(db: Session, opportunity_id: str, organization: Org
     opportunity = db.scalar(select(Opportunity).where(Opportunity.id == opportunity_id, _opportunity_scope(organization.id)))
     if not opportunity:
         raise HTTPException(status_code=404, detail="Opportunity not found")
-    if is_noise_title(opportunity.title):
+    if is_noise_payload(opportunity.title, opportunity.summary, opportunity.raw_text):
         raise HTTPException(status_code=404, detail="Opportunity not found")
     return opportunity
 

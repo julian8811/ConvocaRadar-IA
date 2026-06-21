@@ -2,6 +2,8 @@ import os
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
+import pytest
+
 os.environ["DATABASE_URL"] = "sqlite:///./test_convocaradar.db"
 os.environ["STORAGE_BACKEND"] = "local"
 os.environ["STORAGE_DIR"] = "./test_storage"
@@ -426,6 +428,31 @@ def test_create_opportunity_enriches_incomplete_payload() -> None:
     assert opportunity.country == "Colombia"
     assert opportunity.close_date is not None
     assert opportunity.confidence_score >= 0.35
+
+
+def test_create_opportunity_rejects_noise_title() -> None:
+    db = SessionLocal()
+    try:
+        organization = db.scalar(select(Organization).where(Organization.slug == "convocaradar-local"))
+        source = db.scalar(select(Source).where(Source.key == "grants-gov"))
+        assert organization is not None and source is not None
+        with pytest.raises(ValueError, match="scraping noise"):
+            create_opportunity(
+                db,
+                OpportunityCreate(
+                    source_id=source.id,
+                    external_id="noise-fixture",
+                    title="a { color: white; }",
+                    entity="Entidad por validar",
+                    country="Por validar",
+                    raw_text="body { display: flex; }",
+                    summary="font-weight: bold;",
+                    official_url="https://example.com/noise-fixture",
+                ),
+                organization_id=organization.id,
+            )
+    finally:
+        db.close()
 
 
 def test_xlsx_report_download() -> None:
