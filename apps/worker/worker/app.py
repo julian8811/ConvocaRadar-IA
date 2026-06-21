@@ -1,8 +1,11 @@
+import ssl
+
 from celery import Celery
 
 from worker.config import get_settings
 
 settings = get_settings()
+redis_ssl_options = {"ssl_cert_reqs": ssl.CERT_NONE} if settings.redis_url.startswith("rediss://") else None
 
 celery_app = Celery(
     "convocaradar",
@@ -17,12 +20,12 @@ celery_app = Celery(
     ],
 )
 
-celery_app.conf.update(
-    task_track_started=True,
-    task_time_limit=300,
-    worker_prefetch_multiplier=1,
-    timezone="America/Bogota",
-    beat_schedule={
+celery_config = {
+    "task_track_started": True,
+    "task_time_limit": 300,
+    "worker_prefetch_multiplier": 1,
+    "timezone": "America/Bogota",
+    "beat_schedule": {
         "run-enabled-sources-every-30-minutes": {
             "task": "run_enabled_sources",
             "schedule": 1800.0,
@@ -32,7 +35,12 @@ celery_app.conf.update(
             "schedule": 300.0,
         },
     },
-)
+}
+if redis_ssl_options:
+    celery_config["broker_use_ssl"] = redis_ssl_options
+    celery_config["redis_backend_use_ssl"] = redis_ssl_options
+
+celery_app.conf.update(**celery_config)
 
 import worker.tasks.generate_report  # noqa: E402,F401
 import worker.tasks.process_opportunity  # noqa: E402,F401
