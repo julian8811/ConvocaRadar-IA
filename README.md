@@ -71,6 +71,11 @@ The short version is:
 - files on Cloudflare R2;
 - API and worker on Render.
 
+The repository also includes:
+
+- `.github/workflows/ci.yml` for GitHub Actions checks on push and pull request;
+- `render.yaml` as a Render blueprint for the API and worker services.
+
 ## Versioning
 
 See [VERSIONING.md](./VERSIONING.md) for the GitHub release flow and semantic versioning rules.
