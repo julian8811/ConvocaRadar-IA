@@ -67,6 +67,28 @@ a {
   text-decoration: none;
 }
 
+select {
+  color-scheme: light;
+  background-color: #ffffff;
+  color: #102033;
+}
+
+.dark select {
+  color-scheme: dark;
+  background-color: #0f172a;
+  color: #f1f5f9;
+}
+
+select option {
+  background-color: #ffffff;
+  color: #102033;
+}
+
+.dark select option {
+  background-color: #0f172a;
+  color: #f1f5f9;
+}
+
 .js-plotly-plot,
 .plot-container,
 .plot-container .svg-container,

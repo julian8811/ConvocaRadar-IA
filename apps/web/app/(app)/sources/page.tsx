@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { ErrorState, LoadingState } from "@/components/ui/state";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { api } from "@/lib/api";
@@ -191,11 +192,10 @@ export default function SourcesPage() {
             <Input name="category" placeholder="Categorías (coma)" defaultValue="innovacion" />
             <label className="flex flex-col gap-1 text-sm text-slate-700 dark:text-slate-300">
               Tipo de fuente
-              <select
+              <Select
                 name="source_type"
                 value={sourceType}
                 onChange={(event) => setSourceType(event.target.value)}
-                className="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
               >
                 <option value="html">html</option>
                 <option value="api">api</option>
@@ -203,7 +203,7 @@ export default function SourcesPage() {
                 <option value="hybrid">hybrid</option>
                 <option value="pdf">pdf</option>
                 <option value="manual">manual</option>
-              </select>
+              </Select>
             </label>
             <Button className="md:col-span-4" disabled={createSource.isPending}>
               <Plus className="h-4 w-4" />

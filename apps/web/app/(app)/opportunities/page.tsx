@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/state";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { api, downloadReport } from "@/lib/api";
@@ -187,8 +188,7 @@ export default function OpportunitiesPage() {
               }}
             />
           </div>
-          <select
-            className="h-10 rounded-md border border-input bg-card px-3 text-sm text-foreground"
+          <Select
             value={status}
             onChange={(event) => {
               setStatus(event.target.value);
@@ -200,7 +200,7 @@ export default function OpportunitiesPage() {
                 {item.label}
               </option>
             ))}
-          </select>
+          </Select>
           <Input
             placeholder="País"
             value={country}
