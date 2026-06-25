@@ -29,6 +29,8 @@ from worker.connectors.ukri import UKRIConnector
 from worker.connectors.unwomen_innovate import UnwomenInnovateConnector
 from worker.connectors.wordpress_grants import WordPressGrantsConnector
 from worker.connectors.horizon_sedia import HorizonSediaConnector
+from worker.connectors.wellcome import WellcomeConnector
+from worker.connectors.mincit import MincitConvocatoriasConnector
 
 
 @pytest.mark.asyncio
@@ -1799,4 +1801,72 @@ async def test_horizon_sedia_connector_parses_fixture() -> None:
     assert candidate.country == "European Union"
     assert "HORIZON-2026-OPEN-1" in candidate.official_url
     assert (await connector.validate(candidate)).ok
+
+
+@pytest.mark.asyncio
+async def test_wellcome_connector_parses_next_data_fixture() -> None:
+    payload = {
+        "props": {
+            "pageProps": {
+                "initialListings": [
+                    {
+                        "title": "Wellcome Discovery Awards",
+                        "url": "/research-funding/schemes/wellcome-discovery-awards",
+                        "listing_summary": "<p>Funding for researchers.</p>",
+                        "scheme_status": "Open",
+                        "scheme_closes_for_applications": "22 September 2026",
+                        "linked_strategic_programmes": [{"name": "Discovery Research"}],
+                    }
+                ]
+            }
+        }
+    }
+    html = f'<html><script id="__NEXT_DATA__" type="application/json">{json.dumps(payload)}</script></html>'
+    connector = WellcomeConnector()
+    raw = RawSourceResult(
+        source_key="wellcome-grants",
+        url="https://wellcome.org/research-funding/schemes",
+        content=html,
+        content_type="text/html",
+    )
+
+    candidates = await connector.parse(raw)
+
+    assert len(candidates) == 1
+    assert candidates[0].title == "Wellcome Discovery Awards"
+    assert candidates[0].official_url.endswith("/wellcome-discovery-awards")
+    assert candidates[0].close_date is not None
+    assert (await connector.validate(candidates[0])).ok
+
+
+@pytest.mark.asyncio
+async def test_mincit_connector_parses_listing_fixture() -> None:
+    html = """
+    <html><body>
+      <h3>CONVOCATORIA BEST TOURISM VILLAGES - ONU TURISMO 2026</h3>
+      <p>Abierta hasta: 2026-12-31 23:59:00</p>
+      <a href="https://convocatoriasturismo.mincit.gov.co/convocatoria/72" class="btn">Ver más</a>
+    </body></html>
+    """
+    connector = MincitConvocatoriasConnector()
+    raw = RawSourceResult(
+        source_key="mincit-innovacion",
+        url="https://convocatoriasturismo.mincit.gov.co/listado-convocatorias/7",
+        content=html,
+        content_type="text/html",
+    )
+
+    candidates = await connector.parse(raw)
+
+    assert len(candidates) == 1
+    assert candidates[0].official_url.endswith("/convocatoria/72")
+    assert "TOURISM VILLAGES" in candidates[0].title
+    assert (await connector.validate(candidates[0])).ok
+
+
+def test_connector_factory_selects_wellcome_and_mincit() -> None:
+    wellcome = connector_for("wellcome-grants", "https://wellcome.org/research-funding/schemes")
+    mincit = connector_for("mincit-innovacion", "https://convocatoriasturismo.mincit.gov.co/listado-convocatorias")
+    assert isinstance(wellcome, WellcomeConnector)
+    assert isinstance(mincit, MincitConvocatoriasConnector)
 
