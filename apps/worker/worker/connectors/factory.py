@@ -23,11 +23,67 @@ from worker.connectors.wordpress_grants import WordPressGrantsConnector
 from worker.connectors.horizon_sedia import HorizonSediaConnector
 from worker.connectors.mincit import MincitConvocatoriasConnector
 from worker.connectors.wellcome import WellcomeConnector
+from worker.connectors.bdn_convocatorias import BdnConvocatoriasConnector
+from worker.connectors.heading_list_html import HeadingListHtmlConnector
+from worker.connectors.idrc_funding import IdrcFundingConnector
+from worker.connectors.usaid_grants import UsaidGrantsConnector
+from worker.connectors.giz_funding import GizFundingConnector
 
 
 WORDPRESS_GRANT_SOURCE_KEYS = {
     "novo-nordisk-grants",
 }
+
+BDN_CONVOCATORIAS_SOURCE_KEYS = {
+    "cdti-convocatorias": {
+        "search_query": "CDTI",
+        "entity_name": "CDTI",
+        "default_country": "Spain",
+        "allowed_domains": ["infosubvenciones.es", "www.infosubvenciones.es", "cdti.es", "www.cdti.es"],
+    },
+    "isciii-convocatorias": {
+        "search_query": "Instituto de Salud Carlos III",
+        "entity_name": "ISCIII",
+        "default_country": "Spain",
+        "allowed_domains": ["infosubvenciones.es", "www.infosubvenciones.es", "isciii.es", "www.isciii.es"],
+    },
+}
+
+HEADING_LIST_SOURCE_KEYS = {
+    "lundbeck-foundation": {
+        "entity_name": "Lundbeck Foundation",
+        "default_country": "Denmark",
+        "allowed_domains": ["lundbeckfonden.com"],
+    },
+    "velux-foundation": {
+        "entity_name": "Velux Fonden",
+        "default_country": "Denmark",
+        "allowed_domains": ["veluxfonden.dk"],
+    },
+}
+
+
+def _bdn_connector(source_key: str, base_url: str) -> BdnConvocatoriasConnector:
+    config = BDN_CONVOCATORIAS_SOURCE_KEYS[source_key]
+    return BdnConvocatoriasConnector(
+        source_key,
+        base_url,
+        search_query=config["search_query"],
+        entity_name=config["entity_name"],
+        default_country=config.get("default_country", "Spain"),
+        allowed_domains=config.get("allowed_domains"),
+    )
+
+
+def _heading_list_connector(source_key: str, base_url: str) -> HeadingListHtmlConnector:
+    config = HEADING_LIST_SOURCE_KEYS[source_key]
+    return HeadingListHtmlConnector(
+        source_key,
+        base_url,
+        entity_name=config["entity_name"],
+        default_country=config["default_country"],
+        allowed_domains=config["allowed_domains"],
+    )
 
 
 def _wordpress_connector(source_key: str, base_url: str) -> WordPressGrantsConnector:
@@ -87,6 +143,18 @@ def connector_for(source_key: str, base_url: str | None = None, source_type: str
         return WellcomeConnector(base_url)
     if source_key == "mincit-innovacion":
         return MincitConvocatoriasConnector(base_url)
+    if source_key == "lundbeck-foundation":
+        return _heading_list_connector(source_key, base_url or "")
+    if source_key == "velux-foundation":
+        return _heading_list_connector(source_key, base_url or "")
+    if source_key in BDN_CONVOCATORIAS_SOURCE_KEYS:
+        return _bdn_connector(source_key, base_url or "")
+    if source_key == "idrc-funding":
+        return IdrcFundingConnector(base_url)
+    if source_key == "usaid-grants":
+        return UsaidGrantsConnector(base_url)
+    if source_key == "giz-funding":
+        return GizFundingConnector(base_url)
     if source_key in WORDPRESS_GRANT_SOURCE_KEYS or "/wp-json/wp/v2/" in (base_url or ""):
         return _wordpress_connector(source_key, base_url or "")
     if source_type == "manual":

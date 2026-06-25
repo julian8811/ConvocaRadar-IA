@@ -790,7 +790,7 @@ def test_admin_reseed_default_sources() -> None:
     response = c.post("/api/v1/admin/sources/reseed-defaults", headers=auth)
     assert response.status_code == 200
     payload = response.json()
-    assert payload["total"] >= 26
+    assert payload["total"] >= 33
     assert payload["after_total"] >= before_count
     assert payload["inserted"] + payload["updated"] >= 1
 
