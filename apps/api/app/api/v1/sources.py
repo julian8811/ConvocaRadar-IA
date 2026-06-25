@@ -8,7 +8,7 @@ from app.api.deps import get_current_organization, get_current_user
 from app.db.session import get_db
 from app.models import Organization, Source, SourceRun, User
 from app.schemas import SourceCreate, SourceHealthRead, SourceRead, SourceRunRead, SourceUpdate
-from app.services import audit, execute_source_run_locally, validate_source_url
+from app.services import audit, execute_source_run_locally, schedule_or_execute_source_run, source_due_for_scraping, validate_source_url
 
 router = APIRouter()
 
@@ -240,13 +240,14 @@ def run_all_sources(
     )
     runs: list[SourceRun] = []
     for source in sources:
-        run = execute_source_run_locally(db, source, organization_id=organization.id)
+        if not source_due_for_scraping(source):
+            continue
+        run = schedule_or_execute_source_run(db, source, organization_id=organization.id)
         audit(db, "run_source", "source_run", user, run.id)
         runs.append(run)
     db.commit()
     for run in runs:
         db.refresh(run)
-    db.commit()
     return runs
 
 

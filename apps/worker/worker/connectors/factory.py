@@ -19,6 +19,31 @@ from worker.connectors.simpler_grants import SimplerGrantsConnector
 from worker.connectors.undef import UNDEFConnector
 from worker.connectors.ukri import UKRIConnector
 from worker.connectors.unwomen_innovate import UnwomenInnovateConnector
+from worker.connectors.wordpress_grants import WordPressGrantsConnector
+from worker.connectors.horizon_sedia import HorizonSediaConnector
+
+
+WORDPRESS_GRANT_SOURCE_KEYS = {
+    "novo-nordisk-grants",
+}
+
+
+def _wordpress_connector(source_key: str, base_url: str) -> WordPressGrantsConnector:
+    defaults = {
+        "novo-nordisk-grants": {
+            "entity_name": "Novo Nordisk Foundation",
+            "default_country": "Denmark",
+            "allowed_domains": ["novonordiskfonden.dk"],
+        },
+    }
+    config = defaults.get(source_key, {})
+    return WordPressGrantsConnector(
+        source_key,
+        base_url,
+        entity_name=config.get("entity_name"),
+        default_country=config.get("default_country", "Por validar"),
+        allowed_domains=config.get("allowed_domains"),
+    )
 
 
 def connector_for(source_key: str, base_url: str | None = None, source_type: str | None = None):
@@ -54,6 +79,10 @@ def connector_for(source_key: str, base_url: str | None = None, source_type: str
         return GrantsGovRssConnector(source_key, base_url or "")
     if source_key == "unwomen-innovate":
         return UnwomenInnovateConnector(base_url)
+    if source_key == "horizon-europe-sedia":
+        return HorizonSediaConnector(base_url)
+    if source_key in WORDPRESS_GRANT_SOURCE_KEYS or "/wp-json/wp/v2/" in (base_url or ""):
+        return _wordpress_connector(source_key, base_url or "")
     if source_type == "manual":
         return ManualConnector(source_key, base_url or "")
     if source_type == "pdf":

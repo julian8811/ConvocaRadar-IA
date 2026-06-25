@@ -780,6 +780,27 @@ def test_admin_retry_degraded_sources_schedules_retry(monkeypatch) -> None:
     assert payload["scheduled"] >= 1
 
 
+def test_admin_reseed_default_sources() -> None:
+    c = client()
+    auth = {"Authorization": f"Bearer {token(c)}"}
+    before = c.get("/api/v1/sources", headers=auth)
+    assert before.status_code == 200
+    before_count = len(before.json())
+
+    response = c.post("/api/v1/admin/sources/reseed-defaults", headers=auth)
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["total"] >= 26
+    assert payload["after_total"] >= before_count
+    assert payload["inserted"] + payload["updated"] >= 1
+
+    sources = c.get("/api/v1/sources", headers=auth)
+    assert sources.status_code == 200
+    keys = {item["key"] for item in sources.json()}
+    assert "novo-nordisk-grants" in keys
+    assert "horizon-europe-sedia" in keys
+
+
 def test_alert_lifecycle() -> None:
     c = client()
     auth = {"Authorization": f"Bearer {token(c)}"}
