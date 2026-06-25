@@ -303,7 +303,8 @@ def _get_opportunity_embedding(db: Session, opportunity_id: str) -> OpportunityE
     return None
 
 
-def _merge_opportunity_records(db: Session, survivor: Opportunity, duplicate: Opportunity) -> None:
+def _reassign_opportunity_relations(db: Session, survivor: Opportunity, duplicate: Opportunity) -> None:
+    """Reassign all FK relations from duplicate → survivor. Does NOT delete the duplicate."""
     if duplicate.is_favorite and not survivor.is_favorite:
         survivor.is_favorite = True
     if duplicate.user_status not in {"review"} and survivor.user_status == "review":
@@ -340,6 +341,9 @@ def _merge_opportunity_records(db: Session, survivor: Opportunity, duplicate: Op
     for alert in db.scalars(select(Alert).where(Alert.opportunity_id == duplicate.id)):
         alert.opportunity_id = survivor.id
 
+
+def _merge_opportunity_records(db: Session, survivor: Opportunity, duplicate: Opportunity) -> None:
+    _reassign_opportunity_relations(db, survivor, duplicate)
     db.delete(duplicate)
 
 
@@ -353,6 +357,8 @@ def deduplicate_opportunities(db: Session, organization_id: str | None = None) -
 
     groups_merged = 0
     duplicates_removed = 0
+    duplicates_to_delete: list[Opportunity] = []
+
     for group in grouped.values():
         if len(group) < 2:
             continue
@@ -360,9 +366,16 @@ def deduplicate_opportunities(db: Session, organization_id: str | None = None) -
         for duplicate in group:
             if duplicate.id == survivor.id:
                 continue
-            _merge_opportunity_records(db, survivor, duplicate)
+            _reassign_opportunity_relations(db, survivor, duplicate)
+            duplicates_to_delete.append(duplicate)
             duplicates_removed += 1
         groups_merged += 1
+
+    # Flush all FK reassignments before any deletes to avoid FK constraint violations
+    db.flush()
+
+    for duplicate in duplicates_to_delete:
+        db.delete(duplicate)
     db.flush()
     return {"groups_merged": groups_merged, "duplicates_removed": duplicates_removed}
 
