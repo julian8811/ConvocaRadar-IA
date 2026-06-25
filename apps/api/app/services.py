@@ -279,10 +279,28 @@ def find_duplicate_opportunity(
     return None
 
 
+def _normalize_survivor_datetime(value: datetime | None) -> datetime:
+    if value is None:
+        return datetime.min.replace(tzinfo=None)
+    if value.tzinfo is not None:
+        return value.replace(tzinfo=None)
+    return value
+
+
 def _opportunity_survivor_key(opportunity: Opportunity) -> tuple[datetime, datetime, str]:
-    first_seen = opportunity.first_seen_at or datetime.min.replace(tzinfo=None)
-    created = opportunity.created_at or first_seen
+    first_seen = _normalize_survivor_datetime(opportunity.first_seen_at)
+    created = _normalize_survivor_datetime(opportunity.created_at) if opportunity.created_at else first_seen
     return (first_seen, created, opportunity.id)
+
+
+def _get_opportunity_embedding(db: Session, opportunity_id: str) -> OpportunityEmbedding | None:
+    existing = db.scalar(select(OpportunityEmbedding).where(OpportunityEmbedding.opportunity_id == opportunity_id))
+    if existing:
+        return existing
+    for pending in db.new:
+        if isinstance(pending, OpportunityEmbedding) and pending.opportunity_id == opportunity_id:
+            return pending
+    return None
 
 
 def _merge_opportunity_records(db: Session, survivor: Opportunity, duplicate: Opportunity) -> None:
@@ -338,7 +356,7 @@ def deduplicate_opportunities(db: Session, organization_id: str | None = None) -
     for group in grouped.values():
         if len(group) < 2:
             continue
-        survivor = min(group, key=lambda opportunity: (opportunity.first_seen_at, opportunity.created_at, opportunity.id))
+        survivor = min(group, key=_opportunity_survivor_key)
         for duplicate in group:
             if duplicate.id == survivor.id:
                 continue
@@ -533,7 +551,7 @@ def opportunity_reanalysis_text(db: Session, opportunity: Opportunity) -> str:
 def upsert_opportunity_embedding(db: Session, opportunity: Opportunity) -> OpportunityEmbedding:
     source_text = opportunity_embedding_text(opportunity)
     vector = build_embedding(source_text)
-    existing = db.scalar(select(OpportunityEmbedding).where(OpportunityEmbedding.opportunity_id == opportunity.id))
+    existing = _get_opportunity_embedding(db, opportunity.id)
     if existing:
         existing.organization_id = opportunity.organization_id
         existing.source_text = source_text

@@ -531,12 +531,15 @@ def test_create_opportunity_merges_cross_source_grants_gov_duplicates() -> None:
             ),
             organization_id=organization.id,
         )
+        first_id = first.id
+        second_id = second.id
+        second_entity = second.entity
         db.commit()
     finally:
         db.close()
 
-    assert first.id == second.id
-    assert second.entity == "USAID"
+    assert first_id == second_id
+    assert second_entity == "USAID"
 
 
 def test_deduplicate_opportunities_removes_existing_duplicates() -> None:
@@ -593,6 +596,61 @@ def test_deduplicate_opportunities_removes_existing_duplicates() -> None:
     assert stats["duplicates_removed"] >= 1
     assert len(remaining) == 1
     assert remaining_id is not None
+
+
+def test_deduplicate_opportunities_handles_null_created_at() -> None:
+    seed()
+    db = SessionLocal()
+    try:
+        organization = db.scalar(select(Organization).where(Organization.slug == "convocaradar-local"))
+        grants_source = db.scalar(select(Source).where(Source.key == "grants-gov"))
+        usaid_source = db.scalar(select(Source).where(Source.key == "usaid-grants"))
+        assert organization is not None and grants_source is not None and usaid_source is not None
+
+        shared_url = "https://www.grants.gov/search-results-detail/5151"
+        shared_raw = json.dumps({"id": "5151", "number": "OFOP0005151"})
+        shared_time = datetime(2026, 6, 25, 12, 0, 0)
+        first = Opportunity(
+            organization_id=organization.id,
+            source_id=grants_source.id,
+            title="Duplicate cleanup fixture null created_at",
+            slug="duplicate-cleanup-fixture-null-created-at-grants",
+            entity="Agency A",
+            country="United States",
+            raw_text=shared_raw,
+            official_url=shared_url,
+            first_seen_at=shared_time,
+            created_at=None,
+        )
+        second = Opportunity(
+            organization_id=organization.id,
+            source_id=usaid_source.id,
+            title="Duplicate cleanup fixture null created_at",
+            slug="duplicate-cleanup-fixture-null-created-at-usaid",
+            entity="Agency B",
+            country="United States",
+            raw_text=shared_raw,
+            official_url=shared_url,
+            first_seen_at=shared_time,
+            created_at=shared_time,
+        )
+        db.add_all([first, second])
+        db.flush()
+        stats = deduplicate_opportunities(db, organization.id)
+        remaining = list(
+            db.scalars(
+                select(Opportunity).where(
+                    Opportunity.organization_id == organization.id,
+                    Opportunity.official_url == shared_url,
+                )
+            )
+        )
+        db.commit()
+    finally:
+        db.close()
+
+    assert stats["duplicates_removed"] >= 1
+    assert len(remaining) == 1
 
 
 def test_admin_deduplicate_opportunities_endpoint() -> None:
