@@ -10,7 +10,7 @@ from app.core.task_queue import enqueue_scrape_source
 from app.models import Alert, AuditLog, Opportunity, OpportunityEmbedding, Organization, Report, Source, SourceRun, Task, User
 from app.schemas import AdminMetricsRead, AuditLogRead, SourceRunOverviewRead
 from app.db.seed import seed_default_sources
-from app.services import execute_source_run_locally, rebuild_opportunity_embeddings
+from app.services import deduplicate_opportunities, execute_source_run_locally, rebuild_opportunity_embeddings
 
 router = APIRouter()
 
@@ -226,6 +226,26 @@ def reseed_default_sources_admin(
     )
     db.commit()
     return {**stats, "before_total": before_total, "after_total": after_total}
+
+
+@router.post("/admin/opportunities/deduplicate")
+def deduplicate_opportunities_admin(
+    organization: Organization = Depends(get_current_organization),
+    _: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> dict[str, int]:
+    stats = deduplicate_opportunities(db, organization.id)
+    db.add(
+        AuditLog(
+            organization_id=organization.id,
+            action="deduplicate_opportunities",
+            resource_type="opportunity",
+            resource_id=organization.id,
+            metadata_json=stats,
+        )
+    )
+    db.commit()
+    return stats
 
 
 @router.post("/admin/sources/retry-degraded")

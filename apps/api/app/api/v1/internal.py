@@ -57,7 +57,7 @@ def complete_source_run(
     failed_items = 0
     for candidate in payload.items:
         try:
-            external_id = candidate_external_id(source, candidate.official_url, candidate.title)
+            external_id = candidate_external_id(source, candidate.official_url, candidate.title, candidate.raw_text or "")
             existing_opportunity = db.scalar(
                 select(Opportunity).where(
                     Opportunity.source_id == source.id,

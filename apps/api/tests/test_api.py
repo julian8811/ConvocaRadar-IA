@@ -1,3 +1,4 @@
+import json
 import os
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -22,7 +23,7 @@ import app.main as app_main  # noqa: E402
 from app.main import app  # noqa: E402
 from app.models import Alert, Opportunity, OpportunityEmbedding, OpportunityScore, Organization, Source, SourceRun, Task  # noqa: E402
 from app.schemas import OpportunityCreate  # noqa: E402
-from app.services import create_opportunity, is_private_url  # noqa: E402
+from app.services import create_opportunity, deduplicate_opportunities, is_private_url, opportunity_dedup_key  # noqa: E402
 
 
 def client() -> TestClient:
@@ -479,6 +480,129 @@ def test_create_opportunity_rejects_noise_title() -> None:
             )
     finally:
         db.close()
+
+
+def test_opportunity_dedup_key_uses_grants_gov_id() -> None:
+    key = opportunity_dedup_key(
+        "https://www.grants.gov/search-results-detail/2831",
+        "Sample grant",
+    )
+    assert key == "grants-gov:2831"
+
+
+def test_create_opportunity_merges_cross_source_grants_gov_duplicates() -> None:
+    seed()
+    db = SessionLocal()
+    try:
+        organization = db.scalar(select(Organization).where(Organization.slug == "convocaradar-local"))
+        grants_source = db.scalar(select(Source).where(Source.key == "grants-gov"))
+        usaid_source = db.scalar(select(Source).where(Source.key == "usaid-grants"))
+        assert organization is not None and grants_source is not None and usaid_source is not None
+
+        shared_url = "https://www.grants.gov/search-results-detail/2831"
+        shared_raw = json.dumps({"id": "2831", "number": "OFOP0002831", "agencyName": "DOS-IND"})
+        first = create_opportunity(
+            db,
+            OpportunityCreate(
+                source_id=grants_source.id,
+                external_id="dedup-fixture-grants",
+                title="U.S. India Sports Technology Dialogues and Innovation Program",
+                entity="DOS-IND",
+                country="United States",
+                summary="OFOP0002831 | DOS-IND | Status: posted",
+                raw_text=shared_raw,
+                official_url=shared_url,
+                close_date=datetime(2026, 6, 7),
+            ),
+            organization_id=organization.id,
+        )
+        second = create_opportunity(
+            db,
+            OpportunityCreate(
+                source_id=usaid_source.id,
+                external_id="dedup-fixture-usaid",
+                title="U.S. India Sports Technology Dialogues and Innovation Program",
+                entity="USAID",
+                country="United States",
+                summary="OFOP0002831 | USAID | Status: posted",
+                raw_text=shared_raw,
+                official_url=shared_url,
+                close_date=datetime(2026, 6, 7),
+            ),
+            organization_id=organization.id,
+        )
+        db.commit()
+    finally:
+        db.close()
+
+    assert first.id == second.id
+    assert second.entity == "USAID"
+
+
+def test_deduplicate_opportunities_removes_existing_duplicates() -> None:
+    seed()
+    db = SessionLocal()
+    try:
+        organization = db.scalar(select(Organization).where(Organization.slug == "convocaradar-local"))
+        grants_source = db.scalar(select(Source).where(Source.key == "grants-gov"))
+        usaid_source = db.scalar(select(Source).where(Source.key == "usaid-grants"))
+        assert organization is not None and grants_source is not None and usaid_source is not None
+
+        shared_url = "https://www.grants.gov/search-results-detail/4242"
+        shared_raw = json.dumps({"id": "4242", "number": "OFOP0004242"})
+        first = create_opportunity(
+            db,
+            OpportunityCreate(
+                source_id=grants_source.id,
+                title="Duplicate cleanup fixture A",
+                entity="Agency A",
+                country="United States",
+                raw_text=shared_raw,
+                official_url=shared_url,
+            ),
+            organization_id=organization.id,
+        )
+        db.add(
+            Opportunity(
+                organization_id=organization.id,
+                source_id=usaid_source.id,
+                title="Duplicate cleanup fixture A",
+                slug="duplicate-cleanup-fixture-a-usaid",
+                entity="Agency B",
+                country="United States",
+                raw_text=shared_raw,
+                official_url=shared_url,
+            )
+        )
+        db.flush()
+        first_id = first.id
+        stats = deduplicate_opportunities(db, organization.id)
+        remaining = list(
+            db.scalars(
+                select(Opportunity).where(
+                    Opportunity.organization_id == organization.id,
+                    Opportunity.official_url == shared_url,
+                )
+            )
+        )
+        remaining_id = remaining[0].id if remaining else None
+        db.commit()
+    finally:
+        db.close()
+
+    assert stats["duplicates_removed"] >= 1
+    assert len(remaining) == 1
+    assert remaining_id is not None
+
+
+def test_admin_deduplicate_opportunities_endpoint() -> None:
+    c = client()
+    auth = {"Authorization": f"Bearer {token(c)}"}
+    response = c.post("/api/v1/admin/opportunities/deduplicate", headers=auth)
+    assert response.status_code == 200
+    payload = response.json()
+    assert "duplicates_removed" in payload
+    assert "groups_merged" in payload
 
 
 def test_xlsx_report_download() -> None:

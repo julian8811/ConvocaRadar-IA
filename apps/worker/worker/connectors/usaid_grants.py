@@ -15,9 +15,12 @@ class UsaidGrantsConnector(GrantsGovConnector):
     async def parse(self, raw: RawSourceResult) -> list[OpportunityCandidate]:
         candidates = await super().parse(raw)
         for candidate in candidates:
-            candidate.entity = "USAID"
+            lowered = f"{candidate.title} {candidate.summary}".lower()
+            if "usaid" in lowered:
+                candidate.entity = "USAID"
             candidate.country = candidate.country or "United States"
             candidate.categories = ["grants", "cooperation", "international development"]
+            candidate.topics = list(dict.fromkeys([*(candidate.topics or []), "USAID"]))
         return candidates[:50]
 
     async def validate(self, candidate: OpportunityCandidate) -> ValidationResult:
