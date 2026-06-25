@@ -259,7 +259,7 @@ export default function OpportunityDetailPage() {
                     <span className="text-slate-500 dark:text-slate-400">Puntaje</span>
                     <span className="text-2xl font-semibold text-slate-950 dark:text-white">{Math.round(latestScore.score)}</span>
                   </div>
-                  <div className="h-2 overflow-hidden rounded-full bg-muted">
+                  <div className="h-2 overflow-hidden rounded-full bg-slate-200 dark:bg-slate-700">
                     <div className="h-2 rounded-full bg-cyan-500" style={{ width: `${Math.min(latestScore.score, 100)}%` }} />
                   </div>
                   <Badge tone={latestScore.priority}>{latestScore.priority}</Badge>
@@ -408,7 +408,7 @@ function InfoList({ title, icon: Icon, items, empty }: { title: string; icon: El
         {items.length ? (
           <ul className="space-y-2 text-sm text-slate-700 dark:text-slate-300">
             {items.map((item) => (
-              <li key={item} className="rounded-lg bg-muted px-3 py-2">
+              <li key={item} className="rounded-lg bg-slate-100 px-3 py-2 dark:bg-slate-800">
                 {item}
               </li>
             ))}

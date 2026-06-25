@@ -9,6 +9,7 @@ import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardDescription, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/state";
 import { api } from "@/lib/api";
 import type { Alert } from "@/lib/types";
@@ -194,13 +195,13 @@ export default function AlertsPage() {
           </CardHeader>
           <CardContent className="pt-5">
             <form className="grid gap-3 md:grid-cols-2" onSubmit={submit}>
-              <select name="alert_type" className="h-10 rounded-md border border-input bg-card px-3 text-sm text-slate-950 dark:text-white">
+              <Select name="alert_type">
                 {alertTypes.map((item) => (
                   <option key={item.value} value={item.value}>
                     {item.label}
                   </option>
                 ))}
-              </select>
+              </Select>
               <Input name="recipient" type="email" placeholder="usuario@organizacion.com" required />
               <Input name="subject" placeholder="Asunto" required />
               <Input name="scheduled_at" type="datetime-local" />
