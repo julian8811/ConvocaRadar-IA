@@ -11,8 +11,8 @@ from worker.connectors.common import BROWSER_UA, clean_text, fetch_httpx_text
 
 PROCOLOMBIA_SITEMAP_URL = "https://www.procolombia.co/sitemap.xml"
 PROCOLOMBIA_HUB_URLS = (
-    "https://procolombia.co/convocatorias-exportaciones",
-    "https://procolombia.co/convocatorias-turismo",
+    "https://www.procolombia.co/convocatorias-exportaciones",
+    "https://www.procolombia.co/convocatorias-turismo",
 )
 CLOSED_KEYWORDS = ("cerrad", "finaliz", "cerró", "cerró", "conclu", "vencid")
 ALLOWED_HOSTS = {
@@ -26,6 +26,10 @@ ALLOWED_HOSTS = {
 def _slug_to_title(slug: str) -> str:
     text = slug.replace("-", " ").strip()
     return re.sub(r"\s+", " ", text).title()
+
+
+def _normalize_procolombia_url(url: str) -> str:
+    return url.replace("https://procolombia.co/", "https://www.procolombia.co/")
 
 
 class ProcolombiaConvocatoriasConnector:
@@ -45,15 +49,16 @@ class ProcolombiaConvocatoriasConnector:
         )
         locs = re.findall(r"<loc>([^<]+)</loc>", sitemap_content)
         conv_urls = [
-            loc
+            _normalize_procolombia_url(loc)
             for loc in locs
             if "convocatoria" in loc.lower()
-            and "/sala-de-prensa/noticias/" in loc.lower()
+            and ("/sala-de-prensa/noticias/" in loc.lower() or "/articulos/" in loc.lower())
         ][:25]
         for url in [*PROCOLOMBIA_HUB_URLS, *conv_urls]:
+            normalized_url = _normalize_procolombia_url(url)
             try:
                 page_url, content, _ = await fetch_httpx_text(
-                    url,
+                    normalized_url,
                     headers={"User-Agent": BROWSER_UA},
                     fallback_content_type="text/html",
                     playwright_fallback=False,
@@ -75,6 +80,7 @@ class ProcolombiaConvocatoriasConnector:
         )
 
     def _candidate_from_url(self, url: str, title: str | None = None) -> OpportunityCandidate | None:
+        url = _normalize_procolombia_url(url)
         parsed = urlparse(url)
         host = parsed.hostname or ""
         if host and not any(host == allowed or host.endswith(f".{allowed}") for allowed in ALLOWED_HOSTS):
