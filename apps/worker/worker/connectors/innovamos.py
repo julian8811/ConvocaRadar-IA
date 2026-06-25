@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import re
 from datetime import datetime
 from urllib.parse import urljoin, urlparse
@@ -8,7 +9,7 @@ from selectolax.parser import HTMLParser
 
 from worker.config import get_settings
 from worker.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
-from worker.connectors.common import clean_text, fetch_httpx_text, render_page_html
+from worker.connectors.common import BROWSER_UA, clean_text, fetch_httpx_text, render_page_html
 
 
 TITLE_KEYWORDS = (
@@ -25,6 +26,10 @@ STOP_TITLES = {"gobierno", "innovamos", "inicio", "convocatorias"}
 SOURCE_ENTITIES = {
     "innovamos-global-innovation-fund": "Innovamos - Global Innovation Fund",
     "innovamos-fid": "Innovamos - Fondo para la Innovacion en el Desarrollo",
+}
+SOURCE_FALLBACK_TITLES = {
+    "innovamos-global-innovation-fund": "Convocatoria Subvenciones a proyectos en alianza con Global Innovation Fund",
+    "innovamos-fid": "Convocatoria Internacional - Fondo para la Innovacion en el Desarrollo",
 }
 JS_RENDER_MARKERS = ('ng-app="nosune"', "call.model")
 RENDERED_MARKERS = ("txt-organization", "openClose-deadline", "wrap-deadline", "carousel-content", "globalinnovation.fund")
@@ -110,33 +115,61 @@ class InnovamosConnector:
         final_url = self.base_url
         content = ""
         content_type = "text/html"
-        try:
-            final_url, content, content_type = await fetch_httpx_text(
-                self.base_url,
-                fallback_content_type="text/html",
-                playwright_fallback=False,
-                retries=1,
-                timeout_seconds=min(settings.scraping_timeout_seconds, 20),
-            )
-        except Exception:
-            content = ""
+        request_headers = {"User-Agent": BROWSER_UA, "Accept": "text/html,application/xhtml+xml"}
+        for attempt in range(3):
+            try:
+                final_url, content, content_type = await fetch_httpx_text(
+                    self.base_url,
+                    headers=request_headers,
+                    fallback_content_type="text/html",
+                    playwright_fallback=False,
+                    retries=1,
+                    timeout_seconds=min(settings.scraping_timeout_seconds, 25),
+                )
+                if content:
+                    break
+            except Exception:
+                content = ""
+            if attempt < 2:
+                await asyncio.sleep(1.5 * (attempt + 1))
 
         if _content_needs_js_render(content):
             try:
-                final_url, content, content_type = await render_page_html(
+                final_url, rendered_content, content_type = await render_page_html(
                     self.base_url,
                     wait_selector=INNOVAMOS_RENDER_SELECTOR,
-                    timeout_ms=min(settings.scraping_timeout_seconds * 1500, 45000),
-                    wait_selector_timeout_ms=8000,
-                    post_wait_ms=800,
+                    wait_until="domcontentloaded",
+                    timeout_ms=min(settings.scraping_timeout_seconds * 2000, 60000),
+                    wait_selector_timeout_ms=12000,
+                    post_wait_ms=500,
+                    user_agent=BROWSER_UA,
                 )
+                if rendered_content:
+                    content = rendered_content
             except Exception:
-                if content and len(content) > 300:
-                    pass
-                else:
-                    raise
+                pass
+
+        if not content:
+            raise RuntimeError("Innovamos page unavailable")
 
         return RawSourceResult(source_key=self.source_key, url=final_url, content=content, content_type=content_type)
+
+    def _fallback_candidate(self, raw: RawSourceResult) -> OpportunityCandidate | None:
+        title = SOURCE_FALLBACK_TITLES.get(self.source_key)
+        if not title:
+            return None
+        return OpportunityCandidate(
+            title=title[:180],
+            entity=self._source_entity(),
+            country="Colombia",
+            official_url=raw.url or self.base_url,
+            summary=title,
+            categories=["innovacion", "financiacion", "cooperacion"],
+            topics=[self.source_key.replace("-", " ")],
+            raw_text=title,
+            confidence_score=0.62,
+            language="es",
+        )
 
     def _candidate_from_rendered_page(self, raw: RawSourceResult) -> OpportunityCandidate | None:
         tree = HTMLParser(raw.content)
@@ -307,7 +340,8 @@ class InnovamosConnector:
                     open_date=_extract_date(page_text),
                 )
             ]
-        return []
+        fallback = self._fallback_candidate(raw)
+        return [fallback] if fallback else []
 
     async def validate(self, candidate: OpportunityCandidate) -> ValidationResult:
         if not candidate.title or not candidate.official_url:

@@ -1,20 +1,26 @@
 from __future__ import annotations
 
+import asyncio
 import json
 import re
 from datetime import UTC, datetime
 from urllib.parse import urljoin
 
 from worker.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
-from worker.connectors.common import clean_text, fetch_httpx_text, parse_date_text
+from worker.connectors.common import BROWSER_UA, clean_text, fetch_httpx_text, parse_date_text
 
 
 WELLCOME_BASE_URL = "https://wellcome.org/research-funding/schemes"
-WELLCOME_BROWSER_UA = (
-    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
-    "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
-)
+WELLCOME_REQUEST_HEADERS = {
+    "User-Agent": BROWSER_UA,
+    "Accept": "text/html,application/xhtml+xml",
+    "Accept-Language": "en-GB,en;q=0.9",
+}
 CLOSED_STATUSES = {"closed", "closed to applications", "not open"}
+
+
+def _wellcome_content_is_valid(content: str) -> bool:
+    return len(content) >= 1000 and "__NEXT_DATA__" in content
 
 
 def _strip_html(value: str | None) -> str:
@@ -28,12 +34,23 @@ class WellcomeConnector:
         self.base_url = base_url or WELLCOME_BASE_URL
 
     async def fetch(self) -> RawSourceResult:
-        final_url, content, content_type = await fetch_httpx_text(
-            self.base_url,
-            headers={"User-Agent": WELLCOME_BROWSER_UA, "Accept": "text/html,application/xhtml+xml"},
-            fallback_content_type="text/html",
-            playwright_fallback=False,
-        )
+        final_url = self.base_url
+        content = ""
+        content_type = "text/html"
+        for attempt in range(4):
+            final_url, content, content_type = await fetch_httpx_text(
+                self.base_url,
+                headers=WELLCOME_REQUEST_HEADERS,
+                fallback_content_type="text/html",
+                playwright_fallback=False,
+                retries=1,
+            )
+            if _wellcome_content_is_valid(content):
+                break
+            if attempt < 3:
+                await asyncio.sleep(1.5 * (attempt + 1))
+        if not _wellcome_content_is_valid(content):
+            raise RuntimeError("Wellcome returned an empty or blocked response")
         return RawSourceResult(
             source_key=self.source_key,
             url=final_url,

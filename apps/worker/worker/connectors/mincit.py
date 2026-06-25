@@ -1,15 +1,17 @@
 from __future__ import annotations
 
+import asyncio
 import re
 from datetime import UTC, datetime
 from urllib.parse import urljoin
 
 from worker.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
-from worker.connectors.common import clean_text, fetch_httpx_text, parse_date_text
+from worker.connectors.common import BROWSER_UA, clean_text, fetch_httpx_text, parse_date_text
 
 
 MINCIT_PORTAL_BASE = "https://convocatoriasturismo.mincit.gov.co"
 MINCIT_LISTING_PATHS = ("/listado-convocatorias/7", "/listado-convocatorias/19", "/listado-convocatorias/1")
+MINCIT_REQUEST_HEADERS = {"User-Agent": BROWSER_UA, "Accept": "text/html,application/xhtml+xml"}
 
 
 class MincitConvocatoriasConnector:
@@ -18,24 +20,49 @@ class MincitConvocatoriasConnector:
     def __init__(self, base_url: str | None = None) -> None:
         self.base_url = base_url or f"{MINCIT_PORTAL_BASE}/listado-convocatorias"
 
+    async def _fetch_listing_page(self, path: str) -> str | None:
+        page_url = urljoin(MINCIT_PORTAL_BASE, path)
+        last_error: Exception | None = None
+        for attempt in range(3):
+            try:
+                _, content, _ = await fetch_httpx_text(
+                    page_url,
+                    headers=MINCIT_REQUEST_HEADERS,
+                    fallback_content_type="text/html",
+                    playwright_fallback=False,
+                    retries=1,
+                    timeout_seconds=25,
+                )
+                if len(content) >= 500 and "/convocatoria/" in content:
+                    return content
+            except Exception as exc:
+                last_error = exc
+            if attempt < 2:
+                await asyncio.sleep(1.5 * (attempt + 1))
+        if last_error:
+            return None
+        return None
+
     async def fetch(self) -> RawSourceResult:
         chunks: list[str] = []
         final_url = self.base_url
+        fetched_paths: list[str] = []
         for path in MINCIT_LISTING_PATHS:
-            page_url = urljoin(MINCIT_PORTAL_BASE, path)
-            final_url, content, _ = await fetch_httpx_text(
-                page_url,
-                fallback_content_type="text/html",
-                playwright_fallback=False,
-            )
+            content = await self._fetch_listing_page(path)
+            if not content:
+                continue
+            final_url = urljoin(MINCIT_PORTAL_BASE, path)
+            fetched_paths.append(path)
             chunks.append(content)
+        if not chunks:
+            raise RuntimeError("MinCIT listings unavailable")
         combined = "\n<!-- page-break -->\n".join(chunks)
         return RawSourceResult(
             source_key=self.source_key,
             url=final_url,
             content=combined,
             content_type="text/html",
-            metadata={"listing_paths": list(MINCIT_LISTING_PATHS)},
+            metadata={"listing_paths": fetched_paths},
         )
 
     def _parse_blocks(self, html: str) -> list[OpportunityCandidate]:

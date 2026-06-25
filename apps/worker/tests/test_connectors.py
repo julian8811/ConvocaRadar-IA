@@ -1647,6 +1647,89 @@ async def test_innovamos_fetch_uses_fast_render_path(monkeypatch) -> None:
 
 
 @pytest.mark.asyncio
+async def test_wellcome_fetch_retries_when_response_is_blocked(monkeypatch) -> None:
+    calls = {"count": 0}
+
+    async def fake_fetch(*_args, **_kwargs):
+        calls["count"] += 1
+        if calls["count"] == 1:
+            return "https://wellcome.org/research-funding/schemes", "", "text/html"
+        payload = {
+            "props": {
+                "pageProps": {
+                    "initialListings": [
+                        {
+                            "title": "Wellcome Discovery Awards",
+                            "url": "/research-funding/schemes/wellcome-discovery-awards",
+                            "scheme_status": "Open",
+                        }
+                    ]
+                }
+            }
+        }
+        html = f'<html>{"<!-- padding -->" * 120}<script id="__NEXT_DATA__" type="application/json">{json.dumps(payload)}</script></html>'
+        return "https://wellcome.org/research-funding/schemes", html, "text/html"
+
+    monkeypatch.setattr("worker.connectors.wellcome.fetch_httpx_text", fake_fetch)
+    async def fake_sleep(*_args, **_kwargs):
+        return None
+
+    monkeypatch.setattr("worker.connectors.wellcome.asyncio.sleep", fake_sleep)
+
+    connector = WellcomeConnector()
+    raw = await connector.fetch()
+
+    assert calls["count"] == 2
+    assert "__NEXT_DATA__" in raw.content
+
+
+@pytest.mark.asyncio
+async def test_mincit_fetch_skips_failed_listing_paths(monkeypatch) -> None:
+    async def fake_fetch(url, **_kwargs):
+        if url.endswith("/listado-convocatorias/19"):
+            raise TimeoutError("listing unavailable")
+        return (
+            url,
+            '<h3>CONVOCATORIA TEST</h3><a href="https://convocatoriasturismo.mincit.gov.co/convocatoria/72">Ver</a>'
+            + (" detalle " * 80),
+            "text/html",
+        )
+
+    monkeypatch.setattr("worker.connectors.mincit.fetch_httpx_text", fake_fetch)
+
+    async def fake_sleep(*_args, **_kwargs):
+        return None
+
+    monkeypatch.setattr("worker.connectors.mincit.asyncio.sleep", fake_sleep)
+
+    connector = MincitConvocatoriasConnector()
+    raw = await connector.fetch()
+
+    assert "/convocatoria/72" in raw.content
+    assert raw.metadata["listing_paths"] == ["/listado-convocatorias/7", "/listado-convocatorias/1"]
+
+
+@pytest.mark.asyncio
+async def test_innovamos_parse_uses_fallback_when_rendered_content_missing() -> None:
+    connector = InnovamosConnector(
+        "innovamos-fid",
+        "https://www.innovamos.gov.co/instrumentos/internacional-proyectos-fondo-para-la-innovacion-en",
+    )
+    raw = RawSourceResult(
+        source_key="innovamos-fid",
+        url="https://www.innovamos.gov.co/instrumentos/internacional-proyectos-fondo-para-la-innovacion-en",
+        content='<html ng-app="nosune"></html>',
+        content_type="text/html",
+    )
+
+    candidates = await connector.parse(raw)
+
+    assert len(candidates) == 1
+    assert "Fondo para la Innovacion" in candidates[0].title
+    assert (await connector.validate(candidates[0])).ok
+
+
+@pytest.mark.asyncio
 async def test_innovamos_fetch_keeps_partial_html_when_render_fails(monkeypatch) -> None:
     partial_html = (
         "<html><title>Convocatoria Fondo Innovacion</title><p>Subvencion para alianzas.</p>"
@@ -1667,6 +1750,28 @@ async def test_innovamos_fetch_keeps_partial_html_when_render_fails(monkeypatch)
     raw = await connector.fetch()
 
     assert raw.content == partial_html
+
+
+@pytest.mark.asyncio
+async def test_innovamos_fetch_does_not_raise_when_render_fails_without_shell(monkeypatch) -> None:
+    async def fake_httpx(*_args, **_kwargs):
+        raise TimeoutError("httpx timed out")
+
+    async def fake_render(*_args, **_kwargs):
+        raise TimeoutError("render timed out")
+
+    monkeypatch.setattr("worker.connectors.innovamos.fetch_httpx_text", fake_httpx)
+    monkeypatch.setattr("worker.connectors.innovamos.render_page_html", fake_render)
+
+    async def fake_sleep(*_args, **_kwargs):
+        return None
+
+    monkeypatch.setattr("worker.connectors.innovamos.asyncio.sleep", fake_sleep)
+
+    connector = InnovamosConnector("innovamos-fid", "https://www.innovamos.gov.co/test")
+
+    with pytest.raises(RuntimeError, match="Innovamos page unavailable"):
+        await connector.fetch()
 
 
 def test_render_page_html_uses_container_safe_launch(monkeypatch) -> None:
