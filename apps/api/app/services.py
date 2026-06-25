@@ -58,6 +58,88 @@ def connector_for(source_key: str, base_url: str | None = None, source_type: str
     return worker_connector_for(source_key, base_url, source_type)
 
 
+SLOW_SCRAPE_SOURCE_KEYS = frozenset(
+    {
+        "innovamos-global-innovation-fund",
+        "innovamos-fid",
+        "eu-funding-tenders",
+        "minciencias",
+        "ukri-opportunities",
+        "horizon-europe-sedia",
+    }
+)
+SLOW_SCRAPE_SOURCE_TYPES = frozenset({"hybrid"})
+
+
+def is_slow_scrape_source(source: Source) -> bool:
+    return source.key in SLOW_SCRAPE_SOURCE_KEYS or (source.source_type or "") in SLOW_SCRAPE_SOURCE_TYPES
+
+
+def source_due_for_scraping(source: Source, *, now: datetime | None = None) -> bool:
+    current = now or datetime.now(UTC).replace(tzinfo=None)
+    frequency = (source.scraping_frequency or "daily").lower()
+    if frequency in {"hourly", "every_hour", "daily", "every_day"}:
+        return True
+    if not source.last_run_at:
+        return True
+    elapsed = current - source.last_run_at
+    if frequency in {"weekly", "every_week"}:
+        return elapsed >= timedelta(days=7)
+    if frequency in {"monthly", "every_month"}:
+        return elapsed >= timedelta(days=28)
+    return elapsed >= timedelta(days=1)
+
+
+def schedule_or_execute_source_run(
+    db: Session,
+    source: Source,
+    *,
+    organization_id: str | None = None,
+    prefer_worker_for_slow: bool = True,
+) -> SourceRun:
+    from app.core.task_queue import enqueue_scrape_source
+
+    if prefer_worker_for_slow and is_slow_scrape_source(source):
+        started_at = datetime.now(UTC).replace(tzinfo=None)
+        run = SourceRun(
+            source_id=source.id,
+            status="scheduled",
+            started_at=None,
+            logs=[{"level": "info", "message": "Slow source queued for worker execution"}],
+        )
+        source.last_run_at = started_at
+        db.add(run)
+        db.flush()
+        task = Task(
+            organization_id=organization_id or source.organization_id,
+            source_run_id=run.id,
+            task_type="scrape_source",
+            provider="celery",
+            status="scheduled",
+            started_at=started_at,
+            payload={"source_key": source.key, "base_url": source.base_url, "source_type": source.source_type},
+        )
+        db.add(task)
+        db.flush()
+        external_id = enqueue_scrape_source(
+            source.key,
+            source.base_url,
+            source.source_type,
+            source_run_id=run.id,
+            task_id=task.id,
+        )
+        if external_id:
+            task.external_id = external_id
+            task.status = "queued"
+            task.result = {"message": "Scrape task queued for worker"}
+            run.status = "queued"
+            run.logs = [*run.logs, {"level": "info", "message": "Scrape task queued", "task_id": task.id}]
+            return run
+        db.delete(task)
+        db.delete(run)
+        db.flush()
+    return execute_source_run_locally(db, source, organization_id=organization_id)
+
 def slugify(value: str) -> str:
     value = re.sub(r"[^a-zA-Z0-9]+", "-", value.lower()).strip("-")
     return value or "item"

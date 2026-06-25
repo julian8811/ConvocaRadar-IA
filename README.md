@@ -103,11 +103,29 @@ The worker includes connector implementations for:
 
 - `grants-gov`: Grants.gov public `search2` API connector using `https://api.grants.gov/v1/api/search2`;
 - `grants-gov-rss`: Grants.gov public RSS feed connector using `https://www.grants.gov/rss/GG_OppModByCategory.xml`;
+- `novo-nordisk-grants`: Novo Nordisk Foundation WordPress grants API with pagination (`wp-json/wp/v2/grant`);
+- `horizon-europe-sedia`: Horizon Europe SEDIA search API for EU funding calls;
 - `minciencias`: Minciencias Colombia convocatoria listing connector using `https://minciencias.gov.co/convocatorias/todas`;
 - `innpulsa`: iNNpulsa Colombia convocatoria listing connector using `https://www.innpulsacolombia.com/convocatorias.html`;
 - `apc-colombia`: APC Colombia convocatorias listing connector using `https://www.apccolombia.gov.co/modalidades-de-cooperacion/convocatorias`;
 - `eu-funding-tenders`: European Commission calls-for-proposals listing using the EU Funding & Tenders Portal;
+- `wellcome-grants`, `gates-foundation-grants`, `dfg-grants`, `colfuturo-convocatorias`, `mincit-innovacion`: HTML listing sources via the generic HTML connector;
+- generic WordPress grants: reusable connector for any `wp-json/wp/v2/*` grants endpoint;
 - generic RSS: fallback parser for absolute-link RSS feeds;
 - generic HTML: fallback parser for simple public source pages.
+
+Wave 1 expands the default seed from 19 to 26 sources. Use `POST /api/v1/admin/sources/reseed-defaults` in production to insert new defaults without re-registering the organization.
+
+## Technology Watch Process
+
+Use this monthly checklist to evaluate new funding sources:
+
+1. Discover portals (`/grant`, `/funding`, `/convocatorias`), RSS feeds, and public APIs (`/wp-json/`, OpenAPI docs).
+2. Score each candidate (1-5) on technical access, URL stability, structured format, coverage, relevance, legal/ToS, and latency.
+3. Classify the connector: RSS seed-only, generic API/HTML, reusable WordPress grants, or dedicated connector.
+4. Validate with `POST /api/v1/internal/connectors/probe` before enabling in production.
+5. Add to `seed.py`, run reseed, execute a manual source run, and monitor Admin health for 3+ runs.
+
+Discard sources that require login, CAPTCHA, block cloud IPs, or expose only scanned PDFs.
 
 Connector tests use local fixtures and do not require internet access.

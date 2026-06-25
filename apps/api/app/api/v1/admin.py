@@ -9,6 +9,7 @@ from app.db.session import get_db
 from app.core.task_queue import enqueue_scrape_source
 from app.models import Alert, AuditLog, Opportunity, OpportunityEmbedding, Organization, Report, Source, SourceRun, Task, User
 from app.schemas import AdminMetricsRead, AuditLogRead, SourceRunOverviewRead
+from app.db.seed import seed_default_sources
 from app.services import execute_source_run_locally, rebuild_opportunity_embeddings
 
 router = APIRouter()
@@ -195,6 +196,36 @@ def get_admin_metrics(
         sent_alerts=db.scalar(select(func.count()).select_from(Alert).where(Alert.organization_id == organization.id, Alert.status == "sent")) or 0,
         audit_events=db.scalar(select(func.count()).select_from(AuditLog).where(AuditLog.organization_id == organization.id)) or 0,
     )
+
+
+@router.post("/admin/sources/reseed-defaults")
+def reseed_default_sources_admin(
+    organization: Organization = Depends(get_current_organization),
+    _: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> dict[str, int]:
+    before_total = db.scalar(
+        select(func.count()).select_from(Source).where(
+            or_(Source.organization_id == organization.id, Source.organization_id.is_(None))
+        )
+    ) or 0
+    stats = seed_default_sources(db, organization)
+    after_total = db.scalar(
+        select(func.count()).select_from(Source).where(
+            or_(Source.organization_id == organization.id, Source.organization_id.is_(None))
+        )
+    ) or 0
+    db.add(
+        AuditLog(
+            organization_id=organization.id,
+            action="reseed_default_sources",
+            resource_type="source",
+            resource_id=organization.id,
+            metadata_json={**stats, "before_total": before_total, "after_total": after_total},
+        )
+    )
+    db.commit()
+    return {**stats, "before_total": before_total, "after_total": after_total}
 
 
 @router.post("/admin/sources/retry-degraded")

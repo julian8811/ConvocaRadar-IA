@@ -27,6 +27,8 @@ from worker.connectors.unesco import UNESCOConnector
 from worker.connectors.simpler_grants import SimplerGrantsConnector
 from worker.connectors.ukri import UKRIConnector
 from worker.connectors.unwomen_innovate import UnwomenInnovateConnector
+from worker.connectors.wordpress_grants import WordPressGrantsConnector
+from worker.connectors.horizon_sedia import HorizonSediaConnector
 
 
 @pytest.mark.asyncio
@@ -1708,3 +1710,93 @@ def test_render_page_html_uses_container_safe_launch(monkeypatch) -> None:
     assert captured["headless"] is True
     assert captured["goto_kwargs"]["wait_until"] == "domcontentloaded"
     assert captured["goto_kwargs"]["timeout"] == 12000
+
+
+@pytest.mark.asyncio
+async def test_wordpress_grants_connector_parses_fixture() -> None:
+    payload = [
+        {
+            "id": 646420,
+            "status": "publish",
+            "date": "2026-06-25T14:00:28",
+            "link": "https://novonordiskfonden.dk/en/grant/start-package-grants-for-faculty-recruitment-q4-2026/",
+            "title": {"rendered": "Start Package Grants - for faculty recruitment Q4 2026"},
+            "acf": {"deadline": "2026-12-01"},
+        }
+    ]
+    connector = WordPressGrantsConnector(
+        "novo-nordisk-grants",
+        "https://novonordiskfonden.dk/wp-json/wp/v2/grant?per_page=100&status=publish",
+        entity_name="Novo Nordisk Foundation",
+        default_country="Denmark",
+        allowed_domains=["novonordiskfonden.dk"],
+    )
+    raw = RawSourceResult(
+        source_key="novo-nordisk-grants",
+        url="https://novonordiskfonden.dk/wp-json/wp/v2/grant?per_page=100&status=publish",
+        content=json.dumps(payload),
+        content_type="application/json",
+    )
+
+    candidates = await connector.parse(raw)
+
+    assert len(candidates) == 1
+    candidate = candidates[0]
+    assert candidate.title == "Start Package Grants - for faculty recruitment Q4 2026"
+    assert candidate.country == "Denmark"
+    assert candidate.entity == "Novo Nordisk Foundation"
+    assert candidate.official_url.endswith("/start-package-grants-for-faculty-recruitment-q4-2026/")
+    assert candidate.close_date is not None
+    assert (await connector.validate(candidate)).ok
+
+
+def test_connector_factory_selects_wordpress_and_horizon_connectors() -> None:
+    wp = connector_for(
+        "novo-nordisk-grants",
+        "https://novonordiskfonden.dk/wp-json/wp/v2/grant?per_page=100&status=publish",
+        "api",
+    )
+    horizon = connector_for(
+        "horizon-europe-sedia",
+        "https://api.tech.ec.europa.eu/search-api/prod/rest/search",
+        "api",
+    )
+    assert isinstance(wp, WordPressGrantsConnector)
+    assert isinstance(horizon, HorizonSediaConnector)
+
+
+@pytest.mark.asyncio
+async def test_horizon_sedia_connector_parses_fixture() -> None:
+    payload = {
+        "results": [
+            {
+                "reference": "HORIZON-2026-OPEN-1",
+                "summary": "Horizon Europe Open Research Call",
+                "metadata": {
+                    "callTitle": ["Horizon Europe Open Research Call"],
+                    "identifier": ["HORIZON-2026-OPEN-1"],
+                    "status": ["31094501"],
+                    "startDate": ["2026-05-01T00:00:00.000+0000"],
+                    "deadlineDate": ["2026-12-01T00:00:00.000+0000"],
+                    "keywords": ["research", "innovation"],
+                },
+            }
+        ]
+    }
+    connector = HorizonSediaConnector()
+    raw = RawSourceResult(
+        source_key="horizon-europe-sedia",
+        url="https://api.tech.ec.europa.eu/search-api/prod/rest/search",
+        content=json.dumps(payload),
+        content_type="application/json",
+    )
+
+    candidates = await connector.parse(raw)
+
+    assert len(candidates) == 1
+    candidate = candidates[0]
+    assert candidate.title == "Horizon Europe Open Research Call"
+    assert candidate.country == "European Union"
+    assert "HORIZON-2026-OPEN-1" in candidate.official_url
+    assert (await connector.validate(candidate)).ok
+

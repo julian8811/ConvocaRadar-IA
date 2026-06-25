@@ -5,7 +5,7 @@ from app.db.session import SessionLocal, create_all
 from app.models import Organization, OrganizationProfile, Source, User
 
 
-def seed_default_sources(db, organization: Organization) -> None:
+def seed_default_sources(db, organization: Organization) -> dict[str, int]:
     source_definitions = [
         {
             "key": "simpler-grants",
@@ -197,8 +197,87 @@ def seed_default_sources(db, organization: Organization) -> None:
             "category": ["innovation", "cooperation", "global"],
             "allowed_domains": ["unwomen.org"],
         },
+        {
+            "key": "novo-nordisk-grants",
+            "name": "Novo Nordisk Foundation Grants",
+            "base_url": "https://novonordiskfonden.dk/wp-json/wp/v2/grant?per_page=100&status=publish",
+            "country": "Denmark",
+            "region": "Europe",
+            "source_type": "api",
+            "category": ["grants", "health", "biotech", "research"],
+            "allowed_domains": ["novonordiskfonden.dk"],
+            "scraping_frequency": "daily",
+        },
+        {
+            "key": "wellcome-grants",
+            "name": "Wellcome Trust Funding",
+            "base_url": "https://wellcome.org/research-funding/schemes",
+            "country": "United Kingdom",
+            "region": "Europe",
+            "source_type": "html",
+            "category": ["grants", "health", "research"],
+            "allowed_domains": ["wellcome.org", "www.wellcome.org"],
+            "scraping_frequency": "weekly",
+        },
+        {
+            "key": "horizon-europe-sedia",
+            "name": "Horizon Europe SEDIA API",
+            "base_url": "https://api.tech.ec.europa.eu/search-api/prod/rest/search",
+            "country": "European Union",
+            "region": "Europe",
+            "source_type": "api",
+            "category": ["grants", "research", "innovation", "horizon europe"],
+            "allowed_domains": ["api.tech.ec.europa.eu", "ec.europa.eu"],
+            "scraping_frequency": "daily",
+        },
+        {
+            "key": "gates-foundation-grants",
+            "name": "Gates Foundation Open Opportunities",
+            "base_url": "https://www.gatesfoundation.org/about/how-we-work/grants",
+            "country": "International",
+            "region": "Global",
+            "source_type": "html",
+            "category": ["grants", "health", "development"],
+            "allowed_domains": ["gatesfoundation.org", "www.gatesfoundation.org"],
+            "scraping_frequency": "weekly",
+        },
+        {
+            "key": "dfg-grants",
+            "name": "DFG Funding Opportunities",
+            "base_url": "https://www.dfg.de/en/research_funding/",
+            "country": "Germany",
+            "region": "Europe",
+            "source_type": "html",
+            "category": ["grants", "research", "funding"],
+            "allowed_domains": ["dfg.de", "www.dfg.de"],
+            "scraping_frequency": "weekly",
+        },
+        {
+            "key": "colfuturo-convocatorias",
+            "name": "Colfuturo Convocatorias",
+            "base_url": "https://www.colfuturo.org/convocatorias/",
+            "country": "Colombia",
+            "region": "LatAm",
+            "source_type": "html",
+            "category": ["becas", "cooperacion", "educacion"],
+            "allowed_domains": ["colfuturo.org", "www.colfuturo.org"],
+            "scraping_frequency": "daily",
+        },
+        {
+            "key": "mincit-innovacion",
+            "name": "MinCIT Convocatorias",
+            "base_url": "https://www.mincit.gov.co/convocatorias",
+            "country": "Colombia",
+            "region": "LatAm",
+            "source_type": "html",
+            "category": ["convocatorias", "innovacion", "emprendimiento"],
+            "allowed_domains": ["mincit.gov.co", "www.mincit.gov.co"],
+            "scraping_frequency": "daily",
+        },
     ]
 
+    inserted = 0
+    updated = 0
     for definition in source_definitions:
         source = db.scalar(select(Source).where(Source.key == definition["key"]))
         if source:
@@ -209,9 +288,10 @@ def seed_default_sources(db, organization: Organization) -> None:
             source.region = definition["region"]
             source.source_type = definition["source_type"]
             source.category = definition["category"]
-            source.scraping_frequency = "daily"
+            source.scraping_frequency = definition.get("scraping_frequency", "daily")
             source.allowed_domains = definition["allowed_domains"]
             source.enabled = True
+            updated += 1
             continue
         db.add(
             Source(
@@ -223,10 +303,12 @@ def seed_default_sources(db, organization: Organization) -> None:
                 region=definition["region"],
                 source_type=definition["source_type"],
                 category=definition["category"],
-                scraping_frequency="daily",
+                scraping_frequency=definition.get("scraping_frequency", "daily"),
                 allowed_domains=definition["allowed_domains"],
             )
         )
+        inserted += 1
+    return {"inserted": inserted, "updated": updated, "total": len(source_definitions)}
 
 
 def seed() -> None:

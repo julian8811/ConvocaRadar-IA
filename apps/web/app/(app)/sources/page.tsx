@@ -2,7 +2,7 @@
 
 import { AlertTriangle, Play, Plus, RefreshCw } from "lucide-react";
 import Link from "next/link";
-import { FormEvent, useMemo } from "react";
+import { FormEvent, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
@@ -60,6 +60,7 @@ function formatDays(value: number | null) {
 
 export default function SourcesPage() {
   const queryClient = useQueryClient();
+  const [sourceType, setSourceType] = useState("html");
   const sources = useQuery({ queryKey: ["sources"], queryFn: api.sources });
   const sourceHealth = useQuery({ queryKey: ["source-health"], queryFn: api.sourceHealth });
   const actionLinkClass =
@@ -140,8 +141,12 @@ export default function SourcesPage() {
       key: form.get("key"),
       base_url: baseUrl,
       country: form.get("country") || "Colombia",
-      source_type: "html",
-      category: ["innovacion"],
+      region: form.get("region") || "LatAm",
+      source_type: sourceType,
+      category: String(form.get("category") || "innovacion")
+        .split(",")
+        .map((item) => item.trim())
+        .filter(Boolean),
       allowed_domains: hostname ? [hostname] : [],
     });
     event.currentTarget.reset();
@@ -173,8 +178,8 @@ export default function SourcesPage() {
 
       <Card>
         <CardHeader className="border-b border-border/70 pb-4">
-          <CardTitle className="text-slate-950 dark:text-white">Nueva fuente HTML</CardTitle>
-          <CardDescription>Alta rápida de una nueva fuente con dominio permitido.</CardDescription>
+          <CardTitle className="text-slate-950 dark:text-white">Nueva fuente</CardTitle>
+          <CardDescription>Alta rápida con tipo html, api, rss, hybrid, pdf o manual.</CardDescription>
         </CardHeader>
         <CardContent className="pt-5">
           <form className="grid gap-3 md:grid-cols-4" onSubmit={submit}>
@@ -182,6 +187,24 @@ export default function SourcesPage() {
             <Input name="key" placeholder="Clave única" required />
             <Input name="base_url" placeholder="https://..." required />
             <Input name="country" placeholder="País" defaultValue="Colombia" />
+            <Input name="region" placeholder="Región" defaultValue="LatAm" />
+            <Input name="category" placeholder="Categorías (coma)" defaultValue="innovacion" />
+            <label className="flex flex-col gap-1 text-sm text-slate-700 dark:text-slate-300">
+              Tipo de fuente
+              <select
+                name="source_type"
+                value={sourceType}
+                onChange={(event) => setSourceType(event.target.value)}
+                className="h-10 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-900 shadow-sm dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100"
+              >
+                <option value="html">html</option>
+                <option value="api">api</option>
+                <option value="rss">rss</option>
+                <option value="hybrid">hybrid</option>
+                <option value="pdf">pdf</option>
+                <option value="manual">manual</option>
+              </select>
+            </label>
             <Button className="md:col-span-4" disabled={createSource.isPending}>
               <Plus className="h-4 w-4" />
               Crear fuente

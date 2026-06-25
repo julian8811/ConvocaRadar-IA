@@ -231,6 +231,58 @@ Antes de abrir el sistema al publico:
 4. Confirmar que los reportes descargan y que los enlaces funcionan.
 5. Confirmar que los correos salen desde SMTP real o, si no hay SMTP, dejar alerts en modo desactivado.
 
+## Fuentes y vigilancia tecnologica
+
+La oleada 1 del seed incluye 26 fuentes por defecto (19 originales + 7 nuevas):
+
+| Key | Tipo | Region |
+|-----|------|--------|
+| `novo-nordisk-grants` | WordPress API | Europa |
+| `wellcome-grants` | HTML | UK/Global |
+| `horizon-europe-sedia` | SEDIA API | EU |
+| `gates-foundation-grants` | HTML | Global |
+| `dfg-grants` | HTML | Alemania |
+| `colfuturo-convocatorias` | HTML | Colombia |
+| `mincit-innovacion` | HTML | Colombia |
+
+### Reseed en produccion
+
+Las fuentes nuevas en `seed.py` no aparecen automaticamente si la organizacion ya existe. Tras desplegar, ejecuta como admin autenticado:
+
+```bash
+curl -X POST "$BACKEND_URL/api/v1/admin/sources/reseed-defaults" \
+  -H "Authorization: Bearer $ACCESS_TOKEN"
+```
+
+Verifica en Admin que `Fuentes configuradas` sube a 26+.
+
+### Probe de conectores
+
+```bash
+curl -X POST "$BACKEND_URL/api/v1/internal/connectors/probe" \
+  -H "X-Internal-API-Key: $INTERNAL_API_KEY" \
+  -H "Content-Type: application/json" \
+  -d '{"source_key":"novo-nordisk-grants","base_url":"https://novonordiskfonden.dk/wp-json/wp/v2/grant?per_page=100&status=publish","source_type":"api"}'
+```
+
+Criterio de exito para NNF: `candidates_valid >= 50`.
+
+### Matriz de evaluacion mensual
+
+| Criterio | Peso | Descartar si... |
+|----------|------|-----------------|
+| Acceso tecnico | Alto | Requiere login, CAPTCHA o bloquea IP cloud |
+| Estabilidad URL | Alto | Cambia cada mes sin redirects |
+| Formato estructurado | Alto | Solo PDF escaneado |
+| Cobertura | Medio | Menos de 5 convocatorias activas |
+| Relevancia | Medio | Fuera de I+D, cooperacion o innovacion |
+| Legal/ToS | Medio | Prohibe scraping explicitamente |
+| Latencia | Medio | Mas de 60 s por fuente en Render inline |
+
+### Run-all con 26+ fuentes
+
+`POST /sources/run-all` respeta `scraping_frequency` (fuentes semanales se omiten si corrieron hace menos de 7 dias) y encola fuentes lentas (`innovamos`, `eu-funding-tenders`, `minciencias`, `ukri-opportunities`, `horizon-europe-sedia`, hibridas) al worker cuando `SCRAPING_EXECUTION_MODE=worker` o `auto` con `USE_WORKER=true`. Con `inline`, todas las fuentes elegibles se ejecutan secuencialmente con timeout `SCRAPING_MAX_SOURCE_SECONDS=90`.
+
 ## Observaciones importantes
 
 - No existe una plataforma gratis unica que mantenga `Next.js + FastAPI + Celery + Postgres + Redis + storage` encendida 24/7 sin limites.
