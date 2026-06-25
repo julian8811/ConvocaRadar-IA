@@ -266,12 +266,12 @@ def seed_default_sources(db, organization: Organization) -> dict[str, int]:
         {
             "key": "mincit-innovacion",
             "name": "MinCIT Convocatorias",
-            "base_url": "https://www.mincit.gov.co/convocatorias",
+            "base_url": "https://convocatoriasturismo.mincit.gov.co/listado-convocatorias",
             "country": "Colombia",
             "region": "LatAm",
             "source_type": "html",
             "category": ["convocatorias", "innovacion", "emprendimiento"],
-            "allowed_domains": ["mincit.gov.co", "www.mincit.gov.co"],
+            "allowed_domains": ["mincit.gov.co", "www.mincit.gov.co", "convocatoriasturismo.mincit.gov.co"],
             "scraping_frequency": "daily",
         },
     ]

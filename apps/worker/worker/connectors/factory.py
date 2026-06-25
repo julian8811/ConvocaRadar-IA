@@ -21,6 +21,8 @@ from worker.connectors.ukri import UKRIConnector
 from worker.connectors.unwomen_innovate import UnwomenInnovateConnector
 from worker.connectors.wordpress_grants import WordPressGrantsConnector
 from worker.connectors.horizon_sedia import HorizonSediaConnector
+from worker.connectors.mincit import MincitConvocatoriasConnector
+from worker.connectors.wellcome import WellcomeConnector
 
 
 WORDPRESS_GRANT_SOURCE_KEYS = {
@@ -81,6 +83,10 @@ def connector_for(source_key: str, base_url: str | None = None, source_type: str
         return UnwomenInnovateConnector(base_url)
     if source_key == "horizon-europe-sedia":
         return HorizonSediaConnector(base_url)
+    if source_key == "wellcome-grants":
+        return WellcomeConnector(base_url)
+    if source_key == "mincit-innovacion":
+        return MincitConvocatoriasConnector(base_url)
     if source_key in WORDPRESS_GRANT_SOURCE_KEYS or "/wp-json/wp/v2/" in (base_url or ""):
         return _wordpress_connector(source_key, base_url or "")
     if source_type == "manual":
