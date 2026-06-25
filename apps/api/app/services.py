@@ -279,6 +279,12 @@ def find_duplicate_opportunity(
     return None
 
 
+def _opportunity_survivor_key(opportunity: Opportunity) -> tuple[datetime, datetime, str]:
+    first_seen = opportunity.first_seen_at or datetime.min.replace(tzinfo=None)
+    created = opportunity.created_at or first_seen
+    return (first_seen, created, opportunity.id)
+
+
 def _merge_opportunity_records(db: Session, survivor: Opportunity, duplicate: Opportunity) -> None:
     if duplicate.is_favorite and not survivor.is_favorite:
         survivor.is_favorite = True
