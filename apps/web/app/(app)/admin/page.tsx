@@ -121,7 +121,9 @@ export default function AdminPage() {
                       <p className="text-sm font-medium text-slate-950 dark:text-white">{item.name}</p>
                       <p className="text-xs text-slate-500 dark:text-slate-400">{item.key}</p>
                     </div>
-                    <Badge tone={item.status}>{item.status}</Badge>
+                    <Badge tone={item.status}>
+                      {item.status === "degraded" ? "Degradada" : item.status === "failing" ? "Fallando" : item.status === "idle" ? "Inactiva" : item.status}
+                    </Badge>
                   </div>
                   <div className="mt-3 grid gap-1 text-sm text-slate-700 dark:text-slate-300">
                     <p>Éxito: {Math.round(item.success_rate)}%</p>
