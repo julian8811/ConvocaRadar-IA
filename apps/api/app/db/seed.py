@@ -387,7 +387,7 @@ def seed_default_sources(db, organization: Organization) -> dict[str, int]:
         {
             "key": "procolombia-convocatorias",
             "name": "ProColombia Convocatorias",
-            "base_url": "https://procolombia.co/convocatorias-exportaciones",
+            "base_url": "https://www.procolombia.co/convocatorias-exportaciones",
             "country": "Colombia",
             "region": "LatAm",
             "source_type": "html",
