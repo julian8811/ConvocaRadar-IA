@@ -1,0 +1,29 @@
+{
+  "id": 60,
+  "tier": 4,
+  "marca": "Emma Colchón",
+  "grupo": "Canal/D2C",
+  "ranking": 0,
+  "credito_propio": "No",
+  "producto": "CSI bancarias (Mercado Pago)",
+  "modelo": "G",
+  "aliados": [
+    "BBVA",
+    "Tarjetas"
+  ],
+  "canales": "Online/retail",
+  "plazos": "Según canal",
+  "tasa": "Según canal",
+  "cuota_inicial": "Variable",
+  "monto_max": "Variable",
+  "digital": 5,
+  "inclusion": 2,
+  "condiciones": 3,
+  "modelo_cred": 3,
+  "accesibilidad": 3,
+  "tecnologia": 5,
+  "regulatorio": 4,
+  "url": "https://www.emma-colchon.co/csi/",
+  "estado": "completo",
+  "notas": "NO Addi/Sistecrédito. 12 CSI con 11 bancos."
+}

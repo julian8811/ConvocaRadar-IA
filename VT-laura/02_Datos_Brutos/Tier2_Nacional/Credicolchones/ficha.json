@@ -1,0 +1,28 @@
+{
+  "id": 19,
+  "tier": 2,
+  "marca": "Credicolchones",
+  "grupo": "Independiente",
+  "ranking": 19,
+  "credito_propio": "Sí",
+  "producto": "Crédito personal propio",
+  "modelo": "C",
+  "aliados": [
+    "Sistecredito"
+  ],
+  "canales": "Web formulario, tienda Eje Cafetero",
+  "plazos": "Hasta 10 meses",
+  "tasa": "Por validar",
+  "cuota_inicial": "Sí (al recibir)",
+  "monto_max": "85% producto, máx $2M",
+  "digital": 2,
+  "inclusion": 5,
+  "condiciones": 3,
+  "modelo_cred": 4,
+  "accesibilidad": 4,
+  "tecnologia": 2,
+  "regulatorio": 3,
+  "url": "https://www.credicolchones.com/credito/",
+  "estado": "completo",
+  "notas": "Acepta reportados y sin vida crediticia. Recaudo domicilio Pereira/Manizales."
+}

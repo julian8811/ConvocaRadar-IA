@@ -1,0 +1,30 @@
+{
+  "id": 3,
+  "tier": 1,
+  "marca": "Colchones Comodísimos",
+  "grupo": "Independiente",
+  "ranking": 3,
+  "credito_propio": "No",
+  "producto": "Crédito 100% online",
+  "modelo": "A",
+  "aliados": [
+    "Addi",
+    "BBVA",
+    "Tarjetas"
+  ],
+  "canales": "Web, 145 tiendas, WhatsApp (Callbell)",
+  "plazos": "Según Addi",
+  "tasa": "Según Addi",
+  "cuota_inicial": "Sin",
+  "monto_max": "Según cupo",
+  "digital": 5,
+  "inclusion": 3,
+  "condiciones": 4,
+  "modelo_cred": 4,
+  "accesibilidad": 4,
+  "tecnologia": 5,
+  "regulatorio": 4,
+  "url": "https://www.comodisimos.com",
+  "estado": "completo",
+  "notas": "Banner: crédito online con cédula y WhatsApp. Campañas BBVA 0%."
+}

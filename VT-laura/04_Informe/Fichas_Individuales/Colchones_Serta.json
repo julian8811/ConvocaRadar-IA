@@ -1,0 +1,29 @@
+{
+  "id": 6,
+  "tier": 1,
+  "marca": "Colchones Serta",
+  "grupo": "Grupo Inacsa",
+  "ranking": 5,
+  "credito_propio": "No",
+  "producto": "Financiación en tienda",
+  "modelo": "D",
+  "aliados": [
+    "Crediconvenio_BdB",
+    "Tarjetas"
+  ],
+  "canales": "11 tiendas premium",
+  "plazos": "6-72 meses",
+  "tasa": "Según perfil BdB + FGA",
+  "cuota_inicial": "Según perfil",
+  "monto_max": "$400K-$25M",
+  "digital": 3,
+  "inclusion": 3,
+  "condiciones": 4,
+  "modelo_cred": 4,
+  "accesibilidad": 3,
+  "tecnologia": 3,
+  "regulatorio": 5,
+  "url": "https://sertacolombia.com.co",
+  "estado": "completo",
+  "notas": "Crediconvenio en sucursales Bogotá, B/quilla, Cartagena, etc."
+}

@@ -1,0 +1,33 @@
+{
+  "id": 4,
+  "tier": 1,
+  "marca": "Americana de Colchones",
+  "grupo": "Grupo Inacsa",
+  "ranking": 5,
+  "credito_propio": "Sí",
+  "producto": "Americana Crédito",
+  "modelo": "B",
+  "aliados": [
+    "Listo_Fenalco",
+    "Crediconvenio_BdB",
+    "Addi",
+    "Servicredito",
+    "Vanti",
+    "BBVA"
+  ],
+  "canales": "Listo virtual, tienda (~48), tel 6684949 op5",
+  "plazos": "Por validar Listo",
+  "tasa": "Por validar (Fenalco/Refinancia)",
+  "cuota_inicial": "No declarada",
+  "monto_max": "Tickets >$2M",
+  "digital": 4,
+  "inclusion": 4,
+  "condiciones": 4,
+  "modelo_cred": 5,
+  "accesibilidad": 5,
+  "tecnologia": 4,
+  "regulatorio": 4,
+  "url": "https://americanadecolchones.com/pages/preguntas-frecuentes",
+  "estado": "completo",
+  "notas": "Solo cédula, sin codeudor, sin cuota manejo. Fenalco aprueba. 0% Feria del Hogar."
+}

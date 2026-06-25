@@ -1,0 +1,29 @@
+{
+  "id": 65,
+  "tier": 4,
+  "marca": "Colhogar",
+  "grupo": "Canal/D2C",
+  "ranking": 0,
+  "credito_propio": "No",
+  "producto": "Crédito en línea",
+  "modelo": "A",
+  "aliados": [
+    "KrediYA",
+    "Tarjetas"
+  ],
+  "canales": "Online/retail",
+  "plazos": "Según canal",
+  "tasa": "Según canal",
+  "cuota_inicial": "Variable",
+  "monto_max": "Variable",
+  "digital": 3,
+  "inclusion": 3,
+  "condiciones": 3,
+  "modelo_cred": 3,
+  "accesibilidad": 3,
+  "tecnologia": 3,
+  "regulatorio": 4,
+  "url": "https://colhogar.com.co",
+  "estado": "completo",
+  "notas": "Ramguiflex y otras marcas."
+}

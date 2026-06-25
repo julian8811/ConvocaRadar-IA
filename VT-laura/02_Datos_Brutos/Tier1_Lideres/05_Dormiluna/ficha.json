@@ -1,0 +1,32 @@
+{
+  "id": 5,
+  "tier": 1,
+  "marca": "Colchones Dormiluna",
+  "grupo": "Grupo Inacsa",
+  "ranking": 5,
+  "credito_propio": "Parcial",
+  "producto": "Dormicrédito",
+  "modelo": "H",
+  "aliados": [
+    "Addi",
+    "Servicredito",
+    "Vanti",
+    "Crediconvenio_BdB",
+    "Tarjetas"
+  ],
+  "canales": "Web Shopify, tienda, WhatsApp",
+  "plazos": "Según aliado",
+  "tasa": "Según aliado",
+  "cuota_inicial": "Sin (BNPL)",
+  "monto_max": "Según cupo",
+  "digital": 4,
+  "inclusion": 4,
+  "condiciones": 4,
+  "modelo_cred": 5,
+  "accesibilidad": 4,
+  "tecnologia": 4,
+  "regulatorio": 4,
+  "url": "https://colchonesdormiluna.com/pages/dormicredito",
+  "estado": "completo",
+  "notas": "Segmento acceso/masivo Inacsa."
+}

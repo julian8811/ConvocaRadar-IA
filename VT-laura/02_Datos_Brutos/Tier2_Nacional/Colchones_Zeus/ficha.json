@@ -1,0 +1,28 @@
+{
+  "id": 18,
+  "tier": 2,
+  "marca": "Colchones Zeus",
+  "grupo": "Independiente",
+  "ranking": 18,
+  "credito_propio": "No",
+  "producto": "Sistecrédito exclusivo",
+  "modelo": "F",
+  "aliados": [
+    "Sistecredito"
+  ],
+  "canales": "Solo tienda física",
+  "plazos": "1-6 meses",
+  "tasa": "Según perfil",
+  "cuota_inicial": "Opcional",
+  "monto_max": "$20K-$800K+",
+  "digital": 2,
+  "inclusion": 3,
+  "condiciones": 4,
+  "modelo_cred": 3,
+  "accesibilidad": 3,
+  "tecnologia": 3,
+  "regulatorio": 4,
+  "url": "https://www.colchoneszeus.com/sistecredito/",
+  "estado": "completo",
+  "notas": "Solo tienda. Quincenal/mensual. Retracto 5 días. Prepago sin sanción."
+}
