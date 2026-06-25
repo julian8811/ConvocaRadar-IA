@@ -28,6 +28,11 @@ from worker.connectors.heading_list_html import HeadingListHtmlConnector
 from worker.connectors.idrc_funding import IdrcFundingConnector
 from worker.connectors.usaid_grants import UsaidGrantsConnector
 from worker.connectors.giz_funding import GizFundingConnector
+from worker.connectors.cordis_h2020 import CordisH2020Connector
+from worker.connectors.eic_accelerator import EicAcceleratorConnector
+from worker.connectors.global_innovation_fund import GlobalInnovationFundConnector
+from worker.connectors.procolombia_convocatorias import ProcolombiaConvocatoriasConnector
+from worker.connectors.anii_uruguay import AniiUruguayConnector
 
 
 WORDPRESS_GRANT_SOURCE_KEYS = {
@@ -155,6 +160,16 @@ def connector_for(source_key: str, base_url: str | None = None, source_type: str
         return UsaidGrantsConnector(base_url)
     if source_key == "giz-funding":
         return GizFundingConnector(base_url)
+    if source_key == "cordis-h2020":
+        return CordisH2020Connector(base_url)
+    if source_key == "eic-accelerator":
+        return EicAcceleratorConnector(base_url)
+    if source_key == "global-innovation-fund":
+        return GlobalInnovationFundConnector(base_url)
+    if source_key == "procolombia-convocatorias":
+        return ProcolombiaConvocatoriasConnector(base_url)
+    if source_key == "anii-uruguay":
+        return AniiUruguayConnector(base_url)
     if source_key in WORDPRESS_GRANT_SOURCE_KEYS or "/wp-json/wp/v2/" in (base_url or ""):
         return _wordpress_connector(source_key, base_url or "")
     if source_type == "manual":

@@ -114,7 +114,7 @@ The worker includes connector implementations for:
 - generic RSS: fallback parser for absolute-link RSS feeds;
 - generic HTML: fallback parser for simple public source pages.
 
-Wave 1 expands the default seed from 19 to 26 sources; wave 2 adds 7 more (33 total). Use `POST /api/v1/admin/sources/reseed-defaults` in production to insert new defaults without re-registering the organization.
+Wave 1 expands the default seed from 19 to 26 sources; wave 2 adds 7 more (33 total); wave 3 adds 5 more (38 total). Use `POST /api/v1/admin/sources/reseed-defaults` in production to insert new defaults without re-registering the organization.
 
 ## Technology Watch Process
 

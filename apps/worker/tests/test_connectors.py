@@ -34,6 +34,11 @@ from worker.connectors.bdn_convocatorias import BdnConvocatoriasConnector
 from worker.connectors.heading_list_html import HeadingListHtmlConnector
 from worker.connectors.usaid_grants import UsaidGrantsConnector
 from worker.connectors.mincit import MincitConvocatoriasConnector
+from worker.connectors.cordis_h2020 import CordisH2020Connector
+from worker.connectors.eic_accelerator import EicAcceleratorConnector
+from worker.connectors.global_innovation_fund import GlobalInnovationFundConnector
+from worker.connectors.procolombia_convocatorias import ProcolombiaConvocatoriasConnector
+from worker.connectors.anii_uruguay import AniiUruguayConnector
 
 
 @pytest.mark.asyncio
@@ -1949,4 +1954,160 @@ def test_connector_factory_selects_wave2_connectors() -> None:
         BdnConvocatoriasConnector,
     )
     assert isinstance(connector_for("usaid-grants", "https://api.grants.gov/v1/api/search2", "api"), UsaidGrantsConnector)
+
+
+@pytest.mark.asyncio
+async def test_cordis_h2020_connector_parses_fixture() -> None:
+    payload = [
+        {
+            "reference": "101000000",
+            "title": "Active Horizon 2020 Research Project",
+            "acronym": "ACTIVEH2020",
+            "startDate": "1 January 2024",
+            "endDate": "28 {{month_02}} 2027",
+            "lastUpdateDate": "6 {{month_05}} 2026",
+            "programme": [{"code": "H2020", "title": "Horizon 2020"}],
+            "teaser": "Research and innovation project.",
+        }
+    ]
+    connector = CordisH2020Connector()
+    raw = RawSourceResult(
+        source_key="cordis-h2020",
+        url="https://cordis.europa.eu/api/search/results",
+        content=json.dumps(payload),
+        content_type="application/json",
+    )
+
+    candidates = await connector.parse(raw)
+
+    assert len(candidates) == 1
+    assert candidates[0].entity == "Horizon 2020"
+    assert "101000000" in candidates[0].official_url
+    assert (await connector.validate(candidates[0])).ok
+
+
+@pytest.mark.asyncio
+async def test_eic_accelerator_connector_parses_fixture() -> None:
+    payload = {
+        "results": [
+            {
+                "reference": "HORIZON-EIC-2026-ACCELERATOR-01",
+                "summary": "EIC Accelerator Open 2026",
+                "metadata": {
+                    "callTitle": ["EIC Accelerator Open 2026"],
+                    "identifier": ["HORIZON-EIC-2026-ACCELERATOR-01"],
+                    "status": ["31094501"],
+                    "startDate": ["2026-01-01T00:00:00.000+0000"],
+                    "deadlineDate": ["2026-10-01T00:00:00.000+0000"],
+                    "keywords": ["accelerator", "startup"],
+                },
+            }
+        ]
+    }
+    connector = EicAcceleratorConnector()
+    raw = RawSourceResult(
+        source_key="eic-accelerator",
+        url="https://api.tech.ec.europa.eu/search-api/prod/rest/search",
+        content=json.dumps(payload),
+        content_type="application/json",
+    )
+
+    candidates = await connector.parse(raw)
+
+    assert len(candidates) == 1
+    assert candidates[0].entity == "European Innovation Council"
+    assert "EIC" in candidates[0].title
+    assert (await connector.validate(candidates[0])).ok
+
+
+@pytest.mark.asyncio
+async def test_global_innovation_fund_connector_parses_fixture() -> None:
+    html = """
+    <html><body>
+      <h1>Applying for Funding</h1>
+      <p>We invest in social innovations that improve lives.</p>
+      <a href="https://www.globalinnovation.fund/what-we-do/funding-guidelines/">Funding Guidelines</a>
+    </body></html>
+    """
+    connector = GlobalInnovationFundConnector()
+    raw = RawSourceResult(
+        source_key="global-innovation-fund",
+        url="https://www.globalinnovation.fund/apply-for-funding/",
+        content=html,
+        content_type="text/html",
+    )
+
+    candidates = await connector.parse(raw)
+
+    assert len(candidates) >= 1
+    assert candidates[0].entity == "Global Innovation Fund"
+    assert (await connector.validate(candidates[0])).ok
+
+
+@pytest.mark.asyncio
+async def test_procolombia_connector_parses_fixture() -> None:
+    html = """
+    <!-- page:https://procolombia.co/sala-de-prensa/noticias/abierta-la-convocatoria-turismo -->
+    <html><body>
+      <title>Abierta la convocatoria para los Premios de Turismo Colombia</title>
+      <a href="https://procolombia.co/sala-de-prensa/noticias/abierta-la-convocatoria-turismo">
+        Abierta la convocatoria para los Premios de Turismo Colombia
+      </a>
+    </body></html>
+    """
+    connector = ProcolombiaConvocatoriasConnector()
+    raw = RawSourceResult(
+        source_key="procolombia-convocatorias",
+        url="https://procolombia.co/convocatorias-exportaciones",
+        content=html,
+        content_type="text/html",
+    )
+
+    candidates = await connector.parse(raw)
+
+    assert len(candidates) >= 1
+    assert "convocatoria" in candidates[0].title.lower()
+    assert (await connector.validate(candidates[0])).ok
+
+
+@pytest.mark.asyncio
+async def test_anii_uruguay_connector_parses_fixture() -> None:
+    html = """
+    <!-- page:https://anii.org.uy/apoyos/investigacion/ -->
+    <html><body>
+      <a href="https://anii.org.uy/apoyos/investigacion/529/convocatoria-pilar-en-resistencia-antimicrobiana">
+        Convocatoria Pilar en Resistencia Antimicrobiana
+      </a>
+    </body></html>
+    """
+    connector = AniiUruguayConnector()
+    raw = RawSourceResult(
+        source_key="anii-uruguay",
+        url="https://anii.org.uy/apoyos/investigacion/",
+        content=html,
+        content_type="text/html",
+    )
+
+    candidates = await connector.parse(raw)
+
+    assert len(candidates) == 1
+    assert "Resistencia Antimicrobiana" in candidates[0].title
+    assert (await connector.validate(candidates[0])).ok
+
+
+def test_connector_factory_selects_wave3_connectors() -> None:
+    assert isinstance(connector_for("cordis-h2020", "https://cordis.europa.eu/api/search/results", "api"), CordisH2020Connector)
+    assert isinstance(
+        connector_for("eic-accelerator", "https://api.tech.ec.europa.eu/search-api/prod/rest/search", "api"),
+        EicAcceleratorConnector,
+    )
+    assert isinstance(
+        connector_for("global-innovation-fund", "https://www.globalinnovation.fund/apply-for-funding/"),
+        GlobalInnovationFundConnector,
+    )
+    assert isinstance(
+        connector_for("procolombia-convocatorias", "https://procolombia.co/convocatorias-exportaciones"),
+        ProcolombiaConvocatoriasConnector,
+    )
+    assert isinstance(connector_for("anii-uruguay", "https://anii.org.uy/apoyos/investigacion/"), AniiUruguayConnector)
 
