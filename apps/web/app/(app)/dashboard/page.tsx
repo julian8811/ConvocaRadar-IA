@@ -876,7 +876,7 @@ function InfoTile({ label, value, detail }: { label: string; value: string | num
 
 function ChartEmpty({ title, detail }: { title: string; detail: string }) {
   return (
-    <div className="flex h-full flex-col items-center justify-center rounded-lg border border-dashed border-border bg-muted/30 px-6 text-center">
+    <div className="flex h-full flex-col items-center justify-center rounded-lg border border-dashed border-border bg-slate-100/30 px-6 text-center dark:bg-slate-800/30">
       <p className="text-sm font-medium text-slate-950 dark:text-white">{title}</p>
       <p className="mt-1 max-w-md text-sm text-slate-500 dark:text-slate-400">{detail}</p>
     </div>

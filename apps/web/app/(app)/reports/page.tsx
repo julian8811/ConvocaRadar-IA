@@ -67,7 +67,7 @@ function ReportCard({ report }: { report: Report }) {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4 pt-5">
-        <div className="max-h-44 overflow-hidden rounded-lg border border-border bg-muted/40 p-3 text-xs text-slate-700 dark:text-slate-300">
+        <div className="max-h-44 overflow-hidden rounded-lg border border-border bg-slate-100/40 p-3 text-xs text-slate-700 dark:bg-slate-800/40 dark:text-slate-300">
           {report.html_content.replace(/<[^>]+>/g, " ").slice(0, 300)}
         </div>
         <div className="rounded-xl border border-dashed border-border/80 bg-background/60 p-4 dark:bg-slate-950/30">
