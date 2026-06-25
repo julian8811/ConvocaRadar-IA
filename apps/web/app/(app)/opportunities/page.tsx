@@ -233,7 +233,7 @@ export default function OpportunitiesPage() {
 
       {opportunities.data && items.length > 0 ? (
         <Card>
-          <CardHeader className="border-b border-border/70 pb-4">
+          <CardHeader className="border-b border-slate-200 dark:border-slate-700 pb-4">
             <CardTitle className="text-lg text-slate-950 dark:text-white">
               {total} oportunidades detectadas - página {page} de {totalPages}
             </CardTitle>
