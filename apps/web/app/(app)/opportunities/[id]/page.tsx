@@ -216,7 +216,7 @@ export default function OpportunityDetailPage() {
       <div className="grid gap-4 lg:grid-cols-[1.6fr_1fr]">
         <div className="space-y-4">
           <Card>
-            <CardHeader className="border-b border-border/70 pb-4">
+            <CardHeader className="border-b border-slate-200 dark:border-slate-700 pb-4">
               <CardTitle className="flex items-center gap-2 text-slate-950 dark:text-white">
                 <Sparkles className="h-4 w-4" />
                 Resumen de IA
@@ -244,7 +244,7 @@ export default function OpportunityDetailPage() {
 
         <div className="space-y-4">
           <Card>
-            <CardHeader className="border-b border-border/70 pb-4">
+            <CardHeader className="border-b border-slate-200 dark:border-slate-700 pb-4">
               <CardTitle className="flex items-center gap-2 text-slate-950 dark:text-white">
                 <Gauge className="h-4 w-4" />
                 Compatibilidad
@@ -273,7 +273,7 @@ export default function OpportunityDetailPage() {
           </Card>
 
           <Card>
-            <CardHeader className="border-b border-border/70 pb-4">
+            <CardHeader className="border-b border-slate-200 dark:border-slate-700 pb-4">
               <CardTitle className="text-slate-950 dark:text-white">Datos clave</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 pt-5 text-sm">
@@ -285,7 +285,7 @@ export default function OpportunityDetailPage() {
           </Card>
 
           <Card>
-            <CardHeader className="border-b border-border/70 pb-4">
+            <CardHeader className="border-b border-slate-200 dark:border-slate-700 pb-4">
               <CardTitle className="text-slate-950 dark:text-white">Seguimiento</CardTitle>
             </CardHeader>
             <CardContent className="grid grid-cols-2 gap-2 pt-5">
@@ -331,7 +331,7 @@ function DocumentsCard({
 }) {
   return (
     <Card>
-      <CardHeader className="border-b border-border/70 pb-4">
+      <CardHeader className="border-b border-slate-200 dark:border-slate-700 pb-4">
         <CardTitle className="flex items-center gap-2 text-slate-950 dark:text-white">
           <Paperclip className="h-4 w-4" />
           Adjuntos
@@ -349,7 +349,7 @@ function DocumentsCard({
         {!isLoading && documents.length === 0 ? <p className="text-sm text-slate-500 dark:text-slate-400">No hay adjuntos cargados.</p> : null}
         <div className="space-y-2">
           {documents.map((document) => (
-            <div key={document.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-border bg-card p-3">
+            <div key={document.id} className="flex flex-wrap items-center justify-between gap-3 rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-3">
               <div className="min-w-0">
                 <p className="truncate text-sm font-medium text-slate-950 dark:text-white">{decodeVisibleText(document.file_name, "Documento")}</p>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
@@ -374,7 +374,7 @@ function DocumentsCard({
 
 function KeyValue({ label, value }: { label: string; value: string }) {
   return (
-    <div className="flex items-center justify-between gap-4 border-b border-border/70 pb-2">
+    <div className="flex items-center justify-between gap-4 border-b border-slate-200 dark:border-slate-700 pb-2">
       <span className="text-slate-500 dark:text-slate-400">{label}</span>
       <span className="text-right font-medium text-slate-950 dark:text-white">{value}</span>
     </div>
@@ -398,7 +398,7 @@ function InfoMini({ title, items }: { title: string; items: string[] }) {
 function InfoList({ title, icon: Icon, items, empty }: { title: string; icon: ElementType; items: string[]; empty: string }) {
   return (
     <Card>
-      <CardHeader className="border-b border-border/70 pb-4">
+      <CardHeader className="border-b border-slate-200 dark:border-slate-700 pb-4">
         <CardTitle className="flex items-center gap-2 text-slate-950 dark:text-white">
           <Icon className="h-4 w-4" />
           {title}

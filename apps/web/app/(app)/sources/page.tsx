@@ -178,7 +178,7 @@ export default function SourcesPage() {
       </div>
 
       <Card>
-        <CardHeader className="border-b border-border/70 pb-4">
+        <CardHeader className="border-b border-slate-200 dark:border-slate-700 pb-4">
           <CardTitle className="text-slate-950 dark:text-white">Nueva fuente</CardTitle>
           <CardDescription>Alta rápida con tipo html, api, rss, hybrid, pdf o manual.</CardDescription>
         </CardHeader>
@@ -219,7 +219,7 @@ export default function SourcesPage() {
 
       {sources.data ? (
         <Card>
-          <CardHeader className="border-b border-border/70 pb-4">
+          <CardHeader className="border-b border-slate-200 dark:border-slate-700 pb-4">
             <CardTitle className="text-slate-950 dark:text-white">Fuentes registradas</CardTitle>
             <CardDescription>Estado operativo y última ejecución de cada fuente.</CardDescription>
           </CardHeader>
@@ -264,7 +264,7 @@ export default function SourcesPage() {
 
       {sourceHealth.data ? (
         <Card>
-          <CardHeader className="border-b border-border/70 pb-4">
+          <CardHeader className="border-b border-slate-200 dark:border-slate-700 pb-4">
             <CardTitle className="flex items-center gap-2 text-slate-950 dark:text-white">
               <AlertTriangle className="h-4 w-4" />
               Salud detallada de fuentes
@@ -318,7 +318,7 @@ export default function SourcesPage() {
 
       {(sourceHealth.data ?? []).some((item) => item.status !== "healthy") ? (
         <Card>
-          <CardHeader className="border-b border-border/70 pb-4">
+          <CardHeader className="border-b border-slate-200 dark:border-slate-700 pb-4">
             <CardTitle className="text-slate-950 dark:text-white">Fuentes que requieren atención</CardTitle>
             <CardDescription>Prioriza las fuentes con fallas recientes, degradación o poca actividad.</CardDescription>
           </CardHeader>
@@ -326,7 +326,7 @@ export default function SourcesPage() {
             {healthItems
               .filter((item) => item.status !== "healthy")
               .map((item) => (
-                <div key={item.source_id} className="rounded-lg border border-border bg-card p-4">
+                <div key={item.source_id} className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div>
                       <p className="text-sm font-medium text-slate-950 dark:text-white">{item.name}</p>

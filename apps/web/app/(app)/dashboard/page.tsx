@@ -334,7 +334,7 @@ export default function DashboardPage() {
 
       <div className="grid gap-4 xl:grid-cols-[1.15fr_0.85fr]">
         <Card>
-          <CardHeader className="border-b border-border/70 pb-4">
+          <CardHeader className="border-b border-slate-200 dark:border-slate-700 pb-4">
             <CardTitle className="flex items-center gap-2 text-slate-950 dark:text-white">
               <Radar className="h-4 w-4" />
               Lectura operativa
@@ -352,7 +352,7 @@ export default function DashboardPage() {
         </Card>
 
         <Card>
-          <CardHeader className="border-b border-border/70 pb-4">
+          <CardHeader className="border-b border-slate-200 dark:border-slate-700 pb-4">
             <CardTitle className="flex items-center gap-2 text-slate-950 dark:text-white">
               <Sparkles className="h-4 w-4" />
               Estado de la captura
@@ -383,7 +383,7 @@ export default function DashboardPage() {
 
       <div className="grid gap-4 xl:grid-cols-2">
         <Card>
-          <CardHeader className="border-b border-border/70 pb-4">
+          <CardHeader className="border-b border-slate-200 dark:border-slate-700 pb-4">
             <CardTitle className="flex items-center gap-2 text-slate-950 dark:text-white">
               <TrendingUp className="h-4 w-4" />
               Estado de las convocatorias
@@ -431,7 +431,7 @@ export default function DashboardPage() {
         </Card>
 
         <Card>
-          <CardHeader className="border-b border-border/70 pb-4">
+          <CardHeader className="border-b border-slate-200 dark:border-slate-700 pb-4">
             <CardTitle className="flex items-center gap-2 text-slate-950 dark:text-white">
               <MapPinned className="h-4 w-4" />
               Distribución por país
@@ -465,7 +465,7 @@ export default function DashboardPage() {
         </Card>
 
         <Card>
-          <CardHeader className="border-b border-border/70 pb-4">
+          <CardHeader className="border-b border-slate-200 dark:border-slate-700 pb-4">
             <CardTitle className="flex items-center gap-2 text-slate-950 dark:text-white">
               <Tags className="h-4 w-4" />
               Categorías predominantes
@@ -499,7 +499,7 @@ export default function DashboardPage() {
         </Card>
 
         <Card>
-          <CardHeader className="border-b border-border/70 pb-4">
+          <CardHeader className="border-b border-slate-200 dark:border-slate-700 pb-4">
             <CardTitle className="flex items-center gap-2 text-slate-950 dark:text-white">
               <Sparkles className="h-4 w-4" />
               Cobertura de los datos capturados
@@ -548,7 +548,7 @@ export default function DashboardPage() {
 
       <div className="grid gap-4 xl:grid-cols-[1.3fr_1fr]">
         <Card>
-          <CardHeader className="border-b border-border/70 pb-4">
+          <CardHeader className="border-b border-slate-200 dark:border-slate-700 pb-4">
             <CardTitle className="flex items-center gap-2 text-slate-950 dark:text-white">
               <Search className="h-4 w-4" />
               Oportunidades recientes
@@ -593,7 +593,7 @@ export default function DashboardPage() {
         </Card>
 
         <Card>
-          <CardHeader className="border-b border-border/70 pb-4">
+          <CardHeader className="border-b border-slate-200 dark:border-slate-700 pb-4">
             <CardTitle className="flex items-center gap-2 text-slate-950 dark:text-white">
               <AlertTriangle className="h-4 w-4" />
               Fuentes que piden atención
@@ -631,7 +631,7 @@ export default function DashboardPage() {
 
       <div className="grid gap-4 xl:grid-cols-2">
         <Card>
-          <CardHeader className="border-b border-border/70 pb-4">
+          <CardHeader className="border-b border-slate-200 dark:border-slate-700 pb-4">
             <CardTitle className="flex items-center gap-2 text-slate-950 dark:text-white">
               <CalendarClock className="h-4 w-4" />
               Cierres por mes
@@ -673,7 +673,7 @@ export default function DashboardPage() {
         </Card>
 
         <Card>
-          <CardHeader className="border-b border-border/70 pb-4">
+          <CardHeader className="border-b border-slate-200 dark:border-slate-700 pb-4">
             <CardTitle className="flex items-center gap-2 text-slate-950 dark:text-white">
               <BarChart3 className="h-4 w-4" />
               Salud de las fuentes
@@ -722,7 +722,7 @@ export default function DashboardPage() {
       </div>
 
       <Card>
-        <CardHeader className="border-b border-border/70 pb-4">
+        <CardHeader className="border-b border-slate-200 dark:border-slate-700 pb-4">
           <CardTitle className="flex items-center gap-2 text-slate-950 dark:text-white">
             <MapPinned className="h-4 w-4" />
             Fuentes más activas
@@ -765,7 +765,7 @@ export default function DashboardPage() {
       </Card>
 
       <Card>
-        <CardHeader className="border-b border-border/70 pb-4">
+        <CardHeader className="border-b border-slate-200 dark:border-slate-700 pb-4">
           <CardTitle className="flex items-center gap-2 text-slate-950 dark:text-white">
             <RefreshCcw className="h-4 w-4" />
             Corridas recientes del scraping
@@ -810,7 +810,7 @@ export default function DashboardPage() {
       </Card>
 
       <Card>
-        <CardHeader className="border-b border-border/70 pb-4">
+        <CardHeader className="border-b border-slate-200 dark:border-slate-700 pb-4">
           <CardTitle className="flex items-center gap-2 text-slate-950 dark:text-white">
             <Sparkles className="h-4 w-4" />
             Actividad interna
@@ -876,7 +876,7 @@ function InfoTile({ label, value, detail }: { label: string; value: string | num
 
 function ChartEmpty({ title, detail }: { title: string; detail: string }) {
   return (
-    <div className="flex h-full flex-col items-center justify-center rounded-lg border border-dashed border-border bg-slate-100/30 px-6 text-center dark:bg-slate-800/30">
+    <div className="flex h-full flex-col items-center justify-center rounded-lg border border-dashed border-slate-200 bg-slate-100/30 px-6 text-center dark:border-slate-700 dark:bg-slate-800/30">
       <p className="text-sm font-medium text-slate-950 dark:text-white">{title}</p>
       <p className="mt-1 max-w-md text-sm text-slate-500 dark:text-slate-400">{detail}</p>
     </div>

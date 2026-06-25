@@ -54,7 +54,7 @@ function ReportCard({ report }: { report: Report }) {
 
   return (
     <Card>
-      <CardHeader className="border-b border-border/70 pb-4">
+      <CardHeader className="border-b border-slate-200 dark:border-slate-700 pb-4">
         <CardTitle className="flex items-center justify-between gap-3 text-slate-950 dark:text-white">
           <span className="flex min-w-0 items-center gap-2">
             <FileText className="h-4 w-4 shrink-0" />
@@ -67,10 +67,10 @@ function ReportCard({ report }: { report: Report }) {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4 pt-5">
-        <div className="max-h-44 overflow-hidden rounded-lg border border-border bg-slate-100/40 p-3 text-xs text-slate-700 dark:bg-slate-800/40 dark:text-slate-300">
+        <div className="max-h-44 overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-100/40 p-3 text-xs text-slate-700 dark:bg-slate-800/40 dark:text-slate-300">
           {report.html_content.replace(/<[^>]+>/g, " ").slice(0, 300)}
         </div>
-        <div className="rounded-xl border border-dashed border-border/80 bg-background/60 p-4 dark:bg-slate-950/30">
+        <div className="rounded-xl border border-dashed border-slate-200/80 bg-slate-50/60 p-4 dark:border-slate-700/80 dark:bg-slate-950/30">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Descarga directa</p>
           <p className="mt-1 text-sm text-slate-700 dark:text-slate-300">
             Archivo listo para bajar en formato {formatLabel(report.format)}.

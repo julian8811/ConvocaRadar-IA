@@ -189,7 +189,7 @@ export default function AlertsPage() {
 
       <div className="grid gap-4 xl:grid-cols-[1.5fr_1fr]">
         <Card>
-          <CardHeader className="border-b border-border/70 pb-4">
+          <CardHeader className="border-b border-slate-200 dark:border-slate-700 pb-4">
             <CardTitle className="text-slate-950 dark:text-white">Nueva alerta</CardTitle>
             <CardDescription>Configura el canal y el mensaje auditable.</CardDescription>
           </CardHeader>
@@ -217,7 +217,7 @@ export default function AlertsPage() {
         </Card>
 
         <Card>
-          <CardHeader className="border-b border-border/70 pb-4">
+          <CardHeader className="border-b border-slate-200 dark:border-slate-700 pb-4">
             <CardTitle className="text-slate-950 dark:text-white">Prueba de correo</CardTitle>
             <CardDescription>Registra una prueba sin salir del panel.</CardDescription>
           </CardHeader>

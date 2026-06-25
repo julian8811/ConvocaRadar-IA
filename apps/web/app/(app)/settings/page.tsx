@@ -28,7 +28,7 @@ export default function SettingsPage() {
           const Icon = item.icon;
           return (
             <Card key={item.title}>
-              <CardHeader className="border-b border-border/70 pb-4">
+              <CardHeader className="border-b border-slate-200 dark:border-slate-700 pb-4">
                 <CardTitle className="flex items-center gap-2 text-base text-slate-950 dark:text-white">
                   <Icon className="h-4 w-4" />
                   {item.title}
