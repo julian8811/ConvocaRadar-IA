@@ -66,6 +66,8 @@ SLOW_SCRAPE_SOURCE_KEYS = frozenset(
         "minciencias",
         "ukri-opportunities",
         "horizon-europe-sedia",
+        "eic-accelerator",
+        "procolombia-convocatorias",
     }
 )
 SLOW_SCRAPE_SOURCE_TYPES = frozenset({"hybrid"})

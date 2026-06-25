@@ -233,7 +233,7 @@ Antes de abrir el sistema al publico:
 
 ## Fuentes y vigilancia tecnologica
 
-La oleada 1 del seed incluye 26 fuentes por defecto (19 originales + 7 nuevas). La oleada 2 suma 7 fuentes más (33 total):
+La oleada 1 del seed incluye 26 fuentes por defecto (19 originales + 7 nuevas). La oleada 2 suma 7 fuentes más (33 total). La oleada 3 suma 5 fuentes (38 total):
 
 | Key | Tipo | Region |
 |-----|------|--------|
@@ -256,6 +256,16 @@ Oleada 2:
 | `idrc-funding` | HTML | Canadá/Global |
 | `usaid-grants` | Grants.gov API | Global |
 | `giz-funding` | HTML | Alemania/Global |
+
+Oleada 3:
+
+| Key | Tipo | Región |
+|-----|------|--------|
+| `cordis-h2020` | CORDIS API | EU |
+| `eic-accelerator` | SEDIA API | EU |
+| `global-innovation-fund` | HTML | Global |
+| `procolombia-convocatorias` | HTML | Colombia |
+| `anii-uruguay` | HTML | Uruguay |
 
 ### Reseed en produccion
 

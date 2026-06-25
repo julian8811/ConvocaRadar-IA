@@ -790,7 +790,7 @@ def test_admin_reseed_default_sources() -> None:
     response = c.post("/api/v1/admin/sources/reseed-defaults", headers=auth)
     assert response.status_code == 200
     payload = response.json()
-    assert payload["total"] >= 33
+    assert payload["total"] >= 38
     assert payload["after_total"] >= before_count
     assert payload["inserted"] + payload["updated"] >= 1
 
@@ -799,6 +799,7 @@ def test_admin_reseed_default_sources() -> None:
     keys = {item["key"] for item in sources.json()}
     assert "novo-nordisk-grants" in keys
     assert "horizon-europe-sedia" in keys
+    assert "eic-accelerator" in keys
 
 
 def test_alert_lifecycle() -> None:
