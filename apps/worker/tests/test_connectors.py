@@ -2041,7 +2041,8 @@ async def test_usaid_connector_parses_search_fixture() -> None:
     candidates = await connector.parse(raw)
 
     assert len(candidates) == 1
-    assert candidates[0].entity == "USAID"
+    assert candidates[0].entity == "DOS-ZAM"
+    assert "USAID" in candidates[0].topics
     assert (await connector.validate(candidates[0])).ok
 
 
