@@ -30,6 +30,9 @@ from worker.connectors.unwomen_innovate import UnwomenInnovateConnector
 from worker.connectors.wordpress_grants import WordPressGrantsConnector
 from worker.connectors.horizon_sedia import HorizonSediaConnector
 from worker.connectors.wellcome import WellcomeConnector
+from worker.connectors.bdn_convocatorias import BdnConvocatoriasConnector
+from worker.connectors.heading_list_html import HeadingListHtmlConnector
+from worker.connectors.usaid_grants import UsaidGrantsConnector
 from worker.connectors.mincit import MincitConvocatoriasConnector
 
 
@@ -1869,4 +1872,81 @@ def test_connector_factory_selects_wellcome_and_mincit() -> None:
     mincit = connector_for("mincit-innovacion", "https://convocatoriasturismo.mincit.gov.co/listado-convocatorias")
     assert isinstance(wellcome, WellcomeConnector)
     assert isinstance(mincit, MincitConvocatoriasConnector)
+
+
+@pytest.mark.asyncio
+async def test_bdn_connector_parses_fixture() -> None:
+    payload = [
+        {
+            "id": 1114148,
+            "descripcion": "Resolución de 11 de junio de 2026 de la Presidencia del CDTI por convocatoria INNOGLOBAL",
+            "fechaRecepcion": "2026-06-11",
+            "nivel3": "CENTRO PARA EL DESARROLLO TECNOLÓGICO Y LA INNOVACIÓN E.P.E",
+        }
+    ]
+    connector = BdnConvocatoriasConnector(
+        "cdti-convocatorias",
+        "https://www.infosubvenciones.es/bdnstrans/api/convocatorias/busqueda?descripcion=CDTI",
+        search_query="CDTI",
+        entity_name="CDTI",
+    )
+    raw = RawSourceResult(
+        source_key="cdti-convocatorias",
+        url="https://www.infosubvenciones.es/bdnstrans/api/convocatorias/busqueda?descripcion=CDTI",
+        content=json.dumps(payload),
+        content_type="application/json",
+    )
+
+    candidates = await connector.parse(raw)
+
+    assert len(candidates) == 1
+    assert "CDTI" in candidates[0].title
+    assert candidates[0].official_url.endswith("/1114148")
+    assert (await connector.validate(candidates[0])).ok
+
+
+@pytest.mark.asyncio
+async def test_usaid_connector_parses_search_fixture() -> None:
+    payload = {
+        "errorcode": 0,
+        "data": {
+            "oppHits": [
+                {
+                    "id": "12345",
+                    "title": "EducationUSA Opportunity Funds Program 2026",
+                    "agencyName": "DOS-ZAM",
+                    "oppStatus": "posted",
+                }
+            ]
+        },
+    }
+    connector = UsaidGrantsConnector()
+    raw = RawSourceResult(
+        source_key="usaid-grants",
+        url="https://api.grants.gov/v1/api/search2",
+        content=json.dumps(payload),
+        content_type="application/json",
+    )
+
+    candidates = await connector.parse(raw)
+
+    assert len(candidates) == 1
+    assert candidates[0].entity == "USAID"
+    assert (await connector.validate(candidates[0])).ok
+
+
+def test_connector_factory_selects_wave2_connectors() -> None:
+    assert isinstance(
+        connector_for("lundbeck-foundation", "https://lundbeckfonden.com/en/grants-prizes/apply-grants"),
+        HeadingListHtmlConnector,
+    )
+    assert isinstance(
+        connector_for(
+            "cdti-convocatorias",
+            "https://www.infosubvenciones.es/bdnstrans/api/convocatorias/busqueda?descripcion=CDTI",
+            "api",
+        ),
+        BdnConvocatoriasConnector,
+    )
+    assert isinstance(connector_for("usaid-grants", "https://api.grants.gov/v1/api/search2", "api"), UsaidGrantsConnector)
 

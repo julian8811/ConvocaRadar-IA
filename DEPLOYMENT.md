@@ -233,7 +233,7 @@ Antes de abrir el sistema al publico:
 
 ## Fuentes y vigilancia tecnologica
 
-La oleada 1 del seed incluye 26 fuentes por defecto (19 originales + 7 nuevas):
+La oleada 1 del seed incluye 26 fuentes por defecto (19 originales + 7 nuevas). La oleada 2 suma 7 fuentes más (33 total):
 
 | Key | Tipo | Region |
 |-----|------|--------|
@@ -244,6 +244,18 @@ La oleada 1 del seed incluye 26 fuentes por defecto (19 originales + 7 nuevas):
 | `dfg-grants` | HTML | Alemania |
 | `colfuturo-convocatorias` | HTML | Colombia |
 | `mincit-innovacion` | HTML | Colombia |
+
+Oleada 2:
+
+| Key | Tipo | Región |
+|-----|------|--------|
+| `lundbeck-foundation` | HTML | Dinamarca |
+| `velux-foundation` | HTML | Dinamarca |
+| `isciii-convocatorias` | BDN API | España |
+| `cdti-convocatorias` | BDN API | España |
+| `idrc-funding` | HTML | Canadá/Global |
+| `usaid-grants` | Grants.gov API | Global |
+| `giz-funding` | HTML | Alemania/Global |
 
 ### Reseed en produccion
 
