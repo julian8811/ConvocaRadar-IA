@@ -43,6 +43,16 @@ export type OpportunityList = {
   page_size: number;
 };
 
+export type OpportunitySemanticMatch = {
+  opportunity: Opportunity;
+  similarity: number;
+};
+
+export type OpportunitySemanticList = {
+  query: string;
+  items: OpportunitySemanticMatch[];
+};
+
 export type OpportunityScore = {
   id: string;
   opportunity_id: string;

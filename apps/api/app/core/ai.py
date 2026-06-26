@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import json
 import math
@@ -12,11 +13,12 @@ from typing import Any
 import httpx
 from pydantic import ValidationError
 
-from app.core.config import get_settings
+from app.core.config import effective_llm_provider, get_settings
 from app.schemas import AiOpportunityExtract
 
 MODEL_VERSION = "local-heuristic-v2"
-EMBEDDING_MODEL_VERSION = "local-hash-embeddings-v2"
+LOCAL_EMBEDDING_MODEL_VERSION = "local-hash-embeddings-v2"
+EMBEDDING_MODEL_VERSION = LOCAL_EMBEDDING_MODEL_VERSION
 PROMPT_VERSION = "structured-extraction-v3"
 
 COUNTRY_RULES: list[tuple[str, str]] = [
@@ -308,7 +310,7 @@ def _normalize_remote_extraction(payload: dict[str, Any]) -> dict[str, Any]:
 
 async def _call_llm(text: str) -> dict[str, Any] | None:
     settings = get_settings()
-    provider = settings.llm_provider.strip().lower()
+    provider = effective_llm_provider(settings.llm_provider)
     if provider == "local" or not settings.llm_api_key:
         return None
 
@@ -320,7 +322,7 @@ async def _call_llm(text: str) -> dict[str, Any] | None:
         "Incluye prompt_version, model_version, provider y extraction_strategy si puedes."
     )
     payload = {
-        "model": settings.llm_model,
+        "model": settings.chat_model or settings.llm_model,
         "messages": [
             {"role": "system", "content": system_prompt},
             {"role": "user", "content": text[:12000]},
@@ -445,14 +447,60 @@ def tokenize_for_embedding(text: str) -> list[str]:
     return [token for token in re.findall(r"[a-z0-9]+", _normalize_for_rules(text)) if token]
 
 
-def build_embedding(text: str, *, dimensions: int = 64) -> list[float]:
-    vector = [0.0] * dimensions
+def embedding_model_version() -> str:
+    settings = get_settings()
+    provider = effective_llm_provider(settings.llm_provider)
+    if provider == "openai" and settings.llm_api_key and settings.embedding_model:
+        return f"openai-{settings.embedding_model}-d{settings.embedding_dimensions}"
+    return LOCAL_EMBEDDING_MODEL_VERSION
+
+
+async def _call_openai_embedding(text: str, *, dimensions: int) -> list[float] | None:
+    settings = get_settings()
+    if effective_llm_provider(settings.llm_provider) != "openai" or not settings.llm_api_key or not settings.embedding_model:
+        return None
+    payload = {
+        "model": settings.embedding_model,
+        "input": text[:8000],
+        "dimensions": dimensions,
+    }
+    async with httpx.AsyncClient(timeout=settings.llm_timeout_seconds) as client:
+        response = await client.post(
+            f"{settings.llm_api_base.rstrip('/')}/embeddings",
+            headers={
+                "Authorization": f"Bearer {settings.llm_api_key}",
+                "Content-Type": "application/json",
+            },
+            json=payload,
+        )
+        response.raise_for_status()
+        data = response.json()
+    rows = data.get("data") or []
+    if not rows:
+        return None
+    vector = rows[0].get("embedding")
+    if not isinstance(vector, list):
+        return None
+    return [round(float(item), 6) for item in vector]
+
+
+def build_embedding(text: str, *, dimensions: int | None = None) -> list[float]:
+    settings = get_settings()
+    target_dimensions = dimensions or settings.embedding_dimensions or 64
+    if effective_llm_provider(settings.llm_provider) == "openai" and settings.llm_api_key and settings.embedding_model:
+        try:
+            remote = asyncio.run(_call_openai_embedding(text, dimensions=target_dimensions))
+            if remote:
+                return remote
+        except Exception:
+            pass
+    vector = [0.0] * target_dimensions
     tokens = tokenize_for_embedding(text)
     if not tokens:
         return vector
     for token in tokens:
         digest = hashlib.sha256(token.encode("utf-8")).digest()
-        bucket = int.from_bytes(digest[:4], "big") % dimensions
+        bucket = int.from_bytes(digest[:4], "big") % target_dimensions
         weight = 1.0 + min(len(token), 12) / 12.0
         vector[bucket] += weight
     norm = math.sqrt(sum(value * value for value in vector))

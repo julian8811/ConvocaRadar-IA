@@ -1,23 +1,23 @@
 # ConvocaRadar IA Task Map
 
-## Done in this MVP scaffold
+## Completed in this MVP
 
 - Monorepo structure and Docker Compose.
 - FastAPI API with SQLAlchemy models, Pydantic schemas, auth, CRUD services, report export, scoring, heuristic extraction, and seed data.
-- Celery worker skeleton with connector interface, generic HTML connector, and report/alert tasks.
-- Next.js frontend with a complete institutional dashboard shell and MVP screens.
-- Initial backend tests for auth, source runs, opportunity listing, scoring, reports, and SSRF guardrails.
+- Celery worker with connector interface, dedicated connectors for 38 sources, and report/alert tasks.
+- Next.js frontend with institutional dashboard, registration, semantic search, admin guard, and MVP screens.
+- Backend tests for auth, source runs, opportunity listing, scoring, reports, SSRF guardrails, and semantic search.
 - Alembic migration scaffold with an initial schema migration.
 - Protected internal scheduler endpoints plus Celery Beat jobs for enabled sources and due alerts.
 - Async manual source runs with Celery completion callbacks for `source_runs`, `tasks`, and normalized opportunities.
-- First real source connector: Grants.gov public `search2` API, with fixture-based worker tests.
-- Generic RSS connector plus Grants.gov RSS source seed, with fixture-based worker tests.
-- Minciencias Colombia connector and source seed, with fixture-based worker tests.
-- iNNpulsa Colombia connector and source seed, with fixture-based worker tests.
+- OpenAI-ready extraction and embeddings when `LLM_PROVIDER=openai` and API keys are configured.
+- Automatic bootstrap scrape of priority sources when the database has no opportunities.
+- Optional Sentry integration via `SENTRY_DSN`.
+- Playwright E2E smoke test for login and dashboard navigation.
 
-## Next implementation slices
+## Remaining for production operations
 
-- Add real provider adapter for AI extraction and scoring.
-- Add source-specific connector for Funding & Tenders.
-- Add Playwright E2E tests across web/API.
-- Add Sentry/OpenTelemetry and production deployment manifests.
+- Provision external services (Vercel, Neon, Upstash, R2, Render) and wire environment variables.
+- Configure real SMTP credentials for alert delivery.
+- Run connector probe checks against live sources after each deploy.
+- Expand Playwright coverage across reports, alerts, and source runs in CI with a live API service.

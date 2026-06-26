@@ -9,6 +9,7 @@ from app.db.session import get_db
 from app.core.task_queue import enqueue_scrape_source
 from app.models import Alert, AuditLog, Opportunity, OpportunityEmbedding, Organization, Report, Source, SourceRun, Task, User
 from app.schemas import AdminMetricsRead, AuditLogRead, SourceRunOverviewRead
+from app.db.bootstrap import bootstrap_priority_sources
 from app.db.seed import seed_default_sources
 from app.services import deduplicate_opportunities, execute_source_run_locally, rebuild_opportunity_embeddings
 
@@ -351,6 +352,27 @@ def rebuild_embeddings_admin(
             resource_type="opportunity_embedding",
             resource_id=organization.id,
             metadata_json={"limit": limit, **result},
+        )
+    )
+    db.commit()
+    return result
+
+
+@router.post("/admin/bootstrap-data")
+def bootstrap_data_admin(
+    organization: Organization = Depends(get_current_organization),
+    user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> dict[str, int | str]:
+    result = bootstrap_priority_sources(blocking=True) or {"status": "skipped", "reason": "bootstrap_disabled"}
+    db.add(
+        AuditLog(
+            organization_id=organization.id,
+            user_id=user.id,
+            action="bootstrap_priority_sources",
+            resource_type="source",
+            resource_id=organization.id,
+            metadata_json=result if isinstance(result, dict) else {"status": str(result)},
         )
     )
     db.commit()

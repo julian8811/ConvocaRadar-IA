@@ -10,6 +10,7 @@ os.environ["STORAGE_BACKEND"] = "local"
 os.environ["STORAGE_DIR"] = "./test_storage"
 os.environ["SMTP_HOST"] = ""
 os.environ["INTERNAL_API_KEY"] = "test_internal_key"
+os.environ["BOOTSTRAP_SOURCES_ON_STARTUP"] = "false"
 
 Path("test_convocaradar.db").unlink(missing_ok=True)
 
@@ -1129,6 +1130,15 @@ def test_admin_source_runs_overview() -> None:
         assert "source_name" in first
         assert "source_key" in first
         assert "status" in first
+
+
+def test_admin_bootstrap_data_endpoint() -> None:
+    c = client()
+    auth = {"Authorization": f"Bearer {token(c)}"}
+    response = c.post("/api/v1/admin/bootstrap-data", headers=auth)
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["status"] in {"completed", "skipped"}
 
 
 def test_admin_rebuild_embeddings() -> None:

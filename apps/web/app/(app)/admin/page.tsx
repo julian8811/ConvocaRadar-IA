@@ -33,6 +33,15 @@ export default function AdminPage() {
     onError: (error) => toast.error(error instanceof Error ? error.message : "No se pudieron programar reintentos"),
   });
 
+  const bootstrapData = useMutation({
+    mutationFn: api.bootstrapData,
+    onSuccess: async (payload) => {
+      toast.success(`Bootstrap completado (${String(payload.status ?? "ok")})`);
+      await queryClient.invalidateQueries();
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "No se pudo ejecutar el bootstrap"),
+  });
+
   if (
     me.isLoading ||
     sources.isLoading ||
@@ -78,10 +87,16 @@ export default function AdminPage() {
             Salud operativa, configuración de IA, auditoría y control de fuentes.
           </p>
         </div>
-        <Button variant="outline" onClick={() => retrySources.mutate()} disabled={retrySources.isPending}>
-          <RefreshCcw className={`h-4 w-4 ${retrySources.isPending ? "animate-spin" : ""}`} />
-          {retrySources.isPending ? "Programando..." : "Reintentar fuentes degradadas"}
-        </Button>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={() => bootstrapData.mutate()} disabled={bootstrapData.isPending}>
+            <Database className={`h-4 w-4 ${bootstrapData.isPending ? "animate-pulse" : ""}`} />
+            {bootstrapData.isPending ? "Importando..." : "Cargar datos iniciales"}
+          </Button>
+          <Button variant="outline" onClick={() => retrySources.mutate()} disabled={retrySources.isPending}>
+            <RefreshCcw className={`h-4 w-4 ${retrySources.isPending ? "animate-spin" : ""}`} />
+            {retrySources.isPending ? "Programando..." : "Reintentar fuentes degradadas"}
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-4 md:grid-cols-3">
