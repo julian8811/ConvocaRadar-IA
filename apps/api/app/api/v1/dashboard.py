@@ -1,0 +1,243 @@
+from datetime import UTC, datetime
+
+from fastapi import APIRouter, Depends
+from sqlalchemy import func, or_, select
+from sqlalchemy.orm import Session
+
+from app.api.deps import get_current_organization, get_current_user
+from app.api.v1.admin import _source_health_status
+from app.db.session import get_db
+from app.models import Opportunity, OpportunityEmbedding, OpportunityScore, Organization, OrganizationProfile, Source, User
+from app.schemas import (
+    DashboardBreakdownItem,
+    DashboardDataCoverage,
+    DashboardOpportunityItem,
+    DashboardProfileSummary,
+    DashboardSourceAlert,
+    DashboardSummaryRead,
+)
+from app.services import build_opportunity_query, count_query, is_noise_payload
+
+router = APIRouter()
+
+PROFILE_CHECKS: list[tuple[str, str]] = [
+    ("description", "Descripción institucional"),
+    ("areas_of_interest", "Áreas de interés"),
+    ("funding_types", "Tipos de financiación"),
+    ("organization_type", "Tipo de organización"),
+    ("preferred_currencies", "Monedas preferidas"),
+]
+
+STATUS_LABELS = {
+    "open": "Abiertas",
+    "closing_soon": "Cierran pronto",
+    "closed": "Cerradas",
+    "unknown": "Sin fecha",
+}
+
+
+def _profile_summary(profile: OrganizationProfile | None) -> DashboardProfileSummary:
+    if profile is None:
+        return DashboardProfileSummary(completeness=0.0, missing_fields=[label for _, label in PROFILE_CHECKS])
+
+    filled = 0
+    missing: list[str] = []
+    for field, label in PROFILE_CHECKS:
+        value = getattr(profile, field)
+        has_value = bool(value.strip()) if isinstance(value, str) else bool(value)
+        if field == "organization_type":
+            has_value = profile.organization_type not in {"", "other"}
+        if has_value:
+            filled += 1
+        else:
+            missing.append(label)
+
+    completeness = round((filled / len(PROFILE_CHECKS)) * 100, 1) if PROFILE_CHECKS else 0.0
+    return DashboardProfileSummary(completeness=completeness, missing_fields=missing)
+
+
+def _days_to_close(close_date: datetime | None) -> int | None:
+    if close_date is None:
+        return None
+    return max((close_date - datetime.now(UTC).replace(tzinfo=None)).days, 0)
+
+
+def _to_opportunity_item(opportunity: Opportunity, score: OpportunityScore | None = None) -> DashboardOpportunityItem:
+    return DashboardOpportunityItem(
+        id=opportunity.id,
+        title=opportunity.title,
+        entity=opportunity.entity,
+        country=opportunity.country,
+        status=opportunity.status,
+        close_date=opportunity.close_date,
+        funding_amount_raw=opportunity.funding_amount_raw,
+        funding_amount_value=opportunity.funding_amount_value,
+        funding_amount_currency=opportunity.funding_amount_currency,
+        score=score.score if score else None,
+        priority=score.priority if score else None,
+        days_to_close=_days_to_close(opportunity.close_date),
+    )
+
+
+def _visible_opportunity(opportunity: Opportunity) -> bool:
+    return not is_noise_payload(opportunity.title, opportunity.summary, opportunity.raw_text)
+
+
+@router.get("/dashboard/summary", response_model=DashboardSummaryRead)
+def get_dashboard_summary(
+    organization: Organization = Depends(get_current_organization),
+    _: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> DashboardSummaryRead:
+    base_query = build_opportunity_query(organization.id)
+    opportunity_scope = or_(Opportunity.organization_id == organization.id, Opportunity.organization_id.is_(None))
+    source_scope = or_(Source.organization_id == organization.id, Source.organization_id.is_(None))
+
+    total_opportunities = count_query(db, base_query)
+    open_opportunities = count_query(db, build_opportunity_query(organization.id, status="open"))
+    closing_soon_opportunities = count_query(db, build_opportunity_query(organization.id, status="closing_soon"))
+    high_match_opportunities = (
+        db.scalar(
+            select(func.count(func.distinct(OpportunityScore.opportunity_id)))
+            .select_from(OpportunityScore)
+            .join(Opportunity, Opportunity.id == OpportunityScore.opportunity_id)
+            .where(
+                OpportunityScore.organization_id == organization.id,
+                OpportunityScore.priority == "high",
+                opportunity_scope,
+            )
+        )
+        or 0
+    )
+
+    score_rows = list(
+        db.execute(
+            select(Opportunity, OpportunityScore)
+            .join(OpportunityScore, OpportunityScore.opportunity_id == Opportunity.id)
+            .where(
+                OpportunityScore.organization_id == organization.id,
+                opportunity_scope,
+            )
+            .order_by(OpportunityScore.score.desc(), OpportunityScore.calculated_at.desc())
+            .limit(40)
+        )
+    )
+    top_scored: list[DashboardOpportunityItem] = []
+    seen_scores: set[str] = set()
+    for opportunity, score in score_rows:
+        if opportunity.id in seen_scores or not _visible_opportunity(opportunity):
+            continue
+        seen_scores.add(opportunity.id)
+        top_scored.append(_to_opportunity_item(opportunity, score))
+        if len(top_scored) >= 8:
+            break
+
+    closing_soon = [
+        _to_opportunity_item(item)
+        for item in db.scalars(build_opportunity_query(organization.id, status="closing_soon").limit(8))
+        if _visible_opportunity(item)
+    ]
+
+    status_rows = db.execute(
+        select(Opportunity.status, func.count())
+        .where(opportunity_scope)
+        .where(~Opportunity.title.ilike("%@%"))
+        .where(~Opportunity.title.ilike("http%"))
+        .group_by(Opportunity.status)
+    )
+    status_breakdown = [
+        DashboardBreakdownItem(name=STATUS_LABELS.get(status, status), total=total)
+        for status, total in status_rows
+        if total > 0
+    ]
+    status_breakdown.sort(key=lambda item: item.total, reverse=True)
+
+    country_rows = db.execute(
+        select(Opportunity.country, func.count())
+        .where(opportunity_scope)
+        .where(~Opportunity.title.ilike("%@%"))
+        .where(~Opportunity.title.ilike("http%"))
+        .group_by(Opportunity.country)
+        .order_by(func.count().desc())
+        .limit(8)
+    )
+    country_breakdown = [
+        DashboardBreakdownItem(name=country or "Sin dato", total=total) for country, total in country_rows if total > 0
+    ]
+
+    sources = list(db.scalars(select(Source).where(source_scope)))
+    source_alerts: list[DashboardSourceAlert] = []
+    degraded_sources = 0
+    failing_sources = 0
+    for source in sources:
+        health = _source_health_status(db, source)
+        if health == "degraded":
+            degraded_sources += 1
+            if len(source_alerts) < 5:
+                source_alerts.append(DashboardSourceAlert(source_id=source.id, name=source.name, status="degraded"))
+        elif health == "failing":
+            failing_sources += 1
+            if len(source_alerts) < 5:
+                source_alerts.append(DashboardSourceAlert(source_id=source.id, name=source.name, status="failing"))
+
+    with_summary = (
+        db.scalar(
+            select(func.count())
+            .select_from(Opportunity)
+            .where(opportunity_scope, Opportunity.summary != "", Opportunity.summary.is_not(None))
+        )
+        or 0
+    )
+    with_amount = (
+        db.scalar(
+            select(func.count())
+            .select_from(Opportunity)
+            .where(
+                opportunity_scope,
+                or_(Opportunity.funding_amount_value.is_not(None), Opportunity.funding_amount_raw.is_not(None)),
+            )
+        )
+        or 0
+    )
+    with_close_date = (
+        db.scalar(select(func.count()).select_from(Opportunity).where(opportunity_scope, Opportunity.close_date.is_not(None)))
+        or 0
+    )
+    with_source = (
+        db.scalar(select(func.count()).select_from(Opportunity).where(opportunity_scope, Opportunity.source_id.is_not(None)))
+        or 0
+    )
+    embeddings_total = (
+        db.scalar(
+            select(func.count())
+            .select_from(OpportunityEmbedding)
+            .join(Opportunity, Opportunity.id == OpportunityEmbedding.opportunity_id)
+            .where(opportunity_scope)
+        )
+        or 0
+    )
+    embeddings_coverage = round((embeddings_total / total_opportunities) * 100, 1) if total_opportunities else 0.0
+
+    profile = db.scalar(select(OrganizationProfile).where(OrganizationProfile.organization_id == organization.id))
+
+    return DashboardSummaryRead(
+        total_opportunities=total_opportunities,
+        open_opportunities=open_opportunities,
+        closing_soon_opportunities=closing_soon_opportunities,
+        high_match_opportunities=high_match_opportunities,
+        top_scored=top_scored,
+        closing_soon=closing_soon,
+        status_breakdown=status_breakdown,
+        country_breakdown=country_breakdown,
+        degraded_sources=degraded_sources,
+        failing_sources=failing_sources,
+        source_alerts=source_alerts,
+        data_coverage=DashboardDataCoverage(
+            with_summary=with_summary,
+            with_amount=with_amount,
+            with_close_date=with_close_date,
+            with_source=with_source,
+            embeddings_coverage=embeddings_coverage,
+        ),
+        profile=_profile_summary(profile),
+    )

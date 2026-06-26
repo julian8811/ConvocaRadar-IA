@@ -1118,6 +1118,28 @@ def test_admin_metrics() -> None:
     assert "stale_sources" in payload
 
 
+def test_dashboard_summary() -> None:
+    c = client()
+    auth = {"Authorization": f"Bearer {token(c)}"}
+    create_fixture_opportunity(close_days=5)
+    response = c.get("/api/v1/dashboard/summary", headers=auth)
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["total_opportunities"] >= 1
+    assert payload["open_opportunities"] >= 0
+    assert "closing_soon_opportunities" in payload
+    assert "high_match_opportunities" in payload
+    assert isinstance(payload["top_scored"], list)
+    assert isinstance(payload["closing_soon"], list)
+    assert isinstance(payload["status_breakdown"], list)
+    assert isinstance(payload["country_breakdown"], list)
+    assert "degraded_sources" in payload
+    assert "data_coverage" in payload
+    assert payload["data_coverage"]["embeddings_coverage"] >= 0
+    assert "profile" in payload
+    assert payload["profile"]["completeness"] >= 0
+
+
 def test_admin_source_runs_overview() -> None:
     c = client()
     auth = {"Authorization": f"Bearer {token(c)}"}

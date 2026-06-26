@@ -10,7 +10,7 @@ test("inicia sesion y carga el panel analitico", async ({ page }) => {
   await expect(page).toHaveURL(/\/dashboard$/);
   await expect(page.getByRole("heading", { name: /Panel analitico/i })).toBeVisible();
   await expect(page.getByText(/Convocatorias abiertas/i)).toBeVisible();
-  await expect(page.getByText(/Cobertura de embeddings/i)).toBeVisible();
+  await expect(page.getByText(/Alta compatibilidad/i)).toBeVisible();
 
   await page.getByRole("link", { name: /Convocatorias/i }).click();
   await expect(page).toHaveURL(/\/opportunities$/);

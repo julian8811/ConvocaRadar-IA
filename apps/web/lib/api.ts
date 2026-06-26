@@ -2,6 +2,7 @@ import type {
   AdminMetrics,
   Alert,
   AuditLog,
+  DashboardSummary,
   Opportunity,
   OpportunityDocument,
   OpportunityList,
@@ -156,6 +157,7 @@ export const api = {
   register: (payload: Record<string, unknown>) =>
     request<{ access_token: string }>("/auth/register", { method: "POST", body: JSON.stringify(payload) }),
   me: () => request<{ name: string; email: string; role: string }>("/me"),
+  dashboardSummary: () => request<DashboardSummary>("/dashboard/summary"),
   organization: () => request<{ name: string; country: string; type: string }>("/organizations/current"),
   profile: () => request<Record<string, unknown>>("/organizations/current/profile"),
   updateProfile: (payload: Record<string, unknown>) =>
