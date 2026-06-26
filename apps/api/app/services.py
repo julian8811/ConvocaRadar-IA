@@ -23,11 +23,11 @@ from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, Tabl
 
 from app.core.config import get_settings
 from app.core.ai import (
-    EMBEDDING_MODEL_VERSION,
     build_embedding,
     build_local_extraction,
     compose_embedding_text,
     cosine_similarity,
+    embedding_model_version,
     extract_opportunity_structured,
     infer_language,
     summarize_opportunity_text,
@@ -569,14 +569,14 @@ def upsert_opportunity_embedding(db: Session, opportunity: Opportunity) -> Oppor
         existing.organization_id = opportunity.organization_id
         existing.source_text = source_text
         existing.embedding = vector
-        existing.model_version = EMBEDDING_MODEL_VERSION
+        existing.model_version = embedding_model_version()
         return existing
     embedding = OpportunityEmbedding(
         opportunity_id=opportunity.id,
         organization_id=opportunity.organization_id,
         source_text=source_text,
         embedding=vector,
-        model_version=EMBEDDING_MODEL_VERSION,
+        model_version=embedding_model_version(),
     )
     db.add(embedding)
     return embedding
@@ -598,7 +598,7 @@ def rebuild_opportunity_embeddings(db: Session, organization_id: str, *, limit: 
             existing.organization_id = opportunity.organization_id
             existing.source_text = source_text
             existing.embedding = vector
-            existing.model_version = EMBEDDING_MODEL_VERSION
+            existing.model_version = embedding_model_version()
             updated += 1
             continue
         db.add(
@@ -607,7 +607,7 @@ def rebuild_opportunity_embeddings(db: Session, organization_id: str, *, limit: 
                 organization_id=opportunity.organization_id,
                 source_text=source_text,
                 embedding=vector,
-                model_version=EMBEDDING_MODEL_VERSION,
+                model_version=embedding_model_version(),
             )
         )
         created += 1
