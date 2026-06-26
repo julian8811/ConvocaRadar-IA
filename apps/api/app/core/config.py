@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from pydantic import computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -15,7 +16,14 @@ class Settings(BaseSettings):
     llm_api_base: str = "https://api.openai.com/v1"
     llm_api_key: str | None = None
     llm_model: str = "gpt-4.1-mini"
+    chat_model: str = "gpt-4.1-mini"
+    embedding_model: str = ""
+    embedding_dimensions: int = 64
     llm_timeout_seconds: int = 45
+    bootstrap_sources_on_startup: bool = True
+    bootstrap_sources_blocking: bool = False
+    bootstrap_source_keys: str = "grants-gov-rss,grants-gov,innpulsa,minciencias,nsf-funding-rss"
+    sentry_dsn: str | None = None
     scraping_user_agent: str = "ConvocaRadarBot/0.1"
     scraping_timeout_seconds: int = 30
     scraping_max_source_seconds: int = 90
@@ -43,9 +51,24 @@ class Settings(BaseSettings):
     rate_limit_requests_per_minute: int = 120
     rate_limit_window_seconds: int = 60
 
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def bootstrap_source_key_list(self) -> list[str]:
+        return [item.strip() for item in self.bootstrap_source_keys.split(",") if item.strip()]
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 
 
 @lru_cache
 def get_settings() -> Settings:
-    return Settings()
+    settings = Settings()
+    if not settings.chat_model:
+        settings.chat_model = settings.llm_model
+    return settings
+
+
+def effective_llm_provider(provider: str | None = None) -> str:
+    value = (provider or get_settings().llm_provider).strip().lower()
+    if value in {"mock", "local", ""}:
+        return "local"
+    return value

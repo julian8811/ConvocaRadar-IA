@@ -1,6 +1,6 @@
 import { expect, test } from "@playwright/test";
 
-test("inicia sesi�n y carga el panel anal�tico", async ({ page }) => {
+test("inicia sesion y carga el panel analitico", async ({ page }) => {
   test.setTimeout(120_000);
   await page.goto("/login", { waitUntil: "domcontentloaded" });
 
@@ -8,7 +8,7 @@ test("inicia sesi�n y carga el panel anal�tico", async ({ page }) => {
   await page.getByRole("button", { name: /Entrar con cuenta local/i }).click();
 
   await expect(page).toHaveURL(/\/dashboard$/);
-  await expect(page.getByRole("heading", { name: /Panel anal�tico/i })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Panel analitico/i })).toBeVisible();
   await expect(page.getByText(/Convocatorias abiertas/i)).toBeVisible();
   await expect(page.getByText(/Cobertura de embeddings/i)).toBeVisible();
 

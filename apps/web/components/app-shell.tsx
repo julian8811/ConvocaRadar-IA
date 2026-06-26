@@ -3,7 +3,7 @@
 import { Bell, Database, FileText, Gauge, LogOut, Menu, Radar, Search, Settings, Shield, Target, UserRound } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useMemo, useState, type ComponentType } from "react";
+import { useEffect, useMemo, useState, type ComponentType, type FormEvent, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import { Button } from "@/components/ui/button";
@@ -55,10 +55,11 @@ function NavLink({
   );
 }
 
-export function AppShell({ children }: { children: React.ReactNode }) {
+export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [headerSearch, setHeaderSearch] = useState("");
   const [hasToken] = useState(() => Boolean(getToken()));
 
   const me = useQuery({
@@ -96,6 +97,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     );
   }, [me.data?.name]);
 
+  const isAdmin = me.data?.role === "admin";
+  const visibleSupportNav = supportNav.filter((item) => item.href !== "/admin" || isAdmin);
+
+  function submitHeaderSearch(event: FormEvent<HTMLFormElement>) {
+    event.preventDefault();
+    const query = headerSearch.trim();
+    if (!query) {
+      router.push("/opportunities");
+      return;
+    }
+    router.push(`/opportunities?semantic=${encodeURIComponent(query)}`);
+  }
+
   const sidebar = (
     <div className="flex h-full flex-col">
       <div className="mb-8 flex items-center gap-3 px-2">
@@ -117,7 +131,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       <div className="mt-8 border-t border-slate-200 pt-4 dark:border-slate-800">
         <div className="space-y-1">
-          {supportNav.map((item) => {
+          {visibleSupportNav.map((item) => {
             const Icon = item.icon;
             return <NavLink key={item.href} href={item.href} label={item.label} icon={Icon} active={pathname === item.href} onClick={() => setOpen(false)} />;
           })}
@@ -157,10 +171,15 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <Menu className="h-5 w-5" />
             </Button>
 
-            <div className="relative hidden flex-1 items-center lg:flex">
+            <form className="relative hidden flex-1 items-center lg:flex" onSubmit={submitHeaderSearch}>
               <Search className="pointer-events-none absolute left-3 h-4 w-4 text-slate-500" />
-              <Input className="h-10 rounded-lg border-slate-200 bg-white pl-9 text-sm placeholder:text-slate-500 dark:border-slate-800 dark:bg-slate-900/70" placeholder="Buscar en ConvocaRadar IA..." />
-            </div>
+              <Input
+                className="h-10 rounded-lg border-slate-200 bg-white pl-9 text-sm placeholder:text-slate-500 dark:border-slate-800 dark:bg-slate-900/70"
+                placeholder="Búsqueda semántica de convocatorias..."
+                value={headerSearch}
+                onChange={(event) => setHeaderSearch(event.target.value)}
+              />
+            </form>
 
             <div className="ml-auto flex items-center gap-2">
               <ThemeToggle />
