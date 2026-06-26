@@ -6,6 +6,7 @@ import type {
   OpportunityDocument,
   OpportunityList,
   OpportunityScore,
+  OpportunitySemanticList,
   Report,
   Source,
   SourceHealth,
@@ -24,7 +25,7 @@ function getDefaultApiUrl() {
       return "http://127.0.0.1:8000/api/v1";
     }
   }
-  return "https://convotracker-api.onrender.com/api/v1";
+  return "https://api.convocaradar.com/api/v1";
 }
 
 export function getToken() {
@@ -163,6 +164,10 @@ export const api = {
     const normalized = query && !query.startsWith("?") ? `?${query}` : query;
     return request<OpportunityList>(`/opportunities${normalized}`);
   },
+  semanticSearch: (query: string, limit = 12) =>
+    request<OpportunitySemanticList>(
+      `/opportunities/semantic-search?query=${encodeURIComponent(query)}&limit=${limit}`,
+    ),
   opportunity: (id: string) => request<Opportunity>(`/opportunities/${id}`),
   favorite: (id: string) => request(`/opportunities/${id}/favorite`, { method: "POST" }),
   unfavorite: (id: string) => request(`/opportunities/${id}/favorite`, { method: "DELETE" }),
@@ -199,5 +204,6 @@ export const api = {
   adminMetrics: () => request<AdminMetrics>("/admin/metrics"),
   retryDegradedSources: () =>
     request<{ sources_checked: number; scheduled: number; skipped: number }>("/admin/sources/retry-degraded", { method: "POST" }),
+  bootstrapData: () => request<Record<string, string | number>>("/admin/bootstrap-data", { method: "POST" }),
   tasks: () => request<Task[]>("/tasks"),
 };

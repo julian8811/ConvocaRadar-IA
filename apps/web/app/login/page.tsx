@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { Radar } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
@@ -93,6 +94,12 @@ export default function LoginPage() {
           </form>
           <p className="mt-4 text-xs text-slate-500">
             API configurada: <span className="font-mono">{API_URL}</span>
+          </p>
+          <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
+            ¿Primera vez aquí?{" "}
+            <Link href="/register" className="font-medium text-cyan-700 hover:underline dark:text-cyan-300">
+              Crear cuenta
+            </Link>
           </p>
         </CardContent>
       </Card>

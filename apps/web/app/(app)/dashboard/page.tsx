@@ -373,8 +373,12 @@ export default function DashboardPage() {
               <>
                 <p>No hay convocatorias visibles todavía en esta sesión.</p>
                 <p className="text-slate-500 dark:text-slate-400">
-                  El tablero sigue mostrando salud operativa real de fuentes, corridas y tareas, para que podamos ver dónde está creciendo la captura.
+                  El tablero sigue mostrando salud operativa real de fuentes, corridas y tareas. Ejecuta la captura inicial para poblar convocatorias.
                 </p>
+                <Button onClick={() => runCapture.mutate()} disabled={runCapture.isPending}>
+                  <Play className="h-4 w-4" />
+                  {runCapture.isPending ? "Capturando..." : "Ejecutar captura inicial"}
+                </Button>
               </>
             )}
           </CardContent>

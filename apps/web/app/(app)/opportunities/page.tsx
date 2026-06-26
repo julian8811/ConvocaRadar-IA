@@ -81,8 +81,15 @@ function sortItems(items: Opportunity[]) {
   });
 }
 
+function initialSemanticQuery() {
+  if (typeof window === "undefined") return "";
+  return new URLSearchParams(window.location.search).get("semantic") ?? "";
+}
+
 export default function OpportunitiesPage() {
   const [search, setSearch] = useState("");
+  const [semanticQuery, setSemanticQuery] = useState(initialSemanticQuery);
+  const [searchMode, setSearchMode] = useState<"text" | "semantic">(() => (initialSemanticQuery() ? "semantic" : "text"));
   const [status, setStatus] = useState("open");
   const [country, setCountry] = useState("");
   const [category, setCategory] = useState("");
@@ -104,6 +111,11 @@ export default function OpportunitiesPage() {
   }, [category, country, page, search, status]);
 
   const opportunities = useQuery({ queryKey: ["opportunities", query], queryFn: () => api.opportunities(query) });
+  const semanticResults = useQuery({
+    queryKey: ["semantic-search", semanticQuery],
+    queryFn: () => api.semanticSearch(semanticQuery),
+    enabled: searchMode === "semantic" && semanticQuery.trim().length >= 3,
+  });
   const actionLinkClass =
     "inline-flex h-9 w-9 items-center justify-center rounded-md border border-slate-300 bg-white text-slate-900 shadow-sm transition-colors hover:bg-slate-50 hover:text-slate-950 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800";
 
@@ -129,17 +141,21 @@ export default function OpportunitiesPage() {
     onError: (error) => toast.error(error instanceof Error ? error.message : "No se pudo exportar CSV"),
   });
 
-  const sourceItems = sources.data ?? [];
   const items = useMemo(() => {
+    const applyStatus = (list: Opportunity[]) =>
+      list.filter((item) => {
+        if (!status) return true;
+        if (status === "open") return item.status !== "closed";
+        return item.status === status;
+      });
+
+    if (searchMode === "semantic" && semanticQuery.trim().length >= 3) {
+      return sortItems(applyStatus(semanticItems));
+    }
     const visibleItems = (opportunities.data?.items ?? []).filter((item) => !isNoiseVisibleText(item.title));
-    const filteredByStatus = visibleItems.filter((item) => {
-      if (!status) return true;
-      if (status === "open") return item.status !== "closed";
-      return item.status === status;
-    });
-    return sortItems(filteredByStatus);
-  }, [opportunities.data?.items, status]);
-  const total = opportunities.data?.total ?? 0;
+    return sortItems(applyStatus(visibleItems));
+  }, [opportunities.data?.items, semanticItems, searchMode, semanticQuery, status]);
+  const total = searchMode === "semantic" && semanticQuery.trim().length >= 3 ? items.length : (opportunities.data?.total ?? 0);
   const totalPages = Math.max(Math.ceil(total / pageSize), 1);
   const openCount = items.filter((item) => item.status === "open").length;
   const closingSoon = items.filter((item) => item.status === "closing_soon").length;
@@ -175,15 +191,29 @@ export default function OpportunitiesPage() {
       </div>
 
       <Card>
-        <CardContent className="grid gap-3 p-4 xl:grid-cols-[1.35fr_0.8fr_0.8fr_0.8fr_auto]">
+        <CardContent className="grid gap-3 p-4 xl:grid-cols-[auto_1.35fr_0.8fr_0.8fr_0.8fr_auto]">
+          <Select
+            value={searchMode}
+            onChange={(event) => {
+              setSearchMode(event.target.value as "text" | "semantic");
+              setPage(1);
+            }}
+          >
+            <option value="text">Texto</option>
+            <option value="semantic">Semántica</option>
+          </Select>
           <div className="relative">
             <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-500" />
             <Input
               className="h-10 pl-9"
-              placeholder="Buscar por título o entidad"
-              value={search}
+              placeholder={searchMode === "semantic" ? "Ej: innovación en salud con fondos europeos" : "Buscar por título o entidad"}
+              value={searchMode === "semantic" ? semanticQuery : search}
               onChange={(event) => {
-                setSearch(event.target.value);
+                if (searchMode === "semantic") {
+                  setSemanticQuery(event.target.value);
+                } else {
+                  setSearch(event.target.value);
+                }
                 setPage(1);
               }}
             />
@@ -224,11 +254,21 @@ export default function OpportunitiesPage() {
         </CardContent>
       </Card>
 
-      {opportunities.isLoading || sources.isLoading ? <LoadingState label="Cargando convocatorias" /> : null}
+      {opportunities.isLoading || sources.isLoading || (searchMode === "semantic" && semanticResults.isLoading) ? (
+        <LoadingState label="Cargando convocatorias" />
+      ) : null}
       {opportunities.error ? <ErrorState message={opportunities.error.message} /> : null}
+      {semanticResults.error ? <ErrorState message={semanticResults.error.message} /> : null}
       {sources.error ? <ErrorState message={sources.error.message} /> : null}
       {opportunities.data && items.length === 0 ? (
-        <EmptyState title="No hay convocatorias" detail="Ejecuta una fuente o revisa los filtros activos." />
+        <EmptyState
+          title="No hay convocatorias"
+          detail={
+            searchMode === "semantic"
+              ? "Prueba otra consulta semántica o ejecuta fuentes desde el panel de Fuentes."
+              : "Ejecuta una fuente o revisa los filtros activos."
+          }
+        />
       ) : null}
 
       {opportunities.data && items.length > 0 ? (
