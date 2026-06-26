@@ -198,3 +198,58 @@ export type AdminMetrics = {
   sent_alerts: number;
   audit_events: number;
 };
+
+export type DashboardBreakdownItem = {
+  name: string;
+  total: number;
+};
+
+export type DashboardOpportunityItem = {
+  id: string;
+  title: string;
+  entity: string;
+  country: string;
+  status: string;
+  close_date: string | null;
+  funding_amount_raw: string | null;
+  funding_amount_value: number | null;
+  funding_amount_currency: string | null;
+  score: number | null;
+  priority: string | null;
+  days_to_close: number | null;
+};
+
+export type DashboardSourceAlert = {
+  source_id: string;
+  name: string;
+  status: "degraded" | "failing";
+};
+
+export type DashboardDataCoverage = {
+  with_summary: number;
+  with_amount: number;
+  with_close_date: number;
+  with_source: number;
+  embeddings_coverage: number;
+};
+
+export type DashboardProfileSummary = {
+  completeness: number;
+  missing_fields: string[];
+};
+
+export type DashboardSummary = {
+  total_opportunities: number;
+  open_opportunities: number;
+  closing_soon_opportunities: number;
+  high_match_opportunities: number;
+  top_scored: DashboardOpportunityItem[];
+  closing_soon: DashboardOpportunityItem[];
+  status_breakdown: DashboardBreakdownItem[];
+  country_breakdown: DashboardBreakdownItem[];
+  degraded_sources: number;
+  failing_sources: number;
+  source_alerts: DashboardSourceAlert[];
+  data_coverage: DashboardDataCoverage;
+  profile: DashboardProfileSummary;
+};
