@@ -7,40 +7,72 @@ on:
     branches: [main]
   workflow_dispatch:
 
+env:
+  RENDER_API_SERVICE_ID: srv-d6qovo75r7bs738lipj0
+
 jobs:
   deploy:
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     steps:
-      - name: Deploy API
+      - name: Deploy API via hook or Render API
         env:
           DEPLOY_HOOK: ${{ secrets.RENDER_API_DEPLOY_HOOK }}
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          SERVICE_ID: ${{ env.RENDER_API_SERVICE_ID }}
         run: |
-          if [ -z "$DEPLOY_HOOK" ]; then
-            echo "RENDER_API_DEPLOY_HOOK is not configured; skipping API deploy."
+          if [ -n "$DEPLOY_HOOK" ]; then
+            echo "Triggering Render API deploy via deploy hook..."
+            curl -fsS -X POST "$DEPLOY_HOOK"
             exit 0
           fi
-          echo "Triggering Render API deploy..."
-          curl -fsS -X POST "$DEPLOY_HOOK"
+          if [ -z "$RENDER_API_KEY" ]; then
+            echo "Neither RENDER_API_DEPLOY_HOOK nor RENDER_API_KEY is configured; skipping API deploy."
+            exit 0
+          fi
+          echo "Triggering Render API deploy via Render API..."
+          curl -fsS -X POST "https://api.render.com/v1/services/${SERVICE_ID}/deploys" \
+            -H "Authorization: Bearer ${RENDER_API_KEY}" \
+            -H "Content-Type: application/json" \
+            -H "Accept: application/json" \
+            -d '{"clearCache":"clear"}'
 
-      - name: Deploy worker
+      - name: Deploy worker via hook
         env:
           DEPLOY_HOOK: ${{ secrets.RENDER_WORKER_DEPLOY_HOOK }}
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          SERVICE_ID: ${{ secrets.RENDER_WORKER_SERVICE_ID }}
         run: |
-          if [ -z "$DEPLOY_HOOK" ]; then
-            echo "RENDER_WORKER_DEPLOY_HOOK is not configured; skipping worker deploy."
+          if [ -z "$DEPLOY_HOOK" ] && { [ -z "$RENDER_API_KEY" ] || [ -z "$SERVICE_ID" ]; }; then
+            echo "Worker deploy not configured; skipping."
             exit 0
           fi
-          echo "Triggering Render worker deploy..."
-          curl -fsS -X POST "$DEPLOY_HOOK"
+          if [ -n "$DEPLOY_HOOK" ]; then
+            curl -fsS -X POST "$DEPLOY_HOOK"
+            exit 0
+          fi
+          curl -fsS -X POST "https://api.render.com/v1/services/${SERVICE_ID}/deploys" \
+            -H "Authorization: Bearer ${RENDER_API_KEY}" \
+            -H "Content-Type: application/json" \
+            -H "Accept: application/json" \
+            -d '{"clearCache":"clear"}'
 
-      - name: Deploy worker beat
+      - name: Deploy worker beat via hook
         env:
           DEPLOY_HOOK: ${{ secrets.RENDER_WORKER_BEAT_DEPLOY_HOOK }}
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          SERVICE_ID: ${{ secrets.RENDER_WORKER_BEAT_SERVICE_ID }}
         run: |
-          if [ -z "$DEPLOY_HOOK" ]; then
-            echo "RENDER_WORKER_BEAT_DEPLOY_HOOK is not configured; skipping worker-beat deploy."
+          if [ -z "$DEPLOY_HOOK" ] && { [ -z "$RENDER_API_KEY" ] || [ -z "$SERVICE_ID" ]; }; then
+            echo "Worker-beat deploy not configured; skipping."
             exit 0
           fi
-          echo "Triggering Render worker-beat deploy..."
-          curl -fsS -X POST "$DEPLOY_HOOK"
+          if [ -n "$DEPLOY_HOOK" ]; then
+            curl -fsS -X POST "$DEPLOY_HOOK"
+            exit 0
+          fi
+          curl -fsS -X POST "https://api.render.com/v1/services/${SERVICE_ID}/deploys" \
+            -H "Authorization: Bearer ${RENDER_API_KEY}" \
+            -H "Content-Type: application/json" \
+            -H "Accept: application/json" \
+            -d '{"clearCache":"clear"}'
