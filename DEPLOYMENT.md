@@ -220,15 +220,25 @@ Para que cada push exitoso a `main` redeploye API y workers en Render:
 1. En Render, abre cada servicio (`convocaradar-api`, `convocaradar-worker`, `convocaradar-worker-beat`).
 2. Ve a **Settings → Deploy Hook** y copia la URL del hook.
 3. En GitHub, abre **Settings → Secrets and variables → Actions** del repositorio.
-4. Crea estos secrets:
+4. Crea estos secrets (elige una opcion):
+
+**Opcion A — API key de Render (recomendada)**
+
+| Secret | Valor |
+|---|---|
+| `RENDER_API_KEY` | API key desde [Account Settings → API Keys](https://dashboard.render.com/u/settings#api-keys) |
+
+El workflow `.github/workflows/deploy-render.yml` usa esa key para redeployar `convotracker-api` (`srv-d6qovo75r7bs738lipj0`) cuando CI pasa en `main`.
+
+**Opcion B — Deploy hooks**
 
 | Secret | Servicio Render |
 |---|---|
-| `RENDER_API_DEPLOY_HOOK` | `convocaradar-api` |
-| `RENDER_WORKER_DEPLOY_HOOK` | `convocaradar-worker` |
-| `RENDER_WORKER_BEAT_DEPLOY_HOOK` | `convocaradar-worker-beat` |
+| `RENDER_API_DEPLOY_HOOK` | `convotracker-api` |
+| `RENDER_WORKER_DEPLOY_HOOK` | worker (si existe) |
+| `RENDER_WORKER_BEAT_DEPLOY_HOOK` | worker-beat (si existe) |
 
-El workflow `.github/workflows/deploy-render.yml` se ejecuta cuando CI termina en verde en `main` y hace `POST` a cada hook configurado. Si un secret no existe, ese servicio se omite sin fallar el job.
+El workflow intenta primero el deploy hook y, si no existe, usa `RENDER_API_KEY`.
 
 Tambien puedes dispararlo manualmente desde **Actions → Deploy Render → Run workflow**.
 
