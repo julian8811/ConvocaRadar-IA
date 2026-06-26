@@ -213,6 +213,27 @@ Crear un bucket en Cloudflare R2 y configurar:
 
 Publicar `apps/api` en Render y apuntarlo a la base de datos y Redis administrados.
 
+#### Deploy automatico desde GitHub
+
+Para que cada push exitoso a `main` redeploye API y workers en Render:
+
+1. En Render, abre cada servicio (`convocaradar-api`, `convocaradar-worker`, `convocaradar-worker-beat`).
+2. Ve a **Settings → Deploy Hook** y copia la URL del hook.
+3. En GitHub, abre **Settings → Secrets and variables → Actions** del repositorio.
+4. Crea estos secrets:
+
+| Secret | Servicio Render |
+|---|---|
+| `RENDER_API_DEPLOY_HOOK` | `convocaradar-api` |
+| `RENDER_WORKER_DEPLOY_HOOK` | `convocaradar-worker` |
+| `RENDER_WORKER_BEAT_DEPLOY_HOOK` | `convocaradar-worker-beat` |
+
+El workflow `.github/workflows/deploy-render.yml` se ejecuta cuando CI termina en verde en `main` y hace `POST` a cada hook configurado. Si un secret no existe, ese servicio se omite sin fallar el job.
+
+Tambien puedes dispararlo manualmente desde **Actions → Deploy Render → Run workflow**.
+
+Para el primer deploy despues de mergear cambios importantes, usa **Manual Deploy → Deploy latest commit** en Render si los hooks aun no estan configurados.
+
 ### 5) Worker
 
 Publicar `apps/worker` en Render con el mismo Redis y backend publico.
