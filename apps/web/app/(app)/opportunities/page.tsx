@@ -141,6 +141,11 @@ export default function OpportunitiesPage() {
     onError: (error) => toast.error(error instanceof Error ? error.message : "No se pudo exportar CSV"),
   });
 
+  const sourceItems = sources.data ?? [];
+  const semanticItems = useMemo(
+    () => (semanticResults.data?.items ?? []).map((item) => item.opportunity).filter((item) => !isNoiseVisibleText(item.title)),
+    [semanticResults.data?.items],
+  );
   const items = useMemo(() => {
     const applyStatus = (list: Opportunity[]) =>
       list.filter((item) => {
