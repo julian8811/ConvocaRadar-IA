@@ -1,0 +1,46 @@
+name: Deploy Render
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  deploy:
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy API
+        env:
+          DEPLOY_HOOK: ${{ secrets.RENDER_API_DEPLOY_HOOK }}
+        run: |
+          if [ -z "$DEPLOY_HOOK" ]; then
+            echo "RENDER_API_DEPLOY_HOOK is not configured; skipping API deploy."
+            exit 0
+          fi
+          echo "Triggering Render API deploy..."
+          curl -fsS -X POST "$DEPLOY_HOOK"
+
+      - name: Deploy worker
+        env:
+          DEPLOY_HOOK: ${{ secrets.RENDER_WORKER_DEPLOY_HOOK }}
+        run: |
+          if [ -z "$DEPLOY_HOOK" ]; then
+            echo "RENDER_WORKER_DEPLOY_HOOK is not configured; skipping worker deploy."
+            exit 0
+          fi
+          echo "Triggering Render worker deploy..."
+          curl -fsS -X POST "$DEPLOY_HOOK"
+
+      - name: Deploy worker beat
+        env:
+          DEPLOY_HOOK: ${{ secrets.RENDER_WORKER_BEAT_DEPLOY_HOOK }}
+        run: |
+          if [ -z "$DEPLOY_HOOK" ]; then
+            echo "RENDER_WORKER_BEAT_DEPLOY_HOOK is not configured; skipping worker-beat deploy."
+            exit 0
+          fi
+          echo "Triggering Render worker-beat deploy..."
+          curl -fsS -X POST "$DEPLOY_HOOK"
