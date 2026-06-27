@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_organization, get_current_user
 from app.db.session import get_db
 from app.core.task_queue import enqueue_scrape_source
-from app.models import Alert, AuditLog, Opportunity, OpportunityEmbedding, Organization, Report, Source, SourceRun, Task, User
+from app.models import Alert, AuditLog, Opportunity, OpportunityEmbedding, Organization, Report, Role, Source, SourceRun, Task, User
 from app.schemas import AdminMetricsRead, AuditLogRead, SourceRunOverviewRead
 from app.db.bootstrap import bootstrap_priority_sources
 from app.db.seed import seed_default_sources
@@ -38,7 +38,7 @@ def _days_since_last_success(recent_runs: list[SourceRun], source: Source) -> in
 
 
 def require_admin(user: User = Depends(get_current_user)) -> User:
-    if user.role != "admin":
+    if user.role != Role.admin.value:
         raise HTTPException(status_code=403, detail="Admin role required")
     return user
 

@@ -1,8 +1,7 @@
 ﻿from sqlalchemy import select
 
-from app.core.security import hash_password
 from app.db.session import SessionLocal, create_all
-from app.models import Organization, OrganizationProfile, Source, User
+from app.models import Organization, OrganizationProfile, Source
 
 
 def seed_default_sources(db, organization: Organization) -> dict[str, int]:
@@ -476,18 +475,6 @@ def seed() -> None:
                     has_company_partners=True,
                     has_university_partners=True,
                     application_capacity="high",
-                )
-            )
-
-        user = db.scalar(select(User).where(User.email == "admin@convocaradar.io"))
-        if not user:
-            db.add(
-                User(
-                    email="admin@convocaradar.io",
-                    name="Admin ConvocaRadar",
-                    password_hash=hash_password("ConvocaRadarLocal123!"),
-                    role="admin",
-                    organization_id=organization.id,
                 )
             )
 

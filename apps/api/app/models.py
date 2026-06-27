@@ -81,6 +81,12 @@ class Priority(StrEnum):
     not_recommended = "not_recommended"
 
 
+class Role(StrEnum):
+    admin = "admin"
+    member = "member"
+    viewer = "viewer"
+
+
 class User(Base):
     __tablename__ = "users"
 
@@ -88,7 +94,7 @@ class User(Base):
     email: Mapped[str] = mapped_column(String, unique=True, index=True)
     name: Mapped[str] = mapped_column(String)
     password_hash: Mapped[str] = mapped_column(String)
-    role: Mapped[str] = mapped_column(String, default="admin")
+    role: Mapped[str] = mapped_column(String, default=Role.member.value)
     organization_id: Mapped[str | None] = mapped_column(ForeignKey("organizations.id"))
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
