@@ -24,6 +24,7 @@ class Settings(BaseSettings):
     bootstrap_sources_blocking: bool = False
     bootstrap_source_keys: str = "grants-gov-rss,grants-gov,innpulsa,minciencias,nsf-funding-rss"
     sentry_dsn: str | None = None
+    sentry_send_default_pii: bool = False
     scraping_user_agent: str = "ConvocaRadarBot/0.1"
     scraping_timeout_seconds: int = 30
     scraping_max_source_seconds: int = 90
