@@ -43,11 +43,14 @@ def main() -> None:
 
     password = os.environ.get(args.password_env)
     if not password:
+        # Usage error: missing or empty --password-env value. Exit 2 to
+        # distinguish from exit 1 (reserved for the "admin already exists,
+        # abort" path per the SEC-1.2 spec).
         print(
             f"ERROR: Environment variable '{args.password_env}' is not set or is empty",
             file=sys.stderr,
         )
-        sys.exit(1)
+        sys.exit(2)
 
     db = SessionLocal()
     try:

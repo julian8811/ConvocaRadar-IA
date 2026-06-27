@@ -1461,7 +1461,12 @@ def test_seed_admin_aborts_if_admin_exists(monkeypatch: pytest.MonkeyPatch) -> N
 
 
 def test_seed_admin_rejects_missing_password(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Environment variable not set → exit 1."""
+    """Environment variable not set or empty → exit 2 (usage error).
+
+    SEC-1.2 spec: "process exits with code 2 (usage error)" when the
+    password env var is missing or empty. Exit 1 is reserved for the
+    "admin already exists, abort" path.
+    """
     import sys
 
     from app.db.seed_admin import main
@@ -1484,7 +1489,31 @@ def test_seed_admin_rejects_missing_password(monkeypatch: pytest.MonkeyPatch) ->
     monkeypatch.delenv("THIS_ENV_VAR_DOES_NOT_EXIST", raising=False)
     with pytest.raises(SystemExit) as exc_info:
         main()
-    assert exc_info.value.code == 1, f"Expected exit 1, got {exc_info.value.code}"
+    assert exc_info.value.code == 2, (
+        f"Expected exit 2 (usage error) for missing --password-env, "
+        f"got {exc_info.value.code!r}. Exit 1 is reserved for the "
+        f"'admin already exists' abort path."
+    )
+
+
+def test_seed_admin_exits_zero_on_help(monkeypatch: pytest.MonkeyPatch) -> None:
+    """`--help` must exit 0 (argparse convention), not 1 or 2.
+
+    Operators running `convocaradar-seed-admin --help` to read the usage
+    must not see a "non-zero exit" failure in their CI logs.
+    """
+    import sys
+
+    from app.db.seed_admin import main
+
+    monkeypatch.setattr(sys, "argv", ["convocaradar-seed-admin", "--help"])
+    with pytest.raises(SystemExit) as exc_info:
+        main()
+    assert exc_info.value.code == 0, (
+        f"Expected exit 0 on --help, got {exc_info.value.code!r}. "
+        f"argparse defaults to exit(0) for --help; if this regressed, "
+        f"someone overrode the default help action."
+    )
 
 
 # ── Existing tests ───────────────────────────────────────────────────────────
