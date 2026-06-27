@@ -8,7 +8,7 @@ test("inicia sesion y carga el panel analitico", async ({ page }) => {
   await page.getByRole("button", { name: /Entrar con cuenta local/i }).click();
 
   await expect(page).toHaveURL(/\/dashboard$/);
-  await expect(page.getByRole("heading", { name: /Panel analitico/i })).toBeVisible();
+  await expect(page.getByRole("heading", { name: /Panel anal[ií]tico/i })).toBeVisible();
   await expect(page.getByText(/Convocatorias abiertas/i)).toBeVisible();
   await expect(page.getByText(/Alta compatibilidad/i)).toBeVisible();
 
