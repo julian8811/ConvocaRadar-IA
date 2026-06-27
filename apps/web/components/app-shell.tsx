@@ -1,12 +1,13 @@
 "use client";
 
-import { Bell, Database, FileText, Gauge, LogOut, Menu, Radar, Search, Settings, Shield, Target, UserRound } from "lucide-react";
+import { AlertTriangle, Bell, Database, FileText, Gauge, LogOut, Menu, Radar, RefreshCw, Search, Settings, Shield, Target, UserRound } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useMemo, useState, type ComponentType, type FormEvent, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useState, type ComponentType, type FormEvent, type ReactNode } from "react";
 import { useQuery } from "@tanstack/react-query";
 
 import { Button } from "@/components/ui/button";
+import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { LoadingState } from "@/components/ui/state";
 import { ThemeToggle } from "@/components/theme-toggle";
@@ -36,7 +37,7 @@ function NavLink({
 }: {
   href: string;
   label: string;
-  icon: ComponentType<{ className: string }>;
+  icon: ComponentType<{ className?: string }>;
   active: boolean;
   onClick: () => void;
 }) {
@@ -55,6 +56,22 @@ function NavLink({
   );
 }
 
+/**
+ * SEC-1.5: is a thrown error a fetch AbortError (network timeout from
+ * AbortController inside request())?
+ *
+ * Browsers use DOMException with name "AbortError" for AbortController-driven
+ * cancellations, but our request() may also surface a plain Error with the
+ * name "AbortError" if the underlying fetch failed that way.
+ */
+function isAbortError(error: unknown): boolean {
+  if (!error) return false;
+  if (typeof error === "object" && "name" in error) {
+    return (error as { name: string }).name === "AbortError";
+  }
+  return false;
+}
+
 export function AppShell({ children }: { children: ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
@@ -62,25 +79,68 @@ export function AppShell({ children }: { children: ReactNode }) {
   const [headerSearch, setHeaderSearch] = useState("");
   const [hasToken] = useState(() => Boolean(getToken()));
 
+  // SEC-1.5: retry: 1 with retryDelay: 1000 so transient network blips are
+  // absorbed by react-query. We must still distinguish AbortError from real
+  // auth failures in the useEffect below.
   const me = useQuery({
     queryKey: ["me"],
     queryFn: api.me,
     enabled: hasToken,
-    retry: false,
+    retry: 1,
+    retryDelay: 1000,
   });
 
+  // SEC-1.5: track whether the user has manually clicked the "Reintentar"
+  // button after the automatic retry also failed. Two consecutive AbortErrors
+  // (initial + retry, or retry + manual) → redirect to /login with reason.
+  const [manualRetryDone, setManualRetryDone] = useState(false);
+  // Reset the manual-retry flag only when the query has SUCCEEDED (has data).
+  // Resetting on isError=false would clobber the flag during a new fetch and
+  // let the user retry forever after one transient blip.
   useEffect(() => {
-    if (!getToken()) router.replace("/login");
-  }, [router]);
+    if (me.isSuccess) {
+      setManualRetryDone(false);
+    }
+  }, [me.isSuccess]);
 
+  // SEC-1.5 error routing:
+  //   - No token at all      → /login (immediate)
+  //   - Non-AbortError       → /login (real auth failure, no retry UI)
+  //   - AbortError w/ manual retry done → /login?reason=session_expired
+  //   - AbortError first time → show the error UI with "Reintentar" button
   useEffect(() => {
-    if (me.isError) {
+    if (!hasToken) {
+      router.replace("/login");
+      return;
+    }
+    if (!me.isError) return;
+    if (!isAbortError(me.error)) {
       clearToken();
       router.replace("/login");
+      return;
     }
-  }, [me.isError, router]);
+    if (manualRetryDone) {
+      // Two consecutive AbortErrors — give up and ask the user to log in
+      // again. The cookie will be replaced if they authenticate again.
+      router.replace("/login?reason=session_expired");
+    }
+  }, [hasToken, me.isError, me.error, manualRetryDone, router]);
 
-  function logout() {
+  const handleRetry = useCallback(() => {
+    setManualRetryDone(true);
+    void me.refetch();
+  }, [me]);
+
+  async function logout() {
+    try {
+      // Best-effort: clear the cookie on the server. We still redirect even
+      // if the call fails (offline, 5xx, etc.) — the local state is the
+      // source of truth for the user-visible redirect.
+      await api.logout();
+    } catch {
+      // Ignore — the localStorage mirror (dev only) is cleared below and
+      // the user is sent to /login regardless.
+    }
     clearToken();
     router.push("/login");
   }
@@ -109,6 +169,12 @@ export function AppShell({ children }: { children: ReactNode }) {
     }
     router.push(`/opportunities?semantic=${encodeURIComponent(query)}`);
   }
+
+  // SEC-1.5: render the AbortError UI in place of children. Keeps the
+  // sidebar/header visible so the user can still navigate.
+  const showAbortErrorUI = Boolean(
+    hasToken && me.isError && isAbortError(me.error) && !manualRetryDone,
+  );
 
   const sidebar = (
     <div className="flex h-full flex-col">
@@ -190,7 +256,36 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         </header>
 
-        <div className="mx-auto max-w-7xl px-4 py-6 lg:px-6">{!hasToken || me.isLoading ? <LoadingState label="Validando sesión" /> : children}</div>
+        <div className="mx-auto max-w-7xl px-4 py-6 lg:px-6">
+          {!hasToken || me.isLoading ? (
+            <LoadingState label="Validando sesión" />
+          ) : showAbortErrorUI ? (
+            <Card className="border-amber-200 bg-amber-50 dark:border-amber-400/30 dark:bg-amber-400/10" role="alert">
+              <CardContent className="flex flex-col gap-3 py-6 text-sm text-amber-900 dark:text-amber-100 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex items-start gap-3">
+                  <AlertTriangle className="mt-0.5 h-5 w-5 shrink-0 text-amber-700 dark:text-amber-300" />
+                  <div>
+                    <p className="font-semibold">No se pudo contactar al servidor</p>
+                    <p className="text-amber-800 dark:text-amber-200/80">
+                      Revisá tu conexión a internet y volvé a intentarlo.
+                    </p>
+                  </div>
+                </div>
+                <Button
+                  variant="outline"
+                  onClick={handleRetry}
+                  disabled={me.isFetching}
+                  className="shrink-0 border-amber-300 bg-white text-amber-900 hover:bg-amber-100 dark:border-amber-400/30 dark:bg-slate-950/40 dark:text-amber-100 dark:hover:bg-amber-400/20"
+                >
+                  <RefreshCw className={`h-4 w-4 ${me.isFetching ? "animate-spin" : ""}`} />
+                  Reintentar
+                </Button>
+              </CardContent>
+            </Card>
+          ) : (
+            children
+          )}
+        </div>
       </main>
     </div>
   );
