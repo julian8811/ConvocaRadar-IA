@@ -280,13 +280,21 @@ def test_enqueue_seed_default_sources_returns_none_on_error(monkeypatch: pytest.
 # ── WU-A6 helper: register logs warning when broker enqueue fails ────────
 
 
-def test_register_logs_warning_when_broker_down(monkeypatch: pytest.MonkeyPatch, caplog: pytest.LogCaptureFixture) -> None:
-    """If enqueue_seed_default_sources returns None, the request still 200s.
+def test_register_logs_warning_when_broker_down(monkeypatch: pytest.MonkeyPatch) -> None:
+    """If enqueue_seed_default_sources returns None, the request still 200s
+    AND a structlog warning is emitted so on-call sees the broker outage.
 
-    WU-A4 baseline: the request must succeed even when the enqueue helper
-    cannot reach the broker. The structlog warning emission is added in
-    WU-A6; this test only pins the non-blocking contract for now.
+    REQ-AUTH-1 acceptance: the request must never fail because the
+    background enqueue is unreachable; a warning must be visible to the
+    operator so the broker outage is actionable.
+
+    Structlog writes JSON to stdout directly (see app/core/logging.py) so
+    pytest's caplog fixture cannot capture it; we use
+    structlog.testing.capture_logs() instead, which patches the bound
+    loggers in-place.
     """
+    import structlog
+
     monkeypatch.setattr(
         "app.api.v1.auth.enqueue_seed_default_sources",
         lambda _org_id: None,
@@ -294,7 +302,17 @@ def test_register_logs_warning_when_broker_down(monkeypatch: pytest.MonkeyPatch,
 
     c = _client()
     payload = _unique_payload("wu-a6")
-    response = c.post("/api/v1/auth/register", json=payload)
+    with structlog.testing.capture_logs() as captured:
+        response = c.post("/api/v1/auth/register", json=payload)
 
     assert response.status_code == 200, response.text
     assert "access_token" in response.json()
+
+    warning_events = [
+        log for log in captured
+        if log.get("log_level") == "warning" and "seed" in log.get("event", "")
+    ]
+    assert warning_events, (
+        f"expected a structlog warning mentioning seed sources, "
+        f"got events: {[log.get('event') for log in captured]}"
+    )
