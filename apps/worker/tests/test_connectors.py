@@ -2221,6 +2221,52 @@ def test_connector_factory_selects_wave3_connectors() -> None:
     assert isinstance(connector_for("anii-uruguay", "https://anii.org.uy/apoyos/investigacion/"), AniiUruguayConnector)
 
 
+def test_is_private_host_rejects_private_ip_literal() -> None:
+    from worker.connectors.common import _is_private_host
+
+    assert _is_private_host("127.0.0.1")
+    assert _is_private_host("10.0.0.1")
+    assert _is_private_host("192.168.1.1")
+    assert _is_private_host("172.16.0.1")
+    assert _is_private_host("::1")
+    assert not _is_private_host("93.184.216.34")  # example.com
+    assert not _is_private_host("8.8.8.8")
+
+
+def test_is_private_host_rejects_dns_resolved_private(monkeypatch) -> None:
+    import socket
+
+    from worker.connectors.common import _is_private_host
+
+    def mock_getaddrinfo(host, port, *args, **kwargs):
+        return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("10.0.0.99", 80))]
+
+    monkeypatch.setattr("socket.getaddrinfo", mock_getaddrinfo)
+    assert _is_private_host("internal.corp.example")
+
+
+def test_is_private_host_ok_for_public_domain(monkeypatch) -> None:
+    import socket
+
+    from worker.connectors.common import _is_private_host
+
+    def mock_getaddrinfo(host, port, *args, **kwargs):
+        return [(socket.AF_INET, socket.SOCK_STREAM, 6, "", ("93.184.216.34", 80))]
+
+    monkeypatch.setattr("socket.getaddrinfo", mock_getaddrinfo)
+    assert not _is_private_host("example.com")
+
+
+def test_is_private_host_dns_failure_is_safe(monkeypatch) -> None:
+    from worker.connectors.common import _is_private_host
+
+    def mock_getaddrinfo(host, port, *args, **kwargs):
+        raise OSError("DNS resolution failed")
+
+    monkeypatch.setattr("socket.getaddrinfo", mock_getaddrinfo)
+    assert not _is_private_host("nonexistent.invalid")
+
+
 def test_worker_settings_fails_without_internal_api_key() -> None:
     from pydantic import ValidationError
 
@@ -2228,6 +2274,13 @@ def test_worker_settings_fails_without_internal_api_key() -> None:
 
     with pytest.raises(ValidationError):
         WorkerSettings(internal_api_key="")
+
+
+def test_scrape_source_rejects_private_base_url() -> None:
+    from worker.tasks.scrape_source import scrape_source
+
+    with pytest.raises(ValueError, match="Blocked unsafe source URL"):
+        scrape_source("test-key", base_url="http://localhost:8080/internal", source_type="api")
 
 
 def test_generate_report_escapes_html() -> None:
