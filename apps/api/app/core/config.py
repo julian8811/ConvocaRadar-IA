@@ -1,6 +1,6 @@
 from functools import lru_cache
 
-from pydantic import computed_field
+from pydantic import Field, computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -9,7 +9,7 @@ class Settings(BaseSettings):
     app_name: str = "ConvocaRadar IA"
     database_url: str = "sqlite:///./convocaradar.db"
     redis_url: str = "redis://localhost:6379/0"
-    jwt_secret: str = "change_me"
+    jwt_secret: str = Field(min_length=32)
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 60
     llm_provider: str = "local"
@@ -31,7 +31,7 @@ class Settings(BaseSettings):
     scraping_closing_soon_days: int = 10
     scraping_execution_mode: str = "inline"
     use_worker: bool = False
-    internal_api_key: str = "change_me_internal"
+    internal_api_key: str = Field(min_length=32)
     storage_backend: str = "local"
     storage_dir: str = "./storage"
     max_upload_bytes: int = 10_000_000

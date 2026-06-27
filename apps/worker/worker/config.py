@@ -1,5 +1,6 @@
 from functools import lru_cache
 
+from pydantic import Field
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -9,7 +10,7 @@ class WorkerSettings(BaseSettings):
     scraping_user_agent: str = "ConvocaRadarBot/0.1"
     scraping_timeout_seconds: int = 30
     backend_url: str = "http://localhost:8000"
-    internal_api_key: str = "change_me_internal"
+    internal_api_key: str = Field(min_length=32)
 
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 

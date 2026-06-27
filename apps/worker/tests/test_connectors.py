@@ -1,6 +1,9 @@
 import json
+import os
 
 import pytest
+
+os.environ["INTERNAL_API_KEY"] = "a" * 64
 
 from worker.connectors.base import RawSourceResult
 from worker.connectors.common import fetch_httpx_text, is_allowed_host
@@ -2216,4 +2219,13 @@ def test_connector_factory_selects_wave3_connectors() -> None:
         ProcolombiaConvocatoriasConnector,
     )
     assert isinstance(connector_for("anii-uruguay", "https://anii.org.uy/apoyos/investigacion/"), AniiUruguayConnector)
+
+
+def test_worker_settings_fails_without_internal_api_key() -> None:
+    from pydantic import ValidationError
+
+    from worker.config import WorkerSettings
+
+    with pytest.raises(ValidationError):
+        WorkerSettings(internal_api_key="")
 

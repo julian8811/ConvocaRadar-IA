@@ -9,7 +9,8 @@ os.environ["DATABASE_URL"] = "sqlite:///./test_convocaradar.db"
 os.environ["STORAGE_BACKEND"] = "local"
 os.environ["STORAGE_DIR"] = "./test_storage"
 os.environ["SMTP_HOST"] = ""
-os.environ["INTERNAL_API_KEY"] = "test_internal_key"
+os.environ["JWT_SECRET"] = "a" * 64
+os.environ["INTERNAL_API_KEY"] = "a" * 64
 os.environ["BOOTSTRAP_SOURCES_ON_STARTUP"] = "false"
 
 Path("test_convocaradar.db").unlink(missing_ok=True)
@@ -811,7 +812,7 @@ def test_internal_scheduler_runs_enabled_sources(monkeypatch) -> None:
     monkeypatch.setattr(app_services, "connector_for", lambda *_args, **_kwargs: StubConnector())
     response = c.post(
         "/api/v1/internal/scheduler/sources/run-enabled",
-        headers={"X-Internal-API-Key": "test_internal_key"},
+        headers={"X-Internal-API-Key": "a" * 64},
     )
     assert response.status_code == 200
     payload = response.json()
@@ -869,7 +870,7 @@ def test_failed_source_run_creates_health_alert() -> None:
 
     response = c.post(
         f"/api/v1/internal/source-runs/{run_id}/complete",
-        headers={"X-Internal-API-Key": "test_internal_key"},
+        headers={"X-Internal-API-Key": "a" * 64},
         json={
             "task_id": task_id,
             "status": "failed",
@@ -916,7 +917,7 @@ def test_retry_degraded_sources_schedules_retry(monkeypatch) -> None:
 
     response = c.post(
         "/api/v1/internal/scheduler/sources/retry-degraded",
-        headers={"X-Internal-API-Key": "test_internal_key"},
+        headers={"X-Internal-API-Key": "a" * 64},
     )
     assert response.status_code == 200
     payload = response.json()
@@ -1061,7 +1062,7 @@ def test_internal_scheduler_sends_due_alerts() -> None:
 
     sent = c.post(
         "/api/v1/internal/scheduler/alerts/send-due",
-        headers={"X-Internal-API-Key": "test_internal_key"},
+        headers={"X-Internal-API-Key": "a" * 64},
     )
     assert sent.status_code == 200
     assert sent.json()["sent"] >= 1
@@ -1273,7 +1274,7 @@ def test_internal_connector_probe_returns_diagnostics(monkeypatch) -> None:
     monkeypatch.setattr(internal_api, "connector_for", lambda *_args, **_kwargs: StubConnector())
     response = c.post(
         "/api/v1/internal/connectors/probe",
-        headers={"X-Internal-API-Key": "test_internal_key"},
+        headers={"X-Internal-API-Key": "a" * 64},
         json={"source_key": "grants-gov-rss"},
     )
     assert response.status_code == 200
@@ -1282,3 +1283,21 @@ def test_internal_connector_probe_returns_diagnostics(monkeypatch) -> None:
     assert payload["raw_content_length"] > 0
     assert payload["candidates_parsed"] == 1
     assert payload["candidates_valid"] == 1
+
+
+def test_settings_fails_without_jwt_secret() -> None:
+    from pydantic import ValidationError
+
+    from app.core.config import Settings
+
+    with pytest.raises(ValidationError):
+        Settings(jwt_secret="")
+
+
+def test_settings_fails_without_internal_api_key() -> None:
+    from pydantic import ValidationError
+
+    from app.core.config import Settings
+
+    with pytest.raises(ValidationError):
+        Settings(internal_api_key="")
