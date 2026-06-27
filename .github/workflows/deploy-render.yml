@@ -15,129 +15,26 @@ jobs:
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
     runs-on: ubuntu-latest
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Deploy API via hook or Render API
         env:
           DEPLOY_HOOK: ${{ secrets.RENDER_API_DEPLOY_HOOK }}
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
           SERVICE_ID: ${{ env.RENDER_API_SERVICE_ID }}
-        run: |
-          trigger_render_deploy() {
-            local label="$1"
-            local hook="$2"
-            local api_key="$3"
-            local service_id="$4"
-
-            if [ -n "$hook" ]; then
-              echo "Triggering ${label} deploy via deploy hook..."
-              if curl -fsS -X POST "$hook"; then
-                echo "${label} deploy hook accepted."
-                return 0
-              fi
-              echo "${label} deploy hook failed; trying Render API key fallback..."
-            fi
-
-            if [ -z "$api_key" ]; then
-              if [ -n "$hook" ]; then
-                echo "Deploy hook failed and RENDER_API_KEY is not configured."
-              else
-                echo "Neither deploy hook nor RENDER_API_KEY is configured for ${label}."
-              fi
-              return 1
-            fi
-
-            if [ -z "$service_id" ]; then
-              echo "Render service id is missing for ${label}."
-              return 1
-            fi
-
-            echo "Triggering ${label} deploy via Render API..."
-            curl -fsS -X POST "https://api.render.com/v1/services/${service_id}/deploys" \
-              -H "Authorization: Bearer ${api_key}" \
-              -H "Content-Type: application/json" \
-              -H "Accept: application/json" \
-              -d '{"clearCache":"clear"}'
-          }
-
-          trigger_render_deploy "API" "$DEPLOY_HOOK" "$RENDER_API_KEY" "$SERVICE_ID"
+        run: bash scripts/trigger-render-deploy.sh "API" "$DEPLOY_HOOK" "$RENDER_API_KEY" "$SERVICE_ID" true
 
       - name: Deploy worker via hook
         env:
           DEPLOY_HOOK: ${{ secrets.RENDER_WORKER_DEPLOY_HOOK }}
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
           SERVICE_ID: ${{ secrets.RENDER_WORKER_SERVICE_ID }}
-        run: |
-          trigger_render_deploy() {
-            local label="$1"
-            local hook="$2"
-            local api_key="$3"
-            local service_id="$4"
-
-            if [ -z "$hook" ] && { [ -z "$api_key" ] || [ -z "$service_id" ]; }; then
-              echo "${label} deploy not configured; skipping."
-              return 0
-            fi
-
-            if [ -n "$hook" ]; then
-              echo "Triggering ${label} deploy via deploy hook..."
-              if curl -fsS -X POST "$hook"; then
-                echo "${label} deploy hook accepted."
-                return 0
-              fi
-              echo "${label} deploy hook failed; trying Render API key fallback..."
-            fi
-
-            if [ -z "$api_key" ] || [ -z "$service_id" ]; then
-              echo "${label} deploy hook failed and Render API fallback is not configured; skipping."
-              return 0
-            fi
-
-            echo "Triggering ${label} deploy via Render API..."
-            curl -fsS -X POST "https://api.render.com/v1/services/${service_id}/deploys" \
-              -H "Authorization: Bearer ${api_key}" \
-              -H "Content-Type: application/json" \
-              -H "Accept: application/json" \
-              -d '{"clearCache":"clear"}'
-          }
-
-          trigger_render_deploy "worker" "$DEPLOY_HOOK" "$RENDER_API_KEY" "$SERVICE_ID"
+        run: bash scripts/trigger-render-deploy.sh "worker" "$DEPLOY_HOOK" "$RENDER_API_KEY" "$SERVICE_ID" false
 
       - name: Deploy worker beat via hook
         env:
           DEPLOY_HOOK: ${{ secrets.RENDER_WORKER_BEAT_DEPLOY_HOOK }}
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
           SERVICE_ID: ${{ secrets.RENDER_WORKER_BEAT_SERVICE_ID }}
-        run: |
-          trigger_render_deploy() {
-            local label="$1"
-            local hook="$2"
-            local api_key="$3"
-            local service_id="$4"
-
-            if [ -z "$hook" ] && { [ -z "$api_key" ] || [ -z "$service_id" ]; }; then
-              echo "${label} deploy not configured; skipping."
-              return 0
-            fi
-
-            if [ -n "$hook" ]; then
-              echo "Triggering ${label} deploy via deploy hook..."
-              if curl -fsS -X POST "$hook"; then
-                echo "${label} deploy hook accepted."
-                return 0
-              fi
-              echo "${label} deploy hook failed; trying Render API key fallback..."
-            fi
-
-            if [ -z "$api_key" ] || [ -z "$service_id" ]; then
-              echo "${label} deploy hook failed and Render API fallback is not configured; skipping."
-              return 0
-            fi
-
-            echo "Triggering ${label} deploy via Render API..."
-            curl -fsS -X POST "https://api.render.com/v1/services/${service_id}/deploys" \
-              -H "Authorization: Bearer ${api_key}" \
-              -H "Content-Type: application/json" \
-              -H "Accept: application/json" \
-              -d '{"clearCache":"clear"}'
-          }
-
-          trigger_render_deploy "worker-beat" "$DEPLOY_HOOK" "$RENDER_API_KEY" "$SERVICE_ID"
+        run: bash scripts/trigger-render-deploy.sh "worker-beat" "$DEPLOY_HOOK" "$RENDER_API_KEY" "$SERVICE_ID" false
