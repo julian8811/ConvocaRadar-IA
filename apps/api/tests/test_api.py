@@ -1506,3 +1506,112 @@ def test_settings_fails_without_internal_api_key() -> None:
 
     with pytest.raises(ValidationError):
         Settings(internal_api_key="")
+
+
+# ── SEC-1.5: JWT cookie migration (dual-support) ─────────────────────────────
+
+
+def test_login_sets_convocaradar_token_cookie() -> None:
+    """POST /auth/login must set the HttpOnly cookie with the expected attributes."""
+    c = client()
+    response = c.post(
+        "/api/v1/auth/login",
+        json={"email": "admin@convocaradar.io", "password": "ConvocaRadarLocal123!"},
+    )
+    assert response.status_code == 200
+    # Cookie name must match the spec
+    assert "convocaradar_token" in response.cookies
+    # JSON body still returns the token for backward compatibility
+    assert response.json()["access_token"]
+
+
+def test_login_cookie_attributes_are_secure() -> None:
+    """The cookie must be HttpOnly, SameSite=Lax, Path=/, Max-Age=3600."""
+    c = client()
+    response = c.post(
+        "/api/v1/auth/login",
+        json={"email": "admin@convocaradar.io", "password": "ConvocaRadarLocal123!"},
+    )
+    assert response.status_code == 200
+    cookie_header = response.headers.get("set-cookie", "")
+    # Each attribute must be present in the Set-Cookie header
+    assert "convocaradar_token=" in cookie_header
+    assert "HttpOnly" in cookie_header
+    assert "SameSite=Lax" in cookie_header or "samesite=lax" in cookie_header.lower()
+    assert "Path=/" in cookie_header
+    assert "Max-Age=3600" in cookie_header
+
+
+def test_register_sets_convocaradar_token_cookie() -> None:
+    """POST /auth/register must also set the cookie (same as login)."""
+    c = client()
+    response = c.post(
+        "/api/v1/auth/register",
+        json={
+            "email": "newcookie@example.com",
+            "password": "strongpass789!",
+            "name": "Cookie User",
+            "organization_name": "Cookie Org",
+            "organization_type": "startup",
+            "country": "Brazil",
+        },
+    )
+    assert response.status_code == 200
+    assert "convocaradar_token" in response.cookies
+
+
+def test_logout_clears_cookie() -> None:
+    """POST /auth/logout must clear the cookie."""
+    c = client()
+    login_resp = c.post(
+        "/api/v1/auth/login",
+        json={"email": "admin@convocaradar.io", "password": "ConvocaRadarLocal123!"},
+    )
+    assert login_resp.status_code == 200
+    # Now logout
+    logout_resp = c.post("/api/v1/auth/logout")
+    assert logout_resp.status_code == 200
+    # Set-Cookie should clear (Max-Age=0) the cookie
+    cookie_header = logout_resp.headers.get("set-cookie", "")
+    assert "convocaradar_token" in cookie_header
+    assert "Max-Age=0" in cookie_header or "max-age=0" in cookie_header.lower()
+
+
+def test_me_authenticates_via_cookie() -> None:
+    """GET /me must work when the token is supplied via cookie only (no Bearer)."""
+    c = client()
+    # Login and grab the cookie value
+    login_resp = c.post(
+        "/api/v1/auth/login",
+        json={"email": "admin@convocaradar.io", "password": "ConvocaRadarLocal123!"},
+    )
+    assert login_resp.status_code == 200
+    token_value = login_resp.cookies["convocaradar_token"]
+    # Make a separate request using ONLY the cookie
+    response = c.get("/api/v1/me", cookies={"convocaradar_token": token_value})
+    assert response.status_code == 200
+    assert response.json()["email"] == "admin@convocaradar.io"
+
+
+def test_me_authenticates_via_bearer_header() -> None:
+    """GET /me must still work with the Authorization: Bearer header (backward-compat)."""
+    c = client()
+    auth = {"Authorization": f"Bearer {token(c)}"}
+    response = c.get("/api/v1/me", headers=auth)
+    assert response.status_code == 200
+    assert response.json()["email"] == "admin@convocaradar.io"
+
+
+def test_me_with_neither_cookie_nor_header_returns_401() -> None:
+    """GET /me with no auth (no cookie, no header) must return 401."""
+    c = client()
+    # Use a fresh client with no cookies and no header
+    response = c.get("/api/v1/me")
+    assert response.status_code == 401
+
+
+def test_me_with_invalid_cookie_returns_401() -> None:
+    """GET /me with a malformed cookie value must return 401, not 500."""
+    c = client()
+    response = c.get("/api/v1/me", cookies={"convocaradar_token": "garbage.token.value"})
+    assert response.status_code == 401

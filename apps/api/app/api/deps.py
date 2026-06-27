@@ -1,4 +1,6 @@
-from fastapi import Depends, HTTPException, status
+from typing import Optional
+
+from fastapi import Depends, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -7,15 +9,44 @@ from app.core.security import decode_access_token
 from app.db.session import get_db
 from app.models import Organization, OrganizationProfile, User
 
-bearer = HTTPBearer()
+# SEC-1.5: cookie name for JWT auth. Imported by app.api.v1.auth to set/clear
+# the cookie on login/logout/register.
+TOKEN_COOKIE_NAME = "convocaradar_token"
+
+# auto_error=False: don't raise when no header is present, so the cookie
+# fallback can take over (SEC-1.5 dual-support).
+bearer = HTTPBearer(auto_error=False)
+
+
+def _extract_token(
+    credentials: Optional[HTTPAuthorizationCredentials],
+    request: Request,
+) -> Optional[str]:
+    """SEC-1.5: Prefer the cookie (browser auth); fall back to Authorization
+    header (legacy clients / direct API users).
+
+    Cookie-first matches the user-facing request flow: the browser auto-sends
+    the cookie on same-origin requests, so the cookie path is the primary
+    authentication mechanism now.
+    """
+    cookie_token = request.cookies.get(TOKEN_COOKIE_NAME)
+    if cookie_token:
+        return cookie_token
+    if credentials and credentials.credentials:
+        return credentials.credentials
+    return None
 
 
 def get_current_user(
-    credentials: HTTPAuthorizationCredentials = Depends(bearer),
+    request: Request,
+    credentials: Optional[HTTPAuthorizationCredentials] = Depends(bearer),
     db: Session = Depends(get_db),
 ) -> User:
+    token = _extract_token(credentials, request)
+    if not token:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Not authenticated")
     try:
-        payload = decode_access_token(credentials.credentials)
+        payload = decode_access_token(token)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token") from exc
     user_id = payload.get("sub")
