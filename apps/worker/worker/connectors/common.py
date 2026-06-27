@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import html
 import re
+import socket
 from datetime import datetime
 import unicodedata
 import ipaddress
@@ -105,8 +106,22 @@ def _is_private_host(hostname: str) -> bool:
     try:
         ip = ipaddress.ip_address(host)
     except ValueError:
-        return False
-    return ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast
+        pass
+    else:
+        return ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast
+    try:
+        addrs = socket.getaddrinfo(host, 80)
+        for family, _type, _proto, _cname, sockaddr in addrs:
+            raw = sockaddr[0]
+            try:
+                addr = ipaddress.ip_address(raw)
+            except ValueError:
+                continue
+            if addr.is_private or addr.is_loopback or addr.is_link_local or addr.is_reserved or addr.is_multicast:
+                return True
+    except OSError:
+        pass
+    return False
 
 
 def is_allowed_host(url: str, allowed_domains: list[str] | tuple[str, ...] | None = None) -> bool:
