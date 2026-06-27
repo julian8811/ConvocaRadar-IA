@@ -1,4 +1,5 @@
 .env
+.env.*
 .venv/
 __pycache__/
 .pytest_cache/
@@ -21,3 +22,8 @@ outputs/
 test_storage/
 *.png
 *.log
+*.pem
+*.key
+*.p12
+*.crt
+*.cer
