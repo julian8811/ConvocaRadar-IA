@@ -1,4 +1,5 @@
 import asyncio
+from urllib.parse import urlparse
 
 import httpx
 from tenacity import retry, retry_if_exception_type, stop_after_attempt, wait_exponential_jitter
@@ -35,6 +36,13 @@ def scrape_source(
     source_run_id: str | None = None,
     task_id: str | None = None,
 ) -> dict[str, object]:
+    if base_url:
+        from worker.connectors.common import _is_private_host
+
+        parsed = urlparse(base_url)
+        if parsed.scheme not in {"http", "https"} or _is_private_host(parsed.hostname or ""):
+            raise ValueError(f"Blocked unsafe source URL: {base_url}")
+
     async def run() -> dict[str, object]:
         connector = connector_for(source_key, base_url, source_type)
         raw, candidates = await _fetch_candidates(connector)
