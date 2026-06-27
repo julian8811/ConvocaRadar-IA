@@ -60,5 +60,42 @@ def enqueue_scrape_source(
         return None
 
 
+def enqueue_seed_default_sources(organization_id: str) -> str | None:
+    """Dispatch seed_default_sources_for_org to Celery.
+
+    GAP-1 (dashboard-redesign): this helper is called from POST /auth/register
+    after the new user + organization are committed. It must never block the
+    request path; on any failure (broker down, network error, missing celery)
+    it logs a warning and returns ``None``. The bootstrap.py startup sweep
+    in apps/api/app/db/bootstrap.py covers cold-orgs as a safety net.
+
+    Returns the Celery task id on success, or ``None`` on any failure.
+    """
+    settings = get_settings()
+    try:
+        from celery import Celery
+    except ImportError as exc:
+        logger.warning("celery_not_available_for_seed_sources", org_id=organization_id, error=str(exc))
+        return None
+
+    try:
+        ssl_options = _redis_ssl_options(settings.redis_url)
+        celery_app = Celery(
+            "convocaradar-api-producer",
+            broker=settings.redis_url,
+            backend=settings.redis_url,
+        )
+        if ssl_options:
+            celery_app.conf.update(broker_use_ssl=ssl_options, redis_backend_use_ssl=ssl_options)
+        result = celery_app.send_task(
+            "seed_default_sources_for_org",
+            kwargs={"organization_id": organization_id},
+        )
+        return str(result.id)
+    except Exception as exc:
+        logger.warning("seed_sources_enqueue_failed", org_id=organization_id, error=str(exc))
+        return None
+
+
 def task_payload(**kwargs: Any) -> dict[str, Any]:
     return {key: value for key, value in kwargs.items() if value is not None}
