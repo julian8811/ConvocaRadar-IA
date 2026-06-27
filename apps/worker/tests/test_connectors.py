@@ -2229,3 +2229,15 @@ def test_worker_settings_fails_without_internal_api_key() -> None:
     with pytest.raises(ValidationError):
         WorkerSettings(internal_api_key="")
 
+
+def test_generate_report_escapes_html() -> None:
+    from worker.tasks.generate_report import generate_report
+
+    result = generate_report(
+        title="<script>alert(1)</script>",
+        opportunities=[{"title": '<img src=x onerror=alert(2)>', "entity": "Test", "country": "CO"}],
+    )
+    assert "&lt;script&gt;alert(1)&lt;/script&gt;" in result["html_content"]
+    assert "<script>" not in result["html_content"]
+    assert "&lt;img src=x onerror=alert(2)&gt;" in result["html_content"]
+
