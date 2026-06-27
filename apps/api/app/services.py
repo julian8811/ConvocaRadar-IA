@@ -45,6 +45,7 @@ from app.models import (
     OrganizationProfile,
     Priority,
     Report,
+    Role,
     Source,
     SourceRun,
     Task,
@@ -410,7 +411,7 @@ def create_source_health_alert(db: Session, source: Source, *, reason: str, reci
     if not recipient:
         recipient = db.scalar(
             select(User.email)
-            .where(User.organization_id == source.organization_id, User.role == "admin")
+            .where(User.organization_id == source.organization_id, User.role == Role.admin.value)
             .order_by(User.created_at.asc())
         )
     if not recipient:
