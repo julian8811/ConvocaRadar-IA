@@ -34,6 +34,9 @@ dependencies = [
   "sentry-sdk[fastapi]>=2.19.0"
 ]
 
+[project.scripts]
+convocaradar-seed-admin = "app.db.seed_admin:main"
+
 [project.optional-dependencies]
 dev = [
   "pytest>=8.3.2",

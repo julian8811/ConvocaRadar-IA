@@ -23,13 +23,33 @@ from app.db.session import SessionLocal  # noqa: E402
 from app.core.ai import EMBEDDING_MODEL_VERSION  # noqa: E402
 import app.main as app_main  # noqa: E402
 from app.main import app  # noqa: E402
-from app.models import Alert, Opportunity, OpportunityEmbedding, OpportunityScore, Organization, Source, SourceRun, Task  # noqa: E402
+from app.models import Alert, Opportunity, OpportunityEmbedding, OpportunityScore, Organization, Role, Source, SourceRun, Task, User  # noqa: E402
 from app.schemas import OpportunityCreate  # noqa: E402
 from app.services import create_opportunity, deduplicate_opportunities, is_private_url, opportunity_dedup_key  # noqa: E402
 
 
 def client() -> TestClient:
     seed()
+    # seed() no longer creates users (SEC-1.2). Create the test admin so
+    # existing test helpers (token(), etc.) continue to work.
+    db = SessionLocal()
+    try:
+        org = db.scalar(select(Organization).where(Organization.slug == "convocaradar-local"))
+        if org and not db.scalar(select(User).where(User.email == "admin@convocaradar.io")):
+            from app.core.security import hash_password
+
+            db.add(
+                User(
+                    email="admin@convocaradar.io",
+                    name="Admin ConvocaRadar",
+                    password_hash=hash_password("ConvocaRadarLocal123!"),
+                    role=Role.admin.value,
+                    organization_id=org.id,
+                )
+            )
+            db.commit()
+    finally:
+        db.close()
     return TestClient(app)
 
 
@@ -1292,6 +1312,182 @@ def test_verify_internal_key_uses_compare_digest() -> None:
 
     source = inspect.getsource(verify_internal_key)
     assert "hmac.compare_digest" in source
+
+
+def test_register_as_member() -> None:
+    c = client()
+    response = c.post(
+        "/api/v1/auth/register",
+        json={
+            "email": "miembro@example.com",
+            "password": "strongpass123!",
+            "name": "Miembro Nuevo",
+            "organization_name": "Org Miembro",
+            "organization_type": "startup",
+            "country": "Mexico",
+        },
+    )
+    assert response.status_code == 200
+    data = response.json()
+    # The register endpoint returns a Token (access_token, token_type).
+    # We need /me to check the role, or check the token payload.
+    # Let's use /me with the token to verify role.
+    headers = {"Authorization": f"Bearer {data['access_token']}"}
+    me = c.get("/api/v1/me", headers=headers)
+    assert me.status_code == 200
+    assert me.json()["role"] == "member", f"Expected role=member but got {me.json()['role']}"
+
+
+def test_member_cannot_access_admin() -> None:
+    c = client()
+    # Register a new user (will get role=member after fix)
+    reg = c.post(
+        "/api/v1/auth/register",
+        json={
+            "email": "socio@example.com",
+            "password": "strongpass456!",
+            "name": "Socio Limitado",
+            "organization_name": "Socio Org",
+            "organization_type": "company",
+            "country": "Chile",
+        },
+    )
+    assert reg.status_code == 200
+    token = reg.json()["access_token"]
+    headers = {"Authorization": f"Bearer {token}"}
+    # Try to access admin-only endpoint
+    response = c.get("/api/v1/admin/metrics", headers=headers)
+    assert response.status_code == 403, (
+        f"Expected 403 for member accessing admin endpoint, got {response.status_code}: {response.text}"
+    )
+
+
+def test_existing_admin_keeps_role() -> None:
+    # The existing test_login_and_me already covers this; this is an extra safety check.
+    c = client()
+    auth = {"Authorization": f"Bearer {token(c)}"}
+    response = c.get("/api/v1/me", headers=auth)
+    assert response.status_code == 200
+    assert response.json()["role"] == "admin"
+
+
+# ── SEC-1.2: Admin seed CLI ──────────────────────────────────────────────────
+
+
+def test_seed_admin_creates(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Happy path: no admin in org → creates admin → exit 0."""
+    import sys
+
+    from app.db.seed_admin import main
+    from app.models import Role, User  # noqa: N812
+
+    # Ensure there is no admin user in the org so the CLI can succeed.
+    # (previous tests may have created one via client()).
+    db = SessionLocal()
+    try:
+        existing = db.scalars(select(User))
+        for u in existing:
+            db.delete(u)
+        db.commit()
+    finally:
+        db.close()
+
+    seed()
+    monkeypatch.setattr(sys, "argv", [
+        "convocaradar-seed-admin",
+        "--email", "new-cli-admin@example.com",
+        "--password-env", "SEED_ADMIN_TEST_PW",
+    ])
+    monkeypatch.setenv("SEED_ADMIN_TEST_PW", "supersecret123!")  # noqa: S105
+    with pytest.raises(SystemExit) as exc_info:
+        main()
+    assert exc_info.value.code == 0, f"Expected exit 0, got {exc_info.value.code}"
+    # Verify the user was created
+    db = SessionLocal()
+    try:
+        user = db.scalar(select(User).where(User.email == "new-cli-admin@example.com"))
+        assert user is not None, "Admin user was not created"
+        assert user.role == Role.admin.value, f"Expected role={Role.admin.value}, got {user.role}"
+    finally:
+        db.close()
+
+
+def test_seed_admin_aborts_if_admin_exists(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Admin already exists in org → exit 1 (no --force)."""
+    import sys
+
+    from app.core.security import hash_password
+    from app.db.seed_admin import main
+    from app.models import Role, User  # noqa: N812
+
+    # Clear any existing users so we control the precondition
+    db = SessionLocal()
+    try:
+        existing = db.scalars(select(User))
+        for u in existing:
+            db.delete(u)
+        db.commit()
+    finally:
+        db.close()
+    seed()
+    # Create an admin user as precondition (seed() no longer creates users)
+    db = SessionLocal()
+    try:
+        org = db.scalar(select(Organization).where(Organization.slug == "convocaradar-local"))
+        assert org
+        if not db.scalar(select(User).where(User.role == Role.admin.value).limit(1)):
+            db.add(
+                User(
+                    email="admin@convocaradar.io",
+                    name="Admin",
+                    password_hash=hash_password("pw"),
+                    role=Role.admin.value,
+                    organization_id=org.id,
+                )
+            )
+            db.commit()
+    finally:
+        db.close()
+
+    monkeypatch.setattr(sys, "argv", [
+        "convocaradar-seed-admin",
+        "--email", "another-admin@example.com",
+        "--password-env", "SEED_ADMIN_TEST_PW",
+    ])
+    monkeypatch.setenv("SEED_ADMIN_TEST_PW", "supersecret456!")
+    with pytest.raises(SystemExit) as exc_info:
+        main()
+    assert exc_info.value.code == 1, f"Expected exit 1, got {exc_info.value.code}"
+
+
+def test_seed_admin_rejects_missing_password(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Environment variable not set → exit 1."""
+    import sys
+
+    from app.db.seed_admin import main
+    from app.models import User  # noqa: N812
+
+    db = SessionLocal()
+    try:
+        existing = db.scalars(select(User))
+        for u in existing:
+            db.delete(u)
+        db.commit()
+    finally:
+        db.close()
+    seed()
+    monkeypatch.setattr(sys, "argv", [
+        "convocaradar-seed-admin",
+        "--email", "nobody@example.com",
+        "--password-env", "THIS_ENV_VAR_DOES_NOT_EXIST",
+    ])
+    monkeypatch.delenv("THIS_ENV_VAR_DOES_NOT_EXIST", raising=False)
+    with pytest.raises(SystemExit) as exc_info:
+        main()
+    assert exc_info.value.code == 1, f"Expected exit 1, got {exc_info.value.code}"
+
+
+# ── Existing tests ───────────────────────────────────────────────────────────
 
 
 def test_settings_fails_without_jwt_secret() -> None:
