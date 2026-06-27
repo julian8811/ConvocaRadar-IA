@@ -1,3 +1,4 @@
+import hmac
 from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, Header, HTTPException, status
@@ -16,7 +17,7 @@ router = APIRouter(prefix="/internal", tags=["internal"])
 
 
 def verify_internal_key(x_internal_api_key: str | None = Header(default=None)) -> None:
-    if x_internal_api_key != get_settings().internal_api_key:
+    if not hmac.compare_digest(x_internal_api_key or "", get_settings().internal_api_key):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid internal API key")
 
 

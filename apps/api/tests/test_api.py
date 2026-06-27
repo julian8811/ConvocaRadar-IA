@@ -1285,6 +1285,15 @@ def test_internal_connector_probe_returns_diagnostics(monkeypatch) -> None:
     assert payload["candidates_valid"] == 1
 
 
+def test_verify_internal_key_uses_compare_digest() -> None:
+    import inspect
+
+    from app.api.v1.internal import verify_internal_key
+
+    source = inspect.getsource(verify_internal_key)
+    assert "hmac.compare_digest" in source
+
+
 def test_settings_fails_without_jwt_secret() -> None:
     from pydantic import ValidationError
 
