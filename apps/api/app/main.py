@@ -160,7 +160,17 @@ app.add_exception_handler(Exception, unhandled_exception_handler)
 @app.middleware("http")
 async def rate_limit_middleware(request: Request, call_next):
     path = request.url.path
-    if path in {"/health", "/docs", "/openapi.json"} or path.startswith("/api/v1/internal/"):
+    # Bypass rate limiting for liveness/readiness probes and the internal
+    # scheduler endpoints. Orchestrators (k8s, Render) and the scheduler may
+    # legitimately call these endpoints at high frequency.
+    if path in {
+        "/health",
+        "/api/v1/health",
+        "/api/v1/health/live",
+        "/api/v1/health/ready",
+        "/docs",
+        "/openapi.json",
+    } or path.startswith("/api/v1/internal/"):
         return await call_next(request)
     client_host = (request.client.host if request.client else "unknown") or "unknown"
     bucket = app.state.rate_limits[client_host]
@@ -203,12 +213,64 @@ app.add_middleware(
 
 @app.get("/health")
 def health() -> dict[str, str]:
+    """Unversioned liveness probe. Returns 200 as long as the process is up."""
     return {"status": "ok", "service": "convocaradar-api"}
 
 
+def _check_database() -> bool:
+    """Run a trivial SELECT against the engine. Returns True on success."""
+    from sqlalchemy import text
+
+    from app.db.session import engine
+
+    with engine.connect() as connection:
+        connection.execute(text("SELECT 1"))
+    return True
+
+
+def _readiness_response() -> JSONResponse:
+    """Build the readiness response — 200 when DB is reachable, 503 otherwise."""
+    try:
+        if _check_database():
+            return JSONResponse(
+                status_code=200,
+                content={"status": "ok", "database": "reachable"},
+            )
+    except SQLAlchemyError:
+        struct_logger.warning("healthcheck_db_unreachable")
+    return JSONResponse(
+        status_code=503,
+        content={"status": "degraded", "database": "unreachable"},
+    )
+
+
 @app.get("/api/v1/health")
-def health_v1() -> dict[str, str]:
+def health_v1() -> JSONResponse:
+    """Readiness probe with a database connectivity check.
+
+    Use this for k8s readinessProbe and the Render healthCheckPath: when the
+    DB is down, we want the orchestrator to stop routing traffic to this
+    instance until it recovers. The body shape is stable so existing
+    monitoring keeps working.
+    """
+    return _readiness_response()
+
+
+@app.get("/api/v1/health/live")
+def health_v1_live() -> dict[str, str]:
+    """Liveness probe — 200 as long as the process is up.
+
+    Does NOT touch the database. Use this for k8s livenessProbe: a process
+    that can answer this endpoint is alive; the orchestrator should not kill
+    it just because Postgres is having a bad day.
+    """
     return health()
+
+
+@app.get("/api/v1/health/ready")
+def health_v1_ready() -> JSONResponse:
+    """Alias for /api/v1/health with explicit 'ready' naming for k8s."""
+    return _readiness_response()
 
 
 app.include_router(api_router)
