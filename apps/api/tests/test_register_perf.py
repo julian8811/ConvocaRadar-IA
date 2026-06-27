@@ -87,6 +87,23 @@ def _assert_user_created(email: str) -> None:
         db.close()
 
 
+def _handler_imports_seed_default_sources(monkeypatch: pytest.MonkeyPatch, replacement: Any) -> bool:
+    """Try to patch ``app.api.v1.auth.seed_default_sources``.
+
+    Returns True if the handler module still imports the symbol (so the
+    patch went in and the request path could call it) and False if the
+    import was dropped by the WU-A4 fix. Centralising this logic keeps
+    each test readable and makes the contract obvious to future readers:
+    the inline call is gone, and the absence of the import is itself
+    proof.
+    """
+    try:
+        monkeypatch.setattr("app.api.v1.auth.seed_default_sources", replacement)
+        return True
+    except AttributeError:
+        return False
+
+
 # ── WU-A1: register returns in <1 s when seed_default_sources is slow ─────
 
 
@@ -106,16 +123,7 @@ def test_register_returns_under_1s(monkeypatch: pytest.MonkeyPatch) -> None:
         time.sleep(5)
         return {"inserted": 0, "updated": 0, "skipped": 0}
 
-    # If the inline call is still in place, ``seed_default_sources`` is
-    # imported into ``app.api.v1.auth`` and the patch will slow the
-    # request down. After the WU-A4 fix the import is gone and the
-    # monkeypatch.setattr raises AttributeError; we catch that and assert
-    # it explicitly (its absence is proof the inline call is gone).
-    try:
-        monkeypatch.setattr("app.api.v1.auth.seed_default_sources", _slow_seed)
-        inline_call_still_present = True
-    except AttributeError:
-        inline_call_still_present = False
+    inline_call_still_present = _handler_imports_seed_default_sources(monkeypatch, _slow_seed)
 
     c = _client()
     payload = _unique_payload("wu-a1")
@@ -163,12 +171,7 @@ def test_register_succeeds_when_seed_raises(monkeypatch: pytest.MonkeyPatch) -> 
     def _raising_seed(*_args: Any, **_kwargs: Any) -> dict[str, int]:
         raise RuntimeError("simulated seed failure")
 
-    handler_imports_seed = True
-    try:
-        monkeypatch.setattr("app.api.v1.auth.seed_default_sources", _raising_seed)
-    except AttributeError:
-        # Import is gone: handler is decoupled by construction.
-        handler_imports_seed = False
+    handler_imports_seed = _handler_imports_seed_default_sources(monkeypatch, _raising_seed)
 
     c = _client()
     payload = _unique_payload("wu-a4-raise")
@@ -200,12 +203,7 @@ def test_register_does_not_call_seed_inline(monkeypatch: pytest.MonkeyPatch) -> 
         call_log.append("called")
         return {"inserted": 0, "updated": 0, "skipped": 0}
 
-    handler_imports_seed = True
-    try:
-        monkeypatch.setattr("app.api.v1.auth.seed_default_sources", _spy_seed)
-    except AttributeError:
-        # Import is gone: handler is decoupled.
-        handler_imports_seed = False
+    handler_imports_seed = _handler_imports_seed_default_sources(monkeypatch, _spy_seed)
 
     c = _client()
     payload = _unique_payload("wu-a4-spy")
