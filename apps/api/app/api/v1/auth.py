@@ -1,8 +1,8 @@
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.api.deps import get_current_user
+from app.api.deps import TOKEN_COOKIE_NAME, get_current_user
 from app.core.security import create_access_token, hash_password, verify_password
 from app.db.session import get_db
 from app.db.seed import seed_default_sources
@@ -12,9 +12,42 @@ from app.services import slugify
 
 router = APIRouter()
 
+# Cookie name and lifetime for JWT auth (SEC-1.5). Name comes from deps to
+# avoid an import cycle; the lifetime is local to this module.
+TOKEN_COOKIE_MAX_AGE_SECONDS = 3600
+
+
+def _set_token_cookie(response: Response, token: str) -> None:
+    """Set the JWT as an HttpOnly, SameSite=Lax cookie for browser-based auth.
+
+    SEC-1.5: dual-support migration — the cookie is the new primary path; the
+    Authorization: Bearer header remains supported by get_current_user for legacy
+    clients.
+    """
+    response.set_cookie(
+        key=TOKEN_COOKIE_NAME,
+        value=token,
+        max_age=TOKEN_COOKIE_MAX_AGE_SECONDS,
+        httponly=True,
+        secure=True,
+        samesite="lax",
+        path="/",
+    )
+
+
+def _clear_token_cookie(response: Response) -> None:
+    """Delete the JWT cookie on logout."""
+    response.delete_cookie(
+        key=TOKEN_COOKIE_NAME,
+        path="/",
+        httponly=True,
+        secure=True,
+        samesite="lax",
+    )
+
 
 @router.post("/auth/register", response_model=Token)
-def register(payload: RegisterRequest, db: Session = Depends(get_db)) -> Token:
+def register(payload: RegisterRequest, response: Response, db: Session = Depends(get_db)) -> Token:
     existing = db.scalar(select(User).where(User.email == payload.email))
     if existing:
         raise HTTPException(status_code=409, detail="Email already registered")
@@ -46,15 +79,28 @@ def register(payload: RegisterRequest, db: Session = Depends(get_db)) -> Token:
     db.add(user)
     seed_default_sources(db, organization)
     db.commit()
-    return Token(access_token=create_access_token(user.id, {"organization_id": organization.id}))
+    token_str = create_access_token(user.id, {"organization_id": organization.id})
+    _set_token_cookie(response, token_str)
+    # Keep returning the token in the JSON body for legacy clients (SEC-1.5).
+    return Token(access_token=token_str)
 
 
 @router.post("/auth/login", response_model=Token)
-def login(payload: LoginRequest, db: Session = Depends(get_db)) -> Token:
+def login(payload: LoginRequest, response: Response, db: Session = Depends(get_db)) -> Token:
     user = db.scalar(select(User).where(User.email == payload.email))
     if not user or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid credentials")
-    return Token(access_token=create_access_token(user.id, {"organization_id": user.organization_id}))
+    token_str = create_access_token(user.id, {"organization_id": user.organization_id})
+    _set_token_cookie(response, token_str)
+    # Keep returning the token in the JSON body for legacy clients (SEC-1.5).
+    return Token(access_token=token_str)
+
+
+@router.post("/auth/logout")
+def logout(response: Response) -> dict[str, str]:
+    """Clear the JWT cookie. Idempotent — no auth required to drop a session."""
+    _clear_token_cookie(response)
+    return {"detail": "Sesión cerrada"}
 
 
 @router.get("/me", response_model=UserRead)

@@ -20,5 +20,8 @@
     "test:worker": "cd apps/worker && pytest",
     "migrate:api": "cd apps/api && python -m alembic upgrade head",
     "seed:api": "cd apps/api && python -m app.db.seed"
+  },
+  "dependencies": {
+    "@tailwindcss/oxide-linux-x64-gnu": "^4.3.1"
   }
 }

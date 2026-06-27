@@ -12,14 +12,16 @@ import { Input } from "@/components/ui/input";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { API_URL, api, setToken } from "@/lib/api";
 
-const LOCAL_EMAIL = "admin@convocaradar.io";
-const LOCAL_PASSWORD = "ConvocaRadarLocal123!";
-
 export default function LoginPage() {
+  // Env vars are read at render-time so tests can stub them via vi.stubEnv
+  const localEmail = process.env.NEXT_PUBLIC_LOCAL_EMAIL || "";
+  const localPassword = process.env.NEXT_PUBLIC_LOCAL_PASSWORD || "";
+  const isDev = process.env.NEXT_PUBLIC_ENV === "development";
+
   const router = useRouter();
   const [loading, setLoading] = useState(false);
-  const [email, setEmail] = useState(LOCAL_EMAIL);
-  const [password, setPassword] = useState(LOCAL_PASSWORD);
+  const [email, setEmail] = useState(isDev ? localEmail : "");
+  const [password, setPassword] = useState(isDev ? localPassword : "");
   const [error, setError] = useState<string | null>(null);
 
   async function onSubmit(event: FormEvent<HTMLFormElement>) {
@@ -85,12 +87,14 @@ export default function LoginPage() {
                 {error}
               </div>
             ) : null}
-            <Button className="w-full" disabled={loading} type="button" data-testid="login-submit" onClick={() => signIn(email, password)}>
+            <Button className="w-full" disabled={loading} type="button" onClick={() => signIn(email, password)}>
               {loading ? "Ingresando..." : "Ingresar"}
             </Button>
-            <Button className="w-full" disabled={loading} type="button" variant="outline" onClick={() => signIn(LOCAL_EMAIL, LOCAL_PASSWORD)}>
-              Entrar con cuenta local
-            </Button>
+            {isDev && (
+              <Button className="w-full" disabled={loading} type="button" variant="outline" onClick={() => signIn(localEmail, localPassword)}>
+                Entrar con cuenta local
+              </Button>
+            )}
           </form>
           <p className="mt-4 text-xs text-slate-500">
             API configurada: <span className="font-mono">{API_URL}</span>
