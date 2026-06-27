@@ -1,0 +1,176 @@
+name: Deploy
+
+on:
+  workflow_run:
+    workflows: [CI]
+    types: [completed]
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: deploy-production
+  cancel-in-progress: false
+
+env:
+  RENDER_API_BASE: https://api.render.com/v1
+  RENDER_API_SERVICE_ID_API: srv-d6qovo75r7bs738lipj0
+  VERCEL_PRODUCTION_URL: https://convocaradar-web.vercel.app
+  RENDER_PRODUCTION_URL: https://convotracker-api.onrender.com
+
+jobs:
+  render-api:
+    name: Deploy API to Render
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger API redeploy via Render API
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          SERVICE_ID: ${{ env.RENDER_API_SERVICE_ID_API }}
+        run: |
+          echo "Triggering Render API redeploy for service ${SERVICE_ID}..."
+          response=$(curl -sS -o /tmp/render-api-response.txt -w "%{http_code}" \
+            -X POST "${RENDER_API_BASE}/services/${SERVICE_ID}/deploys" \
+            -H "Authorization: Bearer ${RENDER_API_KEY}" \
+            -H "Content-Type: application/json" \
+            -H "Accept: application/json" \
+            -d '{"clearCache":"clear"}')
+          if [ "$response" -ge 200 ] && [ "$response" -lt 300 ]; then
+            echo "Render API deploy accepted (HTTP ${response})"
+            head -c 500 /tmp/render-api-response.txt
+            echo
+          else
+            echo "::error::Render API deploy failed (HTTP ${response})"
+            head -c 500 /tmp/render-api-response.txt
+            echo
+            exit 1
+          fi
+
+  render-worker:
+    name: Deploy Worker to Render
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Worker redeploy via Render API
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          SERVICE_ID: ${{ secrets.RENDER_WORKER_SERVICE_ID }}
+        run: |
+          if [ -z "$SERVICE_ID" ]; then
+            echo "::warning::RENDER_WORKER_SERVICE_ID secret not set; skipping worker deploy."
+            exit 0
+          fi
+          echo "Triggering Render Worker redeploy for service ${SERVICE_ID}..."
+          response=$(curl -sS -o /tmp/render-worker-response.txt -w "%{http_code}" \
+            -X POST "${RENDER_API_BASE}/services/${SERVICE_ID}/deploys" \
+            -H "Authorization: Bearer ${RENDER_API_KEY}" \
+            -H "Content-Type: application/json" \
+            -H "Accept: application/json" \
+            -d '{}')
+          if [ "$response" -ge 200 ] && [ "$response" -lt 300 ]; then
+            echo "Render Worker deploy accepted (HTTP ${response})"
+          else
+            echo "::error::Render Worker deploy failed (HTTP ${response})"
+            head -c 500 /tmp/render-worker-response.txt
+            echo
+            exit 1
+          fi
+
+  render-beat:
+    name: Deploy Worker Beat to Render
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trigger Worker Beat redeploy via Render API
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          SERVICE_ID: ${{ secrets.RENDER_WORKER_BEAT_SERVICE_ID }}
+        run: |
+          if [ -z "$SERVICE_ID" ]; then
+            echo "::warning::RENDER_WORKER_BEAT_SERVICE_ID secret not set; skipping beat deploy."
+            exit 0
+          fi
+          echo "Triggering Render Worker Beat redeploy for service ${SERVICE_ID}..."
+          response=$(curl -sS -o /tmp/render-beat-response.txt -w "%{http_code}" \
+            -X POST "${RENDER_API_BASE}/services/${SERVICE_ID}/deploys" \
+            -H "Authorization: Bearer ${RENDER_API_KEY}" \
+            -H "Content-Type: application/json" \
+            -H "Accept: application/json" \
+            -d '{}')
+          if [ "$response" -ge 200 ] && [ "$response" -lt 300 ]; then
+            echo "Render Worker Beat deploy accepted (HTTP ${response})"
+          else
+            echo "::error::Render Worker Beat deploy failed (HTTP ${response})"
+            head -c 500 /tmp/render-beat-response.txt
+            echo
+            exit 1
+          fi
+
+  vercel:
+    name: Deploy to Vercel
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Deploy to Vercel (production)
+        uses: amondnet/vercel-action@v25
+        with:
+          vercel-token: ${{ secrets.VERCEL_TOKEN }}
+          vercel-org-id: ${{ secrets.VERCEL_ORG_ID }}
+          vercel-project-id: ${{ secrets.VERCEL_PROJECT_ID }}
+          working-directory: ./apps/web
+          vercel-args: '--prod --yes'
+          github-comment: false
+
+  healthcheck:
+    name: Post-deploy healthcheck
+    needs: [render-api, render-worker, render-beat, vercel]
+    if: ${{ always() }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wait for deployments to settle
+        run: sleep 30
+
+      - name: Healthcheck Render API
+        run: |
+          echo "Checking ${RENDER_PRODUCTION_URL}/api/v1/health ..."
+          for i in $(seq 1 30); do
+            if curl -sf -m 10 "${RENDER_PRODUCTION_URL}/api/v1/health"; then
+              echo "Render API healthy after $((i*5))s"
+              exit 0
+            fi
+            echo "  attempt $i: not healthy yet, retrying in 5s"
+            sleep 5
+          done
+          echo "::error::Render API healthcheck failed after 150s"
+          exit 1
+
+      - name: Healthcheck Vercel
+        run: |
+          echo "Checking ${VERCEL_PRODUCTION_URL}/login ..."
+          for i in $(seq 1 30); do
+            code=$(curl -sS -o /dev/null -m 10 -w "%{http_code}" "${VERCEL_PRODUCTION_URL}/login" || echo "000")
+            case "$code" in
+              200|301|302|307|308)
+                echo "Vercel healthy (HTTP ${code}) after $((i*5))s"
+                exit 0
+                ;;
+            esac
+            echo "  attempt $i: HTTP ${code}, retrying in 5s"
+            sleep 5
+          done
+          echo "::error::Vercel healthcheck failed after 150s"
+          exit 1
+
+      - name: Healthcheck dashboard summary (404 regression check)
+        run: |
+          echo "Checking ${RENDER_PRODUCTION_URL}/api/v1/dashboard/summary exists (was 404 before PR 5daf427 deploy)..."
+          code=$(curl -sS -o /dev/null -m 10 -w "%{http_code}" \
+            -H "Authorization: Bearer ${{ secrets.HEALTHCHECK_JWT }}" \
+            "${RENDER_PRODUCTION_URL}/api/v1/dashboard/summary" || echo "000")
+          if [ "$code" = "200" ]; then
+            echo "Dashboard summary endpoint is alive (HTTP 200)"
+          elif [ "$code" = "401" ]; then
+            echo "Dashboard summary endpoint exists but auth failed (HTTP 401) — needs a real token to fully test"
+          else
+            echo "::warning::Dashboard summary returned HTTP ${code} — this was the original 404 bug"
+          fi
