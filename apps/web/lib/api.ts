@@ -19,6 +19,26 @@ import type {
 export const API_URL =
   process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? getDefaultApiUrl();
 
+/** SEC-1.5: cookie name. Must match the backend's TOKEN_COOKIE_NAME. */
+export const TOKEN_COOKIE_NAME = "convocaradar_token";
+
+/** SEC-1.5: legacy localStorage key used by pre-cookie clients. */
+const LEGACY_TOKEN_STORAGE_KEY = "convocaradar_token";
+
+/** SEC-1.5: request timeout — 12s per the spec. */
+const REQUEST_TIMEOUT_MS = 12_000;
+
+/**
+ * Is the running environment "production"?
+ *
+ * SEC-1.5: the legacy localStorage Bearer fallback is ONLY allowed in
+ * non-production. In production we never read localStorage — the cookie is
+ * the sole auth path.
+ */
+function isProduction(): boolean {
+  return process.env.NEXT_PUBLIC_ENV === "production";
+}
+
 function getDefaultApiUrl() {
   if (typeof window !== "undefined") {
     const isLocalhost = window.location.hostname === "localhost" || window.location.hostname === "127.0.0.1";
@@ -29,17 +49,46 @@ function getDefaultApiUrl() {
   return "https://api.convocaradar.com/api/v1";
 }
 
-export function getToken() {
+/**
+ * Read a legacy token from localStorage.
+ *
+ * SEC-1.5: in production this MUST return null — no localStorage reads.
+ * In development it returns the stored token so pre-cookie clients can
+ * keep using `Authorization: Bearer`.
+ */
+function readLegacyToken(): string | null {
+  if (isProduction()) return null;
   if (typeof window === "undefined") return null;
-  return window.localStorage.getItem("convocaradar_token");
+  return window.localStorage.getItem(LEGACY_TOKEN_STORAGE_KEY);
 }
 
-export function setToken(token: string) {
-  window.localStorage.setItem("convocaradar_token", token);
+/**
+ * Legacy `getToken` helper kept for backward compatibility with code that
+ * imported it. Reads from localStorage in dev, returns null in production.
+ */
+export function getToken(): string | null {
+  return readLegacyToken();
 }
 
-export function clearToken() {
-  window.localStorage.removeItem("convocaradar_token");
+/**
+ * Legacy `setToken` — kept so existing imports don't break. The cookie is
+ * the real auth path now; this just mirrors the value to localStorage in
+ * non-production for the legacy Bearer fallback to keep working.
+ */
+export function setToken(token: string): void {
+  if (isProduction()) return;
+  if (typeof window === "undefined") return;
+  window.localStorage.setItem(LEGACY_TOKEN_STORAGE_KEY, token);
+}
+
+/**
+ * Legacy `clearToken` — kept so existing imports don't break. Clears the
+ * localStorage mirror in non-production.
+ */
+export function clearToken(): void {
+  if (isProduction()) return;
+  if (typeof window === "undefined") return;
+  window.localStorage.removeItem(LEGACY_TOKEN_STORAGE_KEY);
 }
 
 function handleUnauthorized(path: string) {
@@ -54,30 +103,45 @@ function isAuthPath(path: string) {
   return path.startsWith("/auth/");
 }
 
-async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
-  const token = getToken();
-  if (!token && !isAuthPath(path)) {
-    handleUnauthorized(path);
-    throw new Error("Sesión requerida. Redirigiendo al inicio de sesión.");
+/**
+ * SEC-1.5: wrap fetch with an AbortController that fires after 12s.
+ * Exposed for testing — production code uses the `api` object below.
+ */
+export async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+  const controller = new AbortController();
+  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+
+  // Legacy Bearer fallback: only in non-production, only if a token is in
+  // localStorage. In production this is always null.
+  const legacyToken = readLegacyToken();
+  const headers: Record<string, string> = {
+    "Content-Type": "application/json",
+    ...(init.headers as Record<string, string> | undefined),
+  };
+  if (legacyToken) {
+    headers["Authorization"] = `Bearer ${legacyToken}`;
   }
-  const response = await fetch(`${API_URL}${path}`, {
-    ...init,
-    headers: {
-      "Content-Type": "application/json",
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-      ...init.headers,
-    },
-  });
-  if (!response.ok) {
-    const body = await response.json().catch(() => ({ detail: response.statusText }));
-    if (response.status === 401) {
-      handleUnauthorized(path);
-      throw new Error("Sesión expirada. Redirigiendo al inicio de sesión.");
+
+  try {
+    const response = await fetch(`${API_URL}${path}`, {
+      ...init,
+      signal: controller.signal,
+      credentials: "include",
+      headers,
+    });
+    if (!response.ok) {
+      const body = await response.json().catch(() => ({ detail: response.statusText }));
+      if (response.status === 401) {
+        handleUnauthorized(path);
+        throw new Error("Sesión expirada. Redirigiendo al inicio de sesión.");
+      }
+      throw new Error(body.detail ?? "Request failed");
     }
-    throw new Error(body.detail ?? "Request failed");
+    if (response.status === 204) return undefined as T;
+    return response.json() as Promise<T>;
+  } finally {
+    clearTimeout(timeout);
   }
-  if (response.status === 204) return undefined as T;
-  return response.json() as Promise<T>;
 }
 
 function filenameFromDisposition(disposition: string | null, fallback: string) {
@@ -87,11 +151,14 @@ function filenameFromDisposition(disposition: string | null, fallback: string) {
 }
 
 export async function downloadReport(report: Report) {
-  const token = getToken();
+  const legacyToken = readLegacyToken();
+  const headers: Record<string, string> = {};
+  if (legacyToken) {
+    headers["Authorization"] = `Bearer ${legacyToken}`;
+  }
   const response = await fetch(`${API_URL}/reports/${report.id}/download`, {
-    headers: {
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
+    credentials: "include",
+    headers,
   });
   if (!response.ok) {
     const body = await response.json().catch(() => ({ detail: response.statusText }));
@@ -109,14 +176,11 @@ export async function downloadReport(report: Report) {
 }
 
 export async function uploadOpportunityDocument(opportunityId: string, file: File) {
-  const token = getToken();
   const form = new FormData();
   form.append("file", file);
   const response = await fetch(`${API_URL}/opportunities/${opportunityId}/documents`, {
     method: "POST",
-    headers: {
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
+    credentials: "include",
     body: form,
   });
   if (!response.ok) {
@@ -127,11 +191,8 @@ export async function uploadOpportunityDocument(opportunityId: string, file: Fil
 }
 
 export async function downloadOpportunityDocument(doc: OpportunityDocument) {
-  const token = getToken();
   const response = await fetch(`${API_URL}/opportunity-documents/${doc.id}/download`, {
-    headers: {
-      ...(token ? { Authorization: `Bearer ${token}` } : {}),
-    },
+    credentials: "include",
   });
   if (!response.ok) {
     const body = await response.json().catch(() => ({ detail: response.statusText }));
@@ -156,6 +217,7 @@ export const api = {
     }),
   register: (payload: Record<string, unknown>) =>
     request<{ access_token: string }>("/auth/register", { method: "POST", body: JSON.stringify(payload) }),
+  logout: () => request<{ detail: string }>("/auth/logout", { method: "POST" }),
   me: () => request<{ name: string; email: string; role: string }>("/me"),
   dashboardSummary: () => request<DashboardSummary>("/dashboard/summary"),
   organization: () => request<{ name: string; country: string; type: string }>("/organizations/current"),
