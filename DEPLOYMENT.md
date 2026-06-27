@@ -238,7 +238,15 @@ El workflow `.github/workflows/deploy-render.yml` usa esa key para redeployar `c
 | `RENDER_WORKER_DEPLOY_HOOK` | worker (si existe) |
 | `RENDER_WORKER_BEAT_DEPLOY_HOOK` | worker-beat (si existe) |
 
-El workflow intenta primero el deploy hook y, si no existe, usa `RENDER_API_KEY`.
+El workflow intenta primero el deploy hook y, si falla o no existe, usa `RENDER_API_KEY`.
+
+**Importante:** `RENDER_API_KEY` debe ser una API key de Render ([Account Settings → API Keys](https://dashboard.render.com/u/settings#api-keys)), no un token de GitHub ni de otro servicio.
+
+Si el deploy falla con `Deploy API via hook or Render API`, revisa:
+
+1. Que `RENDER_API_DEPLOY_HOOK` apunte al hook vigente del servicio `convotracker-api`, o elimina ese secret para forzar solo API key.
+2. Que `RENDER_API_KEY` sea una key activa de Render con permisos sobre el servicio.
+3. El service id del API en el workflow: `srv-d6qovo75r7bs738lipj0`.
 
 Tambien puedes dispararlo manualmente desde **Actions → Deploy Render → Run workflow**.
 
