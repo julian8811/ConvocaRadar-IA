@@ -1,15 +1,9 @@
-"""Idempotent per-org source seeding Celery task.
+"""GAP-1 (dashboard-redesign): seed_default_sources_for_org Celery task.
 
-GAP-1 (dashboard-redesign): seed_default_sources was previously called
-inline from POST /auth/register, blocking the request for 5+ seconds on
-Render free tier. The fix is to enqueue this task from the API; the
-register handler returns immediately and the worker fills in the source
-set asynchronously.
-
-Idempotency: seed_default_sources in apps/api/app/db/seed.py checks for
-an existing Source by (organization_id, key) and either updates it in
-place or adds a new one. Re-running this task produces the same DB state
-with no duplicate-key errors.
+Replaces the inline ``seed_default_sources`` call in POST /auth/register
+with an idempotent background task. ``seed_default_sources`` in
+apps/api/app/db/seed.py uses check-then-update on (organization_id, key),
+so re-runs produce the same DB state with no duplicate-key errors.
 """
 
 from __future__ import annotations
@@ -29,16 +23,11 @@ logger = structlog.get_logger(__name__)
 def seed_default_sources_for_org(organization_id: str) -> dict[str, object]:
     """Seed the default source set for a freshly registered organization.
 
-    The Celery task is the safe-to-retry counterpart of the previous
-    inline call: it opens its own SessionLocal so the request-path session
-    is not reused, fetches the Organization by id, and delegates to
-    ``seed_default_sources`` from ``apps/api/app/db/seed.py``. If the org
-    does not exist (e.g. a stale task from a deleted org), the task logs
-    a warning and returns a ``skipped`` status instead of raising.
-
-    Returns a dict so the worker can serialise the result to the
-    result backend; the API consumer (``enqueue_seed_default_sources``)
-    only needs the Celery task id, not the payload.
+    Opens its own SessionLocal so the request-path session is not
+    reused, fetches the Organization by id, and delegates to
+    ``seed_default_sources``. Unknown org ids return ``skipped`` instead
+    of raising (Celery would otherwise mark the task as failed and
+    retry indefinitely).
     """
     db = SessionLocal()
     try:
