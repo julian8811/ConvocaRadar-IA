@@ -287,9 +287,29 @@ def test_health_data_coverage_embeddings_partial() -> None:
     """When some opps have embeddings, embeddings_coverage reflects the ratio."""
     c = _client()
     auth = {"Authorization": f"Bearer {_token(c)}"}
-    # 2 opps, only 1 with embedding → ~50% coverage.
-    _make_opportunity(title="Health Emb A", close_days=10, with_embedding=True)
+    # create_opportunity auto-creates an embedding. Wipe all auto-created
+    # embeddings first so we have full control: 1 of 2 opps has an embedding.
+    _make_opportunity(title="Health Emb A", close_days=10, with_embedding=False)
     _make_opportunity(title="Health Emb B", close_days=10, with_embedding=False)
+    db = SessionLocal()
+    try:
+        # Drop every embedding and re-add exactly one (for the first opp).
+        for emb in list(db.scalars(select(OpportunityEmbedding))):
+            db.delete(emb)
+        db.flush()
+        opp_a = db.scalar(select(Opportunity).where(Opportunity.title == "Health Emb A"))
+        assert opp_a is not None
+        db.add(
+            OpportunityEmbedding(
+                opportunity_id=opp_a.id,
+                organization_id=opp_a.organization_id,
+                embedding=[0.0] * 64,
+                model_version="test-fixture",
+            )
+        )
+        db.commit()
+    finally:
+        db.close()
     response = c.get("/api/v1/dashboard/health", headers=auth)
     assert response.status_code == 200
     payload = response.json()
