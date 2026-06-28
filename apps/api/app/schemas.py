@@ -425,7 +425,7 @@ class DashboardDataCoverage(BaseModel):
     with_amount: int
     with_close_date: int
     with_source: int
-    embeddings_coverage: float
+    embeddings_coverage: float | None = None
 
 
 class DashboardProfileSummary(BaseModel):
@@ -490,6 +490,30 @@ class PipelineOpportunityItem(BaseModel):
 class PipelineRead(BaseModel):
     top_scored: list[PipelineOpportunityItem]
     closing_soon: list[PipelineOpportunityItem]
+
+
+# PR B-1c: Health zone. A focused payload for the health lane: the same
+# KPI counts the legacy summary returned, plus status/country breakdowns,
+# the data-coverage strip (with the now-nullable embeddings_coverage),
+# and the per-source health entries. This is the new canonical source of
+# truth for the Health zone; the legacy /dashboard/summary is converted
+# into a thin alias that merges Triage + Pipeline + Health.
+class HealthKpis(BaseModel):
+    total: int
+    open: int
+    closing_soon: int
+    high_match: int
+
+
+class HealthRead(BaseModel):
+    kpis: HealthKpis
+    status_breakdown: list[DashboardBreakdownItem]
+    country_breakdown: list[DashboardBreakdownItem]
+    data_coverage: DashboardDataCoverage
+    sources_health: list[SourceHealthRead]
+    failing_sources: int
+    degraded_sources: int
+    source_alerts: list[DashboardSourceAlert]
 
 
 class AiOpportunityExtract(BaseModel):

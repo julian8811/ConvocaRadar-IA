@@ -51,7 +51,16 @@ from app.models import (
     Task,
     User,
 )
-from app.schemas import OpportunityCreate, PipelineOpportunityItem, TriageOpportunityItem
+from app.schemas import (
+    DashboardBreakdownItem,
+    DashboardDataCoverage,
+    DashboardSourceAlert,
+    HealthKpis,
+    OpportunityCreate,
+    PipelineOpportunityItem,
+    SourceHealthRead,
+    TriageOpportunityItem,
+)
 
 
 def connector_for(source_key: str, base_url: str | None = None, source_type: str | None = None):
@@ -2112,3 +2121,201 @@ def get_closing_soon(
             )
         )
     return items
+
+
+# ---------------------------------------------------------------------------
+# PR B-1c: /dashboard/health helpers
+# ---------------------------------------------------------------------------
+
+
+# Local mirror of STATUS_LABELS in app.api.v1.dashboard — kept here so the
+# service layer does not depend on the route module. (Mirrored, not imported,
+# to avoid the circular import risk that route→service→route would create.)
+_STATUS_LABELS = {
+    "open": "Abiertas",
+    "closing_soon": "Cierran pronto",
+    "closed": "Cerradas",
+    "unknown": "Sin fecha",
+}
+
+
+def get_health_kpis(db: Session, organization_id: str) -> HealthKpis:
+    """Return the 4 KPI counts that drive the Health zone summary.
+
+    * total: every opportunity visible to the org scope.
+    * open: opportunities with status='open'.
+    * closing_soon: opportunities with status='closing_soon'.
+    * high_match: distinct opportunities with an OpportunityScore row
+      marked priority='high' for the current org.
+    """
+    opportunity_scope = or_(Opportunity.organization_id == organization_id, Opportunity.organization_id.is_(None))
+    total = count_query(db, build_opportunity_query(organization_id))
+    open_total = count_query(db, build_opportunity_query(organization_id, status="open"))
+    closing_soon_total = count_query(db, build_opportunity_query(organization_id, status="closing_soon"))
+    high_match = (
+        db.scalar(
+            select(func.count(func.distinct(OpportunityScore.opportunity_id)))
+            .select_from(OpportunityScore)
+            .join(Opportunity, Opportunity.id == OpportunityScore.opportunity_id)
+            .where(
+                OpportunityScore.organization_id == organization_id,
+                OpportunityScore.priority == "high",
+                opportunity_scope,
+            )
+        )
+        or 0
+    )
+    return HealthKpis(
+        total=total,
+        open=open_total,
+        closing_soon=closing_soon_total,
+        high_match=high_match,
+    )
+
+
+def get_status_breakdown(db: Session, organization_id: str) -> list[DashboardBreakdownItem]:
+    """Group opportunities by status; return ``[{name, total}, ...]`` sorted desc.
+
+    The same noise filters the legacy /summary used (no @ in title, no
+    "http*" prefix) so the chart counts match what the consultant was
+    already used to seeing.
+    """
+    opportunity_scope = or_(Opportunity.organization_id == organization_id, Opportunity.organization_id.is_(None))
+    rows = db.execute(
+        select(Opportunity.status, func.count())
+        .where(opportunity_scope)
+        .where(~Opportunity.title.ilike("%@%"))
+        .where(~Opportunity.title.ilike("http%"))
+        .group_by(Opportunity.status)
+    )
+    items = [
+        DashboardBreakdownItem(name=_STATUS_LABELS.get(status, status), total=total)
+        for status, total in rows
+        if total > 0
+    ]
+    items.sort(key=lambda item: item.total, reverse=True)
+    return items
+
+
+def get_country_breakdown(db: Session, organization_id: str) -> list[DashboardBreakdownItem]:
+    """Top-8 country counts; rows with empty country bucket under "Sin dato"."""
+    opportunity_scope = or_(Opportunity.organization_id == organization_id, Opportunity.organization_id.is_(None))
+    rows = db.execute(
+        select(Opportunity.country, func.count())
+        .where(opportunity_scope)
+        .where(~Opportunity.title.ilike("%@%"))
+        .where(~Opportunity.title.ilike("http%"))
+        .group_by(Opportunity.country)
+        .order_by(func.count().desc())
+        .limit(8)
+    )
+    return [
+        DashboardBreakdownItem(name=country or "Sin dato", total=total)
+        for country, total in rows
+        if total > 0
+    ]
+
+
+def get_data_coverage(db: Session, organization_id: str) -> DashboardDataCoverage:
+    """Build the data-coverage strip; ``embeddings_coverage`` is now nullable.
+
+    The embeddings field is ``None`` (not 0.0) when there are zero
+    opportunities so a fresh org does not look "broken" — the frontend
+    renders "Sin datos aún" for the None case. When opportunities exist
+    but none have embeddings, the value is the real zero (``0.0``).
+    """
+    opportunity_scope = or_(Opportunity.organization_id == organization_id, Opportunity.organization_id.is_(None))
+    with_summary = (
+        db.scalar(
+            select(func.count())
+            .select_from(Opportunity)
+            .where(opportunity_scope, Opportunity.summary != "", Opportunity.summary.is_not(None))
+        )
+        or 0
+    )
+    with_amount = (
+        db.scalar(
+            select(func.count())
+            .select_from(Opportunity)
+            .where(
+                opportunity_scope,
+                or_(Opportunity.funding_amount_value.is_not(None), Opportunity.funding_amount_raw.is_not(None)),
+            )
+        )
+        or 0
+    )
+    with_close_date = (
+        db.scalar(
+            select(func.count()).select_from(Opportunity).where(opportunity_scope, Opportunity.close_date.is_not(None))
+        )
+        or 0
+    )
+    with_source = (
+        db.scalar(
+            select(func.count()).select_from(Opportunity).where(opportunity_scope, Opportunity.source_id.is_not(None))
+        )
+        or 0
+    )
+    total_opportunities = count_query(db, build_opportunity_query(organization_id))
+    embeddings_total = (
+        db.scalar(
+            select(func.count())
+            .select_from(OpportunityEmbedding)
+            .join(Opportunity, Opportunity.id == OpportunityEmbedding.opportunity_id)
+            .where(opportunity_scope)
+        )
+        or 0
+    )
+    embeddings_coverage: float | None = (
+        round((embeddings_total / total_opportunities) * 100, 1) if total_opportunities else None
+    )
+    return DashboardDataCoverage(
+        with_summary=with_summary,
+        with_amount=with_amount,
+        with_close_date=with_close_date,
+        with_source=with_source,
+        embeddings_coverage=embeddings_coverage,
+    )
+
+
+def get_sources_health(db: Session, organization_id: str) -> list[SourceHealthRead]:
+    """Build a full ``SourceHealthRead`` entry for every source visible to the org.
+
+    The per-source health is computed by the same helper that backs
+    ``GET /sources/health``; we import it lazily to avoid the route →
+    service → route circular dependency.
+    """
+    from app.api.v1.sources import _source_health  # lazy: avoid circular import
+
+    source_scope = or_(Source.organization_id == organization_id, Source.organization_id.is_(None))
+    sources = list(db.scalars(select(Source).where(source_scope)))
+    return [_source_health(db, source) for source in sources]
+
+
+def get_source_health_summaries(
+    db: Session, organization_id: str
+) -> tuple[int, int, list[DashboardSourceAlert]]:
+    """Return (degraded_count, failing_count, top-5 alerts) for the org's sources.
+
+    Mirrors the legacy /summary's source-health counts. The alerts list
+    is capped at 5 entries per the original contract so the e2e and any
+    client still consuming the merged summary see the same shape.
+    """
+    from app.api.v1.admin import _source_health_status  # lazy: avoid circular import
+
+    source_scope = or_(Source.organization_id == organization_id, Source.organization_id.is_(None))
+    sources = list(db.scalars(select(Source).where(source_scope)))
+    degraded = 0
+    failing = 0
+    alerts: list[DashboardSourceAlert] = []
+    for source in sources:
+        health = _source_health_status(db, source)
+        if health == "degraded":
+            degraded += 1
+            if len(alerts) < 5:
+                alerts.append(DashboardSourceAlert(source_id=source.id, name=source.name, status="degraded"))
+        elif health == "failing":
+            failing += 1
+            if len(alerts) < 5:
+                alerts.append(DashboardSourceAlert(source_id=source.id, name=source.name, status="failing"))
+    return degraded, failing, alerts
