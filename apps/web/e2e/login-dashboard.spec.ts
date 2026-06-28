@@ -31,10 +31,13 @@ test("inicia sesion y carga el panel analitico", async ({ page }) => {
   await expect(page.getByText(/top compatibilidad/i)).toBeVisible();
   await expect(page.getByText(/estado de convocatorias/i)).toBeVisible();
 
-  // The legacy KPI labels are now in the HealthZone's 4 stat cards.
-  // They render as soon as the data resolves (no collapsible to open).
-  await expect(page.getByText(/Convocatorias abiertas/i)).toBeVisible();
-  await expect(page.getByText(/Alta compatibilidad/i)).toBeVisible();
+  // The legacy KPI labels are now in the HealthZone's 4 stat cards
+  // (and also surfaced in the TriageZone's KPI footer). They render as
+  // soon as the data resolves. Use .first() because the same label
+  // can appear in more than one zone — strict-mode getByText() would
+  // otherwise fail with 'resolved to N elements'.
+  await expect(page.getByText(/Convocatorias abiertas/i).first()).toBeVisible();
+  await expect(page.getByText(/Alta compatibilidad/i).first()).toBeVisible();
 
   await page.getByRole("link", { name: "Convocatorias", exact: true }).click();
   await expect(page).toHaveURL(/\/opportunities$/);
