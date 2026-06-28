@@ -149,7 +149,7 @@ jobs:
 
   healthcheck:
     name: Post-deploy healthcheck
-    needs: [ci-status, render-api]
+    needs: [ci-status, render-api, vercel]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     steps:
