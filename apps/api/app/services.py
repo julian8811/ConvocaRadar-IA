@@ -13,7 +13,7 @@ from functools import lru_cache
 from urllib.parse import urlparse
 
 import httpx
-from sqlalchemy import Select, func, or_, select
+from sqlalchemy import Select, and_, func, or_, select
 from sqlalchemy.orm import Session
 from openpyxl import Workbook
 from reportlab.lib import colors
@@ -51,7 +51,7 @@ from app.models import (
     Task,
     User,
 )
-from app.schemas import OpportunityCreate
+from app.schemas import OpportunityCreate, TriageOpportunityItem
 
 
 def connector_for(source_key: str, base_url: str | None = None, source_type: str | None = None):
@@ -1813,4 +1813,126 @@ def summarize_text(text: str) -> str:
 
 def count_query(db: Session, stmt: Select[tuple[Opportunity]]) -> int:
     return db.scalar(select(func.count()).select_from(stmt.subquery())) or 0
+
+
+# ---------------------------------------------------------------------------
+# PR B-1a: /dashboard/triage helpers
+# ---------------------------------------------------------------------------
+
+
+def _triage_days_to_close(close_date: datetime | None) -> int | None:
+    """Compute days_to_close without clamping negatives.
+
+    Per PR B-1a spec: an opportunity that has already closed can still appear
+    in closing_soon_7d as a negative number. None means no close_date at all.
+    """
+    if close_date is None:
+        return None
+    now = datetime.now(UTC).replace(tzinfo=None)
+    return (close_date - now).days
+
+
+def get_review_queue(
+    db: Session,
+    organization_id: str,
+    *,
+    limit: int = 8,
+) -> list[TriageOpportunityItem]:
+    """Return up to ``limit`` items the user has marked for review or kept.
+
+    Filter: ``Opportunity.organization_id == org_id`` AND
+            ``Opportunity.user_status IN ('review', 'kept')`` AND
+            ``Opportunity.close_date IS NOT NULL``.
+    Order: ``close_date ASC NULLS LAST`` (soonest first).
+    Score: joined from ``OpportunityScore`` for the given org, if any.
+    """
+    stmt = (
+        select(Opportunity, OpportunityScore, Source)
+        .outerjoin(
+            OpportunityScore,
+            and_(
+                OpportunityScore.opportunity_id == Opportunity.id,
+                OpportunityScore.organization_id == organization_id,
+            ),
+        )
+        .outerjoin(Source, Source.id == Opportunity.source_id)
+        .where(
+            Opportunity.organization_id == organization_id,
+            Opportunity.user_status.in_(["review", "kept"]),
+            Opportunity.close_date.is_not(None),
+        )
+        .order_by(Opportunity.close_date.asc().nullslast())
+        .limit(limit)
+    )
+    rows = list(db.execute(stmt))
+    items: list[TriageOpportunityItem] = []
+    for opportunity, score, source in rows:
+        items.append(
+            TriageOpportunityItem(
+                id=opportunity.id,
+                title=opportunity.title,
+                country=opportunity.country,
+                currency=opportunity.funding_amount_currency,
+                funding_amount=opportunity.funding_amount_value,
+                days_to_close=_triage_days_to_close(opportunity.close_date),
+                score=score.score if score else None,
+                source_key=source.key if source else None,
+            )
+        )
+    return items
+
+
+def get_closing_soon_7d(
+    db: Session,
+    organization_id: str,
+    *,
+    limit: int = 8,
+) -> list[TriageOpportunityItem]:
+    """Return up to ``limit`` items closing within 7 days (any user_status).
+
+    Filter: ``Opportunity.organization_id == org_id OR
+            Opportunity.organization_id IS NULL`` AND
+            ``Opportunity.close_date IS NOT NULL`` AND
+            ``Opportunity.close_date <= now + 7 days``.
+    Order: ``close_date ASC NULLS LAST``.
+    """
+    cutoff = datetime.now(UTC).replace(tzinfo=None) + timedelta(days=7)
+    stmt = (
+        select(Opportunity, OpportunityScore, Source)
+        .outerjoin(
+            OpportunityScore,
+            and_(
+                OpportunityScore.opportunity_id == Opportunity.id,
+                OpportunityScore.organization_id == organization_id,
+            ),
+        )
+        .outerjoin(Source, Source.id == Opportunity.source_id)
+        .where(
+            or_(
+                Opportunity.organization_id == organization_id,
+                Opportunity.organization_id.is_(None),
+            ),
+            Opportunity.close_date.is_not(None),
+            Opportunity.close_date <= cutoff,
+        )
+        .order_by(Opportunity.close_date.asc().nullslast())
+        .limit(limit)
+    )
+    rows = list(db.execute(stmt))
+    items: list[TriageOpportunityItem] = []
+    for opportunity, score, source in rows:
+        items.append(
+            TriageOpportunityItem(
+                id=opportunity.id,
+                title=opportunity.title,
+                country=opportunity.country,
+                currency=opportunity.funding_amount_currency,
+                funding_amount=opportunity.funding_amount_value,
+                days_to_close=_triage_days_to_close(opportunity.close_date),
+                score=score.score if score else None,
+                source_key=source.key if source else None,
+            )
+        )
+    return items
+
 

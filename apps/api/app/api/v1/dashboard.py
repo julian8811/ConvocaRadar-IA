@@ -15,8 +15,15 @@ from app.schemas import (
     DashboardProfileSummary,
     DashboardSourceAlert,
     DashboardSummaryRead,
+    TriageRead,
 )
-from app.services import build_opportunity_query, count_query, is_noise_payload
+from app.services import (
+    build_opportunity_query,
+    count_query,
+    get_closing_soon_7d,
+    get_review_queue,
+    is_noise_payload,
+)
 
 router = APIRouter()
 
@@ -240,4 +247,25 @@ def get_dashboard_summary(
             embeddings_coverage=embeddings_coverage,
         ),
         profile=_profile_summary(profile),
+    )
+
+
+@router.get("/dashboard/triage", response_model=TriageRead)
+def get_dashboard_triage(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+    org: Organization = Depends(get_current_organization),
+) -> TriageRead:
+    """PR B-1a: action-oriented triage list for the consultor persona.
+
+    Returns a short list of things to do today:
+
+    * review_queue: items the user has marked for review or kept, ordered
+      by close_date ASC (soonest first, NULL last).
+    * closing_soon_7d: any opportunity closing within 7 days, regardless
+      of user_status, ordered by close_date ASC.
+    """
+    return TriageRead(
+        review_queue=get_review_queue(db, org.id, limit=8),
+        closing_soon_7d=get_closing_soon_7d(db, org.id, limit=8),
     )
