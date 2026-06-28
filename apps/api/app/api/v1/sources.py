@@ -232,13 +232,12 @@ def run_all_sources(
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> dict[str, object]:
-    """Start an asynchronous sweep of all enabled sources.
+    """Start a background sweep of all enabled sources.
 
-    The sweep runs in the background via asyncio.create_task so the
-    HTTP response returns immediately. Use GET /api/v1/sources/health
-    to monitor per-source progress.
+    The sweep runs in a daemon thread so the HTTP response returns
+    immediately. Use GET /api/v1/sources/health to monitor progress.
     """
-    import asyncio
+    import threading
 
     sources = list(
         db.scalars(
@@ -250,7 +249,7 @@ def run_all_sources(
     )
     org_id = organization.id
 
-    async def _background_sweep() -> None:
+    def _background_sweep() -> None:
         db2 = SessionLocal()
         try:
             for source in sources:
@@ -259,13 +258,13 @@ def run_all_sources(
                     continue
                 try:
                     execute_source_run_locally(db2, fresh, organization_id=org_id)
-                except Exception as exc:
+                except Exception:
                     db2.rollback()
             db2.commit()
         finally:
             db2.close()
 
-    asyncio.create_task(_background_sweep())
+    threading.Thread(target=_background_sweep, daemon=True).start()
     audit(db, "run_source_sweep_dispatched", "source_sweep", user, None)
     return {"status": "started", "sources": len(sources)}
 
