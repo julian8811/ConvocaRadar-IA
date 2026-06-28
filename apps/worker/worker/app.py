@@ -17,6 +17,7 @@ celery_app = Celery(
         "worker.tasks.generate_report",
         "worker.tasks.send_alerts",
         "worker.tasks.scheduler",
+        "worker.tasks.bootstrap",
     ],
 )
 
@@ -47,3 +48,4 @@ import worker.tasks.process_opportunity  # noqa: E402,F401
 import worker.tasks.scheduler  # noqa: E402,F401
 import worker.tasks.scrape_source  # noqa: E402,F401
 import worker.tasks.send_alerts  # noqa: E402,F401
+import worker.tasks.bootstrap  # noqa: E402,F401
