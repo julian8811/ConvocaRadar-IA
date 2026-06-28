@@ -1820,6 +1820,42 @@ def count_query(db: Session, stmt: Select[tuple[Opportunity]]) -> int:
 # ---------------------------------------------------------------------------
 
 
+def extract_score_reasons(value: object) -> list[str]:
+    """Safely normalize an OpportunityScore.reasons value to a list[str].
+
+    The column is declared as JSON (default=list) and is therefore expected
+    to be a list[str] in the steady state. This helper is defensive and
+    also handles:
+
+    * ``None`` → ``[]``
+    * empty list → ``[]``
+    * JSON string (e.g. ``'["a", "b"]'``) → parsed list (invalid → ``[]``)
+    * comma-separated string (e.g. ``"a, b"``) → split and trimmed tokens
+    * any other unexpected type → ``[]``
+
+    Never raises; the API contract requires ``reasons`` to be a list.
+    """
+    if value is None:
+        return []
+    if isinstance(value, (list, tuple)):
+        return [str(item) for item in value if item is not None]
+    if isinstance(value, str):
+        text = value.strip()
+        if not text:
+            return []
+        if text.startswith("[") and text.endswith("]"):
+            try:
+                parsed = json.loads(text)
+            except (json.JSONDecodeError, TypeError):
+                return []
+            if isinstance(parsed, list):
+                return [str(item) for item in parsed if item is not None]
+            return []
+        # Fallback: comma-separated string.
+        return [part.strip() for part in text.split(",") if part.strip()]
+    return []
+
+
 def _triage_days_to_close(close_date: datetime | None) -> int | None:
     """Compute days_to_close without clamping negatives.
 
