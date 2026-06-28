@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+import logging
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
@@ -11,6 +12,7 @@ from app.schemas import SourceCreate, SourceHealthRead, SourceRead, SourceRunRea
 from app.services import audit, execute_source_run_locally, schedule_or_execute_source_run, source_due_for_scraping, validate_source_url
 
 router = APIRouter()
+logger = logging.getLogger(__name__)
 
 
 def _health_window_days(source: Source) -> int:
@@ -239,15 +241,22 @@ def run_all_sources(
         )
     )
     runs: list[SourceRun] = []
+    errors: list[dict[str, str]] = []
     for source in sources:
         if not source_due_for_scraping(source):
             continue
-        run = schedule_or_execute_source_run(db, source, organization_id=organization.id)
-        audit(db, "run_source", "source_run", user, run.id)
-        runs.append(run)
+        try:
+            run = schedule_or_execute_source_run(db, source, organization_id=organization.id)
+            audit(db, "run_source", "source_run", user, run.id)
+            runs.append(run)
+        except Exception as exc:
+            db.rollback()
+            key = source.key or source.id
+            errors.append({"source": key, "error": str(exc)})
+            logger.warning("source_run_all_skipped", source=key, error=str(exc))
     db.commit()
-    for run in runs:
-        db.refresh(run)
+    if errors:
+        logger.warning("source_run_all_partial", total=len(sources), run=len(runs), errors=len(errors))
     return runs
 
 
