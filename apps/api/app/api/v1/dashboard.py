@@ -15,13 +15,16 @@ from app.schemas import (
     DashboardProfileSummary,
     DashboardSourceAlert,
     DashboardSummaryRead,
+    PipelineRead,
     TriageRead,
 )
 from app.services import (
     build_opportunity_query,
     count_query,
+    get_closing_soon,
     get_closing_soon_7d,
     get_review_queue,
+    get_top_scored,
     is_noise_payload,
 )
 
@@ -268,4 +271,26 @@ def get_dashboard_triage(
     return TriageRead(
         review_queue=get_review_queue(db, org.id, limit=8),
         closing_soon_7d=get_closing_soon_7d(db, org.id, limit=8),
+    )
+
+
+@router.get("/dashboard/pipeline", response_model=PipelineRead)
+def get_dashboard_pipeline(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+    org: Organization = Depends(get_current_organization),
+) -> PipelineRead:
+    """PR B-1b: lists lane of the dashboard for the consultor persona.
+
+    Returns two focused slices:
+
+    * top_scored — the highest-scoring opportunities for the current org,
+      each with a numeric ``score`` and a list of ``reasons`` explaining it.
+    * closing_soon — items whose close_date falls in [0, 30] days, ordered
+      by close_date ASC (soonest first). Excludes already-closed
+      (days_to_close < 0) and undated (close_date IS NULL) opportunities.
+    """
+    return PipelineRead(
+        top_scored=get_top_scored(db, org.id, limit=8),
+        closing_soon=get_closing_soon(db, org.id, limit=8, days_window=30),
     )
