@@ -449,6 +449,27 @@ class DashboardSummaryRead(BaseModel):
     profile: DashboardProfileSummary
 
 
+# PR B-1a: Triage zone. A short, action-oriented list for the consultor
+# persona that surfaces the two highest-leverage things to do today:
+# the review queue (items the user previously marked for review) and
+# the closing-soon-in-7-days list (any opportunity, regardless of user
+# status, that closes within a week).
+class TriageOpportunityItem(BaseModel):
+    id: str
+    title: str
+    country: str | None = None
+    currency: str | None = None
+    funding_amount: float | None = None
+    days_to_close: int | None = None
+    score: float | None = None
+    source_key: str | None = None
+
+
+class TriageRead(BaseModel):
+    review_queue: list[TriageOpportunityItem]
+    closing_soon_7d: list[TriageOpportunityItem]
+
+
 class AiOpportunityExtract(BaseModel):
     title: str
     entity: str
