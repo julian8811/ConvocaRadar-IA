@@ -6,7 +6,7 @@ from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_organization, get_current_user
-from app.db.session import get_db
+from app.db.session import get_db, SessionLocal
 from app.models import Organization, Source, SourceRun, User
 from app.schemas import SourceCreate, SourceHealthRead, SourceRead, SourceRunRead, SourceUpdate
 from app.services import audit, execute_source_run_locally, schedule_or_execute_source_run, source_due_for_scraping, validate_source_url
@@ -226,12 +226,20 @@ def run_source(
     return run
 
 
-@router.post("/sources/run-all", response_model=list[SourceRunRead])
+@router.post("/sources/run-all", response_model=dict)
 def run_all_sources(
     organization: Organization = Depends(get_current_organization),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
-) -> list[SourceRun]:
+) -> dict[str, object]:
+    """Start an asynchronous sweep of all enabled sources.
+
+    The sweep runs in the background via asyncio.create_task so the
+    HTTP response returns immediately. Use GET /api/v1/sources/health
+    to monitor per-source progress.
+    """
+    import asyncio
+
     sources = list(
         db.scalars(
             select(Source).where(
@@ -240,24 +248,26 @@ def run_all_sources(
             )
         )
     )
-    runs: list[SourceRun] = []
-    for source in sources:
-        if not source_due_for_scraping(source):
-            continue
+    org_id = organization.id
+
+    async def _background_sweep() -> None:
+        db2 = SessionLocal()
         try:
-            run = execute_source_run_locally(db, source, organization_id=organization.id)
-            audit(db, "run_source", "source_run", user, run.id)
-            runs.append(run)
-        except Exception as exc:
-            db.rollback()
-            key = source.key or source.id
-            logger.warning("source_run_all_skipped", source=key, error=str(exc))
-    db.commit()
-    if not runs:
-        last = max((s.last_run_at for s in sources if s.last_run_at), default=None)
-        detail = "All sources are within their scraping cooldown. Last run: " + (str(last) if last else "never")
-        logger.info("source_run_all_none_due", detail=detail)
-    return runs
+            for source in sources:
+                fresh = db2.merge(source)
+                if not source_due_for_scraping(fresh):
+                    continue
+                try:
+                    execute_source_run_locally(db2, fresh, organization_id=org_id)
+                except Exception as exc:
+                    db2.rollback()
+            db2.commit()
+        finally:
+            db2.close()
+
+    asyncio.create_task(_background_sweep())
+    audit(db, "run_source_sweep_dispatched", "source_sweep", user, None)
+    return {"status": "started", "sources": len(sources)}
 
 
 @router.get("/sources/{source_id}/runs", response_model=list[SourceRunRead])
