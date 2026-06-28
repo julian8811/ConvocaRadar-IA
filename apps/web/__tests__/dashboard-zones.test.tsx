@@ -88,9 +88,24 @@ describe("Dashboard 3-zone structure (PR B-2)", () => {
   });
 
   it("renders three distinct zones in the Triage -> Pipeline -> Health order", async () => {
-    mockDashboardTriage.mockReturnValue(pendingPromise());
-    mockDashboardPipeline.mockReturnValue(pendingPromise());
-    mockDashboardHealth.mockReturnValue(pendingPromise());
+    // Resolve all 3 queries with empty data so each zone renders its
+    // content (including the zone marker heading) rather than a skeleton.
+    mockDashboardTriage.mockResolvedValue({
+      review_queue: [],
+      closing_soon_7d: [],
+      profile: { completeness: 0, missing_fields: [] },
+    });
+    mockDashboardPipeline.mockResolvedValue({ top_scored: [], closing_soon: [] });
+    mockDashboardHealth.mockResolvedValue({
+      kpis: { total: 0, open: 0, closing_soon: 0, high_match: 0 },
+      data_coverage: { with_summary: 0, with_amount: 0, with_close_date: 0, with_source: 0, embeddings_coverage: null },
+      status_breakdown: [],
+      country_breakdown: [],
+      sources_health: [],
+      failing_sources: 0,
+      degraded_sources: 0,
+      source_alerts: [],
+    });
 
     const { DashboardPage } = await import("@/app/(app)/dashboard/page");
     const Wrapper = makeWrapper();
@@ -104,13 +119,13 @@ describe("Dashboard 3-zone structure (PR B-2)", () => {
     await waitFor(() => {
       expect(screen.getByText(/qu[ée]\s+hago\s+hoy/i)).toBeDefined();
     });
-    expect(screen.getByText(/pipeline/i)).toBeDefined();
-    expect(screen.getByText(/salud/i)).toBeDefined();
+    expect(screen.getByText(/top compatibilidad/i)).toBeDefined();
+    expect(screen.getByText(/estado de convocatorias/i)).toBeDefined();
 
     // DOM order: Triage zone appears before Pipeline zone appears before Health zone.
     const triageHeading = screen.getByText(/qu[ée]\s+hago\s+hoy/i);
-    const pipelineHeading = screen.getByText(/pipeline/i);
-    const healthHeading = screen.getByText(/salud/i);
+    const pipelineHeading = screen.getByText(/top compatibilidad/i);
+    const healthHeading = screen.getByText(/estado de convocatorias/i);
     expect(
       triageHeading.compareDocumentPosition(pipelineHeading) & Node.DOCUMENT_POSITION_FOLLOWING,
     ).toBeTruthy();
@@ -175,8 +190,10 @@ describe("Dashboard 3-zone structure (PR B-2)", () => {
     );
 
     // Three distinct skeleton elements must be present (one per zone).
+    // Each skeleton carries data-zone-skeleton="triage|pipeline|health".
     await waitFor(() => {
-      expect(container.querySelectorAll('[data-testid="zone-skeleton"]').length).toBe(3);
+      const skeletons = container.querySelectorAll("[data-zone-skeleton]");
+      expect(skeletons.length).toBe(3);
     });
   });
 });
