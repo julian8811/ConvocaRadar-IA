@@ -470,6 +470,28 @@ class TriageRead(BaseModel):
     closing_soon_7d: list[TriageOpportunityItem]
 
 
+# PR B-1b: Pipeline zone. A focused payload for the lists lane: top-scored
+# opportunities (with their score and the reasons that explain it) and
+# closing-soon opportunities (with a numeric days_to_close countdown).
+# Distinct from the existing TriageRead (which surfaces the user's review
+# queue and the 7-day-closing window) so each zone can evolve independently.
+class PipelineOpportunityItem(BaseModel):
+    id: str
+    title: str
+    country: str | None = None
+    currency: str | None = None
+    funding_amount: float | None = None
+    days_to_close: int | None = None
+    score: float | None = None
+    reasons: list[str] = Field(default_factory=list)
+    source_key: str | None = None
+
+
+class PipelineRead(BaseModel):
+    top_scored: list[PipelineOpportunityItem]
+    closing_soon: list[PipelineOpportunityItem]
+
+
 class AiOpportunityExtract(BaseModel):
     title: str
     entity: str
