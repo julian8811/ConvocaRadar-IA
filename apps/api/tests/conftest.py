@@ -27,6 +27,11 @@ os.environ.setdefault("SMTP_HOST", "")
 os.environ.setdefault("JWT_SECRET", "a" * 64)
 os.environ.setdefault("INTERNAL_API_KEY", "a" * 64)
 os.environ.setdefault("BOOTSTRAP_SOURCES_ON_STARTUP", "false")
+# In-process Celery (worker + beat) is started by the FastAPI lifespan
+# in production. The test DB has no Redis broker, so the subprocess
+# would fail and spam /tmp/celery-*.log with retry noise. Disable
+# explicitly here so tests do not fork Celery children.
+os.environ.setdefault("DISABLE_INPROCESS_CELERY", "1")
 
 import pytest  # noqa: E402
 
