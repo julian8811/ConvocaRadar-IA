@@ -43,6 +43,7 @@ vi.mock("@/lib/api", () => ({
 vi.mock("lucide-react", () => {
   const Stub: React.FC<{ className?: string }> = (props) => <svg data-testid="icon-stub" className={props.className} />;
   return {
+    AlertCircle: Stub,
     AlertTriangle: Stub,
     CalendarClock: Stub,
     Database: Stub,
