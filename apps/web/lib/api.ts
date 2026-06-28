@@ -3,17 +3,20 @@ import type {
   Alert,
   AuditLog,
   DashboardSummary,
+  HealthRead,
   Opportunity,
   OpportunityDocument,
   OpportunityList,
   OpportunityScore,
   OpportunitySemanticList,
+  PipelineRead,
   Report,
   Source,
   SourceHealth,
   SourceRunOverview,
   SourceRun,
   Task,
+  TriageRead,
 } from "@/lib/types";
 
 export const API_URL =
@@ -219,6 +222,14 @@ export const api = {
     request<{ access_token: string }>("/auth/register", { method: "POST", body: JSON.stringify(payload) }),
   logout: () => request<{ detail: string }>("/auth/logout", { method: "POST" }),
   me: () => request<{ name: string; email: string; role: string }>("/me"),
+  // PR B-2 (dashboard-redesign): the new 3-zone endpoints. Each zone
+  // (Triage / Pipeline / Health) calls its own endpoint independently
+  // so a slow endpoint cannot block the others. dashboardSummary
+  // remains as a thin merged alias for the e2e and any external
+  // clients that still depend on the legacy shape.
+  dashboardTriage: () => request<TriageRead>("/dashboard/triage"),
+  dashboardPipeline: () => request<PipelineRead>("/dashboard/pipeline"),
+  dashboardHealth: () => request<HealthRead>("/dashboard/health"),
   dashboardSummary: () => request<DashboardSummary>("/dashboard/summary"),
   organization: () => request<{ name: string; country: string; type: string }>("/organizations/current"),
   profile: () => request<Record<string, unknown>>("/organizations/current/profile"),

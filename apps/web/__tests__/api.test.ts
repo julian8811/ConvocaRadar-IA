@@ -218,3 +218,117 @@ describe("SEC-1.5 — request() error classification", () => {
     });
   });
 });
+
+/**
+ * PR B-2 (dashboard-redesign): the 3 new zone methods on the API client
+ * each hit their own endpoint. dashboardSummary stays as a backward-compat
+ * alias for the e2e + external clients.
+ */
+describe("PR B-2 — dashboard zone methods", () => {
+  beforeEach(() => {
+    vi.stubEnv("NEXT_PUBLIC_ENV", "development");
+  });
+
+  it("api.dashboardTriage() issues a GET to /dashboard/triage", async () => {
+    const capturedUrls: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string) => {
+        capturedUrls.push(url);
+        return Promise.resolve(new Response(JSON.stringify({ review_queue: [], closing_soon_7d: [] }), { status: 200 }));
+      }),
+    );
+
+    const { api } = await loadApiModule();
+    const result = await api.dashboardTriage();
+    expect(capturedUrls).toHaveLength(1);
+    expect(capturedUrls[0]).toMatch(/\/dashboard\/triage$/);
+    expect(result.review_queue).toEqual([]);
+    expect(result.closing_soon_7d).toEqual([]);
+  });
+
+  it("api.dashboardPipeline() issues a GET to /dashboard/pipeline", async () => {
+    const capturedUrls: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string) => {
+        capturedUrls.push(url);
+        return Promise.resolve(new Response(JSON.stringify({ top_scored: [], closing_soon: [] }), { status: 200 }));
+      }),
+    );
+
+    const { api } = await loadApiModule();
+    const result = await api.dashboardPipeline();
+    expect(capturedUrls).toHaveLength(1);
+    expect(capturedUrls[0]).toMatch(/\/dashboard\/pipeline$/);
+    expect(result.top_scored).toEqual([]);
+    expect(result.closing_soon).toEqual([]);
+  });
+
+  it("api.dashboardHealth() issues a GET to /dashboard/health", async () => {
+    const capturedUrls: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string) => {
+        capturedUrls.push(url);
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              kpis: { total: 0, open: 0, closing_soon: 0, high_match: 0 },
+              data_coverage: { with_summary: 0, with_amount: 0, with_close_date: 0, with_source: 0, embeddings_coverage: null },
+              status_breakdown: [],
+              country_breakdown: [],
+              sources_health: [],
+              failing_sources: 0,
+              degraded_sources: 0,
+              source_alerts: [],
+            }),
+            { status: 200 },
+          ),
+        );
+      }),
+    );
+
+    const { api } = await loadApiModule();
+    const result = await api.dashboardHealth();
+    expect(capturedUrls).toHaveLength(1);
+    expect(capturedUrls[0]).toMatch(/\/dashboard\/health$/);
+    expect(result.data_coverage.embeddings_coverage).toBeNull();
+  });
+
+  it("api.dashboardSummary() still works against /dashboard/summary (backward compat)", async () => {
+    const capturedUrls: string[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string) => {
+        capturedUrls.push(url);
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({
+              total_opportunities: 0,
+              open_opportunities: 0,
+              closing_soon_opportunities: 0,
+              high_match_opportunities: 0,
+              top_scored: [],
+              closing_soon: [],
+              status_breakdown: [],
+              country_breakdown: [],
+              degraded_sources: 0,
+              failing_sources: 0,
+              source_alerts: [],
+              data_coverage: { with_summary: 0, with_amount: 0, with_close_date: 0, with_source: 0, embeddings_coverage: null },
+              profile: { completeness: 0, missing_fields: [] },
+            }),
+            { status: 200 },
+          ),
+        );
+      }),
+    );
+
+    const { api } = await loadApiModule();
+    const result = await api.dashboardSummary();
+    expect(capturedUrls).toHaveLength(1);
+    expect(capturedUrls[0]).toMatch(/\/dashboard\/summary$/);
+    expect(result.data_coverage.embeddings_coverage).toBeNull();
+  });
+});
