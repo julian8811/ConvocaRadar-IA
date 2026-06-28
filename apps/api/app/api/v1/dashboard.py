@@ -44,6 +44,13 @@ from app.services import (
 
 router = APIRouter()
 
+# ── Simple in-memory cache for /dashboard/health ──────────────────────
+# The background source sweep (123 sources on free tier) saturates the
+# DB and makes the health endpoint take >12s, which kills the frontend's
+# AbortController. A 60s TTL module-level dict serves as a lightweight
+# cache so subsequent calls within the window return instantly.
+_health_cache: dict[str, tuple[float, HealthRead | None]] = {}
+
 PROFILE_CHECKS: list[tuple[str, str]] = [
     ("description", "Descripción institucional"),
     ("areas_of_interest", "Áreas de interés"),
@@ -258,10 +265,11 @@ def get_dashboard_health(
     """PR B-1c: health lane of the dashboard for the consultor persona."""
     cache_key = f"health:{org.id}"
     now_time = time.monotonic()
-    cached = getattr(app.state, "_health_cache", {})
-    entry = cached.get(cache_key)
-    if entry and (now_time - entry["ts"]) < 60:
-        return entry["payload"]
+    entry = _health_cache.get(cache_key)
+    if entry:
+        ts, payload = entry
+        if payload and (now_time - ts) < 60:
+            return payload
 
     try:
         degraded, failing, source_alerts = get_source_health_summaries(db, org.id)
@@ -283,8 +291,7 @@ def get_dashboard_health(
             source_contribution=contrib, opportunities_timeline=timeline,
             category_distribution=cat_dist,
         )
-        cached[cache_key] = {"ts": now_time, "payload": payload}
-        app.state._health_cache = cached
+        _health_cache[cache_key] = (now_time, payload)
         return payload
     except Exception:
         # Fallback: return whatever we can without the analytics
