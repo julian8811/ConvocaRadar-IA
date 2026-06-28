@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+import time
 
 from fastapi import APIRouter, Depends, Response
 from sqlalchemy import func, or_, select
@@ -262,7 +263,18 @@ def get_dashboard_health(
 
     Target latency: <500 ms. The endpoint is read-only and uses the
     caller's org scope; no cross-org leakage.
+
+    A lightweight in-memory cache (60 s TTL) avoids killing the
+    frontend's 12 s AbortController when the background source sweep
+    is saturating the DB.
     """
+    cache_key = f"health:{org.id}"
+    now = time.monotonic()
+    cached = getattr(app.state, "_health_cache", {})
+    entry = cached.get(cache_key)
+    if entry and (now - entry["ts"]) < 60:
+        return entry["payload"]
+
     degraded, failing, source_alerts = get_source_health_summaries(db, org.id)
     # Analytics fields may fail in test fixtures where the underlying
     # tables (OpportunityScore, etc.) are empty or absent. Log a warning
@@ -283,7 +295,7 @@ def get_dashboard_health(
         timeline = get_opportunities_timeline(db, org.id)
     except Exception:
         timeline = []
-    return HealthRead(
+    payload = HealthRead(
         kpis=get_health_kpis(db, org.id),
         status_breakdown=get_status_breakdown(db, org.id),
         country_breakdown=get_country_breakdown(db, org.id),
@@ -297,3 +309,6 @@ def get_dashboard_health(
         source_contribution=contrib,
         opportunities_timeline=timeline,
     )
+    cached[cache_key] = {"ts": now, "payload": payload}
+    app.state._health_cache = cached
+    return payload
