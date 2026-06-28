@@ -110,9 +110,9 @@ function isAuthPath(path: string) {
  * SEC-1.5: wrap fetch with an AbortController that fires after 12s.
  * Exposed for testing — production code uses the `api` object below.
  */
-export async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
+export async function request<T>(path: string, init: RequestInit = {}, timeoutMs: number = REQUEST_TIMEOUT_MS): Promise<T> {
   const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
   // Legacy Bearer fallback: only in non-production, only if a token is in
   // localStorage. In production this is always null.
@@ -229,7 +229,9 @@ export const api = {
   // clients that still depend on the legacy shape.
   dashboardTriage: () => request<TriageRead>("/dashboard/triage"),
   dashboardPipeline: () => request<PipelineRead>("/dashboard/pipeline"),
-  dashboardHealth: () => request<HealthRead>("/dashboard/health"),
+  // Health endpoint can be slow during background sweeps (123 sources).
+  // Use a 45s timeout instead of the default 12s.
+  dashboardHealth: () => request<HealthRead>("/dashboard/health", {}, 45_000),
   dashboardSummary: () => request<DashboardSummary>("/dashboard/summary"),
   organization: () => request<{ name: string; country: string; type: string }>("/organizations/current"),
   profile: () => request<Record<string, unknown>>("/organizations/current/profile"),
