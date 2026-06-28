@@ -146,6 +146,11 @@ jobs:
           working-directory: ./apps/web
           vercel-args: '--prod --yes'
           github-comment: false
+          # The action runs `git log -1 --pretty=format:%B` from the working
+          # directory to grab the commit message. In a monorepo that
+          # directory has no .git, so we pass the message explicitly.
+          github-message: ${{ github.event.head_commit.message }}
+          github-sha: ${{ github.event.head_commit.id }}
 
   healthcheck:
     name: Post-deploy healthcheck
