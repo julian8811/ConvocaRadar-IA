@@ -2330,3 +2330,131 @@ def get_source_health_summaries(
             if len(alerts) < 5:
                 alerts.append(DashboardSourceAlert(source_id=source.id, name=source.name, status="failing"))
     return degraded, failing, alerts
+
+
+# ── Analytics helpers (PR analytics-dashboard) ───────────────────────────
+
+
+def get_score_distribution(db: Session, organization_id: str) -> list[DashboardBreakdownItem]:
+    """Group opportunities by their score range: 0-25, 25-50, 50-75, 75-100."""
+    scope = or_(
+        Opportunity.organization_id == organization_id,
+        Opportunity.organization_id.is_(None),
+    )
+    buckets = {"0-25": 0, "25-50": 0, "50-75": 0, "75-100": 0}
+    rows = (
+        db.execute(
+            select(OpportunityScore.score)
+            .join(Opportunity, OpportunityScore.opportunity_id == Opportunity.id)
+            .where(scope, OpportunityScore.organization_id == organization_id)
+        )
+        .scalars()
+        .all()
+    )
+    for score in rows:
+        if score is None:
+            continue
+        if score < 25:
+            buckets["0-25"] += 1
+        elif score < 50:
+            buckets["25-50"] += 1
+        elif score < 75:
+            buckets["50-75"] += 1
+        else:
+            buckets["75-100"] += 1
+    return [
+        DashboardBreakdownItem(name=k, total=v)
+        for k, v in buckets.items()
+        if v > 0
+    ]
+
+
+def get_funding_ranges(db: Session, organization_id: str) -> list[DashboardBreakdownItem]:
+    """Group opportunities by their funding amount range."""
+    scope = or_(
+        Opportunity.organization_id == organization_id,
+        Opportunity.organization_id.is_(None),
+    )
+    buckets = {
+        "<$100K": 0,
+        "$100K-$500K": 0,
+        "$500K-$1M": 0,
+        "$1M-$5M": 0,
+        ">$5M": 0,
+    }
+    rows = (
+        db.execute(
+            select(Opportunity.funding_amount_value)
+            .where(scope, Opportunity.funding_amount_value.isnot(None))
+        )
+        .scalars()
+        .all()
+    )
+    for amount in rows:
+        if amount is None:
+            continue
+        if amount < 100_000:
+            buckets["<$100K"] += 1
+        elif amount < 500_000:
+            buckets["$100K-$500K"] += 1
+        elif amount < 1_000_000:
+            buckets["$500K-$1M"] += 1
+        elif amount < 5_000_000:
+            buckets["$1M-$5M"] += 1
+        else:
+            buckets[">$5M"] += 1
+    return [
+        DashboardBreakdownItem(name=k, total=v)
+        for k, v in buckets.items()
+        if v > 0
+    ]
+
+
+def get_source_contribution(db: Session, organization_id: str) -> list[DashboardBreakdownItem]:
+    """Top 10 sources by the number of opportunities they contributed."""
+    scope = or_(
+        Opportunity.organization_id == organization_id,
+        Opportunity.organization_id.is_(None),
+    )
+    rows = (
+        db.execute(
+            select(Source.name, func.count())
+            .join(Opportunity, Opportunity.source_id == Source.id)
+            .where(scope)
+            .group_by(Source.name)
+            .order_by(func.count().desc())
+            .limit(10)
+        )
+        .all()
+    )
+    return [DashboardBreakdownItem(name=name or "Unknown", total=count) for name, count in rows]
+
+
+def get_opportunities_timeline(db: Session, organization_id: str) -> list[DashboardBreakdownItem]:
+    """Count opportunities scraped per month (last 12 months)."""
+    from datetime import datetime as dt
+
+    scope = or_(
+        Opportunity.organization_id == organization_id,
+        Opportunity.organization_id.is_(None),
+    )
+    cutoff = dt.now(UTC).replace(tzinfo=None) - timedelta(days=365)
+    rows = (
+        db.execute(
+            select(
+                func.date_trunc("month", Opportunity.created_at).label("month"),
+                func.count(),
+            )
+            .where(scope, Opportunity.created_at >= cutoff)
+            .group_by("month")
+            .order_by("month")
+        )
+        .all()
+    )
+    return [
+        DashboardBreakdownItem(
+            name=str(month.strftime("%Y-%m")) if month else "Unknown",
+            total=count,
+        )
+        for month, count in rows
+    ]
