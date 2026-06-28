@@ -253,3 +253,94 @@ export type DashboardSummary = {
   data_coverage: DashboardDataCoverage;
   profile: DashboardProfileSummary;
 };
+
+/**
+ * PR B-2 (dashboard-redesign): Triage zone payload.
+ * Slim opportunity item used by /dashboard/triage (review queue + 7-day
+ * closing window). The backend's TriageOpportunityItem excludes entity,
+ * status, and close_date (which are too wide for the hero lane) and
+ * adds source_key for traceability.
+ */
+export type TriageOpportunityItem = {
+  id: string;
+  title: string;
+  country: string | null;
+  currency: string | null;
+  funding_amount: number | null;
+  days_to_close: number | null;
+  score: number | null;
+  source_key: string | null;
+};
+
+export type TriageRead = {
+  review_queue: TriageOpportunityItem[];
+  closing_soon_7d: TriageOpportunityItem[];
+};
+
+/**
+ * PR B-2 (dashboard-redesign): Pipeline zone payload.
+ * Slim opportunity item used by /dashboard/pipeline (top_scored with
+ * reasons + closing_soon countdown). Mirrors the backend's
+ * PipelineOpportunityItem shape exactly.
+ */
+export type PipelineOpportunityItem = {
+  id: string;
+  title: string;
+  country: string | null;
+  currency: string | null;
+  funding_amount: number | null;
+  days_to_close: number | null;
+  score: number | null;
+  reasons: string[];
+  source_key: string | null;
+};
+
+export type PipelineRead = {
+  top_scored: PipelineOpportunityItem[];
+  closing_soon: PipelineOpportunityItem[];
+};
+
+/**
+ * PR B-2 (dashboard-redesign): Health zone payload.
+ * Mirrors the backend's HealthRead shape. `data_coverage.embeddings_coverage`
+ * is nullable (null when no opportunities exist; the frontend renders
+ * "Sin datos aún" in that case).
+ */
+export type HealthKpis = {
+  total: number;
+  open: number;
+  closing_soon: number;
+  high_match: number;
+};
+
+export type HealthRead = {
+  kpis: HealthKpis;
+  status_breakdown: DashboardBreakdownItem[];
+  country_breakdown: DashboardBreakdownItem[];
+  data_coverage: DashboardDataCoverage;
+  sources_health: SourceHealth[];
+  failing_sources: number;
+  degraded_sources: number;
+  source_alerts: DashboardSourceAlert[];
+};
+
+/**
+ * PR B-2: Top-level KPI shape for the 4 cards demoted into the
+ * <details> footer in the Triage zone (re-used by HealthZone
+ * for the same 4-card strip). Kept separate from HealthKpis
+ * (which uses short keys) for backward-compat with the legacy
+ * DashboardSummary shape that the e2e + alias still emit.
+ */
+export type DashboardKpiCard = {
+  total_opportunities: number;
+  open_opportunities: number;
+  closing_soon_opportunities: number;
+  high_match_opportunities: number;
+};
+
+/**
+ * PR B-2: "Mi cola de revisión" — items the consultor has marked as
+ * review/kept. Reuses TriageOpportunityItem (same slim shape, sourced
+ * from the user's review_queue slice on /dashboard/triage).
+ */
+export type ReviewQueueItem = TriageOpportunityItem;
