@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import func, or_, select
@@ -11,7 +11,14 @@ from app.models import Alert, AuditLog, Opportunity, OpportunityEmbedding, Organ
 from app.schemas import AdminMetricsRead, AuditLogRead, SourceRunOverviewRead
 from app.db.bootstrap import bootstrap_priority_sources
 from app.db.seed import seed_default_sources
-from app.services import deduplicate_opportunities, execute_source_run_locally, rebuild_opportunity_embeddings
+from app.services import (
+    deduplicate_opportunities,
+    execute_source_run_locally,
+    rebuild_opportunity_embeddings,
+    score_unscored_opportunities,
+    send_weekly_digest,
+    summarize_missing_opportunities,
+)
 
 router = APIRouter()
 
@@ -227,6 +234,93 @@ def reseed_default_sources_admin(
     )
     db.commit()
     return {**stats, "before_total": before_total, "after_total": after_total}
+
+
+@router.post("/admin/opportunities/summarize-all")
+def summarize_all_opportunities_admin(
+    limit: int = 10,
+    organization: Organization = Depends(get_current_organization),
+    _: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> dict[str, int]:
+    """Generate AI summaries for opportunities that have none.
+
+    Bounded to ``limit`` per call to stay under the Gemini free-tier quota.
+    The endpoint is safe to call repeatedly; opportunities with a non-empty
+    summary are skipped.
+    """
+    result = summarize_missing_opportunities(db, organization.id, limit=limit)
+    db.add(
+        AuditLog(
+            organization_id=organization.id,
+            action="summarize_all_opportunities",
+            resource_type="opportunity",
+            resource_id=organization.id,
+            metadata_json={**result, "limit": limit},
+        )
+    )
+    db.commit()
+    return result
+
+
+@router.post("/admin/opportunities/score-all")
+def score_all_opportunities_admin(
+    limit: int = 10,
+    organization: Organization = Depends(get_current_organization),
+    _: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> dict[str, int]:
+    """Generate OpportunityScore rows for unscored opportunities for this org.
+
+    Bounded to ``limit`` per call. Opportunities that already have a score
+    for this organization are skipped. The score uses the same heuristic as
+    the per-opportunity ``POST /opportunities/{id}/scores`` endpoint.
+    """
+    result = score_unscored_opportunities(db, organization.id, limit=limit)
+    db.add(
+        AuditLog(
+            organization_id=organization.id,
+            action="score_all_opportunities",
+            resource_type="opportunity",
+            resource_id=organization.id,
+            metadata_json={**result, "limit": limit},
+        )
+    )
+    db.commit()
+    return result
+
+
+@router.post("/admin/alerts/send-digest")
+def send_digest_admin(
+    organization: Organization = Depends(get_current_organization),
+    user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> dict[str, bool | int]:
+    """Manually trigger the weekly digest email for this organization.
+
+    Returns ``{"delivered": bool, "opportunities": int}`` so the frontend can
+    show a meaningful toast. ``delivered=False`` may simply mean SMTP is not
+    configured (the existing ``send_email`` records a dev dry-run in that
+    case), or that the org has no admin recipient.
+    """
+    cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=7)
+    scope = or_(Opportunity.organization_id == organization.id, Opportunity.organization_id.is_(None))
+    opportunity_count = db.scalar(
+        select(func.count()).select_from(Opportunity).where(scope, Opportunity.created_at >= cutoff)
+    ) or 0
+    delivered = send_weekly_digest(db, organization.id)
+    db.add(
+        AuditLog(
+            organization_id=organization.id,
+            user_id=user.id,
+            action="send_weekly_digest",
+            resource_type="alert",
+            resource_id=organization.id,
+            metadata_json={"delivered": delivered, "opportunities": int(opportunity_count)},
+        )
+    )
+    db.commit()
+    return {"delivered": delivered, "opportunities": int(opportunity_count)}
 
 
 @router.post("/admin/opportunities/deduplicate")

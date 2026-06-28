@@ -110,48 +110,86 @@ async def _run_periodic_source_sweep(interval_seconds: int = 1800) -> None:
     inline (same process) using the existing ``execute_source_run_locally``
     codepath. Failures for individual sources are logged and skipped; a
     single bad source does not kill the sweep.
+
+    As a side-effect, every ``WEEKLY_DIGEST_SECONDS`` (default 7 days) we
+    also send the weekly digest for every org that has at least one
+    organization. The digest is best-effort: a hard SMTP failure logs a
+    warning and the loop keeps running.
     """
+    from datetime import UTC, datetime
+
+    WEEKLY_DIGEST_SECONDS = 604800  # 7 days
+    last_digest_at: datetime | None = None
+
     await asyncio.sleep(30)  # let the API settle before the first sweep
     while True:
         try:
             from app.db.session import SessionLocal
             from app.models import Organization, Source
-            from app.services import execute_source_run_locally, source_due_for_scraping
+            from app.services import (
+                execute_source_run_locally,
+                send_weekly_digest,
+                source_due_for_scraping,
+            )
             from sqlalchemy import select
 
             db = SessionLocal()
             try:
                 orgs = db.scalars(select(Organization)).all()
-                if not orgs:
-                    struct_logger.info("sweep_no_orgs")
-                    continue
-                sources = list(
-                    db.scalars(
-                        select(Source).where(Source.enabled.is_(True))
-                    )
-                )
-                total = len(sources)
-                run_count = 0
-                for source in sources:
-                    if not source_due_for_scraping(source):
-                        continue
-                    try:
-                        execute_source_run_locally(db, source, organization_id=orgs[0].id)
-                        run_count += 1
-                    except Exception as exc:
-                        db.rollback()
-                        struct_logger.warning(
-                            "sweep_source_failed",
-                            source=source.key or source.id,
-                            error=str(exc),
+                if orgs:
+                    sources = list(
+                        db.scalars(
+                            select(Source).where(Source.enabled.is_(True))
                         )
-                if run_count:
-                    db.commit()
-                struct_logger.info(
-                    "periodic_sweep_complete",
-                    total=total,
-                    due=run_count,
-                )
+                    )
+                    total = len(sources)
+                    run_count = 0
+                    for source in sources:
+                        if not source_due_for_scraping(source):
+                            continue
+                        try:
+                            execute_source_run_locally(db, source, organization_id=orgs[0].id)
+                            run_count += 1
+                        except Exception as exc:
+                            db.rollback()
+                            struct_logger.warning(
+                                "sweep_source_failed",
+                                source=source.key or source.id,
+                                error=str(exc),
+                            )
+                    if run_count:
+                        db.commit()
+                    struct_logger.info(
+                        "periodic_sweep_complete",
+                        total=total,
+                        due=run_count,
+                    )
+
+                    # Weekly digest. Fires at most once per process lifetime
+                    # interval, so a long-running API instance stays under
+                    # quota. Restarting the API restarts the timer — that's
+                    # fine for a v1 cron substitute on Render's free tier.
+                    now = datetime.now(UTC).replace(tzinfo=None)
+                    if last_digest_at is None or (now - last_digest_at).total_seconds() >= WEEKLY_DIGEST_SECONDS:
+                        delivered_count = 0
+                        for org in orgs:
+                            try:
+                                if send_weekly_digest(db, org.id):
+                                    delivered_count += 1
+                            except Exception as exc:
+                                struct_logger.warning(
+                                    "weekly_digest_failed",
+                                    organization_id=org.id,
+                                    error=str(exc),
+                                )
+                        last_digest_at = now
+                        struct_logger.info(
+                            "weekly_digest_complete",
+                            orgs=len(orgs),
+                            delivered=delivered_count,
+                        )
+                else:
+                    struct_logger.info("sweep_no_orgs")
             finally:
                 db.close()
         except Exception as exc:
