@@ -276,6 +276,29 @@ app.add_middleware(
 )
 
 
+# Security headers middleware. Runs after every response so headers are
+# present even when an exception handler short-circuits the other middleware.
+@app.middleware("http")
+async def security_headers_middleware(request: Request, call_next):
+    response = await call_next(request)
+    response.headers["Strict-Transport-Security"] = "max-age=31536000; includeSubDomains"
+    response.headers["X-Content-Type-Options"] = "nosniff"
+    response.headers["X-Frame-Options"] = "DENY"
+    response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
+    response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
+    # CSP: allow the Vercel frontend, Cloudflare analytics, and inline scripts
+    # needed by React and Recharts. Default-src 'self' for everything else.
+    response.headers["Content-Security-Policy"] = (
+        "default-src 'self'; "
+        "script-src 'self' 'unsafe-inline' https://convocaradar-web.vercel.app; "
+        "style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data: https:; "
+        "connect-src 'self' https://convocaradar-api.onrender.com; "
+        "frame-ancestors 'none'"
+    )
+    return response
+
+
 @app.get("/health")
 def health() -> dict[str, str]:
     """Unversioned liveness probe. Returns 200 as long as the process is up."""
