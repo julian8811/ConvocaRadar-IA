@@ -64,7 +64,7 @@ def test_healthcheck_job_present():
 def test_healthcheck_uses_correct_urls():
     """The healthcheck job must hit the production URLs (via env vars is fine)."""
     env = DATA.get("env", {})
-    assert env.get("RENDER_PRODUCTION_URL") == "https://convotracker-api.onrender.com", \
+    assert env.get("RENDER_PRODUCTION_URL") == "https://convocaradar-api.onrender.com", \
         "env.RENDER_PRODUCTION_URL must point to the live Render API"
     assert env.get("VERCEL_PRODUCTION_URL") == "https://convocaradar-web.vercel.app", \
         "env.VERCEL_PRODUCTION_URL must point to the live Vercel deployment"
