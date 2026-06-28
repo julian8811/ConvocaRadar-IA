@@ -2487,26 +2487,30 @@ def get_opportunities_timeline(db: Session, organization_id: str) -> list[Dashbo
 def get_category_distribution(db: Session, organization_id: str) -> list[DashboardBreakdownItem]:
     """Count opportunities grouped by their source's category tags.
 
-    Source.category is a JSON array (e.g. [\"convocatorias\", \"innovacion\",
-    \"emprendimiento\"]). We unnest the array via a lateral cross join and
-    count how many opportunities fall under each tag. An opportunity whose
-    source has 3 categories counts once per category.
+    Source.category is a JSON array stored as a PostgreSQL JSONB column.
+    Some PG versions (Supabase free tier) do not support cross-join
+    lateral with jsonb_array_elements_text in SQLAlchemy. We fall back to
+    fetching the raw rows and unnesting in Python.
     """
     scope = or_(
         Opportunity.organization_id == organization_id,
         Opportunity.organization_id.is_(None),
     )
-    category_col = func.jsonb_array_elements_text(Source.category).label("cat")
     rows = (
         db.execute(
-            select(category_col, func.count())
-            .select_from(Opportunity)
-            .join(Source, Source.id == Opportunity.source_id)
+            select(Source.category)
+            .join(Opportunity, Opportunity.source_id == Source.id)
             .where(scope)
-            .group_by(category_col)
-            .order_by(func.count().desc())
-            .limit(12)
         )
+        .scalars()
         .all()
     )
-    return [DashboardBreakdownItem(name=cat or "Sin categoría", total=count) for cat, count in rows]
+    from collections import Counter
+    counter: Counter[str] = Counter()
+    for category_list in rows:
+        if isinstance(category_list, list):
+            for cat in category_list:
+                if isinstance(cat, str) and cat.strip():
+                    counter[cat.strip().lower()] += 1
+    items = counter.most_common(12)
+    return [DashboardBreakdownItem(name=cat, total=count) for cat, count in items]
