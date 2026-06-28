@@ -1178,7 +1178,16 @@ def execute_source_run_locally(db: Session, source: Source, organization_id: str
     try:
         validate_source_url(source)
         scrape_stats: dict[str, object] = {}
-        opportunities = asyncio.run(_scrape_source_candidates_with_timeout(source, scrape_stats))
+        # FastAPI sync endpoints run in a thread pool. asyncio.run()
+        # in a thread can deadlock with the parent event loop on some
+        # platforms. Use an explicit fresh loop instead.
+        loop = asyncio.new_event_loop()
+        try:
+            opportunities = loop.run_until_complete(
+                _scrape_source_candidates_with_timeout(source, scrape_stats)
+            )
+        finally:
+            loop.close()
         created = 0
         updated = 0
         failed_items = 0
