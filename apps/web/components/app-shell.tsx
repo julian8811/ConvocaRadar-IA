@@ -99,12 +99,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   // let the user retry forever after one transient blip.
   useEffect(() => {
     if (me.isSuccess) {
-      // eslint-disable-next-line react-hooks/set-state-in-effect -- the
-      // "reset only on success" semantics require a side effect because the
-      // trigger (me.isSuccess flipping true) is not a user action; deriving
-      // the flag from the query would conflate "user clicked retry" with
-      // "query had an error" in transient cases.
-      setManualRetryDone(false);
+      setManualRetryDone(false); // eslint-disable-line react-hooks/set-state-in-effect
     }
   }, [me.isSuccess]);
 

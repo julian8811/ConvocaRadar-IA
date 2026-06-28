@@ -5,7 +5,16 @@ test("inicia sesion y carga el panel analitico", async ({ page }) => {
   await page.goto("/login", { waitUntil: "domcontentloaded" });
 
   await expect(page.getByRole("heading", { name: /ConvocaRadar IA/i })).toBeVisible();
-  await page.getByRole("button", { name: /Entrar con cuenta local/i }).click();
+
+  // SEC-1.3: in production builds (NEXT_PUBLIC_ENV=production, the default
+  // in CI's `npm run build && npm run start`) the dev-credentials button
+  // is hidden. Fill the email + password form directly. The seed CLI
+  // creates an admin@convocaradar.io / ConvocaRadarLocal123! local user.
+  const email = process.env.E2E_TEST_EMAIL ?? "admin@convocaradar.io";
+  const password = process.env.E2E_TEST_PASSWORD ?? "ConvocaRadarLocal123!";
+  await page.getByLabel(/correo|email/i).fill(email);
+  await page.getByLabel(/contraseña|password/i).fill(password);
+  await page.getByRole("button", { name: /^Ingresar$/i }).click();
 
   await expect(page).toHaveURL(/\/dashboard$/);
   await expect(page.getByRole("heading", { name: /Panel anal[ií]tico/i })).toBeVisible();
