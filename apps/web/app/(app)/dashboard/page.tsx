@@ -14,7 +14,7 @@ import { HealthZone } from "@/components/dashboard/HealthZone";
 import { PipelineZone } from "@/components/dashboard/PipelineZone";
 import { TriageZone } from "@/components/dashboard/TriageZone";
 
-export function DashboardPage() {
+export default function DashboardPage() {
   return (
     <section className="space-y-6">
       <TriageZone />
@@ -23,5 +23,3 @@ export function DashboardPage() {
     </section>
   );
 }
-
-export default DashboardPage;
