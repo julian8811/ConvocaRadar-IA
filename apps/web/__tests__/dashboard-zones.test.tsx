@@ -107,7 +107,7 @@ describe("Dashboard 3-zone structure (PR B-2)", () => {
       source_alerts: [],
     });
 
-    const { DashboardPage } = await import("@/app/(app)/dashboard/page");
+    const DashboardPage = (await import("@/app/(app)/dashboard/page")).default;
     const Wrapper = makeWrapper();
     const { container } = render(
       <Wrapper>
@@ -155,7 +155,7 @@ describe("Dashboard 3-zone structure (PR B-2)", () => {
       }),
     );
 
-    const { DashboardPage } = await import("@/app/(app)/dashboard/page");
+    const DashboardPage = (await import("@/app/(app)/dashboard/page")).default;
     const Wrapper = makeWrapper();
     render(
       <Wrapper>
@@ -181,7 +181,7 @@ describe("Dashboard 3-zone structure (PR B-2)", () => {
     mockDashboardPipeline.mockReturnValue(pendingPromise());
     mockDashboardHealth.mockReturnValue(pendingPromise());
 
-    const { DashboardPage } = await import("@/app/(app)/dashboard/page");
+    const DashboardPage = (await import("@/app/(app)/dashboard/page")).default;
     const Wrapper = makeWrapper();
     const { container } = render(
       <Wrapper>
