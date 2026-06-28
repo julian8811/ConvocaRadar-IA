@@ -191,36 +191,6 @@ function HeroActionList({ count, hasClosingSoon7d, hasReviewQueue }: {
   );
 }
 
-function ProfileIncompleteBanner({ completeness, missingFields }: {
-  completeness: number;
-  missingFields: string[];
-}) {
-  if (completeness >= 80) return null;
-  return (
-    <Card className="border-cyan-500/30 bg-cyan-500/5">
-      <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
-        <div>
-          <p className="text-sm font-medium text-slate-950 dark:text-white">
-            Perfil al {formatPercent(completeness)} — mejora la compatibilidad de tus scores
-          </p>
-          {missingFields.length > 0 ? (
-            <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-              Falta completar: {missingFields.join(", ")}.
-            </p>
-          ) : null}
-        </div>
-        <Link
-          href="/onboarding"
-          className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-4 text-sm font-medium text-slate-900 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
-        >
-          Completar perfil
-          <ArrowRight className="h-4 w-4" />
-        </Link>
-      </CardContent>
-    </Card>
-  );
-}
-
 function KpiFooter({ kpis }: { kpis: { total_opportunities: number; open_opportunities: number; closing_soon_opportunities: number; high_match_opportunities: number } }) {
   return (
     <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
@@ -258,7 +228,6 @@ export function TriageZone() {
   const data = query.data;
   const closingSoonCount = data.closing_soon_7d?.length ?? 0;
   const reviewCount = data.review_queue?.length ?? 0;
-  const profile = data.profile ?? { completeness: 0, missing_fields: [] };
 
   // kpis: pull from the review queue + closing-soon 7d slice (slim, no entity/status).
   const kpis = {
@@ -270,7 +239,6 @@ export function TriageZone() {
 
   return (
     <div className="space-y-4" data-zone="triage">
-      <ProfileIncompleteBanner completeness={profile.completeness} missingFields={profile.missing_fields} />
       <div id="closing-soon-7d">
         <ClosingSoon7dWidget items={data.closing_soon_7d ?? []} />
       </div>
