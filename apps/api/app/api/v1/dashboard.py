@@ -226,7 +226,9 @@ def get_dashboard_summary(
         )
         or 0
     )
-    embeddings_coverage = round((embeddings_total / total_opportunities) * 100, 1) if total_opportunities else 0.0
+    embeddings_coverage = (
+        round((embeddings_total / total_opportunities) * 100, 1) if total_opportunities else None
+    )
 
     profile = db.scalar(select(OrganizationProfile).where(OrganizationProfile.organization_id == organization.id))
 
