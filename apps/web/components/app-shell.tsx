@@ -97,14 +97,13 @@ export function AppShell({ children }: { children: ReactNode }) {
   // Reset the manual-retry flag only when the query has SUCCEEDED (has data).
   // Resetting on isError=false would clobber the flag during a new fetch and
   // let the user retry forever after one transient blip.
-  //
-  // eslint-disable-next-line react-hooks/set-state-in-effect -- the
-  // "reset only on success" semantics require a side effect because the
-  // trigger (me.isSuccess flipping true) is not a user action; deriving
-  // the flag from the query would conflate "user clicked retry" with
-  // "query had an error" in transient cases.
   useEffect(() => {
     if (me.isSuccess) {
+      // eslint-disable-next-line react-hooks/set-state-in-effect -- the
+      // "reset only on success" semantics require a side effect because the
+      // trigger (me.isSuccess flipping true) is not a user action; deriving
+      // the flag from the query would conflate "user clicked retry" with
+      // "query had an error" in transient cases.
       setManualRetryDone(false);
     }
   }, [me.isSuccess]);
