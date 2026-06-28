@@ -51,7 +51,7 @@ from app.models import (
     Task,
     User,
 )
-from app.schemas import OpportunityCreate, TriageOpportunityItem
+from app.schemas import OpportunityCreate, PipelineOpportunityItem, TriageOpportunityItem
 
 
 def connector_for(source_key: str, base_url: str | None = None, source_type: str | None = None):
@@ -1972,3 +1972,143 @@ def get_closing_soon_7d(
     return items
 
 
+# ---------------------------------------------------------------------------
+# PR B-1b: /dashboard/pipeline helpers
+# ---------------------------------------------------------------------------
+
+
+def _pipeline_days_to_close(close_date: datetime | None) -> int | None:
+    """Compute days_to_close clamped to >= 0 (matches PipelineRead contract).
+
+    Differs from ``_triage_days_to_close`` which can return negative values:
+    pipeline closing_soon MUST NOT include already-closed items, so the
+    contract is "today or later" only. The function still returns ``None``
+    when there is no close_date at all.
+    """
+    if close_date is None:
+        return None
+    now = datetime.now(UTC).replace(tzinfo=None)
+    days = (close_date - now).days
+    return max(days, 0)
+
+
+def get_top_scored(
+    db: Session,
+    organization_id: str,
+    *,
+    limit: int = 8,
+) -> list[PipelineOpportunityItem]:
+    """Return up to ``limit`` highest-scoring opportunities for the org.
+
+    Filter: scored rows for the given org whose underlying opportunity is
+    visible to the org scope. Each item carries the OpportunityScore
+    ``score`` (float) and ``reasons`` (list[str], normalized via
+    ``extract_score_reasons``) so the UI can explain why the score is what
+    it is.
+
+    Order: ``OpportunityScore.score DESC, OpportunityScore.calculated_at DESC``.
+    """
+    stmt = (
+        select(Opportunity, OpportunityScore, Source)
+        .join(
+            OpportunityScore,
+            and_(
+                OpportunityScore.opportunity_id == Opportunity.id,
+                OpportunityScore.organization_id == organization_id,
+            ),
+        )
+        .outerjoin(Source, Source.id == Opportunity.source_id)
+        .where(
+            or_(
+                Opportunity.organization_id == organization_id,
+                Opportunity.organization_id.is_(None),
+            )
+        )
+        .order_by(OpportunityScore.score.desc(), OpportunityScore.calculated_at.desc())
+        .limit(limit)
+    )
+    items: list[PipelineOpportunityItem] = []
+    for opportunity, score, source in db.execute(stmt):
+        items.append(
+            PipelineOpportunityItem(
+                id=opportunity.id,
+                title=opportunity.title,
+                country=opportunity.country,
+                currency=opportunity.funding_amount_currency,
+                funding_amount=opportunity.funding_amount_value,
+                days_to_close=_pipeline_days_to_close(opportunity.close_date),
+                score=score.score,
+                reasons=extract_score_reasons(score.reasons),
+                source_key=source.key if source else None,
+            )
+        )
+    return items
+
+
+def get_closing_soon(
+    db: Session,
+    organization_id: str,
+    *,
+    limit: int = 8,
+    days_window: int = 30,
+) -> list[PipelineOpportunityItem]:
+    """Return up to ``limit`` items closing within the ``days_window``.
+
+    Filter: ``close_date IS NOT NULL`` AND
+            ``(Opportunity.organization_id == org_id OR IS NULL)`` AND
+            ``close_date`` falls on a day in ``[today, today + days_window]``.
+
+    The lower bound uses day-granularity (start of today) so an opportunity
+    that closes later today (close_date = now + 0 days) is included even if
+    the row was written a few milliseconds before the request — the
+    ``days_to_close`` field is exposed as an integer day count and 0 must
+    mean "today", not "in the past".
+
+    Order: ``close_date ASC NULLS LAST`` (soonest first; NULLs are already
+    filtered out by the ``IS NOT NULL`` predicate).
+    """
+    now = datetime.now(UTC).replace(tzinfo=None)
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    # Upper bound is exclusive of the next day: an item closing any time
+    # during the Nth day from today (where N = days_window) is included,
+    # but not anything on the (N+1)th day. This matches the contract
+    # ``0 <= days_to_close <= days_window`` under day-truncated math.
+    cutoff_exclusive = today_start + timedelta(days=days_window + 1)
+    stmt = (
+        select(Opportunity, OpportunityScore, Source)
+        .outerjoin(
+            OpportunityScore,
+            and_(
+                OpportunityScore.opportunity_id == Opportunity.id,
+                OpportunityScore.organization_id == organization_id,
+            ),
+        )
+        .outerjoin(Source, Source.id == Opportunity.source_id)
+        .where(
+            or_(
+                Opportunity.organization_id == organization_id,
+                Opportunity.organization_id.is_(None),
+            ),
+            Opportunity.close_date.is_not(None),
+            Opportunity.close_date >= today_start,
+            Opportunity.close_date < cutoff_exclusive,
+        )
+        .order_by(Opportunity.close_date.asc().nullslast())
+        .limit(limit)
+    )
+    items: list[PipelineOpportunityItem] = []
+    for opportunity, score, source in db.execute(stmt):
+        items.append(
+            PipelineOpportunityItem(
+                id=opportunity.id,
+                title=opportunity.title,
+                country=opportunity.country,
+                currency=opportunity.funding_amount_currency,
+                funding_amount=opportunity.funding_amount_value,
+                days_to_close=_pipeline_days_to_close(opportunity.close_date),
+                score=score.score if score else None,
+                reasons=[],
+                source_key=source.key if source else None,
+            )
+        )
+    return items
