@@ -255,66 +255,52 @@ def get_dashboard_health(
     user: User = Depends(get_current_user),
     org: Organization = Depends(get_current_organization),
 ) -> HealthRead:
-    """PR B-1c: health lane of the dashboard for the consultor persona.
-
-    Returns the operational health view: KPI counts, status/country
-    breakdowns for the chart widgets, the data-coverage strip (with the
-    new nullable ``embeddings_coverage``), and per-source health entries
-    plus the degraded/failing source counts and the top-5 alerts.
-
-    Target latency: <500 ms. The endpoint is read-only and uses the
-    caller's org scope; no cross-org leakage.
-
-    A lightweight in-memory cache (60 s TTL) avoids killing the
-    frontend's 12 s AbortController when the background source sweep
-    is saturating the DB.
-    """
+    """PR B-1c: health lane of the dashboard for the consultor persona."""
     cache_key = f"health:{org.id}"
-    now = time.monotonic()
+    now_time = time.monotonic()
     cached = getattr(app.state, "_health_cache", {})
     entry = cached.get(cache_key)
-    if entry and (now - entry["ts"]) < 60:
+    if entry and (now_time - entry["ts"]) < 60:
         return entry["payload"]
 
-    degraded, failing, source_alerts = get_source_health_summaries(db, org.id)
-    # Analytics fields may fail in test fixtures where the underlying
-    # tables (OpportunityScore, etc.) are empty or absent. Log a warning
-    # and return empty lists rather than 500.
     try:
-        score_dist = get_score_distribution(db, org.id)
+        degraded, failing, source_alerts = get_source_health_summaries(db, org.id)
+        kpis = get_health_kpis(db, org.id)
+        status_bd = get_status_breakdown(db, org.id)
+        country_bd = get_country_breakdown(db, org.id)
+        coverage = get_data_coverage(db, org.id)
+        sources_h = get_sources_health(db, org.id)
+        score_dist = _safe_call(get_score_distribution, db, org.id)
+        funding = _safe_call(get_funding_ranges, db, org.id)
+        contrib = _safe_call(get_source_contribution, db, org.id)
+        timeline = _safe_call(get_opportunities_timeline, db, org.id)
+        cat_dist = _safe_call(get_category_distribution, db, org.id)
+        payload = HealthRead(
+            kpis=kpis, status_breakdown=status_bd, country_breakdown=country_bd,
+            data_coverage=coverage, sources_health=sources_h,
+            failing_sources=failing, degraded_sources=degraded, source_alerts=source_alerts,
+            score_distribution=score_dist, funding_ranges=funding,
+            source_contribution=contrib, opportunities_timeline=timeline,
+            category_distribution=cat_dist,
+        )
+        cached[cache_key] = {"ts": now_time, "payload": payload}
+        app.state._health_cache = cached
+        return payload
     except Exception:
-        score_dist = []
+        # Fallback: return whatever we can without the analytics
+        kpis = get_health_kpis(db, org.id)
+        return HealthRead(
+            kpis=kpis,
+            status_breakdown=get_status_breakdown(db, org.id),
+            country_breakdown=get_country_breakdown(db, org.id),
+            data_coverage=get_data_coverage(db, org.id),
+            sources_health=get_sources_health(db, org.id),
+            failing_sources=0, degraded_sources=0, source_alerts=[],
+        )
+
+
+def _safe_call(fn, db, org_id):
     try:
-        funding = get_funding_ranges(db, org.id)
+        return fn(db, org_id)
     except Exception:
-        funding = []
-    try:
-        contrib = get_source_contribution(db, org.id)
-    except Exception:
-        contrib = []
-    try:
-        timeline = get_opportunities_timeline(db, org.id)
-    except Exception:
-        timeline = []
-    try:
-        cat_dist = get_category_distribution(db, org.id)
-    except Exception:
-        cat_dist = []
-    payload = HealthRead(
-        kpis=get_health_kpis(db, org.id),
-        status_breakdown=get_status_breakdown(db, org.id),
-        country_breakdown=get_country_breakdown(db, org.id),
-        data_coverage=get_data_coverage(db, org.id),
-        sources_health=get_sources_health(db, org.id),
-        failing_sources=failing,
-        degraded_sources=degraded,
-        source_alerts=source_alerts,
-        score_distribution=score_dist,
-        funding_ranges=funding,
-        source_contribution=contrib,
-        opportunities_timeline=timeline,
-        category_distribution=cat_dist,
-    )
-    cached[cache_key] = {"ts": now, "payload": payload}
-    app.state._health_cache = cached
-    return payload
+        return []
