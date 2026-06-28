@@ -14,6 +14,11 @@ const styles: Record<string, string> = {
   medium: "border-indigo-500/30 bg-indigo-500/10 text-indigo-700 dark:text-indigo-200",
   low: "border-amber-500/30 bg-amber-500/10 text-amber-700 dark:text-amber-200",
   not_recommended: "border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-200",
+  // PR B-2: added 3 tones for the new countdown (destructive/medium/muted)
+  // and the review-queue status badge.
+  destructive: "border-rose-500/30 bg-rose-500/10 text-rose-700 dark:text-rose-200",
+  muted: "border-slate-200 bg-slate-100 text-slate-700 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200",
+  review: "border-cyan-500/30 bg-cyan-500/10 text-cyan-700 dark:text-cyan-200",
 };
 
 export function Badge({ className, tone, ...props }: React.HTMLAttributes<HTMLSpanElement> & { tone: string }) {

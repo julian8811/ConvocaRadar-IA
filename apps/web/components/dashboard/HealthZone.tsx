@@ -1,0 +1,253 @@
+/**
+ * PR B-2 (dashboard-redesign): Health zone — sources + data quality.
+ *
+ * Renders:
+ *   1. Source health banner (degraded + failing alerts)
+ *   2. 4 KPI cards in a row (Total / Abiertas / Cierran pronto / Alta compatibilidad)
+ *   3. Status breakdown bar chart (Recharts vertical)
+ *   4. Country breakdown bar chart (Recharts horizontal)
+ *   5. Data coverage strip — 5 mini-stats, with "Sin datos aún" UX for null embeddings
+ */
+"use client";
+
+import { useQuery, keepPreviousData } from "@tanstack/react-query";
+import { AlertTriangle, Database, MapPinned, TrendingUp } from "lucide-react";
+import Link from "next/link";
+import {
+  Bar,
+  BarChart,
+  CartesianGrid,
+  Cell,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from "recharts";
+
+import { Badge } from "@/components/ui/badge";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { ErrorState } from "@/components/ui/state";
+import { api } from "@/lib/api";
+import type { DashboardDataCoverage, HealthRead, SourceHealth } from "@/lib/types";
+import { HealthSkeleton } from "@/components/dashboard/skeletons/HealthSkeleton";
+
+const STATUS_COLORS = ["#16a34a", "#f59e0b", "#64748b", "#94a3b8"];
+const COUNTRY_COLORS = ["#0ea5e9", "#6366f1", "#14b8a6", "#f97316", "#ec4899", "#8b5cf6", "#22c55e", "#eab308"];
+
+function formatNumber(value: number) {
+  return new Intl.NumberFormat("es-CO", { maximumFractionDigits: 0 }).format(value);
+}
+
+function SourceHealthBanner({ degraded, failing, sourceAlerts }: {
+  degraded: number;
+  failing: number;
+  sourceAlerts: HealthRead["source_alerts"];
+}) {
+  const total = degraded + failing;
+  if (total === 0) return null;
+  return (
+    <Card className="border-amber-500/30 bg-amber-500/5">
+      <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex items-start gap-3">
+          <AlertTriangle className="mt-0.5 h-5 w-5 text-amber-600 dark:text-amber-300" />
+          <div>
+            <p className="text-sm font-medium text-slate-950 dark:text-white">
+              {total} fuente{total === 1 ? "" : "s"} requiere{total === 1 ? "" : "n"} atención
+            </p>
+            <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+              {sourceAlerts.map((item) => item.name).join(", ") || "Revisa el estado operativo de tus conectores."}
+            </p>
+          </div>
+        </div>
+        <Link
+          href="/sources"
+          className="inline-flex h-10 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-4 text-sm font-medium text-slate-900 hover:bg-slate-50 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800"
+        >
+          Ver fuentes
+        </Link>
+      </CardContent>
+    </Card>
+  );
+}
+
+function KpiCards({ kpis }: { kpis: HealthRead["kpis"] }) {
+  return (
+    <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+      <Card>
+        <CardContent className="p-4">
+          <p className="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Total convocatorias</p>
+          <p className="mt-1 text-2xl font-semibold text-slate-950 dark:text-white">{formatNumber(kpis.total)}</p>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardContent className="p-4">
+          <p className="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Convocatorias abiertas</p>
+          <p className="mt-1 text-2xl font-semibold text-slate-950 dark:text-white">{formatNumber(kpis.open)}</p>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardContent className="p-4">
+          <p className="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Cierran pronto</p>
+          <p className="mt-1 text-2xl font-semibold text-slate-950 dark:text-white">{formatNumber(kpis.closing_soon)}</p>
+        </CardContent>
+      </Card>
+      <Card>
+        <CardContent className="p-4">
+          <p className="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Alta compatibilidad</p>
+          <p className="mt-1 text-2xl font-semibold text-slate-950 dark:text-white">{formatNumber(kpis.high_match)}</p>
+        </CardContent>
+      </Card>
+    </div>
+  );
+}
+
+function StatusBreakdownChart({ data }: { data: HealthRead["status_breakdown"] }) {
+  if (!data.length) {
+    return (
+      <div className="flex h-full min-h-[280px] flex-col items-center justify-center rounded-lg border border-dashed border-slate-200 bg-slate-100/30 px-6 text-center dark:border-slate-700 dark:bg-slate-800/30">
+        <p className="text-sm font-medium text-slate-950 dark:text-white">Sin convocatorias visibles</p>
+        <p className="mt-1 max-w-md text-sm text-slate-500 dark:text-slate-400">Ejecuta captura o revisa tus fuentes para poblar el tablero.</p>
+      </div>
+    );
+  }
+  return (
+    <ResponsiveContainer width="100%" height="100%">
+      <BarChart data={data} layout="vertical" margin={{ left: 8, right: 16, top: 8, bottom: 8 }}>
+        <CartesianGrid strokeDasharray="3 3" horizontal={false} className="stroke-slate-200 dark:stroke-slate-700" />
+        <XAxis type="number" allowDecimals={false} tick={{ fill: "currentColor", fontSize: 12 }} />
+        <YAxis type="category" dataKey="name" width={110} tick={{ fill: "currentColor", fontSize: 12 }} />
+        <Tooltip
+          formatter={(value: number) => [formatNumber(value), "Convocatorias"]}
+          contentStyle={{ borderRadius: 8, borderColor: "rgba(148,163,184,0.35)" }}
+        />
+        <Bar dataKey="total" radius={[0, 6, 6, 0]}>
+          {data.map((entry, index) => (
+            <Cell key={entry.name} fill={STATUS_COLORS[index % STATUS_COLORS.length]} />
+          ))}
+        </Bar>
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}
+
+function CountryBreakdownChart({ data }: { data: HealthRead["country_breakdown"] }) {
+  if (!data.length) {
+    return (
+      <div className="flex h-full min-h-[280px] flex-col items-center justify-center rounded-lg border border-dashed border-slate-200 bg-slate-100/30 px-6 text-center dark:border-slate-700 dark:bg-slate-800/30">
+        <p className="text-sm font-medium text-slate-950 dark:text-white">Sin distribución por país</p>
+        <p className="mt-1 max-w-md text-sm text-slate-500 dark:text-slate-400">Todavía no hay convocatorias georreferenciadas para graficar.</p>
+      </div>
+    );
+  }
+  return (
+    <ResponsiveContainer width="100%" height="100%">
+      <BarChart data={data} margin={{ left: 8, right: 16, top: 8, bottom: 8 }}>
+        <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-slate-200 dark:stroke-slate-700" />
+        <XAxis dataKey="name" tick={{ fill: "currentColor", fontSize: 11 }} interval={0} angle={-20} textAnchor="end" height={70} />
+        <YAxis allowDecimals={false} tick={{ fill: "currentColor", fontSize: 12 }} />
+        <Tooltip
+          formatter={(value: number) => [formatNumber(value), "Convocatorias"]}
+          contentStyle={{ borderRadius: 8, borderColor: "rgba(148,163,184,0.35)" }}
+        />
+        <Bar dataKey="total" radius={[6, 6, 0, 0]}>
+          {data.map((entry, index) => (
+            <Cell key={entry.name} fill={COUNTRY_COLORS[index % COUNTRY_COLORS.length]} />
+          ))}
+        </Bar>
+      </BarChart>
+    </ResponsiveContainer>
+  );
+}
+
+function DataCoverageStrip({ dataCoverage }: { dataCoverage: DashboardDataCoverage }) {
+  const cells = [
+    { label: "Con resumen", value: formatNumber(dataCoverage.with_summary) },
+    { label: "Con monto", value: formatNumber(dataCoverage.with_amount) },
+    { label: "Con fecha cierre", value: formatNumber(dataCoverage.with_close_date) },
+    { label: "Con fuente", value: formatNumber(dataCoverage.with_source) },
+  ];
+  return (
+    <Card>
+      <CardHeader className="border-b border-slate-200 pb-4 dark:border-slate-700">
+        <CardTitle className="flex items-center gap-2 text-slate-950 dark:text-white">
+          <Database className="h-4 w-4" />
+          Calidad de datos
+        </CardTitle>
+        <CardDescription>Cobertura agregada de campos útiles para alertas y scoring.</CardDescription>
+      </CardHeader>
+      <CardContent className="grid gap-3 pt-5 sm:grid-cols-2 xl:grid-cols-5">
+        {cells.map((c) => (
+          <div key={c.label} className="rounded-md border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+            <p className="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">{c.label}</p>
+            <p className="mt-1 text-lg font-semibold text-slate-950 dark:text-white">{c.value}</p>
+          </div>
+        ))}
+        <div className="rounded-md border border-slate-200 bg-white p-3 dark:border-slate-800 dark:bg-slate-900">
+          <p className="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Cobertura embeddings</p>
+          {dataCoverage.embeddings_coverage === null ? (
+            <p className="mt-1 text-lg font-semibold text-slate-500 dark:text-slate-400">Sin datos aún</p>
+          ) : (
+            <p className="mt-1 text-lg font-semibold text-slate-950 dark:text-white">
+              {Math.round(dataCoverage.embeddings_coverage * 10) / 10}%
+            </p>
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+export function HealthZone() {
+  const query = useQuery<HealthRead>({
+    queryKey: ["dashboard-health"],
+    queryFn: api.dashboardHealth,
+    placeholderData: keepPreviousData,
+  });
+
+  if (query.isLoading) return <HealthSkeleton />;
+  if (query.error) return <ErrorState message={query.error.message} />;
+  if (!query.data) return null;
+
+  const data = query.data;
+
+  return (
+    <div className="space-y-4" data-zone="health">
+      <SourceHealthBanner
+        degraded={data.degraded_sources}
+        failing={data.failing_sources}
+        sourceAlerts={data.source_alerts}
+      />
+      <KpiCards kpis={data.kpis} />
+      <div className="grid gap-4 xl:grid-cols-2">
+        <Card>
+          <CardHeader className="border-b border-slate-200 pb-4 dark:border-slate-700">
+            <CardTitle className="flex items-center gap-2 text-slate-950 dark:text-white">
+              <TrendingUp className="h-4 w-4" />
+              Estado de convocatorias
+            </CardTitle>
+            <CardDescription>Distribución agregada en servidor, sin muestreo parcial.</CardDescription>
+          </CardHeader>
+          <CardContent className="h-[320px] pt-5">
+            <StatusBreakdownChart data={data.status_breakdown} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="border-b border-slate-200 pb-4 dark:border-slate-700">
+            <CardTitle className="flex items-center gap-2 text-slate-950 dark:text-white">
+              <MapPinned className="h-4 w-4" />
+              Convocatorias por país
+            </CardTitle>
+            <CardDescription>Top países con mayor volumen detectado.</CardDescription>
+          </CardHeader>
+          <CardContent className="h-[320px] pt-5">
+            <CountryBreakdownChart data={data.country_breakdown} />
+          </CardContent>
+        </Card>
+      </div>
+      <DataCoverageStrip dataCoverage={data.data_coverage} />
+      {/* Suppress unused-import warnings for types we re-export indirectly. */}
+      <span className="hidden" data-source-health-count={(data.sources_health as SourceHealth[]).length} />
+    </div>
+  );
+}
