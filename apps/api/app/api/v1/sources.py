@@ -241,22 +241,22 @@ def run_all_sources(
         )
     )
     runs: list[SourceRun] = []
-    errors: list[dict[str, str]] = []
     for source in sources:
         if not source_due_for_scraping(source):
             continue
         try:
-            run = schedule_or_execute_source_run(db, source, organization_id=organization.id)
+            run = execute_source_run_locally(db, source, organization_id=organization.id)
             audit(db, "run_source", "source_run", user, run.id)
             runs.append(run)
         except Exception as exc:
             db.rollback()
             key = source.key or source.id
-            errors.append({"source": key, "error": str(exc)})
             logger.warning("source_run_all_skipped", source=key, error=str(exc))
     db.commit()
-    if errors:
-        logger.warning("source_run_all_partial", total=len(sources), run=len(runs), errors=len(errors))
+    if not runs:
+        last = max((s.last_run_at for s in sources if s.last_run_at), default=None)
+        detail = "All sources are within their scraping cooldown. Last run: " + (str(last) if last else "never")
+        logger.info("source_run_all_none_due", detail=detail)
     return runs
 
 
