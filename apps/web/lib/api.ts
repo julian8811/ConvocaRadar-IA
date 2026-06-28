@@ -282,5 +282,17 @@ export const api = {
   retryDegradedSources: () =>
     request<{ sources_checked: number; scheduled: number; skipped: number }>("/admin/sources/retry-degraded", { method: "POST" }),
   bootstrapData: () => request<Record<string, string | number>>("/admin/bootstrap-data", { method: "POST" }),
+  summarizeAllOpportunities: (limit = 10) =>
+    request<{ processed: number; summarized: number }>(
+      `/admin/opportunities/summarize-all?limit=${limit}`,
+      { method: "POST" },
+    ),
+  scoreAllOpportunities: (limit = 10) =>
+    request<{ processed: number; scored: number }>(
+      `/admin/opportunities/score-all?limit=${limit}`,
+      { method: "POST" },
+    ),
+  sendWeeklyDigest: () =>
+    request<{ delivered: boolean; opportunities: number }>("/admin/alerts/send-digest", { method: "POST" }),
   tasks: () => request<Task[]>("/tasks"),
 };

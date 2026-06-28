@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, Activity, Database, RefreshCcw, ShieldCheck, WandSparkles } from "lucide-react";
+import { AlertTriangle, Activity, Database, Mail, RefreshCcw, ShieldCheck, Sparkles, WandSparkles } from "lucide-react";
 import type { ElementType } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
@@ -40,6 +40,37 @@ export default function AdminPage() {
       await queryClient.invalidateQueries();
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "No se pudo ejecutar el bootstrap"),
+  });
+
+  const summarizeAll = useMutation({
+    mutationFn: () => api.summarizeAllOpportunities(10),
+    onSuccess: async (payload) => {
+      toast.success(`Resúmenes generados: ${payload.summarized}/${payload.processed}`);
+      await queryClient.invalidateQueries({ queryKey: ["opportunities"] });
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "No se pudieron generar resúmenes"),
+  });
+
+  const scoreAll = useMutation({
+    mutationFn: () => api.scoreAllOpportunities(10),
+    onSuccess: async (payload) => {
+      toast.success(`Compatibilidades calculadas: ${payload.scored}/${payload.processed}`);
+      await queryClient.invalidateQueries({ queryKey: ["admin-metrics"] });
+      await queryClient.invalidateQueries({ queryKey: ["dashboard"] });
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "No se pudieron calcular compatibilidades"),
+  });
+
+  const sendDigest = useMutation({
+    mutationFn: api.sendWeeklyDigest,
+    onSuccess: (payload) => {
+      toast.success(
+        payload.delivered
+          ? `Resumen enviado (${payload.opportunities} oportunidades)`
+          : `Resumen registrado (${payload.opportunities} oportunidades, SMTP en dry-run)`,
+      );
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "No se pudo enviar el resumen"),
   });
 
   if (
@@ -104,6 +135,42 @@ export default function AdminPage() {
         <AdminCard icon={Database} title="Fuentes configuradas" value={String(sources.data?.length ?? 0)} detail="Incluye fuentes globales y de organización" />
         <AdminCard icon={WandSparkles} title="Tareas registradas" value={String(tasks.data?.length ?? 0)} detail="Scraping, IA, reportes y alertas" />
       </div>
+
+      <Card>
+        <CardHeader className="border-b border-slate-200 dark:border-slate-700 pb-4">
+          <CardTitle className="flex items-center gap-2 text-slate-950 dark:text-white">
+            <Sparkles className="h-4 w-4" />
+            Funciones de IA
+          </CardTitle>
+          <CardDescription>Acciones batch sobre oportunidades y resúmenes semanales.</CardDescription>
+        </CardHeader>
+        <CardContent className="grid gap-3 pt-5 sm:grid-cols-2 lg:grid-cols-3">
+          <ActionTile
+            icon={Sparkles}
+            title="Resumir oportunidades"
+            description="Genera resúmenes con IA para las oportunidades activas que aún no tienen resumen (máx. 10 por lote para respetar la cuota gratuita de Gemini)."
+            buttonLabel={summarizeAll.isPending ? "Resumiendo..." : "Resumir todas (10)"}
+            onClick={() => summarizeAll.mutate()}
+            disabled={summarizeAll.isPending}
+          />
+          <ActionTile
+            icon={WandSparkles}
+            title="Calcular compatibilidad"
+            description="Calcula la compatibilidad con el perfil para las oportunidades que aún no han sido evaluadas (máx. 10 por lote)."
+            buttonLabel={scoreAll.isPending ? "Calculando..." : "Calcular todas (10)"}
+            onClick={() => scoreAll.mutate()}
+            disabled={scoreAll.isPending}
+          />
+          <ActionTile
+            icon={Mail}
+            title="Enviar resumen semanal"
+            description="Genera y envía manualmente el digest semanal a los administradores de la organización (últimos 7 días, top 5)."
+            buttonLabel={sendDigest.isPending ? "Enviando..." : "Enviar resumen"}
+            onClick={() => sendDigest.mutate()}
+            disabled={sendDigest.isPending}
+          />
+        </CardContent>
+      </Card>
 
       <div className="grid gap-4 md:grid-cols-4">
         <MetricCard label="Fuentes sanas" value={healthCounts.healthy} detail="Operando con normalidad" />
@@ -261,5 +328,34 @@ function MetricCard({ label, value, detail }: { label: string; value: number; de
         <p className="text-xs text-slate-500 dark:text-slate-400">{detail}</p>
       </CardContent>
     </Card>
+  );
+}
+
+function ActionTile({
+  icon: Icon,
+  title,
+  description,
+  buttonLabel,
+  onClick,
+  disabled,
+}: {
+  icon: ElementType;
+  title: string;
+  description: string;
+  buttonLabel: string;
+  onClick: () => void;
+  disabled: boolean;
+}) {
+  return (
+    <div className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4">
+      <div className="flex items-center gap-2 text-slate-950 dark:text-white">
+        <Icon className="h-4 w-4" />
+        <p className="text-sm font-medium">{title}</p>
+      </div>
+      <p className="mt-2 text-xs leading-5 text-slate-500 dark:text-slate-400">{description}</p>
+      <Button className="mt-3 w-full" variant="outline" onClick={onClick} disabled={disabled}>
+        {buttonLabel}
+      </Button>
+    </div>
   );
 }
