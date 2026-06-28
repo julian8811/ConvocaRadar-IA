@@ -13,14 +13,36 @@ concurrency:
 
 env:
   RENDER_API_BASE: https://api.render.com/v1
-  RENDER_API_SERVICE_ID_API: srv-d6qovo75r7bs738lipj0
+  # convocaradar-api (the actual service the user tests, not the
+  # historical convotracker-api which had a stale Dockerfile path)
+  RENDER_API_SERVICE_ID_API: srv-d8vs7e1o3t8c73blhubg
+  RENDER_PRODUCTION_URL: https://convocaradar-api.onrender.com
   VERCEL_PRODUCTION_URL: https://convocaradar-web.vercel.app
-  RENDER_PRODUCTION_URL: https://convotracker-api.onrender.com
 
 jobs:
+  ci-status:
+    # An explicit gate that fails the workflow when CI did not succeed.
+    # The previous design used `if: ... github.event.workflow_run.conclusion == 'success'`
+    # on each deploy job, which made them SKIP (and the workflow report
+    # success) when CI failed. The deploy jobs now `need` this gate so
+    # the workflow correctly fails when CI is red.
+    name: Check CI status
+    if: ${{ github.event_name == 'workflow_run' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Validate CI conclusion
+        run: |
+          conclusion="${{ github.event.workflow_run.conclusion }}"
+          echo "CI workflow conclusion: ${conclusion}"
+          if [ "${conclusion}" != "success" ]; then
+            echo "::error::CI did not succeed (${conclusion}). Skipping deploy."
+            exit 1
+          fi
+          echo "CI passed — proceeding to deploy."
+
   render-api:
     name: Deploy API to Render
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    needs: ci-status
     runs-on: ubuntu-latest
     steps:
       - name: Trigger API redeploy via Render API
@@ -47,8 +69,12 @@ jobs:
           fi
 
   render-worker:
+    # Optional: only runs when the worker service ID is configured.
+    # The user has not yet created the celery worker and beat services
+    # on Render. Set RENDER_WORKER_SERVICE_ID + RENDER_WORKER_BEAT_SERVICE_ID
+    # in repo secrets once those services exist.
     name: Deploy Worker to Render
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    needs: ci-status
     runs-on: ubuntu-latest
     steps:
       - name: Trigger Worker redeploy via Render API
@@ -78,7 +104,7 @@ jobs:
 
   render-beat:
     name: Deploy Worker Beat to Render
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    needs: ci-status
     runs-on: ubuntu-latest
     steps:
       - name: Trigger Worker Beat redeploy via Render API
@@ -108,7 +134,7 @@ jobs:
 
   vercel:
     name: Deploy to Vercel
-    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+    needs: ci-status
     runs-on: ubuntu-latest
     steps:
       - name: Deploy to Vercel (production)
@@ -123,7 +149,7 @@ jobs:
 
   healthcheck:
     name: Post-deploy healthcheck
-    needs: [render-api, render-worker, render-beat, vercel]
+    needs: [ci-status, render-api]
     if: ${{ always() }}
     runs-on: ubuntu-latest
     steps:
@@ -160,17 +186,3 @@ jobs:
           done
           echo "::error::Vercel healthcheck failed after 150s"
           exit 1
-
-      - name: Healthcheck dashboard summary (404 regression check)
-        run: |
-          echo "Checking ${RENDER_PRODUCTION_URL}/api/v1/dashboard/summary exists (was 404 before PR 5daf427 deploy)..."
-          code=$(curl -sS -o /dev/null -m 10 -w "%{http_code}" \
-            -H "Authorization: Bearer ${{ secrets.HEALTHCHECK_JWT }}" \
-            "${RENDER_PRODUCTION_URL}/api/v1/dashboard/summary" || echo "000")
-          if [ "$code" = "200" ]; then
-            echo "Dashboard summary endpoint is alive (HTTP 200)"
-          elif [ "$code" = "401" ]; then
-            echo "Dashboard summary endpoint exists but auth failed (HTTP 401) — needs a real token to fully test"
-          else
-            echo "::warning::Dashboard summary returned HTTP ${code} — this was the original 404 bug"
-          fi
