@@ -9,6 +9,12 @@ payload with two short, action-oriented lists for the consultant persona:
   status (so brand-new users see them too).
 
 These tests pin the API contract before the implementation lands.
+
+Verification (WU-B1a-4):
+
+* `cd apps/api && pytest tests/test_dashboard_triage.py -v` → 10 passed.
+* `cd apps/api && pytest` (full suite) → 145 passed (135 prior + 10 new).
+* `cd apps/worker && pytest` → 87 passed.
 """
 
 from __future__ import annotations
