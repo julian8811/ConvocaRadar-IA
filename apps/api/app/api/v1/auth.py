@@ -1,16 +1,18 @@
 from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
+import structlog
 
 from app.api.deps import TOKEN_COOKIE_NAME, get_current_user
 from app.core.security import create_access_token, hash_password, verify_password
+from app.core.task_queue import enqueue_seed_default_sources
 from app.db.session import get_db
-from app.db.seed import seed_default_sources
 from app.models import Organization, OrganizationProfile, Role, User
 from app.schemas import LoginRequest, RegisterRequest, Token, UserRead
 from app.services import slugify
 
 router = APIRouter()
+logger = structlog.get_logger(__name__)
 
 # Cookie name and lifetime for JWT auth (SEC-1.5). Name comes from deps to
 # avoid an import cycle; the lifetime is local to this module.
@@ -77,8 +79,21 @@ def register(payload: RegisterRequest, response: Response, db: Session = Depends
         role=Role.member.value,
     )
     db.add(user)
-    seed_default_sources(db, organization)
     db.commit()
+    # GAP-1: decouple source seeding from the request path. The Celery
+    # task is idempotent (uses check-then-update on (organization_id, key))
+    # so races with the bootstrap.py startup sweep are safe. The helper
+    # already logs a warning inside the broker-down path; we also surface
+    # a request-path warning when the helper returns None so on-call sees
+    # the broker outage even if the helper's internal log is lost.
+    task_id = enqueue_seed_default_sources(organization.id)
+    if task_id is None:
+        logger.warning(
+            "seed_default_sources_enqueue_skipped",
+            org_id=organization.id,
+            user_id=user.id,
+            hint="broker may be down; bootstrap.py startup sweep will retry",
+        )
     token_str = create_access_token(user.id, {"organization_id": organization.id})
     _set_token_cookie(response, token_str)
     # Keep returning the token in the JSON body for legacy clients (SEC-1.5).

@@ -27,3 +27,4 @@ test_storage/
 *.p12
 *.crt
 *.cer
+.sdd-apply-env.sh
