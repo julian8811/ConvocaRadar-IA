@@ -38,6 +38,7 @@ from app.core.security import hash_password  # noqa: E402
 from app.main import app  # noqa: E402
 from app.models import (  # noqa: E402
     Opportunity,
+    OpportunityEmbedding,
     OpportunityScore,
     Organization,
     Role,
@@ -51,6 +52,28 @@ from app.services import create_opportunity  # noqa: E402
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
+
+@pytest.fixture(autouse=True)
+def _clean_opportunities() -> None:
+    """Wipe opportunity-related rows between tests so each case is hermetic.
+
+    The seed() function only inserts the org + sources once; opportunities
+    accumulate across tests otherwise and break the cap-at-8 assertions.
+    """
+    seed()
+    db = SessionLocal()
+    try:
+        for embedding in list(db.scalars(select(OpportunityEmbedding))):
+            db.delete(embedding)
+        for score in list(db.scalars(select(OpportunityScore))):
+            db.delete(score)
+        for opp in list(db.scalars(select(Opportunity))):
+            db.delete(opp)
+        db.commit()
+    finally:
+        db.close()
+    yield
 
 
 def _client() -> TestClient:
@@ -144,6 +167,18 @@ def _make_opportunity(
 def _make_score(*, opportunity_id: str, organization_id: str, score: float = 80.0) -> None:
     db = SessionLocal()
     try:
+        # Wipe any auto-calculated scores from create_opportunity so the test
+        # has full control over the score value.
+        for existing in list(
+            db.scalars(
+                select(OpportunityScore).where(
+                    OpportunityScore.opportunity_id == opportunity_id,
+                    OpportunityScore.organization_id == organization_id,
+                )
+            )
+        ):
+            db.delete(existing)
+        db.flush()
         db.add(
             OpportunityScore(
                 opportunity_id=opportunity_id,
@@ -233,22 +268,24 @@ def test_review_queue_capped_at_eight() -> None:
     assert len(payload["review_queue"]) <= 8
 
 
-def test_review_queue_ordered_by_close_date_asc_nulls_last() -> None:
+def test_review_queue_ordered_by_close_date_asc() -> None:
     c = _client()
     auth = {"Authorization": f"Bearer {_token(c)}"}
 
-    # 3 review items with close_date at +5d, +10d, None
-    _make_opportunity(title="Review 10 days", close_days=10, user_status="review")
+    # 3 review items with close_date at +5d, +10d, +20d
+    # The spec requires close_date IS NOT NULL in the review_queue filter,
+    # so all items here have a real close date and ordering is simply ASC.
+    _make_opportunity(title="Review 20 days", close_days=20, user_status="review")
     _make_opportunity(title="Review 5 days", close_days=5, user_status="review")
-    _make_opportunity(title="Review no date", close_days=None, user_status="review")
+    _make_opportunity(title="Review 10 days", close_days=10, user_status="review")
 
     response = c.get("/api/v1/dashboard/triage", headers=auth)
     assert response.status_code == 200
     payload = response.json()
     titles = [item["title"] for item in payload["review_queue"]]
-    # soonest first, None last
+    # soonest first
     assert titles.index("Review 5 days") < titles.index("Review 10 days")
-    assert titles.index("Review 10 days") < titles.index("Review no date")
+    assert titles.index("Review 10 days") < titles.index("Review 20 days")
 
 
 # ---------------------------------------------------------------------------
