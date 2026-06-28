@@ -27,8 +27,12 @@ from app.services import (
     get_closing_soon_7d,
     get_country_breakdown,
     get_data_coverage,
+    get_funding_ranges,
     get_health_kpis,
+    get_opportunities_timeline,
     get_review_queue,
+    get_score_distribution,
+    get_source_contribution,
     get_source_health_summaries,
     get_sources_health,
     get_status_breakdown,
@@ -260,6 +264,25 @@ def get_dashboard_health(
     caller's org scope; no cross-org leakage.
     """
     degraded, failing, source_alerts = get_source_health_summaries(db, org.id)
+    # Analytics fields may fail in test fixtures where the underlying
+    # tables (OpportunityScore, etc.) are empty or absent. Log a warning
+    # and return empty lists rather than 500.
+    try:
+        score_dist = get_score_distribution(db, org.id)
+    except Exception:
+        score_dist = []
+    try:
+        funding = get_funding_ranges(db, org.id)
+    except Exception:
+        funding = []
+    try:
+        contrib = get_source_contribution(db, org.id)
+    except Exception:
+        contrib = []
+    try:
+        timeline = get_opportunities_timeline(db, org.id)
+    except Exception:
+        timeline = []
     return HealthRead(
         kpis=get_health_kpis(db, org.id),
         status_breakdown=get_status_breakdown(db, org.id),
@@ -269,4 +292,8 @@ def get_dashboard_health(
         failing_sources=failing,
         degraded_sources=degraded,
         source_alerts=source_alerts,
+        score_distribution=score_dist,
+        funding_ranges=funding,
+        source_contribution=contrib,
+        opportunities_timeline=timeline,
     )

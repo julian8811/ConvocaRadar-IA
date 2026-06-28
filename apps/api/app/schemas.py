@@ -514,6 +514,11 @@ class HealthRead(BaseModel):
     failing_sources: int
     degraded_sources: int
     source_alerts: list[DashboardSourceAlert]
+    # Analytics charts (new — PR analytics-dashboard)
+    score_distribution: list[DashboardBreakdownItem] = []
+    funding_ranges: list[DashboardBreakdownItem] = []
+    source_contribution: list[DashboardBreakdownItem] = []
+    opportunities_timeline: list[DashboardBreakdownItem] = []
 
 
 class AiOpportunityExtract(BaseModel):

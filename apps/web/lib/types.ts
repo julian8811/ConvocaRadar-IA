@@ -322,6 +322,11 @@ export type HealthRead = {
   failing_sources: number;
   degraded_sources: number;
   source_alerts: DashboardSourceAlert[];
+  // Analytics charts (PR analytics-dashboard)
+  score_distribution: DashboardBreakdownItem[];
+  funding_ranges: DashboardBreakdownItem[];
+  source_contribution: DashboardBreakdownItem[];
+  opportunities_timeline: DashboardBreakdownItem[];
 };
 
 /**

@@ -25,6 +25,9 @@ import type { DashboardDataCoverage, HealthRead, SourceHealth } from "@/lib/type
 import { HealthSkeleton } from "@/components/dashboard/skeletons/HealthSkeleton";
 import { PlotlyCountryChart } from "@/components/dashboard/charts/PlotlyCountryChart";
 import { PlotlyStatusChart } from "@/components/dashboard/charts/PlotlyStatusChart";
+import { PlotlyScoreChart } from "@/components/dashboard/charts/PlotlyScoreChart";
+import { PlotlyFundingChart } from "@/components/dashboard/charts/PlotlyFundingChart";
+import { PlotlySourceChart } from "@/components/dashboard/charts/PlotlySourceChart";
 
 function formatNumber(value: number) {
   return new Intl.NumberFormat("es-CO", { maximumFractionDigits: 0 }).format(value);
@@ -181,6 +184,50 @@ export function HealthZone() {
           </CardContent>
         </Card>
       </div>
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        <Card>
+          <CardHeader className="border-b border-slate-200 pb-4 dark:border-slate-700">
+            <CardTitle className="flex items-center gap-2 text-slate-950 dark:text-white">
+              <TrendingUp className="h-4 w-4" />
+              Distribución de scores
+            </CardTitle>
+            <CardDescription>Cuántas convocatorias en cada rango de compatibilidad.</CardDescription>
+          </CardHeader>
+          <CardContent className="pt-5">
+            <PlotlyScoreChart data={data.score_distribution} />
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader className="border-b border-slate-200 pb-4 dark:border-slate-700">
+            <CardTitle className="flex items-center gap-2 text-slate-950 dark:text-white">
+              <TrendingUp className="h-4 w-4" />
+              Rangos de financiamiento
+            </CardTitle>
+            <CardDescription>Distribución por monto de financiamiento.</CardDescription>
+          </CardHeader>
+          <CardContent className="pt-5">
+            <PlotlyFundingChart data={data.funding_ranges} />
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-1">
+        <Card>
+          <CardHeader className="border-b border-slate-200 pb-4 dark:border-slate-700">
+            <CardTitle className="flex items-center gap-2 text-slate-950 dark:text-white">
+              <Database className="h-4 w-4" />
+              Contribución por fuente
+            </CardTitle>
+            <CardDescription>Top fuentes que más convocatorias aportan.</CardDescription>
+          </CardHeader>
+          <CardContent className="pt-5">
+            <PlotlySourceChart data={data.source_contribution} />
+          </CardContent>
+        </Card>
+      </div>
+
       <DataCoverageStrip dataCoverage={data.data_coverage} />
       {/* Suppress unused-import warnings for types we re-export indirectly. */}
       <span className="hidden" data-source-health-count={(data.sources_health as SourceHealth[]).length} />

@@ -1,0 +1,2 @@
+[console_scripts]
+convocaradar-seed-admin = app.db.seed_admin:main
