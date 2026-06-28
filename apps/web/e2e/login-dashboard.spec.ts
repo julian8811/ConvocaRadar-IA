@@ -2,10 +2,11 @@ import { expect, test } from "@playwright/test";
 
 /**
  * PR B-2 (dashboard-redesign): the dashboard is now 3 zones
- * (Triage / Pipeline / Health). The legacy 4 KPI labels are demoted
- * into a <details> summary ("Ver resumen numérico") inside the Triage
- * zone. To assert the legacy strings "Convocatorias abiertas" and
- * "Alta compatibilidad" the test must first open the details element.
+ * (Triage / Pipeline / Health). The legacy 4 KPI labels live in the
+ * HealthZone as the 4 stat cards (they no longer sit in a collapsible
+ * inside the Triage zone). We assert them directly without opening
+ * any <details> because the HealthZone renders them as soon as the
+ * data resolves.
  */
 test("inicia sesion y carga el panel analitico", async ({ page }) => {
   test.setTimeout(120_000);
@@ -30,9 +31,8 @@ test("inicia sesion y carga el panel analitico", async ({ page }) => {
   await expect(page.getByText(/top compatibilidad/i)).toBeVisible();
   await expect(page.getByText(/estado de convocatorias/i)).toBeVisible();
 
-  // The legacy KPI labels now live inside a <details> summary in the
-  // Triage zone. Open it before asserting.
-  await page.locator('summary:has-text("Ver resumen numérico")').click();
+  // The legacy KPI labels are now in the HealthZone's 4 stat cards.
+  // They render as soon as the data resolves (no collapsible to open).
   await expect(page.getByText(/Convocatorias abiertas/i)).toBeVisible();
   await expect(page.getByText(/Alta compatibilidad/i)).toBeVisible();
 
