@@ -2,6 +2,8 @@ from contextlib import asynccontextmanager
 from collections.abc import AsyncIterator
 from collections import defaultdict, deque
 import logging
+import os
+import subprocess
 import time
 
 import httpx
@@ -42,11 +44,74 @@ if settings.sentry_dsn:
         logger.warning("Sentry DSN configured but sentry-sdk is not installed")
 
 
+# In-process Celery worker + beat. Render's free plan does not allow
+# background workers, so we run the Celery worker as a child process
+# inside the API container. Both share the same Python interpreter
+# and the same Redis broker; the worker picks up tasks enqueued by
+# the API (e.g. seed_default_sources_for_org on register). beat
+# schedules the periodic 30-min scrape + 5-min alert sweep.
+_INPROCESS_CELERY_WORKER: subprocess.Popen | None = None
+_INPROCESS_CELERY_BEAT: subprocess.Popen | None = None
+
+
+def _start_inprocess_celery() -> None:
+    """Spawn Celery worker + beat as detached subprocesses.
+
+    Failures are non-fatal: the API must keep starting even if Redis
+    is unreachable, because bootstrap.py will retry there too. Logs go
+    to /tmp/celery-{worker,beat}.log so they show up in Render's
+    "Logs" tab alongside the API's stdout.
+    """
+    global _INPROCESS_CELERY_WORKER, _INPROCESS_CELERY_BEAT
+    if os.getenv("DISABLE_INPROCESS_CELERY") == "1":
+        return
+    common = ["celery", "-A", "worker.app.celery_app", "--loglevel=info"]
+    try:
+        _INPROCESS_CELERY_WORKER = subprocess.Popen(
+            common + ["worker"],
+            stdout=open("/tmp/celery-worker.log", "ab"),
+            stderr=subprocess.STDOUT,
+        )
+        struct_logger.info("inprocess_celery_worker_started", pid=_INPROCESS_CELERY_WORKER.pid)
+    except Exception as exc:  # pragma: no cover - defensive
+        struct_logger.warning("inprocess_celery_worker_start_failed", error=str(exc))
+    try:
+        _INPROCESS_CELERY_BEAT = subprocess.Popen(
+            common + ["beat"],
+            stdout=open("/tmp/celery-beat.log", "ab"),
+            stderr=subprocess.STDOUT,
+        )
+        struct_logger.info("inprocess_celery_beat_started", pid=_INPROCESS_CELERY_BEAT.pid)
+    except Exception as exc:  # pragma: no cover - defensive
+        struct_logger.warning("inprocess_celery_beat_start_failed", error=str(exc))
+
+
+def _stop_inprocess_celery() -> None:
+    """Terminate the worker + beat subprocesses on API shutdown."""
+    for proc, name in [
+        (_INPROCESS_CELERY_WORKER, "celery_worker"),
+        (_INPROCESS_CELERY_BEAT, "celery_beat"),
+    ]:
+        if proc is None or proc.poll() is not None:
+            continue
+        try:
+            proc.terminate()
+            proc.wait(timeout=10)
+            struct_logger.info("inprocess_celery_stopped", component=name, pid=proc.pid)
+        except subprocess.TimeoutExpired:
+            proc.kill()
+            struct_logger.warning("inprocess_celery_killed_after_timeout", component=name)
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     create_all()
     ensure_bootstrap_data()
-    yield
+    _start_inprocess_celery()
+    try:
+        yield
+    finally:
+        _stop_inprocess_celery()
 
 
 app = FastAPI(title=settings.app_name, version="0.1.0", lifespan=lifespan)
