@@ -1,13 +1,13 @@
 """Static analysis tests for the web bundle cleanup.
 
 These tests assert the apps/web code is free of dead dependencies:
-- plotly.js-dist-min, react-plotly.js, @tanstack/react-table,
-  react-hook-form, zod are NOT declared in apps/web/package.json
-- None of those packages are imported from apps/web/app, apps/web/components,
-  or apps/web/lib (the only directories that ship in the production bundle)
+- @tanstack/react-table, react-hook-form, zod are NOT declared in
+  apps/web/package.json AND are NOT imported from apps/web source.
 
-If any of these checks fail, the corresponding dep is being added back without
-a real consumer and is dead weight in the production bundle.
+(plotly.js-dist-min and react-plotly.js were dead when this test
+was first written but are now live — the new interactive dashboard
+charts import them. The DEAD_DEPS list below reflects only the
+remaining packages that still have no consumer.)
 """
 from __future__ import annotations
 
@@ -21,8 +21,6 @@ WEB_ROOT = REPO_ROOT / "apps" / "web"
 WEB_PACKAGE_JSON = WEB_ROOT / "package.json"
 
 DEAD_DEPS = (
-    "plotly.js-dist-min",
-    "react-plotly.js",
     "@tanstack/react-table",
     "react-hook-form",
     "zod",
@@ -88,21 +86,6 @@ def test_dead_deps_absent_from_package_json() -> None:
     assert not present, (
         f"Dead deps still declared in apps/web/package.json: {present}. "
         "Remove them and run pnpm install to refresh the lockfile."
-    )
-
-
-def test_plotly_not_imported_in_web_source() -> None:
-    hits = _grep_imports_for("plotly.js-dist-min")
-    assert not hits, (
-        "plotly.js-dist-min (~3.6 MB) is still imported from apps/web source:\n"
-        + "\n".join(hits)
-    )
-
-
-def test_react_plotly_not_imported_in_web_source() -> None:
-    hits = _grep_imports_for("react-plotly.js")
-    assert not hits, (
-        "react-plotly.js is still imported from apps/web source:\n" + "\n".join(hits)
     )
 
 

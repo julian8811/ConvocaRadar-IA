@@ -4,35 +4,27 @@
  * Renders:
  *   1. Source health banner (degraded + failing alerts)
  *   2. 4 KPI cards in a row (Total / Abiertas / Cierran pronto / Alta compatibilidad)
- *   3. Status breakdown bar chart (Recharts vertical)
- *   4. Country breakdown bar chart (Recharts horizontal)
+ *   3. Status breakdown donut chart (Plotly interactive)
+ *   4. Country breakdown horizontal bar chart (Plotly interactive)
  *   5. Data coverage strip — 5 mini-stats, with "Sin datos aún" UX for null embeddings
+ *
+ * All charts are rendered client-side with Plotly via dynamic import
+ * (SSR-safe, ~3.6 MB bundle loaded on-demand). Hover, click, and zoom
+ * are interactive out of the box.
  */
 "use client";
 
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
 import { AlertTriangle, Database, MapPinned, TrendingUp } from "lucide-react";
 import Link from "next/link";
-import {
-  Bar,
-  BarChart,
-  CartesianGrid,
-  Cell,
-  ResponsiveContainer,
-  Tooltip,
-  XAxis,
-  YAxis,
-} from "recharts";
 
-import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ErrorState } from "@/components/ui/state";
 import { api } from "@/lib/api";
 import type { DashboardDataCoverage, HealthRead, SourceHealth } from "@/lib/types";
 import { HealthSkeleton } from "@/components/dashboard/skeletons/HealthSkeleton";
-
-const STATUS_COLORS = ["#16a34a", "#f59e0b", "#64748b", "#94a3b8"];
-const COUNTRY_COLORS = ["#0ea5e9", "#6366f1", "#14b8a6", "#f97316", "#ec4899", "#8b5cf6", "#22c55e", "#eab308"];
+import { PlotlyCountryChart } from "@/components/dashboard/charts/PlotlyCountryChart";
+import { PlotlyStatusChart } from "@/components/dashboard/charts/PlotlyStatusChart";
 
 function formatNumber(value: number) {
   return new Intl.NumberFormat("es-CO", { maximumFractionDigits: 0 }).format(value);
@@ -101,63 +93,7 @@ function KpiCards({ kpis }: { kpis: HealthRead["kpis"] }) {
   );
 }
 
-function StatusBreakdownChart({ data }: { data: HealthRead["status_breakdown"] }) {
-  if (!data.length) {
-    return (
-      <div className="flex h-full min-h-[280px] flex-col items-center justify-center rounded-lg border border-dashed border-slate-200 bg-slate-100/30 px-6 text-center dark:border-slate-700 dark:bg-slate-800/30">
-        <p className="text-sm font-medium text-slate-950 dark:text-white">Sin convocatorias visibles</p>
-        <p className="mt-1 max-w-md text-sm text-slate-500 dark:text-slate-400">Ejecuta captura o revisa tus fuentes para poblar el tablero.</p>
-      </div>
-    );
-  }
-  return (
-    <ResponsiveContainer width="100%" height="100%">
-      <BarChart data={data} layout="vertical" margin={{ left: 8, right: 16, top: 8, bottom: 8 }}>
-        <CartesianGrid strokeDasharray="3 3" horizontal={false} className="stroke-slate-200 dark:stroke-slate-700" />
-        <XAxis type="number" allowDecimals={false} tick={{ fill: "currentColor", fontSize: 12 }} />
-        <YAxis type="category" dataKey="name" width={110} tick={{ fill: "currentColor", fontSize: 12 }} />
-        <Tooltip
-          formatter={(value: number) => [formatNumber(value), "Convocatorias"]}
-          contentStyle={{ borderRadius: 8, borderColor: "rgba(148,163,184,0.35)" }}
-        />
-        <Bar dataKey="total" radius={[0, 6, 6, 0]}>
-          {data.map((entry, index) => (
-            <Cell key={entry.name} fill={STATUS_COLORS[index % STATUS_COLORS.length]} />
-          ))}
-        </Bar>
-      </BarChart>
-    </ResponsiveContainer>
-  );
-}
 
-function CountryBreakdownChart({ data }: { data: HealthRead["country_breakdown"] }) {
-  if (!data.length) {
-    return (
-      <div className="flex h-full min-h-[280px] flex-col items-center justify-center rounded-lg border border-dashed border-slate-200 bg-slate-100/30 px-6 text-center dark:border-slate-700 dark:bg-slate-800/30">
-        <p className="text-sm font-medium text-slate-950 dark:text-white">Sin distribución por país</p>
-        <p className="mt-1 max-w-md text-sm text-slate-500 dark:text-slate-400">Todavía no hay convocatorias georreferenciadas para graficar.</p>
-      </div>
-    );
-  }
-  return (
-    <ResponsiveContainer width="100%" height="100%">
-      <BarChart data={data} margin={{ left: 8, right: 16, top: 8, bottom: 8 }}>
-        <CartesianGrid strokeDasharray="3 3" vertical={false} className="stroke-slate-200 dark:stroke-slate-700" />
-        <XAxis dataKey="name" tick={{ fill: "currentColor", fontSize: 11 }} interval={0} angle={-20} textAnchor="end" height={70} />
-        <YAxis allowDecimals={false} tick={{ fill: "currentColor", fontSize: 12 }} />
-        <Tooltip
-          formatter={(value: number) => [formatNumber(value), "Convocatorias"]}
-          contentStyle={{ borderRadius: 8, borderColor: "rgba(148,163,184,0.35)" }}
-        />
-        <Bar dataKey="total" radius={[6, 6, 0, 0]}>
-          {data.map((entry, index) => (
-            <Cell key={entry.name} fill={COUNTRY_COLORS[index % COUNTRY_COLORS.length]} />
-          ))}
-        </Bar>
-      </BarChart>
-    </ResponsiveContainer>
-  );
-}
 
 function DataCoverageStrip({ dataCoverage }: { dataCoverage: DashboardDataCoverage }) {
   const cells = [
@@ -227,8 +163,8 @@ export function HealthZone() {
             </CardTitle>
             <CardDescription>Distribución agregada en servidor, sin muestreo parcial.</CardDescription>
           </CardHeader>
-          <CardContent className="h-[320px] pt-5">
-            <StatusBreakdownChart data={data.status_breakdown} />
+          <CardContent className="pt-5">
+            <PlotlyStatusChart data={data.status_breakdown} />
           </CardContent>
         </Card>
 
@@ -240,8 +176,8 @@ export function HealthZone() {
             </CardTitle>
             <CardDescription>Top países con mayor volumen detectado.</CardDescription>
           </CardHeader>
-          <CardContent className="h-[320px] pt-5">
-            <CountryBreakdownChart data={data.country_breakdown} />
+          <CardContent className="pt-5">
+            <PlotlyCountryChart data={data.country_breakdown} />
           </CardContent>
         </Card>
       </div>
