@@ -62,6 +62,17 @@ vi.mock("lucide-react", () => {
   };
 });
 
+// Plotly chart components use dynamic import (next/dynamic) which isn't
+// available in the vitest happy-dom environment. Stub them with inert
+// placeholder divs so the HealthZone renders without trying to load the
+// real Plotly bundle.
+vi.mock("@/components/dashboard/charts/PlotlyStatusChart", () => ({
+  PlotlyStatusChart: () => <div data-testid="plotly-status-chart" />,
+}));
+vi.mock("@/components/dashboard/charts/PlotlyCountryChart", () => ({
+  PlotlyCountryChart: () => <div data-testid="plotly-country-chart" />,
+}));
+
 function makeWrapper() {
   const queryClient = new QueryClient({
     defaultOptions: { queries: { retry: false, gcTime: 0, retryDelay: 0 } },
