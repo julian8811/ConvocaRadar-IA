@@ -58,7 +58,14 @@ jobs:
         working-directory: apps/api
 
       - name: Seed API database
-        run: python -m app.db.seed
+        run: |
+          python -m app.db.seed
+          # Also create the local admin user — seed() only creates the
+          # org + sources; seed_admin is the explicit step for users.
+          E2E_ADMIN_PW=ConvocaRadarLocal123! \
+            python -m app.db.seed_admin \
+            --email admin@convocaradar.io \
+            --password-env E2E_ADMIN_PW
         working-directory: apps/api
         env:
           DATABASE_URL: sqlite:///./ci_convocaradar.db
@@ -66,6 +73,7 @@ jobs:
           # Tier 1 hardening: Settings refuses to start without these.
           JWT_SECRET: ci_jwt_secret_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
           INTERNAL_API_KEY: ci_internal_api_key_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+          E2E_ADMIN_PW: ConvocaRadarLocal123!
 
       - name: Start API
         run: uvicorn app.main:app --host 127.0.0.1 --port 8000 &
