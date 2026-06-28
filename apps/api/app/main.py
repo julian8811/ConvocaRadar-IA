@@ -103,14 +103,77 @@ def _stop_inprocess_celery() -> None:
             struct_logger.warning("inprocess_celery_killed_after_timeout", component=name)
 
 
+async def _run_periodic_source_sweep(interval_seconds: int = 1800) -> None:
+    """Every ``interval_seconds`` (default 30 min), trigger a sweep of all
+    enabled sources. Redis is not reachable on the free tier, so we use
+    an asyncio loop instead of the Celery beat schedule. The sweep runs
+    inline (same process) using the existing ``execute_source_run_locally``
+    codepath. Failures for individual sources are logged and skipped; a
+    single bad source does not kill the sweep.
+    """
+    await asyncio.sleep(30)  # let the API settle before the first sweep
+    while True:
+        try:
+            from app.db.session import SessionLocal
+            from app.models import Organization, Source
+            from app.services import execute_source_run_locally, source_due_for_scraping
+            from sqlalchemy import select
+
+            db = SessionLocal()
+            try:
+                orgs = db.scalars(select(Organization)).all()
+                if not orgs:
+                    struct_logger.info("sweep_no_orgs")
+                    continue
+                sources = list(
+                    db.scalars(
+                        select(Source).where(Source.enabled.is_(True))
+                    )
+                )
+                total = len(sources)
+                run_count = 0
+                for source in sources:
+                    if not source_due_for_scraping(source):
+                        continue
+                    try:
+                        execute_source_run_locally(db, source, organization_id=orgs[0].id)
+                        run_count += 1
+                    except Exception as exc:
+                        db.rollback()
+                        struct_logger.warning(
+                            "sweep_source_failed",
+                            source=source.key or source.id,
+                            error=str(exc),
+                        )
+                if run_count:
+                    db.commit()
+                struct_logger.info(
+                    "periodic_sweep_complete",
+                    total=total,
+                    due=run_count,
+                )
+            finally:
+                db.close()
+        except Exception as exc:
+            struct_logger.warning("periodic_sweep_failed", error=str(exc))
+        await asyncio.sleep(interval_seconds)
+
+
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     create_all()
     ensure_bootstrap_data()
     _start_inprocess_celery()
+    # Background scheduler: every 30 minutes, run all enabled sources.
+    # Redis is not available on the free tier, so we use an asyncio
+    # loop instead of the Celery beat schedule. The loop is a daemon
+    # task — it does not block the API and retries on failure.
+    import asyncio
+    scheduler_task = asyncio.create_task(_run_periodic_source_sweep())
     try:
         yield
     finally:
+        scheduler_task.cancel()
         _stop_inprocess_celery()
 
 
