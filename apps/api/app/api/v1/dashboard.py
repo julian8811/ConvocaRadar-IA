@@ -1,6 +1,6 @@
 from datetime import UTC, datetime
 
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter, Depends, Response
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
@@ -103,31 +103,56 @@ def _visible_opportunity(opportunity: Opportunity) -> bool:
 
 @router.get("/dashboard/summary", response_model=DashboardSummaryRead)
 def get_dashboard_summary(
+    response: Response,
     organization: Organization = Depends(get_current_organization),
     _: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> DashboardSummaryRead:
-    base_query = build_opportunity_query(organization.id)
-    opportunity_scope = or_(Opportunity.organization_id == organization.id, Opportunity.organization_id.is_(None))
-    source_scope = or_(Source.organization_id == organization.id, Source.organization_id.is_(None))
+    """PR B-1c deprecated alias for the legacy /dashboard/summary endpoint.
 
-    total_opportunities = count_query(db, base_query)
-    open_opportunities = count_query(db, build_opportunity_query(organization.id, status="open"))
-    closing_soon_opportunities = count_query(db, build_opportunity_query(organization.id, status="closing_soon"))
-    high_match_opportunities = (
-        db.scalar(
-            select(func.count(func.distinct(OpportunityScore.opportunity_id)))
-            .select_from(OpportunityScore)
-            .join(Opportunity, Opportunity.id == OpportunityScore.opportunity_id)
-            .where(
-                OpportunityScore.organization_id == organization.id,
-                OpportunityScore.priority == "high",
-                opportunity_scope,
-            )
-        )
-        or 0
+    The /dashboard/{triage,pipeline,health} endpoints are the new canonical
+    sources of truth. This alias merges the same data into the original
+    ``DashboardSummaryRead`` shape so the existing e2e spec and any external
+    clients keep working. Removal is targeted for the release after
+    ``Sat, 01 Aug 2026`` (RFC 8594 Sunset).
+
+    Deprecation headers are emitted on every response:
+
+    * ``Deprecation: true`` (RFC 9745)
+    * ``Sunset: Sat, 01 Aug 2026 00:00:00 GMT`` (RFC 8594)
+    * ``Link: </api/v1/dashboard/triage|pipeline|health>; rel="successor-version"``
+
+    The ``embeddings_coverage`` field is now ``float | None`` (``None`` when
+    the org has zero opportunities) so a fresh org no longer reads as
+    "0% embeddings — broken".
+    """
+    response.headers["Deprecation"] = "true"
+    response.headers["Sunset"] = "Sat, 01 Aug 2026 00:00:00 GMT"
+    response.headers["Link"] = (
+        '</api/v1/dashboard/triage>; rel="successor-version", '
+        '</api/v1/dashboard/pipeline>; rel="successor-version", '
+        '</api/v1/dashboard/health>; rel="successor-version"'
     )
 
+    opportunity_scope = or_(
+        Opportunity.organization_id == organization.id, Opportunity.organization_id.is_(None)
+    )
+    source_scope = or_(Source.organization_id == organization.id, Source.organization_id.is_(None))
+
+    # ---- Reusable: kpis, breakdowns, data_coverage, source health ----
+    kpis = get_health_kpis(db, organization.id)
+    status_breakdown = get_status_breakdown(db, organization.id)
+    country_breakdown = get_country_breakdown(db, organization.id)
+    data_coverage = get_data_coverage(db, organization.id)
+    degraded_sources, failing_sources, source_alerts = get_source_health_summaries(db, organization.id)
+
+    # ---- Alias-specific: top_scored + closing_soon keep the legacy
+    # ``DashboardOpportunityItem`` shape (entity, country, status,
+    # close_date, funding_amount_value/raw/currency) so any external client
+    # still consuming the merged summary continues to receive a compatible
+    # response. The new /dashboard/pipeline endpoint exposes a slimmer
+    # ``PipelineOpportunityItem`` (id, title, country, currency, funding,
+    # days_to_close, score, reasons, source_key).
     score_rows = list(
         db.execute(
             select(Opportunity, OpportunityScore)
@@ -156,95 +181,13 @@ def get_dashboard_summary(
         if _visible_opportunity(item)
     ]
 
-    status_rows = db.execute(
-        select(Opportunity.status, func.count())
-        .where(opportunity_scope)
-        .where(~Opportunity.title.ilike("%@%"))
-        .where(~Opportunity.title.ilike("http%"))
-        .group_by(Opportunity.status)
-    )
-    status_breakdown = [
-        DashboardBreakdownItem(name=STATUS_LABELS.get(status, status), total=total)
-        for status, total in status_rows
-        if total > 0
-    ]
-    status_breakdown.sort(key=lambda item: item.total, reverse=True)
-
-    country_rows = db.execute(
-        select(Opportunity.country, func.count())
-        .where(opportunity_scope)
-        .where(~Opportunity.title.ilike("%@%"))
-        .where(~Opportunity.title.ilike("http%"))
-        .group_by(Opportunity.country)
-        .order_by(func.count().desc())
-        .limit(8)
-    )
-    country_breakdown = [
-        DashboardBreakdownItem(name=country or "Sin dato", total=total) for country, total in country_rows if total > 0
-    ]
-
-    sources = list(db.scalars(select(Source).where(source_scope)))
-    source_alerts: list[DashboardSourceAlert] = []
-    degraded_sources = 0
-    failing_sources = 0
-    for source in sources:
-        health = _source_health_status(db, source)
-        if health == "degraded":
-            degraded_sources += 1
-            if len(source_alerts) < 5:
-                source_alerts.append(DashboardSourceAlert(source_id=source.id, name=source.name, status="degraded"))
-        elif health == "failing":
-            failing_sources += 1
-            if len(source_alerts) < 5:
-                source_alerts.append(DashboardSourceAlert(source_id=source.id, name=source.name, status="failing"))
-
-    with_summary = (
-        db.scalar(
-            select(func.count())
-            .select_from(Opportunity)
-            .where(opportunity_scope, Opportunity.summary != "", Opportunity.summary.is_not(None))
-        )
-        or 0
-    )
-    with_amount = (
-        db.scalar(
-            select(func.count())
-            .select_from(Opportunity)
-            .where(
-                opportunity_scope,
-                or_(Opportunity.funding_amount_value.is_not(None), Opportunity.funding_amount_raw.is_not(None)),
-            )
-        )
-        or 0
-    )
-    with_close_date = (
-        db.scalar(select(func.count()).select_from(Opportunity).where(opportunity_scope, Opportunity.close_date.is_not(None)))
-        or 0
-    )
-    with_source = (
-        db.scalar(select(func.count()).select_from(Opportunity).where(opportunity_scope, Opportunity.source_id.is_not(None)))
-        or 0
-    )
-    embeddings_total = (
-        db.scalar(
-            select(func.count())
-            .select_from(OpportunityEmbedding)
-            .join(Opportunity, Opportunity.id == OpportunityEmbedding.opportunity_id)
-            .where(opportunity_scope)
-        )
-        or 0
-    )
-    embeddings_coverage = (
-        round((embeddings_total / total_opportunities) * 100, 1) if total_opportunities else None
-    )
-
     profile = db.scalar(select(OrganizationProfile).where(OrganizationProfile.organization_id == organization.id))
 
     return DashboardSummaryRead(
-        total_opportunities=total_opportunities,
-        open_opportunities=open_opportunities,
-        closing_soon_opportunities=closing_soon_opportunities,
-        high_match_opportunities=high_match_opportunities,
+        total_opportunities=kpis.total,
+        open_opportunities=kpis.open,
+        closing_soon_opportunities=kpis.closing_soon,
+        high_match_opportunities=kpis.high_match,
         top_scored=top_scored,
         closing_soon=closing_soon,
         status_breakdown=status_breakdown,
@@ -252,13 +195,7 @@ def get_dashboard_summary(
         degraded_sources=degraded_sources,
         failing_sources=failing_sources,
         source_alerts=source_alerts,
-        data_coverage=DashboardDataCoverage(
-            with_summary=with_summary,
-            with_amount=with_amount,
-            with_close_date=with_close_date,
-            with_source=with_source,
-            embeddings_coverage=embeddings_coverage,
-        ),
+        data_coverage=data_coverage,
         profile=_profile_summary(profile),
     )
 
