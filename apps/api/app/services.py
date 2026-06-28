@@ -123,8 +123,9 @@ def schedule_or_execute_source_run(
         source.last_run_at = started_at
         db.add(run)
         db.flush()
+        org_id = organization_id or source.organization_id or "00000000-0000-0000-0000-000000000000"
         task = Task(
-            organization_id=organization_id or source.organization_id,
+            organization_id=org_id,
             source_run_id=run.id,
             task_type="scrape_source",
             provider="celery",
@@ -1162,8 +1163,9 @@ def execute_source_run_locally(db: Session, source: Source, organization_id: str
     source.last_run_at = started_at
     db.add(run)
     db.flush()
+    org_id = organization_id or source.organization_id or "00000000-0000-0000-0000-000000000000"
     task = Task(
-        organization_id=organization_id or source.organization_id,
+        organization_id=org_id,
         source_run_id=run.id,
         task_type="scrape_source",
         provider="local",
