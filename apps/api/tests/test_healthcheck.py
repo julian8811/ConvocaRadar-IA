@@ -166,7 +166,12 @@ def test_health_endpoints_bypass_rate_limiter(
 
 
 def test_health_routes_registered() -> None:
-    paths = {route.path for route in app_main.app.routes}
+    # `app.routes` can contain non-API route objects (e.g. _IncludedRouter
+    # from nested include_router calls) which do not expose `.path`. Filter
+    # to attribute-having routes so the set comprehension does not raise
+    # AttributeError in CI environments where the order/contents of
+    # app.routes differ slightly from local.
+    paths = {route.path for route in app_main.app.routes if hasattr(route, "path")}
     assert "/api/v1/health" in paths
     assert "/api/v1/health/live" in paths
     assert "/api/v1/health/ready" in paths

@@ -99,7 +99,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   // let the user retry forever after one transient blip.
   useEffect(() => {
     if (me.isSuccess) {
-      setManualRetryDone(false);
+      setManualRetryDone(false); // eslint-disable-line react-hooks/set-state-in-effect
     }
   }, [me.isSuccess]);
 
