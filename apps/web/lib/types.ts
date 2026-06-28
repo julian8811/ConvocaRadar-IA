@@ -327,6 +327,7 @@ export type HealthRead = {
   funding_ranges: DashboardBreakdownItem[];
   source_contribution: DashboardBreakdownItem[];
   opportunities_timeline: DashboardBreakdownItem[];
+  category_distribution: DashboardBreakdownItem[];
 };
 
 /**

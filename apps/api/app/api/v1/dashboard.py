@@ -24,6 +24,7 @@ from app.schemas import (
 from app.services import (
     build_opportunity_query,
     count_query,
+    get_category_distribution,
     get_closing_soon,
     get_closing_soon_7d,
     get_country_breakdown,
@@ -295,6 +296,10 @@ def get_dashboard_health(
         timeline = get_opportunities_timeline(db, org.id)
     except Exception:
         timeline = []
+    try:
+        cat_dist = get_category_distribution(db, org.id)
+    except Exception:
+        cat_dist = []
     payload = HealthRead(
         kpis=get_health_kpis(db, org.id),
         status_breakdown=get_status_breakdown(db, org.id),
@@ -308,6 +313,7 @@ def get_dashboard_health(
         funding_ranges=funding,
         source_contribution=contrib,
         opportunities_timeline=timeline,
+        category_distribution=cat_dist,
     )
     cached[cache_key] = {"ts": now, "payload": payload}
     app.state._health_cache = cached
