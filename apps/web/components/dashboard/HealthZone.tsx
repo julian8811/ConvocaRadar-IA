@@ -28,6 +28,7 @@ import { PlotlyStatusChart } from "@/components/dashboard/charts/PlotlyStatusCha
 import { PlotlyScoreChart } from "@/components/dashboard/charts/PlotlyScoreChart";
 import { PlotlyFundingChart } from "@/components/dashboard/charts/PlotlyFundingChart";
 import { PlotlySourceChart } from "@/components/dashboard/charts/PlotlySourceChart";
+import { PlotlyCategoryChart } from "@/components/dashboard/charts/PlotlyCategoryChart";
 
 function formatNumber(value: number) {
   return new Intl.NumberFormat("es-CO", { maximumFractionDigits: 0 }).format(value);
@@ -224,6 +225,21 @@ export function HealthZone() {
           </CardHeader>
           <CardContent className="pt-5">
             <PlotlySourceChart data={data.source_contribution} />
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-4 xl:grid-cols-2">
+        <Card>
+          <CardHeader className="border-b border-slate-200 pb-4 dark:border-slate-700">
+            <CardTitle className="flex items-center gap-2 text-slate-950 dark:text-white">
+              <TrendingUp className="h-4 w-4" />
+              Categorías de convocatorias
+            </CardTitle>
+            <CardDescription>Distribución por tipo: innovación, investigación, emprendimiento, etc.</CardDescription>
+          </CardHeader>
+          <CardContent className="pt-5">
+            <PlotlyCategoryChart data={data.category_distribution} />
           </CardContent>
         </Card>
       </div>

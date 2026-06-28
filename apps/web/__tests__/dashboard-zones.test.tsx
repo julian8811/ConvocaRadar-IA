@@ -81,6 +81,9 @@ vi.mock("@/components/dashboard/charts/PlotlyFundingChart", () => ({
 vi.mock("@/components/dashboard/charts/PlotlySourceChart", () => ({
   PlotlySourceChart: () => <div data-testid="plotly-source-chart" />,
 }));
+vi.mock("@/components/dashboard/charts/PlotlyCategoryChart", () => ({
+  PlotlyCategoryChart: () => <div data-testid="plotly-category-chart" />,
+}));
 
 function makeWrapper() {
   const queryClient = new QueryClient({
@@ -129,6 +132,7 @@ describe("Dashboard 3-zone structure (PR B-2)", () => {
       funding_ranges: [],
       source_contribution: [],
       opportunities_timeline: [],
+      category_distribution: [],
     });
 
     const DashboardPage = (await import("@/app/(app)/dashboard/page")).default;
@@ -197,7 +201,7 @@ describe("Dashboard 3-zone structure (PR B-2)", () => {
     // Resolve all so the test cleanup is clean.
     resolveTriage({ kpis: { total_opportunities: 0 }, closing_soon_7d: [], review_queue: [], profile: { completeness: 0, missing_fields: [] } });
     resolvePipeline({ top_scored: [], closing_soon: [], review_queue: [] });
-    resolveHealth({ kpis: { total: 0, open: 0, closing_soon: 0, high_match: 0 }, data_coverage: { with_summary: 0, with_amount: 0, with_close_date: 0, with_source: 0, embeddings_coverage: null }, status_breakdown: [], country_breakdown: [], sources_health: [], failing_sources: 0, degraded_sources: 0, source_alerts: [], score_distribution: [], funding_ranges: [], source_contribution: [], opportunities_timeline: [] });
+    resolveHealth({ kpis: { total: 0, open: 0, closing_soon: 0, high_match: 0 }, data_coverage: { with_summary: 0, with_amount: 0, with_close_date: 0, with_source: 0, embeddings_coverage: null }, status_breakdown: [], country_breakdown: [], sources_health: [], failing_sources: 0, degraded_sources: 0, source_alerts: [], score_distribution: [], funding_ranges: [], source_contribution: [], opportunities_timeline: [], category_distribution: [] });
   });
 
   it("renders a skeleton per zone while each query is loading (no full-page LoadingState)", async () => {

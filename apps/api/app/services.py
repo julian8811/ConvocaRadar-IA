@@ -2482,3 +2482,31 @@ def get_opportunities_timeline(db: Session, organization_id: str) -> list[Dashbo
         )
         for month, count in rows
     ]
+
+
+def get_category_distribution(db: Session, organization_id: str) -> list[DashboardBreakdownItem]:
+    """Count opportunities grouped by their source's category tags.
+
+    Source.category is a JSON array (e.g. [\"convocatorias\", \"innovacion\",
+    \"emprendimiento\"]). We unnest the array via a lateral cross join and
+    count how many opportunities fall under each tag. An opportunity whose
+    source has 3 categories counts once per category.
+    """
+    scope = or_(
+        Opportunity.organization_id == organization_id,
+        Opportunity.organization_id.is_(None),
+    )
+    category_col = func.jsonb_array_elements_text(Source.category).label("cat")
+    rows = (
+        db.execute(
+            select(category_col, func.count())
+            .select_from(Opportunity)
+            .join(Source, Source.id == Opportunity.source_id)
+            .where(scope)
+            .group_by(category_col)
+            .order_by(func.count().desc())
+            .limit(12)
+        )
+        .all()
+    )
+    return [DashboardBreakdownItem(name=cat or "Sin categoría", total=count) for cat, count in rows]

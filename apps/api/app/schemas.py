@@ -519,6 +519,7 @@ class HealthRead(BaseModel):
     funding_ranges: list[DashboardBreakdownItem] = []
     source_contribution: list[DashboardBreakdownItem] = []
     opportunities_timeline: list[DashboardBreakdownItem] = []
+    category_distribution: list[DashboardBreakdownItem] = []
 
 
 class AiOpportunityExtract(BaseModel):
