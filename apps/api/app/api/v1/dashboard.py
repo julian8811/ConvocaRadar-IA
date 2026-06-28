@@ -15,6 +15,8 @@ from app.schemas import (
     DashboardProfileSummary,
     DashboardSourceAlert,
     DashboardSummaryRead,
+    HealthKpis,
+    HealthRead,
     PipelineRead,
     TriageRead,
 )
@@ -23,7 +25,13 @@ from app.services import (
     count_query,
     get_closing_soon,
     get_closing_soon_7d,
+    get_country_breakdown,
+    get_data_coverage,
+    get_health_kpis,
     get_review_queue,
+    get_source_health_summaries,
+    get_sources_health,
+    get_status_breakdown,
     get_top_scored,
     is_noise_payload,
 )
@@ -295,4 +303,33 @@ def get_dashboard_pipeline(
     return PipelineRead(
         top_scored=get_top_scored(db, org.id, limit=8),
         closing_soon=get_closing_soon(db, org.id, limit=8, days_window=30),
+    )
+
+
+@router.get("/dashboard/health", response_model=HealthRead)
+def get_dashboard_health(
+    db: Session = Depends(get_db),
+    user: User = Depends(get_current_user),
+    org: Organization = Depends(get_current_organization),
+) -> HealthRead:
+    """PR B-1c: health lane of the dashboard for the consultor persona.
+
+    Returns the operational health view: KPI counts, status/country
+    breakdowns for the chart widgets, the data-coverage strip (with the
+    new nullable ``embeddings_coverage``), and per-source health entries
+    plus the degraded/failing source counts and the top-5 alerts.
+
+    Target latency: <500 ms. The endpoint is read-only and uses the
+    caller's org scope; no cross-org leakage.
+    """
+    degraded, failing, source_alerts = get_source_health_summaries(db, org.id)
+    return HealthRead(
+        kpis=get_health_kpis(db, org.id),
+        status_breakdown=get_status_breakdown(db, org.id),
+        country_breakdown=get_country_breakdown(db, org.id),
+        data_coverage=get_data_coverage(db, org.id),
+        sources_health=get_sources_health(db, org.id),
+        failing_sources=failing,
+        degraded_sources=degraded,
+        source_alerts=source_alerts,
     )
