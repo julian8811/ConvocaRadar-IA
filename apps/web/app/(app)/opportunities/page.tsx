@@ -316,6 +316,14 @@ export default function OpportunitiesPage() {
                       >
                         {cleanSummary(item.summary)}
                       </p>
+                      {item.summary && item.summary.length > 100 ? (
+                        <details className="mt-1 text-xs text-slate-600 dark:text-slate-300">
+                          <summary className="cursor-pointer text-cyan-700 dark:text-cyan-200/80 hover:underline">
+                            Ver resumen completo
+                          </summary>
+                          <p className="mt-1 leading-5 text-slate-700 dark:text-slate-300">{cleanSummary(item.summary)}</p>
+                        </details>
+                      ) : null}
                       <p className="mt-2 text-[11px] uppercase tracking-[0.16em] text-cyan-700 dark:text-cyan-200/80">
                         Fuente: {decodeVisibleText(sourceName(item, sourceItems), "Fuente no identificada")}
                       </p>
