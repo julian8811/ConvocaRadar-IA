@@ -58,11 +58,22 @@ jobs:
         working-directory: apps/api
 
       - name: Seed API database
-        run: python -m app.db.seed
+        run: |
+          python -m app.db.seed
+          # Also create the local admin user — seed() only creates the
+          # org + sources; seed_admin is the explicit step for users.
+          E2E_ADMIN_PW=ConvocaRadarLocal123! \
+            python -m app.db.seed_admin \
+            --email admin@convocaradar.io \
+            --password-env E2E_ADMIN_PW
         working-directory: apps/api
         env:
           DATABASE_URL: sqlite:///./ci_convocaradar.db
           BOOTSTRAP_SOURCES_ON_STARTUP: "false"
+          # Tier 1 hardening: Settings refuses to start without these.
+          JWT_SECRET: ci_jwt_secret_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+          INTERNAL_API_KEY: ci_internal_api_key_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+          E2E_ADMIN_PW: ConvocaRadarLocal123!
 
       - name: Start API
         run: uvicorn app.main:app --host 127.0.0.1 --port 8000 &
@@ -70,6 +81,8 @@ jobs:
         env:
           DATABASE_URL: sqlite:///./ci_convocaradar.db
           BOOTSTRAP_SOURCES_ON_STARTUP: "false"
+          JWT_SECRET: ci_jwt_secret_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+          INTERNAL_API_KEY: ci_internal_api_key_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 
       - name: Install web dependencies
         run: npm install
@@ -139,8 +152,15 @@ jobs:
           cache: pip
           cache-dependency-path: apps/worker/pyproject.toml
 
-      - name: Install dependencies
-        run: python -m pip install --upgrade pip && python -m pip install -e ".[dev]"
+      # GAP-1 (dashboard-redesign): worker.tasks.bootstrap imports from
+      # app.db.seed, app.db.session, app.models. Install the API as an
+      # editable dep so those imports resolve in CI. Production deploys
+      # already install the API via the worker Dockerfile.
+      - name: Install API as worker dependency
+        run: python -m pip install --upgrade pip && python -m pip install -e "../api[dev]"
+
+      - name: Install worker dependencies
+        run: python -m pip install -e ".[dev]"
 
       - name: Test
         run: python -m pytest

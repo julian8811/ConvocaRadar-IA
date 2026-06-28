@@ -19,7 +19,13 @@ dependencies = [
   "pypdf>=5.0.0",
   "python-dateutil>=2.9.0",
   "tenacity>=8.5.0",
-  "jinja2>=3.1.0"
+  "jinja2>=3.1.0",
+  # GAP-1 (dashboard-redesign): worker.tasks.bootstrap imports structlog and
+  # re-uses app.* modules (seed_default_sources, SessionLocal, Organization).
+  # These come from the API; the worker Dockerfile already installs the API
+  # package in production. Adding structlog here keeps CI hermetic when
+  # only the worker package is installed for tests.
+  "structlog>=24.4.0"
 ]
 
 [project.optional-dependencies]

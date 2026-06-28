@@ -93,12 +93,22 @@ def test_register_returns_under_1s(monkeypatch: pytest.MonkeyPatch) -> None:
     patch pushes the request past the budget. If WU-A4 dropped the
     import, the patch fails fast and the latency check is a smoke
     assertion on the decoupled path.
+
+    Also patch the Celery enqueue helper to a no-op so the latency
+    budget is measured against the request-path work only — CI has no
+    Redis broker and the real send_task call times out at ~20s.
     """
     def _slow(*_a: Any, **_k: Any) -> dict[str, int]:
         time.sleep(5)
         return {"inserted": 0, "updated": 0, "skipped": 0}
 
     inline_present = _try_patch_seed(monkeypatch, _slow)
+    # CI is broker-less: short-circuit the enqueue so it does not block
+    # on a real Redis connection (which would push elapsed well past 19s).
+    monkeypatch.setattr(
+        "app.api.v1.auth.enqueue_seed_default_sources",
+        lambda _org_id: "fake-task-id-ci",
+    )
 
     c = _client()
     started = time.perf_counter()
