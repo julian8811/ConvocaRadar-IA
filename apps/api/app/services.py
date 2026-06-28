@@ -831,6 +831,30 @@ def is_noise_title(title: str | None) -> bool:
         return True
     if "{" in cleaned or "}" in cleaned or "<style" in lowered or "<script" in lowered:
         return True
+    # ── Low-quality / auto-generated title patterns ──
+    # All-caps titles with code-like fragments (e.g. "FNTCE - 322 - 2025")
+    # are almost always scraped noise from poorly structured sources.
+    import re
+    if cleaned == cleaned.upper() and len(cleaned) > 30:
+        # If the title is ALL CAPS and has at least one digit, it's likely
+        # a template title. Allow short acronyms (<=30 chars) through.
+        if re.search(r"[A-Z]{3,}\s*[-–—]\s*\d{2,}", cleaned):
+            return True
+    # Repeated year pattern: "2025 ... 2025" or "2025-2025"
+    years = re.findall(r"\b(20\d{2})\b", cleaned)
+    if len(years) >= 2 and len(set(years)) <= 2:
+        return True
+    # Titles that are >80% uppercase (screaming template titles)
+    upper_ratio = sum(1 for c in cleaned if c.isupper()) / max(len(cleaned), 1)
+    if upper_ratio > 0.8 and len(cleaned) > 60 and re.search(r"\b(20\d{2})\b", cleaned):
+        return True
+    # Generic template markers: "CONVOCATORIA" + code, "AVISO", "LICITACIÓN", etc.
+    if re.search(
+        r"\b(CONVOCATORIA|AVISO|LICITACION|LICITACIÓN|CONCURSO|PROCESO)\b",
+        cleaned,
+        re.IGNORECASE,
+    ) and re.search(r"[A-Z]{3,}\s*[-–—]\s*\d{3,}", cleaned):
+        return True
     return False
 
 
