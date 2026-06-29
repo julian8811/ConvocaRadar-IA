@@ -16,9 +16,9 @@ from pydantic import ValidationError
 from app.core.config import effective_llm_provider, get_settings
 from app.schemas import AiOpportunityExtract
 
-MODEL_VERSION = "local-heuristic-v2"
+MODEL_VERSION = "gemini-vertex" if get_settings().llm_api_key and get_settings().embedding_model else "local-heuristic-v2"
 LOCAL_EMBEDDING_MODEL_VERSION = "local-hash-embeddings-v2"
-EMBEDDING_MODEL_VERSION = LOCAL_EMBEDDING_MODEL_VERSION
+EMBEDDING_MODEL_VERSION = MODEL_VERSION
 PROMPT_VERSION = "structured-extraction-v3"
 
 COUNTRY_RULES: list[tuple[str, str]] = [
@@ -489,7 +489,14 @@ def build_embedding(text: str, *, dimensions: int | None = None) -> list[float]:
     target_dimensions = dimensions or settings.embedding_dimensions or 64
     if effective_llm_provider(settings.llm_provider) == "openai" and settings.llm_api_key and settings.embedding_model:
         try:
-            remote = asyncio.run(_call_openai_embedding(text, dimensions=target_dimensions))
+            import asyncio
+            loop = asyncio.new_event_loop()
+            try:
+                remote = loop.run_until_complete(
+                    _call_openai_embedding(text, dimensions=target_dimensions)
+                )
+            finally:
+                loop.close()
             if remote:
                 return remote
         except Exception:
