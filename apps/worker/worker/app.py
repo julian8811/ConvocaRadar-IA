@@ -18,6 +18,7 @@ celery_app = Celery(
         "worker.tasks.send_alerts",
         "worker.tasks.scheduler",
         "worker.tasks.bootstrap",
+        "worker.tasks.health",
     ],
 )
 
