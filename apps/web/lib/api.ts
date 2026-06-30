@@ -138,6 +138,14 @@ export async function request<T>(path: string, init: RequestInit = {}, timeoutMs
     if (!response.ok) {
       const body = await response.json().catch(() => ({ detail: response.statusText }));
       if (response.status === 401) {
+        // /auth/* 401s are real auth failures (wrong password, expired reset
+        // token, etc.) — surface the server's detail and DON'T auto-redirect.
+        // Other 401s mean our session is stale — handleUnauthorized will
+        // redirect to /login (its own /auth/* skip keeps these two branches
+        // in sync).
+        if (path.startsWith("/auth/")) {
+          throw new Error(body.detail ?? "Credenciales inválidas");
+        }
         handleUnauthorized(path);
         throw new Error("Sesión expirada. Redirigiendo al inicio de sesión.");
       }
