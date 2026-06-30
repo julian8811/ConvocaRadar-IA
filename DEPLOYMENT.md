@@ -351,3 +351,121 @@ Criterio de exito para NNF: `candidates_valid >= 50`.
 - No existe una plataforma gratis unica que mantenga `Next.js + FastAPI + Celery + Postgres + Redis + storage` encendida 24/7 sin limites.
 - Si el scraping debe correr de forma continua, el costo real aparece en el computo del backend o del worker.
 - La combinacion gratis mas equilibrada para un MVP es Vercel + Neon + Upstash + R2.
+
+## Pasos operacionales PR6 (ejecutados por el usuario)
+
+> PR6 no ejecuta nada por si mismo. Los pasos de abajo son **operaciones
+> manuales** que el usuario corre en su entorno (Render dashboard, Neon
+> SQL editor, GitHub repo settings) despues de mergear los commits de
+> PR6-1..PR6-4. Documentarlos aca evita perderlos entre el merge y la
+> sesion de cleanup.
+
+### 1) Reset de contrasena para `montoya8811@gmail.com`
+
+El usuario pidio un reset de contrasena operativo. Se ejecuta **fuera
+del flujo normal de `POST /auth/forgot-password`** porque el seed inicial
+no incluyo un token de recuperacion valido. La forma segura es:
+
+1. Generar un hash bcrypt de la nueva contrasena con la misma
+   configuracion que usa `app.core.security.hash_password` (cost 12):
+   ```python
+   from app.core.security import hash_password
+   print(hash_password("<nueva-contrasena>"))
+   ```
+2. Conectarse a la base de datos de Neon y actualizar la fila:
+   ```sql
+   UPDATE users
+   SET password_hash = '<hash-del-paso-1>',
+       password_changed_at = NOW()
+   WHERE email = 'montoya8811@gmail.com';
+   ```
+3. Confirmar visualmente en la app que el login funciona con la nueva
+   contrasena.
+
+### 2) Auditoria del reset
+
+El reset manual NO emite un evento de `AuditLog` automaticamente. Para
+cumplir con la politica de auditoria, registrar el evento a mano con la
+misma convencion que usa el resto de la app:
+
+```python
+from app.db.session import SessionLocal
+from app.models import AuditLog, User
+db = SessionLocal()
+try:
+    user = db.query(User).filter_by(email="montoya8811@gmail.com").one()
+    db.add(
+        AuditLog(
+            organization_id=user.organization_id,
+            user_id=user.id,
+            action="password_reset_operational",
+            resource_type="user",
+            resource_id=user.id,
+            metadata_json={"actor": "user_operational", "reason": "manual reset post-incident"},
+        )
+    )
+    db.commit()
+finally:
+    db.close()
+```
+
+### 3) Verificacion del servicio huerfano `convocaradar-api`
+
+Despues del incidente CI-red-24h, hay un servicio Render
+`convocaradar-api` (`srv-d6qomotm5p6s73e7alkg`) que puede estar duplicado
+con el servicio actual `convotracker-api` (`srv-d6qovo75r7bs738lipj0`).
+Antes de borrarlo, ejecutar las 4 pruebas de verificacion:
+
+1. **DNS**: `dig +short convocaradar-api.onrender.com` y
+   `dig +short convotracker-api.onrender.com`. Ambos deben resolver a la
+   misma IP solo si son el mismo servicio.
+2. **Bundle Vercel**: descargar el bundle del frontend
+   (`/api/v1/auth/refresh` en `Network` tab) y verificar a que
+   `NEXT_PUBLIC_API_URL` apunta. Si apunta a `convocaradar-api`, el
+   frontend esta usando el huerfano.
+3. **Llamadas API reales**: `curl https://convocaradar-api.onrender.com/health`
+   y `curl https://convotracker-api.onrender.com/health`. Si solo uno
+   responde 200, ese es el activo.
+4. **Render service**: en el dashboard de Render, abrir
+   `convocaradar-api` y revisar `Last deploy` + `Health check`. Si
+   `Last deploy` es de hace mas de 7 dias, es el huerfano.
+
+### 4) Eliminar el servicio huerfano
+
+Una vez confirmado que `convocaradar-api` no tiene trafico, eliminarlo
+desde el dashboard de Render:
+
+1. Ir a **Dashboard → convocaradar-api → Settings → Delete Service**.
+2. Confirmar el nombre del servicio cuando Render lo pida.
+3. Verificar que `convotracker-api` y `convotracker` (worker) siguen
+   respondiendo.
+
+### 5) Verificar que los servicios activos estan sanos
+
+```bash
+# API
+curl -fsS https://convotracker-api.onrender.com/api/v1/health/live
+# Esperado: {"status":"ok","service":"convocaradar-api"}
+
+# Worker (via nuevo endpoint)
+curl -fsS https://convotracker-api.onrender.com/api/v1/ops/worker-health \
+  -H "Authorization: Bearer $ADMIN_JWT"
+# Esperado: {"status":"ok","worker":"<hostname>","timestamp":"..."}
+```
+
+Si `worker-health` devuelve 504, el worker no esta consumiendo tareas.
+Revisar los logs de Render en `convotracker → Logs`.
+
+### 6) Agregar `BACKEND_URL` a los secrets de GitHub
+
+El workflow `.github/workflows/keep-alive.yml` usa el secret
+`BACKEND_URL` para hacer ping al API cada 14 minutos. Sin ese secret
+el cron falla silenciosamente y Render Free apaga el worker despues de
+15 minutos.
+
+1. Ir a **GitHub → Settings → Secrets and variables → Actions →
+   New repository secret**.
+2. Name: `BACKEND_URL`.
+3. Secret: `https://convotracker-api.onrender.com`.
+4. Confirmar que el workflow aparece en **Actions → keep-alive** y la
+   primera corrida programada (cada 14 minutos) muestra un ping 200.
