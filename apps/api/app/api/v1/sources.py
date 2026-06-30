@@ -10,7 +10,7 @@ from app.api.deps import get_current_organization, get_current_user
 from app.db.session import get_db, SessionLocal
 from app.models import Organization, Source, SourceRun, User
 from app.schemas import SourceCreate, SourceHealthRead, SourceRead, SourceRunRead, SourceUpdate
-from app.services import audit, execute_source_run_locally, source_due_for_scraping, validate_source_url
+from app.services import audit, execute_source_run_locally, schedule_or_execute_source_run, source_due_for_scraping, validate_source_url
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -221,7 +221,11 @@ def run_source(
     db: Session = Depends(get_db),
 ) -> SourceRun:
     source = _get_source_for_org(db, source_id, organization)
-    run = execute_source_run_locally(db, source, organization_id=organization.id)
+    # Use schedule_or_execute_source_run (not execute_source_run_locally) so
+    # heavy HTML sources (apc-colombia, minciencias, etc.) are dispatched to
+    # the Celery worker instead of blocking the request for 60-120s.
+    # See PR5 + services.py for the routing logic.
+    run = schedule_or_execute_source_run(db, source, organization_id=organization.id)
     audit(db, "run_source", "source_run", user, run.id)
     db.commit()
     db.refresh(run)
