@@ -45,10 +45,17 @@ def _password_changed_at_epoch(user: User) -> int:
     the conversion in one place ensures the two endpoints agree on the
     semantics — both treat NULL as the floor (epoch 0) so a user who
     has never changed their password can still request a reset.
+
+    Naive datetimes from the ORM (SQLite drops tzinfo on read) are
+    treated as UTC, matching the write path which always uses
+    ``datetime.now(UTC)``.
     """
     if user.password_changed_at is None:
         return 0
-    return int(user.password_changed_at.timestamp())
+    pca = user.password_changed_at
+    if pca.tzinfo is None:
+        pca = pca.replace(tzinfo=UTC)
+    return int(pca.timestamp())
 
 
 def _password_reset_url(token: str) -> str:
