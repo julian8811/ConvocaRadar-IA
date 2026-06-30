@@ -308,18 +308,33 @@ def run_all_sources(
     def _background_sweep() -> None:
         db2 = SessionLocal()
         processed = 0
+        failed = 0
         try:
             for source in due_sources:
                 fresh = db2.merge(source)
                 try:
                     execute_source_run_locally(db2, fresh, organization_id=org_id)
                     processed += 1
-                except Exception:
+                except Exception as exc:
+                    # PR4-4: log the failure with full context so the
+                    # run-all empty-run-list bug can be diagnosed from
+                    # the log output. Previously this except silently
+                    # swallowed the error and the operator had no
+                    # way to know why runs were not being created.
                     db2.rollback()
+                    failed += 1
+                    struct_logger.error(
+                        "run_all.source_failed",
+                        source_id=str(fresh.id),
+                        source_key=fresh.key,
+                        error_type=type(exc).__name__,
+                        error_message=str(exc)[:500],
+                    )
             db2.commit()
             struct_logger.info(
                 "run_all.completed",
                 processed=processed,
+                failed=failed,
                 total=len(due_sources),
             )
         finally:
