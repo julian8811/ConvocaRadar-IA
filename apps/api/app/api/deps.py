@@ -1,3 +1,4 @@
+from datetime import UTC
 from typing import Optional
 
 from fastapi import Depends, HTTPException, Request, status
@@ -66,6 +67,38 @@ def get_current_user(
     user = db.get(User, user_id)
     if not user:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="User not found")
+    # PR2 follow-up: enforce the password_changed_at claim check from
+    # the design (§3 of the tier-2-production-readiness design). A token
+    # whose claim does not match the live ``user.password_changed_at``
+    # is stale — the user has changed their password since the token was
+    # issued, and the token must not continue to authenticate. This is
+    # the mechanism that makes ``POST /auth/change-password`` actually
+    # invalidate every other in-flight session for the same user.
+    #
+    # Backward compat: tokens without a claim (pre-PR2 cookies) default
+    # to 0, which matches the migration backfill (COALESCE created_at).
+    # A user who hasn't changed their password since the migration keeps
+    # working; a user who has changed their password will see their old
+    # cookies invalidated.
+    if token_scope == "access":
+        claim_pca = payload.get("password_changed_at", 0)
+        if user.password_changed_at is None:
+            live_pca = 0
+        else:
+            # Normalize to UTC. The column is ``DateTime`` (no tz) and
+            # SQLite drops tzinfo on read, so a naive datetime is treated
+            # as UTC. This matches the write path (``datetime.now(UTC)``
+            # in change-password / reset-password) and the claim's
+            # ``int(dt.timestamp())`` for UTC-aware datetimes.
+            pca = user.password_changed_at
+            if pca.tzinfo is None:
+                pca = pca.replace(tzinfo=UTC)
+            live_pca = int(pca.timestamp())
+        if claim_pca != live_pca:
+            raise HTTPException(
+                status_code=status.HTTP_401_UNAUTHORIZED,
+                detail="Token invalidated by password change",
+            )
     return user
 
 
