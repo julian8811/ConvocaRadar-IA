@@ -53,7 +53,9 @@ services:
       - key: CHAT_MODEL
         sync: false
       - key: SCRAPING_EXECUTION_MODE
-        value: inline
+        value: worker
+      - key: USE_WORKER
+        value: "true"
 
   - type: worker
     name: convocaradar-worker-beat
