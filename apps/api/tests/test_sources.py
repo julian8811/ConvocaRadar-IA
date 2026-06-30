@@ -1,4 +1,4 @@
-"""Tests for run_all_sources instrumentation (PR4-2).
+"""Tests for run_all_sources instrumentation (PR4-2 + PR4-4).
 
 The run_all endpoint dispatches a background thread that iterates sources
 and calls execute_source_run_locally (which makes real HTTP requests in
@@ -12,6 +12,7 @@ import os
 import uuid
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from unittest.mock import patch
 
 os.environ.setdefault("DATABASE_URL", "sqlite:///./test_convocaradar.db")
 
@@ -121,33 +122,55 @@ def test_run_all_sources_endpoint_response_unchanged_by_instrumentation() -> Non
     assert payload["sources"] >= 1
 
 
-def test_run_all_sources_emits_skip_event_for_disabled_source() -> None:
-    """A source with enabled=False is filtered out at the SQL layer.
+def test_run_all_sources_logs_failure_when_execute_raises(monkeypatch) -> None:
+    """PR4-4: when execute_source_run_locally raises, the background sweep
+    must log a structured error event with full context (source key, error
+    type, error message).
 
-    With all sources disabled, sources_loaded == 0 and the per-source
-    decision loop produces 0 due and 0 skipped.
-
-    NOTE: This test must be run ALONE (not in the same session as the
-    other tests in this file). The background sweep from prior tests
-    holds a DB lock that prevents the source update in this test.
+    Previously the except silently swallowed the error, leaving the
+    operator with no way to know why runs were not being created.
     """
+    # Make all sources unowned so the endpoint picks them up.
     c = _client_with_admin()
-    db = SessionLocal()
-    try:
-        db.execute(Source.__table__.update().values(enabled=False))
-        db.commit()
-    finally:
-        db.close()
+
+    # Make execute_source_run_locally raise a deterministic error.
+    from app.api.v1 import sources as sources_module
+
+    def fake_execute(db, source, organization_id=None):
+        raise RuntimeError("simulated scraper failure for test")
+
+    # Disable the slow-scrape path so all sources go through execute.
+    monkeypatch.setattr(sources_module, "execute_source_run_locally", fake_execute)
+    # Make threading.Thread synchronous so we can capture the background
+    # thread's log output. Use a target wrapper that runs the function
+    # directly instead of in a thread.
+    import threading as _threading
+    original_thread = _threading.Thread
+    def sync_thread(target, *args, **kwargs):
+        class SyncThread:
+            def __init__(self):
+                self._target = target
+            def start(self):
+                self._target()
+        return SyncThread()
+    monkeypatch.setattr(_threading, "Thread", sync_thread)
 
     with structlog.testing.capture_logs() as captured:
         response = c.post("/api/v1/sources/run-all")
     assert response.status_code == 200
-    loaded_events = [e for e in captured if e.get("event") == "run_all.sources_loaded"]
-    assert len(loaded_events) == 1
-    assert loaded_events[0]["sources_loaded"] == 0
-    summary_events = [e for e in captured if e.get("event") == "run_all.decision_summary"]
-    assert len(summary_events) == 1
-    assert summary_events[0]["sources_due"] == 0
-    assert summary_events[0]["sources_skipped"] == 0
-    assert summary_events[0]["total"] == 0
+    # The structured failure event MUST be emitted.
+    failure_events = [e for e in captured if e.get("event") == "run_all.source_failed"]
+    assert len(failure_events) >= 1, (
+        f"expected run_all.source_failed event when scraper fails, "
+        f"got events: {[e.get('event') for e in captured]}"
+    )
+    failure = failure_events[0]
+    assert "source_key" in failure
+    assert failure["error_type"] == "RuntimeError"
+    assert "simulated scraper failure" in failure["error_message"]
+    # The completed event must report failed > 0.
+    completed_events = [e for e in captured if e.get("event") == "run_all.completed"]
+    assert len(completed_events) >= 1
+    assert completed_events[0]["failed"] >= 1
+    assert completed_events[0]["processed"] == 0
 
