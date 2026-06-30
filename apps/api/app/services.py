@@ -79,6 +79,11 @@ SLOW_SCRAPE_SOURCE_KEYS = frozenset(
         "horizon-europe-sedia",
         "eic-accelerator",
         "procolombia-convocatorias",
+        # PR5 follow-up: apc-colombia's HTML page is heavy enough to timeout
+        # under Render free's 30-90s scraping window. Regression test
+        # apps/api/tests/test_sources.py::test_apc_colombia_is_classified_as_slow_source
+        # pins this entry.
+        "apc-colombia",
     }
 )
 SLOW_SCRAPE_SOURCE_TYPES = frozenset({"hybrid"})
