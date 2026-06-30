@@ -208,16 +208,24 @@ def get_admin_metrics(
 
 @router.post("/admin/sources/reseed-defaults")
 def reseed_default_sources_admin(
+    force: bool = False,
     organization: Organization = Depends(get_current_organization),
     _: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ) -> dict[str, int]:
+    """Reseed the default source catalog for the calling org.
+
+    By default (``force=false``), sources already owned by another org are
+    SKIPPED — the seed will not steal them. Pass ``?force=true`` as an
+    explicit admin opt-in to bypass the org-ownership safety check and
+    reassign/update every source.
+    """
     before_total = db.scalar(
         select(func.count()).select_from(Source).where(
             or_(Source.organization_id == organization.id, Source.organization_id.is_(None))
         )
     ) or 0
-    stats = seed_default_sources(db, organization)
+    stats = seed_default_sources(db, organization, force=force)
     after_total = db.scalar(
         select(func.count()).select_from(Source).where(
             or_(Source.organization_id == organization.id, Source.organization_id.is_(None))
@@ -229,11 +237,16 @@ def reseed_default_sources_admin(
             action="reseed_default_sources",
             resource_type="source",
             resource_id=organization.id,
-            metadata_json={**stats, "before_total": before_total, "after_total": after_total},
+            metadata_json={
+                **stats,
+                "force": force,
+                "before_total": before_total,
+                "after_total": after_total,
+            },
         )
     )
     db.commit()
-    return {**stats, "before_total": before_total, "after_total": after_total}
+    return {**stats, "force": force, "before_total": before_total, "after_total": after_total}
 
 
 @router.post("/admin/opportunities/summarize-all")

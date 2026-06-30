@@ -996,7 +996,14 @@ def test_admin_reseed_default_sources() -> None:
     payload = response.json()
     assert payload["total"] >= 38
     assert payload["after_total"] >= before_count
-    assert payload["inserted"] + payload["updated"] >= 1
+    # PR4-1: when sources are already owned by the local org, the seed
+    # counts them as 'skipped' (not stolen). The response shape now
+    # includes a 'skipped' key.
+    assert "skipped" in payload
+    assert isinstance(payload["skipped"], int)
+    # The seed always processes every default source — count of
+    # inserted+updated+skipped must equal total.
+    assert payload["inserted"] + payload["updated"] + payload["skipped"] == payload["total"]
 
     sources = c.get("/api/v1/sources", headers=auth)
     assert sources.status_code == 200
@@ -1004,6 +1011,27 @@ def test_admin_reseed_default_sources() -> None:
     assert "novo-nordisk-grants" in keys
     assert "horizon-europe-sedia" in keys
     assert "eic-accelerator" in keys
+
+
+def test_admin_reseed_default_sources_with_force_true() -> None:
+    """?force=true re-claims and updates every source, even org-owned ones.
+
+    PR4-1: the admin endpoint accepts ?force=true as an explicit opt-in
+    to bypass the org-ownership safety check. With force=true, every
+    default source is updated (reassigned and refreshed) — none are
+    skipped.
+    """
+    c = client()
+    auth = {"Authorization": f"Bearer {token(c)}"}
+
+    response = c.post("/api/v1/admin/sources/reseed-defaults?force=true", headers=auth)
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["total"] >= 38
+    # With force=true, no source is skipped — every source is updated
+    # (or freshly inserted).
+    assert payload["skipped"] == 0, f"force=true must skip 0, got {payload}"
+    assert payload["inserted"] + payload["updated"] == payload["total"]
 
 
 def test_alert_lifecycle() -> None:
