@@ -6,7 +6,7 @@ import structlog
 
 from app.api.deps import TOKEN_COOKIE_NAME, get_current_user
 from app.core.rate_limit import SlidingWindowLimiter
-from app.core.security import create_access_token, hash_password, verify_password
+from app.core.security import create_access_token, decode_access_token, hash_password, verify_password
 from app.core.task_queue import enqueue_seed_default_sources
 from app.db.session import get_db
 from app.models import AuditLog, Organization, OrganizationProfile, Role, User
@@ -15,6 +15,7 @@ from app.schemas import (
     ForgotPasswordRequest,
     LoginRequest,
     RegisterRequest,
+    ResetPasswordRequest,
     Token,
     UserRead,
 )
@@ -314,3 +315,68 @@ def _client_ip(request: Request) -> str:
     if request.client and request.client.host:
         return request.client.host
     return "unknown"
+
+
+# PR2-5: reset-password endpoint. Public, JWT-protected. The token
+# carries ``scope="password_reset"`` (issued by /auth/forgot-password)
+# and the ``password_changed_at`` epoch baked at issue time. We compare
+# the claim against the live row to detect stale tokens — a token
+# issued before a password change is invalid. The bump on success
+# invalidates the token (single-use claim), so a second attempt with
+# the same token is rejected.
+@router.post("/auth/reset-password", status_code=204)
+def reset_password(
+    payload: ResetPasswordRequest,
+    db: Session = Depends(get_db),
+) -> Response:
+    # Constant detail — never leak "expired" vs "wrong scope" vs "bad
+    # signature" vs "user not found". The user gets the same 400 for
+    # all four failure modes so a phishing site cannot use this
+    # endpoint to probe for valid users.
+    invalid_detail = "Reset token is invalid or expired"
+
+    try:
+        claims = decode_access_token(payload.token)
+    except ValueError:
+        # Signature invalid or token expired (jose raises JWTError →
+        # ValueError via decode_access_token). Constant detail.
+        raise HTTPException(status_code=400, detail=invalid_detail)
+
+    # Scope check — only password_reset tokens are accepted.
+    if claims.get("scope") != "password_reset":
+        raise HTTPException(status_code=400, detail=invalid_detail)
+
+    user_id = claims.get("sub")
+    if not user_id:
+        raise HTTPException(status_code=400, detail=invalid_detail)
+
+    user = db.get(User, user_id)
+    if user is None:
+        # User not found. Constant detail — same as all other failure modes.
+        raise HTTPException(status_code=400, detail=invalid_detail)
+
+    # Belt-and-suspenders: the ``password_changed_at`` claim baked at
+    # issue time must match the current value. A mismatch means the
+    # user has changed their password since the reset was issued —
+    # either directly via /change-password, or because another reset
+    # already completed. Both mean the token is stale.
+    claim_pca = claims.get("password_changed_at", 0)
+    live_pca = _password_changed_at_epoch(user)
+    if claim_pca != live_pca:
+        raise HTTPException(status_code=400, detail=invalid_detail)
+
+    # All checks passed — apply the reset.
+    user.password_hash = hash_password(payload.new_password)
+    user.password_changed_at = datetime.now(UTC)
+    db.add(
+        AuditLog(
+            organization_id=user.organization_id,
+            user_id=user.id,
+            action="password_reset",
+            resource_type="user",
+            resource_id=user.id,
+        )
+    )
+    db.commit()
+    logger.info("auth.password_reset", user_id=user.id)
+    return Response(status_code=204)
