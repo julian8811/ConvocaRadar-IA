@@ -35,10 +35,38 @@ def verify_password(password: str, password_hash: str) -> bool:
         return False
 
 
-def create_access_token(subject: str, extra: dict[str, Any] | None = None) -> str:
+def create_access_token(
+    subject: str,
+    extra: dict[str, Any] | None = None,
+    scope: str = "access",
+) -> str:
+    """Mint a JWT for ``subject``.
+
+    Parameters
+    ----------
+    subject:
+        The user id (or any stable identifier) to embed as the ``sub`` claim.
+    extra:
+        Optional bag of extra claims. Anything the caller wants in the
+        payload (e.g. ``{"organization_id": "..."}``).
+    scope:
+        The token's intended purpose. Defaults to ``"access"`` for the
+        login/register flow. PR2's password-reset flow overrides this
+        with ``"password_reset"`` so the same helper can mint both kinds
+        of tokens without the ``get_current_user`` dep accepting a
+        reset token on a protected route.
+
+    Notes
+    -----
+    The ``scope`` claim is checked by ``app.api.deps.get_current_user``:
+    only ``scope="access"`` tokens are allowed on protected routes.
+    Tokens without a ``scope`` claim (issued before PR1) are accepted as
+    ``"access"`` for backward compat — see the decode default in
+    ``get_current_user``.
+    """
     settings = get_settings()
     expires = datetime.now(UTC) + timedelta(minutes=settings.access_token_expire_minutes)
-    payload: dict[str, Any] = {"sub": subject, "exp": expires}
+    payload: dict[str, Any] = {"sub": subject, "exp": expires, "scope": scope}
     if extra:
         payload.update(extra)
     return jwt.encode(payload, settings.jwt_secret, algorithm=settings.jwt_algorithm)

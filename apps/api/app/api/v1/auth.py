@@ -94,7 +94,9 @@ def register(payload: RegisterRequest, response: Response, db: Session = Depends
             user_id=user.id,
             hint="broker may be down; bootstrap.py startup sweep will retry",
         )
-    token_str = create_access_token(user.id, {"organization_id": organization.id})
+    token_str = create_access_token(
+        user.id, {"organization_id": organization.id}, scope="access"
+    )
     _set_token_cookie(response, token_str)
     # Keep returning the token in the JSON body for legacy clients (SEC-1.5).
     return Token(access_token=token_str)
@@ -105,7 +107,9 @@ def login(payload: LoginRequest, response: Response, db: Session = Depends(get_d
     user = db.scalar(select(User).where(User.email == payload.email))
     if not user or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid credentials")
-    token_str = create_access_token(user.id, {"organization_id": user.organization_id})
+    token_str = create_access_token(
+        user.id, {"organization_id": user.organization_id}, scope="access"
+    )
     _set_token_cookie(response, token_str)
     # Keep returning the token in the JSON body for legacy clients (SEC-1.5).
     return Token(access_token=token_str)
