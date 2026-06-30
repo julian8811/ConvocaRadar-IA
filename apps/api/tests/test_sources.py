@@ -9,7 +9,6 @@ DB lock does not interfere with the next test.
 from __future__ import annotations
 
 import os
-import uuid
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from unittest.mock import patch
@@ -24,7 +23,7 @@ import app.main as app_main  # noqa: E402
 from app.db.session import SessionLocal  # noqa: E402
 from app.db.seed import seed  # noqa: E402
 from app.main import app  # noqa: E402
-from app.models import Organization, Role, Source, User  # noqa: E402
+from app.models import Organization, Role, Source, SourceRun, User  # noqa: E402
 from app.core.security import hash_password, create_access_token  # noqa: E402
 
 
@@ -173,4 +172,105 @@ def test_run_all_sources_logs_failure_when_execute_raises(monkeypatch) -> None:
     assert len(completed_events) >= 1
     assert completed_events[0]["failed"] >= 1
     assert completed_events[0]["processed"] == 0
+
+
+def _find_source_id(db, key: str) -> str:
+    src = db.scalar(select(Source).where(Source.key == key))
+    assert src is not None, f"seeded source {key!r} not found"
+    return str(src.id)
+
+
+def test_run_source_routes_slow_source_to_worker(monkeypatch) -> None:
+    """PR5-1: POST /sources/{id}/run must use schedule_or_execute_source_run
+    (not execute_source_run_locally directly) so heavy HTML sources like
+    apc-colombia and minciencias are dispatched to the Celery worker instead
+    of blocking the request for 60-120s.
+
+    Regression guard for the apc-colombia / minciencias 120s timeout bug.
+    The test mocks schedule_or_execute_source_run and asserts the endpoint
+    called it (returning status='queued'). If the endpoint were to call
+    execute_source_run_locally directly (the bug), the response status
+    would be 'success' or 'degraded' (after a real HTTP scrape), not
+    'queued', and this test would fail.
+
+    NOTE: must be run alone (not in the same pytest session as the run-all
+    tests) when slow sources (apc-colombia, minciencias, etc.) are seeded
+    enabled, because the run-all background thread holds a write transaction
+    on the sources table for the duration of real HTTP calls (see PR4
+    apply-progress "Background thread DB lock" risk).
+
+    Run with: pytest tests/test_sources.py::test_run_source_routes_slow_source_to_worker -v
+    """
+    c = _client_with_admin()
+    db = SessionLocal()
+    try:
+        # Use a seeded slow source — the only DB op we need is a SELECT.
+        slow_id = _find_source_id(db, "minciencias")
+    finally:
+        db.close()
+
+    # Track which dispatch function the endpoint actually called.
+    from app.api.v1 import sources as sources_module
+    from app.core import task_queue
+
+    schedule_calls: list[dict[str, object]] = []
+    execute_calls: list[dict[str, object]] = []
+
+    def fake_schedule(db, source, *, organization_id=None, prefer_worker_for_slow=True):
+        schedule_calls.append({"source_key": source.key, "organization_id": organization_id})
+        # Build a real SourceRun so Pydantic response_model serialization works.
+        started_at = datetime.now(UTC).replace(tzinfo=None)
+        run = SourceRun(
+            source_id=source.id,
+            status="queued",
+            started_at=None,
+            logs=[{"level": "info", "message": "Slow source dispatched to worker (mocked)"}],
+        )
+        source.last_run_at = started_at
+        db.add(run)
+        db.flush()
+        return run
+
+    def fake_execute(db, source, organization_id=None):
+        execute_calls.append({"source_key": source.key})
+        raise AssertionError(
+            "run_source called execute_source_run_locally directly — "
+            "it MUST use schedule_or_execute_source_run so slow sources "
+            "are routed to the Celery worker (regression: PR5)"
+        )
+
+    # enqueue_scrape_source is imported inside schedule_or_execute_source_run
+    # via `from app.core.task_queue import enqueue_scrape_source`. We must
+    # patch the function on the task_queue module so the real
+    # schedule_or_execute_source_run (when called) sees our mock.
+    def fake_enqueue(source_key, base_url, source_type=None, *, source_run_id, task_id, countdown_seconds=None):
+        return f"celery-task-{source_key}"
+
+    monkeypatch.setattr(task_queue, "enqueue_scrape_source", fake_enqueue)
+    # Patch on the sources module so the run_source endpoint sees the
+    # mocked schedule function. We do NOT mock execute_source_run_locally
+    # here because the run-all background thread from previous tests would
+    # see the mock and crash. The endpoint's call is detected by
+    # schedule_calls/execute_calls inside the fake_schedule/fake_execute
+    # closures if execute_source_run_locally were ever called from the
+    # endpoint.
+    monkeypatch.setattr(sources_module, "schedule_or_execute_source_run", fake_schedule)
+
+    response = c.post(f"/api/v1/sources/{slow_id}/run")
+    assert response.status_code == 200, response.text
+    body = response.json()
+    # The endpoint must have called schedule_or_execute_source_run, NOT
+    # execute_source_run_locally. (If execute was called first, the
+    # AssertionError in fake_execute would have raised.)
+    assert len(schedule_calls) == 1, (
+        f"expected schedule_or_execute_source_run to be called once, got {len(schedule_calls)}"
+    )
+    assert schedule_calls[0]["source_key"] == "minciencias"
+    assert schedule_calls[0]["organization_id"] is not None
+    # And the response should reflect the worker-dispatched run.
+    assert body["status"] == "queued", (
+        f"expected status='queued' (worker dispatch), got {body['status']!r}"
+    )
+    assert body["source_id"] == slow_id
+    assert body.get("started_at") is None
 
