@@ -97,6 +97,12 @@ class User(Base):
     role: Mapped[str] = mapped_column(String, default=Role.member.value)
     organization_id: Mapped[str | None] = mapped_column(ForeignKey("organizations.id"))
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+    # PR1-1 (Alembic migration 0003) added this column. PR2-3 writes to it on
+    # every successful password change / reset so the JWT claim check in
+    # ``get_current_user`` can invalidate in-flight tokens. Nullable so
+    # pre-migration rows (and brand-new users before their first change) are
+    # valid; the route handler treats ``None`` as epoch 0 for comparison.
+    password_changed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
 
     organization: Mapped["Organization | None"] = relationship(back_populates="users")
 

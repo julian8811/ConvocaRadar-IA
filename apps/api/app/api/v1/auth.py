@@ -1,3 +1,4 @@
+from datetime import UTC, datetime
 from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -7,8 +8,14 @@ from app.api.deps import TOKEN_COOKIE_NAME, get_current_user
 from app.core.security import create_access_token, hash_password, verify_password
 from app.core.task_queue import enqueue_seed_default_sources
 from app.db.session import get_db
-from app.models import Organization, OrganizationProfile, Role, User
-from app.schemas import LoginRequest, RegisterRequest, Token, UserRead
+from app.models import AuditLog, Organization, OrganizationProfile, Role, User
+from app.schemas import (
+    ChangePasswordRequest,
+    LoginRequest,
+    RegisterRequest,
+    Token,
+    UserRead,
+)
 from app.services import slugify
 
 router = APIRouter()
@@ -125,3 +132,33 @@ def logout(response: Response) -> dict[str, str]:
 @router.get("/me", response_model=UserRead)
 def me(user: User = Depends(get_current_user)) -> User:
     return user
+
+
+# PR2-3: change-password endpoint. Authenticated (PR1's scope=access is
+# enforced by ``get_current_user``). On success we bump
+# ``User.password_changed_at`` so PR1-4's JWT claim check invalidates any
+# other in-flight session for the same user. The AuditLog row is the
+# security trail; the password hash itself is never written to the log.
+@router.post("/auth/change-password", status_code=204)
+def change_password(
+    payload: ChangePasswordRequest,
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Response:
+    if not verify_password(payload.current_password, user.password_hash):
+        # Constant message — do not leak whether the user exists.
+        raise HTTPException(status_code=400, detail="Current password is incorrect")
+    user.password_hash = hash_password(payload.new_password)
+    user.password_changed_at = datetime.now(UTC)
+    db.add(
+        AuditLog(
+            organization_id=user.organization_id,
+            user_id=user.id,
+            action="change_password",
+            resource_type="user",
+            resource_id=user.id,
+        )
+    )
+    db.commit()
+    logger.info("auth.change_password", user_id=user.id)
+    return Response(status_code=204)
