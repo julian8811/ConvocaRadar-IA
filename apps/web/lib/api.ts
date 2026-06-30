@@ -20,7 +20,10 @@ import type {
 } from "@/lib/types";
 
 export const API_URL =
-  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") ?? getDefaultApiUrl();
+  // Use || (not ??) so an empty-string env var triggers the fallback too.
+  // Vercel allows setting an env var to "" without deleting it, and we don't
+  // want a broken "" base URL to ship to production.
+  process.env.NEXT_PUBLIC_API_URL?.replace(/\/$/, "") || getDefaultApiUrl();
 
 /** SEC-1.5: cookie name. Must match the backend's TOKEN_COOKIE_NAME. */
 export const TOKEN_COOKIE_NAME = "convocaradar_token";
