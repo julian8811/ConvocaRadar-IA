@@ -10,6 +10,7 @@ from __future__ import annotations
 
 import os
 from datetime import UTC, datetime
+from types import SimpleNamespace
 
 os.environ.setdefault("DATABASE_URL", "sqlite:///./test_convocaradar.db")
 
@@ -458,5 +459,35 @@ def test_run_source_returns_immediately_for_slow_source(monkeypatch) -> None:
     body = response.json()
     assert body["status"] == "queued", (
         f"expected status='queued' (worker dispatch), got {body['status']!r}"
+    )
+
+
+# --- PR5 follow-up: apc-colombia must be in SLOW_SCRAPE_SOURCE_KEYS ---------
+# Regression guard for the orchestrator's curl test that showed
+# apc-colombia timing out at 120s under inline execution. The test for
+# run_source dispatch uses minciencias (which is in the set); this unit
+# test specifically pins apc-colombia so a future refactor of the set
+# can't silently drop it.
+
+
+def test_apc_colombia_is_classified_as_slow_source() -> None:
+    """apc-colombia must be in SLOW_SCRAPE_SOURCE_KEYS so its heavy HTML
+    page is dispatched to the worker instead of running inline (120s
+    timeout in Render free). Regression guard for the orchestrator's
+    curl test that hit the timeout on 2026-06-30.
+    """
+    from app.services import SLOW_SCRAPE_SOURCE_KEYS, is_slow_scrape_source
+
+    assert "apc-colombia" in SLOW_SCRAPE_SOURCE_KEYS, (
+        "apc-colombia must be in SLOW_SCRAPE_SOURCE_KEYS — its HTML page "
+        "is too heavy for inline execution under Render free's 30-90s "
+        "scraping timeout. Add it to the frozenset in services.py:72."
+    )
+    # Also confirm is_slow_scrape_source returns True for a Source-like
+    # object with that key (covers the SLOW_SCRAPE_SOURCE_TYPES branch
+    # as well, in case apc-colombia is later reclassified by source_type).
+    fake_source = SimpleNamespace(key="apc-colombia", source_type="html")
+    assert is_slow_scrape_source(fake_source) is True, (
+        "is_slow_scrape_source must return True for apc-colombia"
     )
 
