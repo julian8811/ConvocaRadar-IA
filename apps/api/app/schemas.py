@@ -33,6 +33,38 @@ class LoginRequest(BaseModel):
     password: str
 
 
+# PR2 (account recovery): three new request bodies for the password
+# management endpoints. All three are intentionally simple — the route
+# handlers do the database / JWT work; the schemas only validate the
+# shape and the project-standard password length (10 chars, matching
+# ``RegisterRequest.password``).
+
+
+class ChangePasswordRequest(BaseModel):
+    """Body for ``POST /api/v1/auth/change-password`` (authenticated).
+
+    The current password is checked against ``User.password_hash`` by the
+    route handler; the new password is then hashed and stored. The 10-char
+    minimum matches the registration rule.
+    """
+
+    current_password: str = Field(min_length=1)
+    new_password: str = Field(min_length=10, max_length=128)
+
+
+class ForgotPasswordRequest(BaseModel):
+    """Body for ``POST /api/v1/auth/forgot-password`` (public, rate-limited)."""
+
+    email: EmailStr
+
+
+class ResetPasswordRequest(BaseModel):
+    """Body for ``POST /api/v1/auth/reset-password`` (public, JWT-protected)."""
+
+    token: str = Field(min_length=1)
+    new_password: str = Field(min_length=10, max_length=128)
+
+
 class OrganizationRead(BaseModel):
     id: str
     name: str
