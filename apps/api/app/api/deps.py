@@ -49,6 +49,19 @@ def get_current_user(
         payload = decode_access_token(token)
     except ValueError as exc:
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token") from exc
+    # PR1-4: scope check. Tokens minted for password_reset (or any other
+    # non-access purpose) must not authenticate protected routes. Tokens
+    # without a scope claim are accepted as scope="access" for backward
+    # compatibility with pre-PR1 cookies still in users' browsers.
+    token_scope = payload.get("scope", "access")
+    if token_scope != "access":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Token scope does not allow access to this resource",
+        )
+    # Expose the scope on request.state so downstream handlers (e.g. the
+    # audit log) can read it without re-decoding the token.
+    request.state.scope = token_scope
     user_id = payload.get("sub")
     user = db.get(User, user_id)
     if not user:
