@@ -9,9 +9,7 @@ DB lock does not interfere with the next test.
 from __future__ import annotations
 
 import os
-from datetime import UTC, datetime, timedelta
-from pathlib import Path
-from unittest.mock import patch
+from datetime import UTC, datetime
 
 os.environ.setdefault("DATABASE_URL", "sqlite:///./test_convocaradar.db")
 
@@ -19,7 +17,6 @@ import structlog.testing  # noqa: E402
 from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy import select  # noqa: E402
 
-import app.main as app_main  # noqa: E402
 from app.db.session import SessionLocal  # noqa: E402
 from app.db.seed import seed  # noqa: E402
 from app.main import app  # noqa: E402
@@ -46,7 +43,6 @@ def _client_with_admin() -> TestClient:
             )
             db.commit()
         admin = db.scalar(select(User).where(User.email == "admin@convocaradar.io"))
-        org_id = str(org.id)
         admin_id = str(admin.id)
     finally:
         db.close()
@@ -144,7 +140,6 @@ def test_run_all_sources_logs_failure_when_execute_raises(monkeypatch) -> None:
     # thread's log output. Use a target wrapper that runs the function
     # directly instead of in a thread.
     import threading as _threading
-    original_thread = _threading.Thread
     def sync_thread(target, *args, **kwargs):
         class SyncThread:
             def __init__(self):
