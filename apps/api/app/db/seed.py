@@ -4,7 +4,22 @@ from app.db.session import SessionLocal, create_all
 from app.models import Organization, OrganizationProfile, Source
 
 
-def seed_default_sources(db, organization: Organization) -> dict[str, int]:
+def seed_default_sources(
+    db, organization: Organization, *, force: bool = False
+) -> dict[str, int]:
+    """Insert or refresh the default source catalog for an organization.
+
+    Safety rules (PR4-1):
+    - If a source with the same key does not exist, INSERT it under the calling org.
+    - If a source exists and is unowned (organization_id IS NULL), claim it
+      under the calling org AND update its metadata.
+    - If a source exists and is owned by another org, SKIP it — do not steal
+      — unless ``force=True`` is passed (admin opt-in), in which case
+      the org-ownership check is bypassed and the source is reassigned.
+
+    Returns a stats dict with ``inserted``, ``updated``, ``skipped``, and
+    ``total`` keys.
+    """
     source_definitions = [
         {
             "key": "simpler-grants",
@@ -1364,20 +1379,27 @@ def seed_default_sources(db, organization: Organization) -> dict[str, int]:
 
     inserted = 0
     updated = 0
+    skipped = 0
     for definition in source_definitions:
         source = db.scalar(select(Source).where(Source.key == definition["key"]))
         if source:
-            source.organization_id = organization.id
-            source.name = definition["name"]
-            source.base_url = definition["base_url"]
-            source.country = definition["country"]
-            source.region = definition["region"]
-            source.source_type = definition["source_type"]
-            source.category = definition["category"]
-            source.scraping_frequency = definition.get("scraping_frequency", "daily")
-            source.allowed_domains = definition["allowed_domains"]
-            source.enabled = True
-            updated += 1
+            # Only mutate sources we own (organization_id IS NULL) — or
+            # every source when the admin passes ?force=true.
+            if force or source.organization_id is None:
+                source.organization_id = organization.id
+                source.name = definition["name"]
+                source.base_url = definition["base_url"]
+                source.country = definition["country"]
+                source.region = definition["region"]
+                source.source_type = definition["source_type"]
+                source.category = definition["category"]
+                source.scraping_frequency = definition.get("scraping_frequency", "daily")
+                source.allowed_domains = definition["allowed_domains"]
+                source.enabled = True
+                updated += 1
+            else:
+                # Source is owned by another org — do not steal.
+                skipped += 1
             continue
         db.add(
             Source(
@@ -1394,7 +1416,12 @@ def seed_default_sources(db, organization: Organization) -> dict[str, int]:
             )
         )
         inserted += 1
-    return {"inserted": inserted, "updated": updated, "total": len(source_definitions)}
+    return {
+        "inserted": inserted,
+        "updated": updated,
+        "skipped": skipped,
+        "total": len(source_definitions),
+    }
 
 
 def seed() -> None:
