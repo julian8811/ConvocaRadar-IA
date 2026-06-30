@@ -1,6 +1,7 @@
 from datetime import UTC, datetime
 import logging
 
+import structlog
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -13,6 +14,7 @@ from app.services import audit, execute_source_run_locally, schedule_or_execute_
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
+struct_logger = structlog.get_logger(__name__)
 
 
 def _health_window_days(source: Source) -> int:
@@ -236,6 +238,17 @@ def run_all_sources(
 
     The sweep runs in a daemon thread so the HTTP response returns
     immediately. Use GET /api/v1/sources/health to monitor progress.
+
+    PR4-2: structured log lines are emitted at every decision point so
+    the run-all empty-return bug can be diagnosed from the log output:
+    - ``run_all.sources_loaded`` — how many sources were loaded
+    - ``run_all.skip`` — per-source skip reason (frequency, last_run_at, elapsed)
+    - ``run_all.completed`` — final processed/skipped counts
+
+    The per-source decision logs are emitted SYNCHRONOUSLY (before the
+    background thread starts) so the run-all empty-return bug can be
+    diagnosed from a single request's log output — the same request
+    that returned an empty run list.
     """
     import threading
 
@@ -248,19 +261,67 @@ def run_all_sources(
         )
     )
     org_id = organization.id
+    struct_logger.info(
+        "run_all.sources_loaded",
+        sources_loaded=len(sources),
+        org_id=org_id,
+    )
+
+    # Pre-compute the per-source due/skip decisions synchronously so the
+    # diagnostic logs are emitted in the request's log context (visible to
+    # the operator who triggered the empty-return bug). The actual scrape
+    # execution is still dispatched to the background thread.
+    now = datetime.now(UTC).replace(tzinfo=None)
+    due_sources: list[Source] = []
+    for source in sources:
+        if source_due_for_scraping(source, now=now):
+            struct_logger.info(
+                "run_all.process",
+                source_id=str(source.id),
+                source_key=source.key,
+                reason="due",
+                frequency=(source.scraping_frequency or "daily").lower(),
+            )
+            due_sources.append(source)
+        else:
+            frequency = (source.scraping_frequency or "daily").lower()
+            last_run = source.last_run_at
+            elapsed_seconds = (
+                (now - last_run).total_seconds() if last_run else None
+            )
+            struct_logger.info(
+                "run_all.skip",
+                source_id=str(source.id),
+                source_key=source.key,
+                reason="not_due",
+                frequency=frequency,
+                last_run_at=last_run.isoformat() if last_run else None,
+                elapsed_seconds=elapsed_seconds,
+            )
+    struct_logger.info(
+        "run_all.decision_summary",
+        sources_due=len(due_sources),
+        sources_skipped=len(sources) - len(due_sources),
+        total=len(sources),
+    )
 
     def _background_sweep() -> None:
         db2 = SessionLocal()
+        processed = 0
         try:
-            for source in sources:
+            for source in due_sources:
                 fresh = db2.merge(source)
-                if not source_due_for_scraping(fresh):
-                    continue
                 try:
                     execute_source_run_locally(db2, fresh, organization_id=org_id)
+                    processed += 1
                 except Exception:
                     db2.rollback()
             db2.commit()
+            struct_logger.info(
+                "run_all.completed",
+                processed=processed,
+                total=len(due_sources),
+            )
         finally:
             db2.close()
 
