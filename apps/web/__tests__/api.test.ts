@@ -332,3 +332,154 @@ describe("PR B-2 — dashboard zone methods", () => {
     expect(result.data_coverage.embeddings_coverage).toBeNull();
   });
 });
+
+/**
+ * PR 3 (tier-2-production-readiness): 401 discrimination by request path.
+ *
+ * `/auth/*` 401s are real auth failures (wrong password, expired reset
+ * token, etc.) — the frontend must surface the server's detail and NOT
+ * auto-redirect. Other 401s mean our session is stale — redirect to /login.
+ *
+ * (The companion env-var fallback tests live in __tests__/api-env.test.ts
+ * so each commit stays atomic.)
+ */
+
+describe("PR 3 — 401 discrimination by request path", () => {
+  beforeEach(() => {
+    vi.stubEnv("NEXT_PUBLIC_ENV", "development");
+    if (typeof window !== "undefined") {
+      window.localStorage.clear();
+    }
+  });
+
+  it("throws the server's body.detail on 401 for /auth/login (no redirect)", async () => {
+    const replaceSpy = vi.fn();
+    // window.location.replace is the navigation entry-point used by
+    // handleUnauthorized. We spy on it to assert "no redirect happened".
+    const originalReplace = window.location.replace;
+    window.location.replace = replaceSpy as typeof window.location.replace;
+    try {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(() =>
+          Promise.resolve(
+            new Response(JSON.stringify({ detail: "Invalid credentials" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" },
+            }),
+          ),
+        ),
+      );
+
+      const { api } = await loadApiModule();
+      await expect(api.login("user@example.com", "wrong-password")).rejects.toThrow(
+        "Invalid credentials",
+      );
+      expect(replaceSpy).not.toHaveBeenCalled();
+    } finally {
+      window.location.replace = originalReplace;
+    }
+  });
+
+  it("throws 'Credenciales inválidas' on 401 for /auth/login with empty body.detail", async () => {
+    const replaceSpy = vi.fn();
+    const originalReplace = window.location.replace;
+    window.location.replace = replaceSpy as typeof window.location.replace;
+    try {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(() =>
+          Promise.resolve(
+            new Response(JSON.stringify({}), {
+              status: 401,
+              headers: { "Content-Type": "application/json" },
+            }),
+          ),
+        ),
+      );
+
+      const { api } = await loadApiModule();
+      await expect(api.login("user@example.com", "wrong-password")).rejects.toThrow(
+        "Credenciales inválidas",
+      );
+      expect(replaceSpy).not.toHaveBeenCalled();
+    } finally {
+      window.location.replace = originalReplace;
+    }
+  });
+
+  it("throws body.detail on 401 for /auth/forgot-password (any /auth/* path)", async () => {
+    const replaceSpy = vi.fn();
+    const originalReplace = window.location.replace;
+    window.location.replace = replaceSpy as typeof window.location.replace;
+    try {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(() =>
+          Promise.resolve(
+            new Response(
+              JSON.stringify({ detail: "Reset token is invalid or expired" }),
+              { status: 401, headers: { "Content-Type": "application/json" } },
+            ),
+          ),
+        ),
+      );
+
+      const { request } = await loadApiModule();
+      await expect(
+        request("/auth/reset-password", {
+          method: "POST",
+          body: JSON.stringify({ token: "x", new_password: "longenough123" }),
+        }),
+      ).rejects.toThrow("Reset token is invalid or expired");
+      expect(replaceSpy).not.toHaveBeenCalled();
+    } finally {
+      window.location.replace = originalReplace;
+    }
+  });
+
+  it("redirects and throws 'Sesión expirada...' on 401 for non-auth paths (e.g. /me)", async () => {
+    const replaceSpy = vi.fn();
+    const originalReplace = window.location.replace;
+    window.location.replace = replaceSpy as typeof window.location.replace;
+    try {
+      vi.stubGlobal(
+        "fetch",
+        vi.fn(() =>
+          Promise.resolve(
+            new Response(JSON.stringify({ detail: "Not authenticated" }), {
+              status: 401,
+              headers: { "Content-Type": "application/json" },
+            }),
+          ),
+        ),
+      );
+
+      const { api } = await loadApiModule();
+      await expect(api.me()).rejects.toThrow(
+        "Sesión expirada. Redirigiendo al inicio de sesión.",
+      );
+      // handleUnauthorized MUST have redirected to /login.
+      expect(replaceSpy).toHaveBeenCalledWith("/login");
+    } finally {
+      window.location.replace = originalReplace;
+    }
+  });
+
+  it("unchanged: throws body.detail on 500 (not affected by 401 split)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(JSON.stringify({ detail: "Internal server error" }), {
+            status: 500,
+            headers: { "Content-Type": "application/json" },
+          }),
+        ),
+      ),
+    );
+
+    const { api } = await loadApiModule();
+    await expect(api.me()).rejects.toThrow("Internal server error");
+  });
+});
