@@ -34,6 +34,14 @@ dev = [
   "pytest-asyncio>=0.23.8"
 ]
 
+[tool.setuptools.packages.find]
+# The worker package lives under apps/worker/worker/. Setuptools automatic
+# discovery picks up both apps/ and worker/ as top-level packages in the
+# Docker build context (COPY apps/api ./apps/api creates apps/), causing:
+#   "Multiple top-level packages discovered in a flat-layout: ['apps', 'worker']"
+# Pin discovery to the worker directory to suppress the setuptools ≥68 check.
+where = ["worker"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 pythonpath = [".", "../api"]
