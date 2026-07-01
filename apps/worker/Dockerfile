@@ -15,4 +15,7 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel \
     && pip install --no-cache-dir ./apps/api \
     && pip install --no-cache-dir .
 RUN python -m playwright install --with-deps chromium
-CMD ["celery", "-A", "worker.app.celery_app", "worker", "--loglevel=info"]
+# PR38: use runner.py so a minimal health-check HTTP server starts alongside
+# the Celery worker. Render requires an HTTP endpoint for deploy health; the
+# Celery worker alone does not serve HTTP, so all deploys would fail.
+CMD ["python", "-m", "worker.runner"]
