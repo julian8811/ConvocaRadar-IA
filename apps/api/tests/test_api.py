@@ -20,7 +20,7 @@ from sqlalchemy import select  # noqa: E402
 
 from app.db.seed import seed  # noqa: E402
 from app.db.session import SessionLocal  # noqa: E402
-from app.core.ai import EMBEDDING_MODEL_VERSION  # noqa: E402
+from app.core.ai import embedding_model_version  # noqa: E402
 import app.main as app_main  # noqa: E402
 from app.main import app  # noqa: E402
 from app.models import Alert, Opportunity, OpportunityEmbedding, OpportunityScore, Organization, Role, Source, SourceRun, Task, User  # noqa: E402
@@ -1229,7 +1229,7 @@ def test_admin_rebuild_embeddings() -> None:
     finally:
         db.close()
     assert embedding is not None
-    assert embedding.model_version == EMBEDDING_MODEL_VERSION
+    assert embedding.model_version == embedding_model_version()
 
 
 def test_source_run_marks_degraded_when_no_candidates(monkeypatch) -> None:
