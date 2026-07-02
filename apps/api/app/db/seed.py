@@ -1,21 +1,27 @@
-﻿from sqlalchemy import select
+from sqlalchemy import select
 
 from app.db.session import SessionLocal, create_all
 from app.models import Organization, OrganizationProfile, Source
 
 
 def seed_default_sources(
-    db, organization: Organization, *, force: bool = False
+    db, organization: Organization, *, force: bool = False, bootstrap_mode: bool = False
 ) -> dict[str, int]:
     """Insert or refresh the default source catalog for an organization.
 
     Safety rules (PR4-1):
-    - If a source with the same key does not exist, INSERT it under the calling org.
+    - If a source with the same key does not exist, INSERT it under the calling org
+      (or as unowned when ``bootstrap_mode=True``).
     - If a source exists and is unowned (organization_id IS NULL), claim it
       under the calling org AND update its metadata.
     - If a source exists and is owned by another org, SKIP it — do not steal
       — unless ``force=True`` is passed (admin opt-in), in which case
       the org-ownership check is bypassed and the source is reassigned.
+
+    When ``bootstrap_mode=True`` all sources are created WITHOUT an organization_id
+    (``NULL``). This is used during the initial startup seed so that ANY org
+    can later claim the sources when they register, instead of locking them
+    to the bootstrap organization.
 
     Returns a stats dict with ``inserted``, ``updated``, ``skipped``, and
     ``total`` keys.
@@ -236,18 +242,18 @@ def seed_default_sources(
         {
             "key": "horizon-europe-sedia",
             "name": "Horizon Europe SEDIA API",
-            "base_url": "https://api.tech.ec.europa.eu/search-api/prod/rest/search",
+            "base_url": "https://ec.europa.eu/info/funding-tenders/opportunities/portal/screen/opportunities/calls-for-proposals",
             "country": "European Union",
             "region": "Europe",
-            "source_type": "api",
+            "source_type": "html",
             "category": ["grants", "research", "innovation", "horizon europe"],
-            "allowed_domains": ["api.tech.ec.europa.eu", "ec.europa.eu"],
+            "allowed_domains": ["ec.europa.eu"],
             "scraping_frequency": "daily",
         },
         {
             "key": "gates-foundation-grants",
-            "name": "Gates Foundation Open Opportunities",
-            "base_url": "https://www.gatesfoundation.org/about/how-we-work/grants",
+            "name": "Gates Foundation Grant Opportunities",
+            "base_url": "https://www.gatesfoundation.org/about/how-we-work/grant-opportunities",
             "country": "International",
             "region": "Global",
             "source_type": "html",
@@ -268,8 +274,8 @@ def seed_default_sources(
         },
         {
             "key": "colfuturo-convocatorias",
-            "name": "Colfuturo Convocatorias",
-            "base_url": "https://www.colfuturo.org/convocatorias/",
+            "name": "Colfuturo Crédito Beca",
+            "base_url": "https://www.colfuturo.org/programas/credito-beca/informacion-general",
             "country": "Colombia",
             "region": "LatAm",
             "source_type": "html",
@@ -378,13 +384,13 @@ def seed_default_sources(
         },
         {
             "key": "eic-accelerator",
-            "name": "EIC Accelerator (SEDIA)",
-            "base_url": "https://api.tech.ec.europa.eu/search-api/prod/rest/search",
+            "name": "EIC Accelerator (EU Funding)",
+            "base_url": "https://ec.europa.eu/info/funding-tenders/opportunities/portal/screen/opportunities/calls-for-proposals",
             "country": "European Union",
             "region": "Europe",
-            "source_type": "api",
+            "source_type": "html",
             "category": ["grants", "innovation", "startup", "eic accelerator"],
-            "allowed_domains": ["api.tech.ec.europa.eu", "ec.europa.eu"],
+            "allowed_domains": ["ec.europa.eu"],
             "scraping_frequency": "daily",
         },
         {
@@ -426,8 +432,8 @@ def seed_default_sources(
         # ================================================================
         {
             "key": "sena-convocatorias",
-            "name": "SENA Convocatorias",
-            "base_url": "https://www.sena.edu.co/es-co/trabajo/Paginas/convocatorias.aspx",
+            "name": "SENA Oferta Educativa",
+            "base_url": "https://oferta.senasofiaplus.edu.co/sofia-oferta/buscar-oferta-educativa.html",
             "country": "Colombia",
             "region": "LatAm",
             "source_type": "html",
@@ -449,7 +455,7 @@ def seed_default_sources(
         {
             "key": "camara-comercio-bogota",
             "name": "Cámara de Comercio de Bogotá — Convocatorias",
-            "base_url": "https://www.ccb.org.co/Transformar-Bogota/Convocatorias",
+            "base_url": "https://www.ccb.org.co/camara-comercio-bogota/nosotros/convocatorias",
             "country": "Colombia",
             "region": "LatAm",
             "source_type": "html",
@@ -482,7 +488,7 @@ def seed_default_sources(
         {
             "key": "findeter-convocatorias",
             "name": "Findeter Convocatorias",
-            "base_url": "https://www.findeter.gov.co/publicaciones/convocatorias",
+            "base_url": "https://www.findeter.gov.co/convocatorias",
             "country": "Colombia",
             "region": "LatAm",
             "source_type": "html",
@@ -570,7 +576,7 @@ def seed_default_sources(
         {
             "key": "universidad-antioquia",
             "name": "Universidad de Antioquia — Investigación",
-            "base_url": "https://www.udea.edu.co/wps/portal/udea/web/inicio/investigacion/convocatorias",
+            "base_url": "https://www.udea.edu.co/investigacion/convocatorias",
             "country": "Colombia",
             "region": "LatAm",
             "source_type": "html",
@@ -804,8 +810,8 @@ def seed_default_sources(
         },
         {
             "key": "bid-convocatorias",
-            "name": "BID — Convocatorias y Licitaciones",
-            "base_url": "https://www.iadb.org/es/convocatorias",
+            "name": "BID — Adquisiciones y Licitaciones",
+            "base_url": "https://www.iadb.org/en/how-we-can-work-together/procurement/procurement-projects",
             "country": "International",
             "region": "LatAm",
             "source_type": "html",
@@ -1356,7 +1362,7 @@ def seed_default_sources(
         {
             "key": "norad-norway",
             "name": "NORAD Noruega — Grants",
-            "base_url": "https://www.norad.no/en/front/grants/",
+            "base_url": "https://www.norad.no/en/for-partners/guides-and-tools/calls-for-proposals2/",
             "country": "Norway",
             "region": "Europe",
             "source_type": "html",
@@ -1367,7 +1373,7 @@ def seed_default_sources(
         {
             "key": "danida-denmark",
             "name": "DANIDA Dinamarca — Research Grants",
-            "base_url": "https://um.dk/en/danida/research/calls-for-proposals",
+            "base_url": "https://um.dk/en/danida",
             "country": "Denmark",
             "region": "Europe",
             "source_type": "html",
@@ -1403,7 +1409,7 @@ def seed_default_sources(
             continue
         db.add(
             Source(
-                organization_id=organization.id,
+                organization_id=None if bootstrap_mode else organization.id,
                 name=definition["name"],
                 key=definition["key"],
                 base_url=definition["base_url"],
@@ -1460,7 +1466,11 @@ def seed() -> None:
                 )
             )
 
-        seed_default_sources(db, organization)
+        # Create all 123 sources WITHOUT an organization_id (unowned).
+        # This allows ANY org to claim them when they register, via the
+        # query (organization_id IS NULL) in the sources endpoint and
+        # the seed_default_sources claim logic in enqueue_seed_default_sources.
+        seed_default_sources(db, organization, bootstrap_mode=True)
 
         db.commit()
     finally:
