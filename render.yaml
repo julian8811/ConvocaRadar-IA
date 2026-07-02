@@ -6,100 +6,35 @@ services:
     dockerfilePath: apps/api/Dockerfile
     plan: free
     autoDeploy: true
-    healthCheckPath: /api/v1/health
+    healthCheckPath: /health
     envVars:
+      - key: APP_ENV
+        value: production
+      - key: APP_NAME
+        value: ConvocaRadar IA
       - key: DATABASE_URL
-        sync: false
-      - key: REDIS_URL
         sync: false
       - key: JWT_SECRET
         sync: false
       - key: INTERNAL_API_KEY
         sync: false
       - key: BACKEND_URL
-        sync: false
+        value: https://convocaradar-api.onrender.com
       - key: FRONTEND_URL
-        sync: false
+        value: https://convocaradar-web.vercel.app
       - key: STORAGE_BACKEND
-        sync: false
-      - key: S3_ENDPOINT_URL
-        sync: false
-      - key: S3_ACCESS_KEY
-        sync: false
-      - key: S3_SECRET_KEY
-        sync: false
-      - key: S3_BUCKET
-        sync: false
-      - key: S3_REGION
-        sync: false
-      - key: SMTP_HOST
-        sync: false
-      - key: SMTP_PORT
-        sync: false
-      - key: SMTP_USER
-        sync: false
-      - key: SMTP_PASSWORD
-        sync: false
-      - key: SMTP_FROM
-        sync: false
-      - key: SMTP_USE_TLS
-        sync: false
-      - key: LLM_PROVIDER
-        sync: false
-      - key: OPENAI_API_KEY
-        sync: false
-      - key: EMBEDDING_MODEL
-        sync: false
-      - key: CHAT_MODEL
-        sync: false
+        value: local
+      - key: STORAGE_DIR
+        value: ./storage
       - key: SCRAPING_EXECUTION_MODE
-        value: worker
+        value: inline
       - key: USE_WORKER
+        value: "false"
+      - key: BOOTSTRAP_SOURCES_ON_STARTUP
         value: "true"
-
-  - type: worker
-    name: convocaradar-worker-beat
-    env: docker
-    rootDir: .
-    dockerfilePath: apps/worker/Dockerfile
-    plan: free
-    autoDeploy: true
-    envVars:
-      - key: DATABASE_URL
-        sync: false
-      - key: REDIS_URL
-        sync: false
-      - key: BACKEND_URL
-        sync: false
-      - key: INTERNAL_API_KEY
-        sync: false
-    dockerCommand: celery -A worker.app.celery_app beat --loglevel=info
-
-  - type: worker
-    name: convocaradar-worker
-    env: docker
-    rootDir: .
-    dockerfilePath: apps/worker/Dockerfile
-    plan: free
-    autoDeploy: true
-    envVars:
-      - key: DATABASE_URL
-        sync: false
-      - key: REDIS_URL
-        sync: false
-      - key: BACKEND_URL
-        sync: false
-      - key: INTERNAL_API_KEY
-        sync: false
-      - key: STORAGE_BACKEND
-        sync: false
-      - key: S3_ENDPOINT_URL
-        sync: false
-      - key: S3_ACCESS_KEY
-        sync: false
-      - key: S3_SECRET_KEY
-        sync: false
-      - key: S3_BUCKET
-        sync: false
-      - key: S3_REGION
-        sync: false
+      - key: BOOTSTRAP_SOURCES_BLOCKING
+        value: "false"
+      - key: LLM_PROVIDER
+        value: mock
+      - key: SMTP_HOST
+        value: ""
