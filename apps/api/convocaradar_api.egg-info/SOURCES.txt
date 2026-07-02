@@ -14,6 +14,7 @@ app/api/v1/auth.py
 app/api/v1/dashboard.py
 app/api/v1/internal.py
 app/api/v1/opportunities.py
+app/api/v1/ops.py
 app/api/v1/organizations.py
 app/api/v1/reports.py
 app/api/v1/router.py
@@ -23,6 +24,7 @@ app/core/ai.py
 app/core/config.py
 app/core/email.py
 app/core/logging.py
+app/core/rate_limit.py
 app/core/security.py
 app/core/storage.py
 app/core/task_queue.py
@@ -38,6 +40,8 @@ convocaradar_api.egg-info/entry_points.txt
 convocaradar_api.egg-info/requires.txt
 convocaradar_api.egg-info/top_level.txt
 tests/test_api.py
+tests/test_auth.py
+tests/test_change_password.py
 tests/test_compose_and_env.py
 tests/test_dashboard_health.py
 tests/test_dashboard_pipeline.py
@@ -45,7 +49,17 @@ tests/test_dashboard_summary_alias.py
 tests/test_dashboard_triage.py
 tests/test_deploy_workflow.py
 tests/test_exception_handlers.py
+tests/test_forgot_password.py
+tests/test_genai_admin.py
 tests/test_healthcheck.py
+tests/test_migrations.py
+tests/test_ops.py
+tests/test_password_changed_at_claim.py
+tests/test_rate_limit.py
 tests/test_register_perf.py
+tests/test_reset_password.py
+tests/test_schemas_password_recovery.py
 tests/test_security_docs_and_scanner.py
+tests/test_seed.py
+tests/test_sources.py
 tests/test_web_bundle_cleanup.py

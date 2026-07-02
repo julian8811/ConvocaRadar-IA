@@ -26,6 +26,10 @@ jobs:
     # on each deploy job, which made them SKIP (and the workflow report
     # success) when CI failed. The deploy jobs now `need` this gate so
     # the workflow correctly fails when CI is red.
+    #
+    # Note: CI has pre-existing flaky tests that fail non-deterministically.
+    # workflow_dispatch bypasses this gate so production can still be deployed
+    # while the flaky tests are being fixed.
     name: Check CI status
     if: ${{ github.event_name == 'workflow_run' }}
     runs-on: ubuntu-latest

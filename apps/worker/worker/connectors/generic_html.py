@@ -32,12 +32,89 @@ DATE_FIELDS = (
 
 
 class GenericHtmlConnector:
+    # Common URL path patterns that government/convocatoria portals use
+    FALLBACK_PATTERNS = (
+        "/convocatorias",
+        "/es/convocatorias",
+        "/convocatorias-abiertas",
+        "/convocatorias-concursos",
+        "/convocatorias-y-concursos",
+        "/convocatorias/",
+        "/oportunidades",
+        "/web/guest/convocatorias",
+        "/web/entidad/convocatorias",
+        "/tramites-y-servicios/convocatorias",
+        "/tramites-servicios/convocatorias",
+        "/seccion/convocatorias",
+        "/node/41",  # Common Drupal pattern
+    )
+
     def __init__(self, source_key: str, base_url: str) -> None:
         self.source_key = source_key
         self.base_url = base_url
+        self._resolved_url: str | None = None
+
+    async def _try_url(self, url: str) -> tuple[str, str, str] | None:
+        """Try fetching a URL, return (final_url, content, content_type) or None."""
+        try:
+            return await fetch_httpx_text(url, fallback_content_type="text/html")
+        except Exception:
+            return None
+
+    def _parent_paths(self, url: str) -> list[str]:
+        """Generate parent paths from most specific to domain root."""
+        parsed = urlparse(url)
+        domain = f"{parsed.scheme}://{parsed.hostname}"
+        paths = parsed.path.rstrip("/").split("/")
+        parents: list[str] = []
+        for i in range(len(paths), 0, -1):
+            parent = domain + "/".join(paths[:i])
+            if parent != url.rstrip("/"):
+                parents.append(parent)
+        parents.append(domain)
+        return parents
+
+    async def _resolve_base_url(self) -> str:
+        """Try original URL, then parent paths, fallback patterns, then homepage."""
+        # 1. Try original URL first
+        result = await self._try_url(self.base_url)
+        if result is not None:
+            self._resolved_url = result[0]
+            return self._resolved_url
+
+        # 2. Try parent paths (e.g. /a/b/c → /a/b, /a, /)
+        parsed = urlparse(self.base_url)
+        domain = f"{parsed.scheme}://{parsed.hostname}"
+
+        for parent in self._parent_paths(self.base_url):
+            if parent == domain:
+                continue  # Will try as last resort
+            result = await self._try_url(parent)
+            if result is not None:
+                self._resolved_url = result[0]
+                return self._resolved_url
+
+        # 3. Try common fallback patterns on domain root
+        for path in self.FALLBACK_PATTERNS:
+            test_url = urljoin(domain, path)
+            if test_url == self.base_url:
+                continue
+            result = await self._try_url(test_url)
+            if result is not None:
+                self._resolved_url = result[0]
+                return self._resolved_url
+
+        # 4. Last resort: try domain homepage and let parse() find convocatorias links
+        result = await self._try_url(domain)
+        if result is not None:
+            self._resolved_url = result[0]
+            return self._resolved_url
+
+        return self.base_url
 
     async def fetch(self) -> RawSourceResult:
-        final_url, content, content_type = await fetch_httpx_text(self.base_url, fallback_content_type="text/html")
+        resolved_url = await self._resolve_base_url()
+        final_url, content, content_type = await fetch_httpx_text(resolved_url, fallback_content_type="text/html")
         return RawSourceResult(
             source_key=self.source_key,
             url=final_url,
