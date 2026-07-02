@@ -2,16 +2,14 @@ FROM python:3.12-slim
 
 WORKDIR /app
 
-# Copy ALL application code first
-COPY apps/api/pyproject.toml .
-COPY apps/api/alembic.ini .
-COPY apps/api/migrations ./migrations
-COPY apps/api/app ./app
-COPY apps/worker/worker ./worker
+# Copy application code
+COPY apps/api .
 
-# Install dependencies (pyproject.toml has all deps)
-RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
-    pip install --no-cache-dir .
+# Install dependencies
+RUN pip install --no-cache-dir --upgrade pip && \
+    pip install --no-cache-dir fastapi uvicorn pydantic pydantic-settings \
+        sqlalchemy psycopg2-binary httpx python-dateutil email-validator \
+        alembic python-jose structlog pgvector
 
-# Start server (alembic + create_all + uvicorn)
-CMD ["sh", "-c", "alembic upgrade head 2>/dev/null; python -c 'from app.db.session import create_all; create_all()' 2>/dev/null; uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
+# Start server
+CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
