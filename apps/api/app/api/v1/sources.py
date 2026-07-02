@@ -3,10 +3,11 @@ import logging
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException
-from sqlalchemy import select
+from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_organization, get_current_user
+from app.db.seed import seed_default_sources
 from app.db.session import get_db, SessionLocal
 from app.models import Organization, Source, SourceRun, User
 from app.schemas import SourceCreate, SourceHealthRead, SourceRead, SourceRunRead, SourceUpdate
@@ -386,3 +387,31 @@ def get_source_health(
 ) -> SourceHealthRead:
     source = _get_source_for_org(db, source_id, organization)
     return _source_health(db, source)
+
+
+@router.post("/sources/claim-defaults")
+def claim_default_sources(
+    force: bool = False,
+    organization: Organization = Depends(get_current_organization),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict[str, int]:
+    """Claim or reseed the default source catalog for the calling org.
+
+    Any non-admin user can call this when their org has no sources.
+    With ``force=true``, even sources owned by another org are reassigned.
+    """
+    before_total = db.scalar(
+        select(func.count()).select_from(Source).where(
+            or_(Source.organization_id == organization.id, Source.organization_id.is_(None))
+        )
+    ) or 0
+    stats = seed_default_sources(db, organization, force=force)
+    after_total = db.scalar(
+        select(func.count()).select_from(Source).where(
+            or_(Source.organization_id == organization.id, Source.organization_id.is_(None))
+        )
+    ) or 0
+    db.commit()
+    audit(db, "claim_default_sources", "source", user, organization.id)
+    return {**stats, "force": force, "before_total": before_total, "after_total": after_total}
