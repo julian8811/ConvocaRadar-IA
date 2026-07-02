@@ -249,11 +249,13 @@ def run_source(
     db: Session = Depends(get_db),
 ) -> SourceRun:
     source = _get_source_for_org(db, source_id, organization)
-    # Use schedule_or_execute_source_run (not execute_source_run_locally) so
-    # heavy HTML sources (apc-colombia, minciencias, etc.) are dispatched to
-    # the Celery worker instead of blocking the request for 60-120s.
-    # See PR5 + services.py for the routing logic.
-    run = schedule_or_execute_source_run(db, source, organization_id=organization.id)
+    # Execute directly — Celery worker is not available (Render free tier).
+    # schedule_or_execute_source_run with prefer_worker_for_slow=True would
+    # try to enqueue, fail, delete, and recreate the SourceRun, which causes
+    # a 500 error on slow sources. Execute_locally avoids that entirely.
+    from app.services import execute_source_run_locally
+
+    run = execute_source_run_locally(db, source, organization_id=organization.id)
     audit(db, "run_source", "source_run", user, run.id)
     db.commit()
     db.refresh(run)
