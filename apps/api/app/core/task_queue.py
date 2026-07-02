@@ -61,22 +61,26 @@ def enqueue_scrape_source(
 
 
 def enqueue_seed_default_sources(organization_id: str) -> str | None:
-    """Dispatch seed_default_sources_for_org to Celery.
+    """Dispatch seed_default_sources_for_org to Celery (or inline fallback).
 
     GAP-1 (dashboard-redesign): this helper is called from POST /auth/register
     after the new user + organization are committed. It must never block the
-    request path; on any failure (broker down, network error, missing celery)
-    it logs a warning and returns ``None``. The bootstrap.py startup sweep
-    in apps/api/app/db/bootstrap.py covers cold-orgs as a safety net.
+    request path.
 
-    Returns the Celery task id on success, or ``None`` on any failure.
+    On any failure (broker down, network error, missing celery) it falls back
+    to inline execution via ``seed_default_sources`` so the new organization
+    always receives its default sources — even on Render free-tier where Redis
+    and Celery are not available.
+
+    Returns the Celery task id on success, or the literal ``"inline"`` when
+    the fallback path was used.
     """
     settings = get_settings()
     try:
         from celery import Celery
-    except ImportError as exc:
-        logger.warning("celery_not_available_for_seed_sources", org_id=organization_id, error=str(exc))
-        return None
+    except ImportError:
+        logger.info("seed_sources_celery_unavailable_falling_back_to_inline", org_id=organization_id)
+        return _seed_inline(organization_id)
 
     try:
         ssl_options = _redis_ssl_options(settings.redis_url)
@@ -93,8 +97,34 @@ def enqueue_seed_default_sources(organization_id: str) -> str | None:
         )
         return str(result.id)
     except Exception as exc:
-        logger.warning("seed_sources_enqueue_failed", org_id=organization_id, error=str(exc))
+        logger.warning("seed_sources_enqueue_failed_falling_back_to_inline", org_id=organization_id, error=str(exc))
+        return _seed_inline(organization_id)
+
+
+def _seed_inline(organization_id: str) -> str | None:
+    """Inline fallback: seed default sources directly without Celery."""
+    from sqlalchemy import select
+
+    from app.db.seed import seed_default_sources
+    from app.db.session import SessionLocal
+    from app.models import Organization
+
+    db = SessionLocal()
+    try:
+        organization = db.scalar(select(Organization).where(Organization.id == organization_id))
+        if organization is None:
+            logger.warning("seed_inline_org_not_found", org_id=organization_id)
+            return None
+        result = seed_default_sources(db, organization)
+        db.commit()
+        logger.info("seed_sources_inline_completed", org_id=organization_id, **result)
+        return "inline"
+    except Exception as exc:
+        db.rollback()
+        logger.exception("seed_inline_failed", org_id=organization_id, error=str(exc))
         return None
+    finally:
+        db.close()
 
 
 def task_payload(**kwargs: Any) -> dict[str, Any]:
