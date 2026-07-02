@@ -18,6 +18,31 @@ logger = logging.getLogger(__name__)
 struct_logger = structlog.get_logger(__name__)
 
 
+def _load_recent_runs_for_sources(db: Session, sources: list[Source]) -> dict[str, list[SourceRun]]:
+    """Batch-load the latest 10 SourceRun per source in a single query.
+
+    Returns ``{source_id: [SourceRun, ...]}`` ordered newest-first per source.
+    """
+    if not sources:
+        return {}
+    source_ids = [s.id for s in sources]
+    all_runs = list(
+        db.scalars(
+            select(SourceRun)
+            .where(SourceRun.source_id.in_(source_ids))
+            .order_by(SourceRun.source_id, SourceRun.created_at.desc())
+        )
+    )
+    result: dict[str, list[SourceRun]] = {}
+    for run in all_runs:
+        bucket = result.get(run.source_id)
+        if bucket is None:
+            result[run.source_id] = [run]
+        elif len(bucket) < 10:
+            bucket.append(run)
+    return result
+
+
 def _health_window_days(source: Source) -> int:
     frequency = (source.scraping_frequency or "").lower()
     if frequency in {"hourly", "every_hour"}:
@@ -83,15 +108,16 @@ def _get_source_for_org(db: Session, source_id: str, organization: Organization)
     return source
 
 
-def _source_health(db: Session, source: Source) -> SourceHealthRead:
-    raw_recent_runs = list(
-        db.scalars(
-            select(SourceRun)
-            .where(SourceRun.source_id == source.id)
-            .order_by(SourceRun.created_at.desc())
-            .limit(10)
+def _source_health(db: Session, source: Source, raw_recent_runs: list[SourceRun] | None = None) -> SourceHealthRead:
+    if raw_recent_runs is None:
+        raw_recent_runs = list(
+            db.scalars(
+                select(SourceRun)
+                .where(SourceRun.source_id == source.id)
+                .order_by(SourceRun.created_at.desc())
+                .limit(10)
+            )
         )
-    )
     recent_runs = [run for run in raw_recent_runs if run.status in {"success", "failed", "degraded"}]
     failures = sum(1 for run in recent_runs if run.status == "failed")
     recent_items_found = sum(run.items_found for run in recent_runs)
@@ -163,7 +189,8 @@ def list_sources_health(
             select(Source).where((Source.organization_id == organization.id) | (Source.organization_id.is_(None)))
         )
     )
-    return [_source_health(db, source) for source in sources]
+    runs_by_source = _load_recent_runs_for_sources(db, sources)
+    return [_source_health(db, source, runs_by_source.get(source.id, [])) for source in sources]
 
 
 @router.get("/sources/{source_id}", response_model=SourceRead)

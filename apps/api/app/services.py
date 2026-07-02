@@ -2345,11 +2345,32 @@ def get_source_health_summaries(
 
     source_scope = or_(Source.organization_id == organization_id, Source.organization_id.is_(None))
     sources = list(db.scalars(select(Source).where(source_scope)))
+
+    # Batch-load the latest 10 SourceRun per source (single query instead of N+1)
+    if sources:
+        source_ids = [s.id for s in sources]
+        all_runs = list(
+            db.scalars(
+                select(SourceRun)
+                .where(SourceRun.source_id.in_(source_ids))
+                .order_by(SourceRun.source_id, SourceRun.created_at.desc())
+            )
+        )
+        runs_by_source: dict[str, list[SourceRun]] = {}
+        for run in all_runs:
+            bucket = runs_by_source.get(run.source_id)
+            if bucket is None:
+                runs_by_source[run.source_id] = [run]
+            elif len(bucket) < 10:
+                bucket.append(run)
+    else:
+        runs_by_source = {}
+
     degraded = 0
     failing = 0
     alerts: list[DashboardSourceAlert] = []
     for source in sources:
-        health = _source_health_status(db, source)
+        health = _source_health_status(db, source, runs_by_source.get(source.id, []))
         if health == "degraded":
             degraded += 1
             if len(alerts) < 5:

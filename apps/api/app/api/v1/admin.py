@@ -50,15 +50,16 @@ def require_admin(user: User = Depends(get_current_user)) -> User:
     return user
 
 
-def _source_health_status(db: Session, source: Source) -> str:
-    raw_recent_runs = list(
-        db.scalars(
-            select(SourceRun)
-            .where(SourceRun.source_id == source.id)
-            .order_by(SourceRun.created_at.desc())
-            .limit(10)
+def _source_health_status(db: Session, source: Source, raw_recent_runs: list[SourceRun] | None = None) -> str:
+    if raw_recent_runs is None:
+        raw_recent_runs = list(
+            db.scalars(
+                select(SourceRun)
+                .where(SourceRun.source_id == source.id)
+                .order_by(SourceRun.created_at.desc())
+                .limit(10)
+            )
         )
-    )
     recent_runs = [run for run in raw_recent_runs if run.status in {"success", "failed", "degraded"}]
     failures = sum(1 for run in recent_runs if run.status == "failed")
     days_since_last_success = _days_since_last_success(recent_runs, source)
@@ -150,9 +151,30 @@ def get_admin_metrics(
     source_scope = or_(Source.organization_id == organization.id, Source.organization_id.is_(None))
     opportunity_scope = or_(Opportunity.organization_id == organization.id, Opportunity.organization_id.is_(None))
     sources = list(db.scalars(select(Source).where(source_scope)))
+
+    # Batch-load the latest 10 SourceRun per source (single query instead of N+1)
+    if sources:
+        source_ids = [s.id for s in sources]
+        all_runs = list(
+            db.scalars(
+                select(SourceRun)
+                .where(SourceRun.source_id.in_(source_ids))
+                .order_by(SourceRun.source_id, SourceRun.created_at.desc())
+            )
+        )
+        runs_by_source: dict[str, list[SourceRun]] = {}
+        for run in all_runs:
+            bucket = runs_by_source.get(run.source_id)
+            if bucket is None:
+                runs_by_source[run.source_id] = [run]
+            elif len(bucket) < 10:
+                bucket.append(run)
+    else:
+        runs_by_source = {}
+
     source_health_counts = {
-        "degraded": sum(1 for source in sources if _source_health_status(db, source) == "degraded"),
-        "failing": sum(1 for source in sources if _source_health_status(db, source) == "failing"),
+        "degraded": sum(1 for source in sources if _source_health_status(db, source, runs_by_source.get(source.id, [])) == "degraded"),
+        "failing": sum(1 for source in sources if _source_health_status(db, source, runs_by_source.get(source.id, [])) == "failing"),
     }
     stale_sources = sum(
         1
