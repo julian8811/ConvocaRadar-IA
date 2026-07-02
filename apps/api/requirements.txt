@@ -1,11 +1,11 @@
 fastapi
-uvicorn
+uvicorn[standard]
 pydantic
 pydantic-settings
 sqlalchemy
 alembic
 psycopg[binary]
-python-jose
+python-jose[cryptography]
 python-multipart
 structlog
 httpx
@@ -19,4 +19,7 @@ jinja2
 celery
 redis
 boto3
-sentry-sdk
+sentry-sdk[fastapi]
+tenacity
+playwright
+pypdf
