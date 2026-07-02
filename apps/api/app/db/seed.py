@@ -1,7 +1,37 @@
+import os
+
 from sqlalchemy import select
 
+from app.core.security import hash_password
 from app.db.session import SessionLocal, create_all
-from app.models import Organization, OrganizationProfile, Source
+from app.models import Organization, OrganizationProfile, Role, Source, User
+
+
+def _seed_admin_user(db, organization) -> None:
+    """Create the admin user from env vars if it doesn't exist yet.
+
+    Reads ``ADMIN_EMAIL`` (default: "admin@convocarad.ar") and ``ADMIN_PW``
+    from the environment (or a ``.env`` file loaded by pydantic-settings).
+    """
+    admin_email = os.environ.get("ADMIN_EMAIL", "admin@convocarad.ar")
+    admin_pw = os.environ.get("ADMIN_PW")
+    if not admin_pw:
+        return  # no password configured → skip
+
+    existing = db.scalar(
+        select(User).where(User.email == admin_email, User.organization_id == organization.id).limit(1),
+    )
+    if existing:
+        return  # already seeded
+
+    user = User(
+        email=admin_email,
+        name=f"Admin {admin_email.split('@')[0]}",
+        password_hash=hash_password(admin_pw),
+        role=Role.admin.value,
+        organization_id=organization.id,
+    )
+    db.add(user)
 
 
 def seed_default_sources(
@@ -1471,6 +1501,8 @@ def seed() -> None:
         # query (organization_id IS NULL) in the sources endpoint and
         # the seed_default_sources claim logic in enqueue_seed_default_sources.
         seed_default_sources(db, organization, bootstrap_mode=True)
+
+        _seed_admin_user(db, organization)
 
         db.commit()
     finally:
