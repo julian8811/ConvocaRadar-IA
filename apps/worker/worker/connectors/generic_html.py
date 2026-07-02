@@ -1,7 +1,7 @@
 import json
 import re
 from datetime import UTC, datetime
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 
 from selectolax.parser import HTMLParser
 
