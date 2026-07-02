@@ -13,3 +13,6 @@ python-dateutil
 email-validator
 pgvector
 selectolax
+reportlab
+openpyxl
+jinja2
