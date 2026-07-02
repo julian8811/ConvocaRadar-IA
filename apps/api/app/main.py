@@ -4,7 +4,35 @@ from collections import defaultdict, deque
 import logging
 import os
 import subprocess
+import sys
 import time
+from pathlib import Path
+
+# ── Python buildpack path fix ──────────────────────────────────────────────
+# Render's Python buildpack does NOT copy apps/worker/worker/ into the same
+# path tree that the Dockerfile builds.  To make "from worker.connectors..."
+# and "celery -A worker.app.celery_app" work in the Python buildpack, add the
+# worker package's parent directory to sys.path.
+#
+# Dockerfile layout (works):
+#   /app/          ← PYTHONPATH root
+#   ├── app/       ← apps/api/app/
+#   └── worker/    ← apps/worker/worker/   (copied by COPY instruction)
+#
+# Python buildpack layout (needs fix):
+#   /opt/render/…/src/
+#   ├── apps/api/app/     ← main.py lives here
+#   └── apps/worker/worker/  ← NOT on sys.path by default
+#
+# Path resolution (absolute):
+#   main.py          = /…/apps/api/app/main.py
+#   .parents[2]      = /…/apps/              → apps/
+#   .parents[2]/worker/worker/ = apps/worker/worker/  → the worker package
+#   .parents[2]/worker/        = apps/worker/         → parent (for import worker)
+_WORKER_PARENT = Path(__file__).resolve().parents[2] / "worker"
+if _WORKER_PARENT.is_dir():
+    sys.path.insert(0, str(_WORKER_PARENT))
+# ────────────────────────────────────────────────────────────────────────────
 
 import httpx
 import pydantic
