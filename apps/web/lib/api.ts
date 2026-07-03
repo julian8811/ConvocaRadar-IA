@@ -113,49 +113,62 @@ function isAuthPath(path: string) {
  * SEC-1.5: wrap fetch with an AbortController that fires after 12s.
  * Exposed for testing — production code uses the `api` object below.
  */
+/** Retry delay when the Render free-tier server is waking up (sleep -> wake takes ~30s). */
+const RETRY_DELAYS_MS = [3_000, 8_000, 15_000, 25_000, 40_000];
+
 export async function request<T>(path: string, init: RequestInit = {}, timeoutMs: number = REQUEST_TIMEOUT_MS): Promise<T> {
-  const controller = new AbortController();
-  const timeout = setTimeout(() => controller.abort(), timeoutMs);
+  const lastError: Error[] = [];
 
-  // Legacy Bearer fallback: only in non-production, only if a token is in
-  // localStorage. In production this is always null.
-  const legacyToken = readLegacyToken();
-  const headers: Record<string, string> = {
-    "Content-Type": "application/json",
-    ...(init.headers as Record<string, string> | undefined),
-  };
-  if (legacyToken) {
-    headers["Authorization"] = `Bearer ${legacyToken}`;
-  }
+  for (let attempt = 0; attempt <= RETRY_DELAYS_MS.length; attempt++) {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
-  try {
-    const response = await fetch(`${API_URL}${path}`, {
-      ...init,
-      signal: controller.signal,
-      credentials: "include",
-      headers,
-    });
-    if (!response.ok) {
-      const body = await response.json().catch(() => ({ detail: response.statusText }));
-      if (response.status === 401) {
-        // /auth/* 401s are real auth failures (wrong password, expired reset
-        // token, etc.) — surface the server's detail and DON'T auto-redirect.
-        // Other 401s mean our session is stale — handleUnauthorized will
-        // redirect to /login (its own /auth/* skip keeps these two branches
-        // in sync).
-        if (path.startsWith("/auth/")) {
-          throw new Error(body.detail ?? "Credenciales inválidas");
-        }
-        handleUnauthorized(path);
-        throw new Error("Sesión expirada. Redirigiendo al inicio de sesión.");
-      }
-      throw new Error(body.detail ?? "Request failed");
+    // Legacy Bearer fallback: only in non-production, only if a token is in
+    // localStorage. In production this is always null.
+    const legacyToken = readLegacyToken();
+    const headers: Record<string, string> = {
+      "Content-Type": "application/json",
+      ...(init.headers as Record<string, string> | undefined),
+    };
+    if (legacyToken) {
+      headers["Authorization"] = `Bearer ${legacyToken}`;
     }
-    if (response.status === 204) return undefined as T;
-    return response.json() as Promise<T>;
-  } finally {
-    clearTimeout(timeout);
+
+    try {
+      const response = await fetch(`${API_URL}${path}`, {
+        ...init,
+        signal: controller.signal,
+        credentials: "include",
+        headers,
+      });
+      if (!response.ok) {
+        const body = await response.json().catch(() => ({ detail: response.statusText }));
+        if (response.status === 401) {
+          if (path.startsWith("/auth/")) {
+            throw new Error(body.detail ?? "Credenciales inválidas");
+          }
+          handleUnauthorized(path);
+          throw new Error("Sesión expirada. Redirigiendo al inicio de sesión.");
+        }
+        throw new Error(body.detail ?? "Request failed");
+      }
+      if (response.status === 204) return undefined as T;
+      return response.json() as Promise<T>;
+    } catch (err) {
+      const isServerWaking =
+        err instanceof TypeError && (err.message === "Failed to fetch" || err.message.includes("TypeError"));
+      if (!isServerWaking || attempt >= RETRY_DELAYS_MS.length) {
+        throw err;
+      }
+      lastError.push(err as Error);
+      // Server is waking up (Render free tier), wait and retry
+      await new Promise((r) => setTimeout(r, RETRY_DELAYS_MS[attempt]));
+    } finally {
+      clearTimeout(timeout);
+    }
   }
+
+  throw lastError[lastError.length - 1] ?? new Error("Request failed after retries");
 }
 
 function filenameFromDisposition(disposition: string | null, fallback: string) {
