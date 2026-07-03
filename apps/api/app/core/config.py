@@ -27,7 +27,7 @@ class Settings(BaseSettings):
     sentry_send_default_pii: bool = False
     scraping_user_agent: str = "ConvocaRadarBot/0.1"
     scraping_timeout_seconds: int = 30
-    scraping_max_source_seconds: int = 90
+    scraping_max_source_seconds: int = 180
     scraping_max_concurrency: int = 5
     scraping_closing_soon_days: int = 10
     scraping_execution_mode: str = "inline"
