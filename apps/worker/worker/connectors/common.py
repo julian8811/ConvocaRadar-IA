@@ -42,38 +42,47 @@ async def render_page_html(
     navigation_timeout_ms = timeout_ms or settings.scraping_timeout_seconds * 1000
     from playwright.async_api import async_playwright
 
-    try:
-        async with async_playwright() as playwright:
-            browser = await launch_chromium(playwright)
-            try:
-                page = await browser.new_page(user_agent=request_user_agent)
+    for attempt in range(2):
+        try:
+            async with async_playwright() as playwright:
+                browser = await launch_chromium(playwright)
+                try:
+                    page = await browser.new_page(user_agent=request_user_agent)
 
-                async def _route_handler(route) -> None:
-                    if route.request.resource_type in PLAYWRIGHT_BLOCKED_RESOURCE_TYPES:
-                        await route.abort()
-                        return
-                    await route.continue_()
+                    async def _route_handler(route) -> None:
+                        if route.request.resource_type in PLAYWRIGHT_BLOCKED_RESOURCE_TYPES:
+                            await route.abort()
+                            return
+                        await route.continue_()
 
-                await page.route("**/*", _route_handler)
-                await page.goto(url, wait_until=wait_until, timeout=navigation_timeout_ms)
-                if wait_selector:
-                    try:
-                        await page.wait_for_selector(wait_selector, timeout=wait_selector_timeout_ms)
-                    except Exception:
-                        pass
-                if post_wait_ms > 0:
-                    await page.wait_for_timeout(post_wait_ms)
-                final_url = page.url
-                if _is_private_host(urlparse(final_url).hostname or ""):
-                    raise ValueError(f"Blocked redirect to unsafe URL: {final_url}")
-                return final_url, await page.content(), "text/html"
-            finally:
-                await browser.close()
-    except Exception as exc:
-        raise RuntimeError(
-            f"Playwright/Chromium not available: {exc}. "
-            "Install with: playwright install chromium"
-        ) from exc
+                    await page.route("**/*", _route_handler)
+                    await page.goto(url, wait_until=wait_until, timeout=navigation_timeout_ms)
+                    if wait_selector:
+                        try:
+                            await page.wait_for_selector(wait_selector, timeout=wait_selector_timeout_ms)
+                        except Exception:
+                            pass
+                    if post_wait_ms > 0:
+                        await page.wait_for_timeout(post_wait_ms)
+                    final_url = page.url
+                    if _is_private_host(urlparse(final_url).hostname or ""):
+                        raise ValueError(f"Blocked redirect to unsafe URL: {final_url}")
+                    return final_url, await page.content(), "text/html"
+                finally:
+                    await browser.close()
+        except Exception as exc:
+            if attempt == 0 and "Executable doesn't exist" in str(exc):
+                import subprocess, sys as _sys
+                _sys.stdout.flush()
+                subprocess.run(
+                    [_sys.executable, "-m", "playwright", "install", "chromium"],
+                    capture_output=True, timeout=180,
+                )
+                continue
+            raise RuntimeError(
+                f"Playwright/Chromium not available: {exc}. "
+                "Install with: playwright install chromium"
+            ) from exc
 
 
 def clean_text(value: str | None) -> str:
