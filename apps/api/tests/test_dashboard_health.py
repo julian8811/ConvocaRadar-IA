@@ -33,13 +33,13 @@ from pathlib import Path
 
 import pytest
 
-os.environ["DATABASE_URL"] = "sqlite:///./test_dashboard_health.db"
-os.environ["STORAGE_BACKEND"] = "local"
-os.environ["STORAGE_DIR"] = "./test_storage_health"
-os.environ["SMTP_HOST"] = ""
-os.environ["JWT_SECRET"] = "a" * 64
-os.environ["INTERNAL_API_KEY"] = "a" * 64
-os.environ["BOOTSTRAP_SOURCES_ON_STARTUP"] = "false"
+os.environ.setdefault("DATABASE_URL", "sqlite:///./test_dashboard_health.db")
+os.environ.setdefault("STORAGE_BACKEND", "local")
+os.environ.setdefault("STORAGE_DIR", "./test_storage_health")
+os.environ.setdefault("SMTP_HOST", "")
+os.environ.setdefault("JWT_SECRET", "a" * 64)
+os.environ.setdefault("INTERNAL_API_KEY", "a" * 64)
+os.environ.setdefault("BOOTSTRAP_SOURCES_ON_STARTUP", "false")
 
 Path("test_dashboard_health.db").unlink(missing_ok=True)
 
@@ -83,6 +83,9 @@ def _clean_opportunities() -> None:
         db.commit()
     finally:
         db.close()
+    # Clear the health cache so stale results from previous tests don't pollute
+    from app.api.v1.dashboard import _health_cache
+    _health_cache.clear()
     yield
 
 

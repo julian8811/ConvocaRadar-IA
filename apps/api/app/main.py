@@ -3,19 +3,6 @@ from collections.abc import AsyncIterator
 from collections import defaultdict, deque
 import logging
 import time
-from pathlib import Path
-
-# ── Connector library path fix ────────────────────────────────────────────
-# The API imports ``worker.connectors`` for inline scraping. On Render's
-# Python buildpack the worker package lives at:
-#   /opt/render/…/src/apps/worker/worker/
-# but is not on sys.path. Add the worker package's parent so
-# ``from worker.connectors…`` resolves at runtime.
-_WORKER_PARENT = Path(__file__).resolve().parents[2] / "worker"
-if _WORKER_PARENT.is_dir():
-    import sys
-    sys.path.insert(0, str(_WORKER_PARENT))
-# ────────────────────────────────────────────────────────────────────────────
 
 import httpx
 import pydantic

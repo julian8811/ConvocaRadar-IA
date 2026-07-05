@@ -744,7 +744,7 @@ def test_source_run_creates_real_opportunity_via_connector(monkeypatch) -> None:
             )()
 
         async def parse(self, raw):
-            from worker.connectors.base import OpportunityCandidate
+            from app.connectors.base import OpportunityCandidate
 
             return [
                 OpportunityCandidate(
@@ -764,7 +764,7 @@ def test_source_run_creates_real_opportunity_via_connector(monkeypatch) -> None:
             ]
 
         async def validate(self, candidate):
-            from worker.connectors.base import ValidationResult
+            from app.connectors.base import ValidationResult
 
             return ValidationResult(ok=True)
 
@@ -1053,7 +1053,7 @@ def test_source_run_marks_degraded_when_no_candidates(monkeypatch) -> None:
             return []
 
         async def validate(self, candidate):
-            from worker.connectors.base import ValidationResult
+            from app.connectors.base import ValidationResult
 
             return ValidationResult(ok=True)
 
@@ -1099,7 +1099,7 @@ def test_internal_connector_probe_returns_diagnostics(monkeypatch) -> None:
             )()
 
         async def parse(self, raw):
-            from worker.connectors.base import OpportunityCandidate
+            from app.connectors.base import OpportunityCandidate
 
             return [
                 OpportunityCandidate(
@@ -1112,7 +1112,7 @@ def test_internal_connector_probe_returns_diagnostics(monkeypatch) -> None:
             ]
 
         async def validate(self, candidate):
-            from worker.connectors.base import ValidationResult
+            from app.connectors.base import ValidationResult
 
             return ValidationResult(ok=True)
 

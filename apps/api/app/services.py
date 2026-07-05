@@ -64,7 +64,7 @@ from app.schemas import (
 
 
 def connector_for(source_key: str, base_url: str | None = None, source_type: str | None = None):
-    from worker.connectors.factory import connector_for as worker_connector_for
+    from app.connectors.factory import connector_for as worker_connector_for
 
     return worker_connector_for(source_key, base_url, source_type)
 
@@ -1675,7 +1675,7 @@ tbody tr:hover {{ background: rgba(13, 78, 94, 0.03); }}
 async def _render_pdf_with_playwright(html: str) -> bytes:
     from playwright.async_api import async_playwright
 
-    from worker.connectors.common import launch_chromium
+    from app.connectors.common import launch_chromium
 
     async with async_playwright() as playwright:
         browser = await launch_chromium(playwright)
