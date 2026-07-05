@@ -35,4 +35,14 @@ services:
       - key: EMBEDDING_MODEL
         value: ""
       - key: SMTP_HOST
+        value: smtp.resend.com
+      - key: SMTP_PORT
+        value: "587"
+      - key: SMTP_USER
+        value: resend
+      - key: SMTP_FROM
+        value: convocaradar <onboarding@resend.dev>
+      - key: SMTP_USE_TLS
+        value: "true"
+      - key: SMTP_HOST
         value: ""
