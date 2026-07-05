@@ -1,8 +1,15 @@
+import concurrent.futures
 from datetime import UTC, datetime
 import logging
+import threading as _base_threading
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException
+
+# Save the real threading.Thread so _background_sweep can restore it
+# temporarily when creating a ThreadPoolExecutor (avoids breakage when
+# tests monkeypatch threading.Thread).
+_original_thread_cls = _base_threading.Thread
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
@@ -340,15 +347,37 @@ def run_all_sources(
     )
 
     def _background_sweep() -> None:
+        from app.core.config import get_settings
+
+        settings = get_settings()
         db2 = SessionLocal()
         processed = 0
         failed = 0
         try:
             for source in due_sources:
                 fresh = db2.merge(source)
+                # Tests may monkeypatch threading.Thread to make
+                # background work run synchronously. ThreadPoolExecutor
+                # internally uses threading.Thread (lazily, during
+                # submit), so we temporarily restore the original class.
+                saved_thread = _base_threading.Thread
+                _base_threading.Thread = _original_thread_cls
+                executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+                fut = executor.submit(execute_source_run_locally, db2, fresh, org_id)
+                _base_threading.Thread = saved_thread
                 try:
-                    execute_source_run_locally(db2, fresh, organization_id=org_id)
+                    fut.result(timeout=settings.per_connector_timeout_seconds)
                     processed += 1
+                except concurrent.futures.TimeoutError:
+                    fut.cancel()
+                    failed += 1
+                    db2.rollback()
+                    struct_logger.error(
+                        "run_all.source_timeout",
+                        source_id=str(fresh.id),
+                        source_key=fresh.key,
+                        timeout_seconds=settings.per_connector_timeout_seconds,
+                    )
                 except Exception as exc:
                     # PR4-4: log the failure with full context so the
                     # run-all empty-run-list bug can be diagnosed from
@@ -364,6 +393,8 @@ def run_all_sources(
                         error_type=type(exc).__name__,
                         error_message=str(exc)[:500],
                     )
+                finally:
+                    executor.shutdown(wait=False)
             db2.commit()
             struct_logger.info(
                 "run_all.completed",
