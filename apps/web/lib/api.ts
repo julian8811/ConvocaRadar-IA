@@ -247,7 +247,7 @@ export const api = {
     // Same cold-start concern as login.
     request<{ access_token: string }>("/auth/register", { method: "POST", body: JSON.stringify(payload) }, 65_000),
   logout: () => request<{ detail: string }>("/auth/logout", { method: "POST" }),
-  me: () => request<{ name: string; email: string; role: string }>("/me"),
+  me: () => request<{ name: string; email: string; role: string }>("/me", {}, 30_000),
   // PR B-2 (dashboard-redesign): the new 3-zone endpoints. Each zone
   // (Triage / Pipeline / Health) calls its own endpoint independently
   // so a slow endpoint cannot block the others. dashboardSummary

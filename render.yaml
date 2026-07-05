@@ -41,7 +41,7 @@ services:
       - key: SMTP_USER
         value: resend
       - key: SMTP_FROM
-        value: convocaradar <onboarding@resend.dev>
+        value: ConvocaRadar IA <onboarding@resend.dev>
       - key: SMTP_USE_TLS
         value: "true"
       - key: SMTP_HOST
