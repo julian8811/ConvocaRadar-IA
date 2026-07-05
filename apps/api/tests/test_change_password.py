@@ -17,7 +17,7 @@ These tests are integration tests — they hit the real FastAPI app via
 
 from __future__ import annotations
 
-from datetime import datetime
+from datetime import UTC, datetime
 
 from fastapi.testclient import TestClient
 from sqlalchemy import select
@@ -126,14 +126,14 @@ def test_change_password_success_bumps_password_changed_at() -> None:
         password="old-password-2",
     )
     c = TestClient(app)
-    before = datetime.utcnow()
+    before = datetime.now(UTC)
     response = c.post(
         "/api/v1/auth/change-password",
         json={"current_password": "old-password-2", "new_password": "new-password-2"},
         headers={"Authorization": f"Bearer {token}"},
     )
     assert response.status_code == 204
-    after = datetime.utcnow()
+    after = datetime.now(UTC)
     user = _get_user("cp-bump@example.com")
     assert user is not None
     assert user.password_changed_at is not None, (
