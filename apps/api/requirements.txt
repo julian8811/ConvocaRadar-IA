@@ -16,8 +16,6 @@ selectolax
 reportlab
 openpyxl
 jinja2
-celery
-redis
 boto3
 sentry-sdk[fastapi]
 tenacity
