@@ -49,6 +49,22 @@ jobs:
     needs: ci-status
     runs-on: ubuntu-latest
     steps:
+      - name: Set LLM_API_KEY on Render
+        env:
+          RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
+          SERVICE_ID: ${{ env.RENDER_API_SERVICE_ID_API }}
+          LLM_KEY: ${{ secrets.LLM_API_KEY }}
+        run: |
+          echo "Setting LLM_API_KEY environment variable..."
+          curl -sS -X PATCH "${RENDER_API_BASE}/services/${SERVICE_ID}/env-vars" \
+            -H "Authorization: Bearer ${RENDER_API_KEY}" \
+            -H "Content-Type: application/json" \
+            -d "$(cat <<EOF
+          {"envVars": [{"key": "LLM_API_KEY", "value": "${LLM_KEY}"}]}
+          EOF
+          )" -o /tmp/render-env-result.txt -w "%{http_code}"
+          echo "LLM_API_KEY set (status: $(cat /tmp/render-env-result.txt))"
+
       - name: Trigger API redeploy via Render API
         env:
           RENDER_API_KEY: ${{ secrets.RENDER_API_KEY }}
