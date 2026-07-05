@@ -17,19 +17,6 @@ import structlog
 logger = structlog.get_logger(__name__)
 
 
-def enqueue_scrape_source(
-    source_key: str,
-    base_url: str,
-    source_type: str | None = None,
-    *,
-    source_run_id: str,
-    task_id: str,
-    countdown_seconds: int | None = None,
-) -> None:
-    """Inline-only execution. Always returns None — no Celery broker."""
-    return None
-
-
 def enqueue_seed_default_sources(organization_id: str) -> str | None:
     """Seed default sources inline (no Celery broker available).
 
@@ -58,6 +45,3 @@ def enqueue_seed_default_sources(organization_id: str) -> str | None:
     finally:
         db.close()
 
-
-def task_payload(**kwargs: object) -> dict[str, object]:
-    return {key: value for key, value in kwargs.items() if value is not None}
