@@ -15,7 +15,7 @@ env:
   RENDER_API_BASE: https://api.render.com/v1
   # convocaradar-api (the actual service the user tests, not the
   # historical convotracker-api which had a stale Dockerfile path)
-  RENDER_API_SERVICE_ID_API: srv-d8vs7e1o3t8c73blhubg
+  RENDER_API_SERVICE_ID_API: srv-d938h6m7r5hc73bo7u00
   RENDER_PRODUCTION_URL: https://convocaradar-ia.onrender.com
   VERCEL_PRODUCTION_URL: https://convocaradar-web.vercel.app
 
