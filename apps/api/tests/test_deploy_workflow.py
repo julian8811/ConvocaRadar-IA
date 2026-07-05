@@ -43,12 +43,8 @@ def test_workflow_triggers_correctly():
 
 def test_render_jobs_present():
     jobs = DATA.get("jobs", {})
-    # At least one Render job
-    render_jobs = [name for name in jobs if name.startswith("render-")]
-    assert render_jobs, "Missing Render deploy jobs (expected render-api, render-worker, render-beat)"
+    # Render-only API job (worker/beat removed — inline-only architecture)
     assert "render-api" in jobs, "Missing render-api job"
-    assert "render-worker" in jobs, "Missing render-worker job"
-    assert "render-beat" in jobs, "Missing render-beat job"
 
 
 def test_vercel_job_present():

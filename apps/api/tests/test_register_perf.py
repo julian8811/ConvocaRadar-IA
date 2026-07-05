@@ -1,9 +1,7 @@
 """GAP-1 (dashboard-redesign): POST /api/v1/auth/register must not block on
-``seed_default_sources``. The synchronous call caused 30 s+ timeouts on
-Render free tier; the fix is to enqueue the seeding work via Celery and
-return the JWT in <1 s. CI is hermetic — the tests monkey-patch the
-seed function and the Celery producer so no broker or DB writes are
-required to exercise the contract.
+``seed_default_sources``. After Celery/Redis removal, seeding runs inline
+within the API process — the important contract is that it returns <1 s
+and does not crash.
 """
 
 from __future__ import annotations
@@ -17,9 +15,8 @@ import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
-# Same env + sqlite convention as test_api.py; isolated file to keep the
-# perf assertions out of the general auth/seed contract tests.
-os.environ.setdefault("DATABASE_URL", "sqlite:///./test_register_perf.db")
+# Use a dedicated DB to avoid polluting the main test DB.
+os.environ["DATABASE_URL"] = "sqlite:///./test_register_perf.db"
 os.environ.setdefault("STORAGE_BACKEND", "local")
 os.environ.setdefault("STORAGE_DIR", "./test_storage_register_perf")
 os.environ.setdefault("SMTP_HOST", "")
@@ -93,22 +90,12 @@ def test_register_returns_under_1s(monkeypatch: pytest.MonkeyPatch) -> None:
     patch pushes the request past the budget. If WU-A4 dropped the
     import, the patch fails fast and the latency check is a smoke
     assertion on the decoupled path.
-
-    Also patch the Celery enqueue helper to a no-op so the latency
-    budget is measured against the request-path work only — CI has no
-    Redis broker and the real send_task call times out at ~20s.
     """
     def _slow(*_a: Any, **_k: Any) -> dict[str, int]:
         time.sleep(5)
         return {"inserted": 0, "updated": 0, "skipped": 0}
 
     inline_present = _try_patch_seed(monkeypatch, _slow)
-    # CI is broker-less: short-circuit the enqueue so it does not block
-    # on a real Redis connection (which would push elapsed well past 19s).
-    monkeypatch.setattr(
-        "app.api.v1.auth.enqueue_seed_default_sources",
-        lambda _org_id: "fake-task-id-ci",
-    )
 
     c = _client()
     started = time.perf_counter()
@@ -179,69 +166,44 @@ def test_register_does_not_call_seed_inline(monkeypatch: pytest.MonkeyPatch) -> 
     )
 
 
-# ── WU-A2: enqueue helper contract ────────────────────────────────────
+# ── WU-A2: enqueue helper contract (updated for inline-only) ────────────
 
 
-def test_enqueue_seed_default_sources_returns_task_id(monkeypatch: pytest.MonkeyPatch) -> None:
-    """Happy path: the helper dispatches via Celery and returns the task id."""
-    fake_id = "celery-task-id-12345"
-
-    class _Result:
-        id = fake_id
-
-    class _Celery:
-        def __init__(self, *_a: Any, **_k: Any) -> None:
-            self.sent: list[dict[str, Any]] = []
-
-        def conf_update(self, **_k: Any) -> None:
-            pass
-
-        def send_task(self, *args: Any, **kwargs: Any) -> _Result:
-            self.sent.append({"args": args, "kwargs": kwargs})
-            return _Result()
-
-    monkeypatch.setattr("celery.Celery", _Celery)
-
+def test_enqueue_seed_default_sources_returns_success() -> None:
+    """Inline helper returns 'inline' on success (no Celery broker)."""
     from app.core.task_queue import enqueue_seed_default_sources
-    assert enqueue_seed_default_sources("org-xyz") == fake_id
+
+    # The function needs a real org ID. Use the seeded org.
+    db = SessionLocal()
+    try:
+        from app.models import Organization
+        org = db.scalar(select(Organization).where(Organization.slug == "convocaradar-local"))
+        assert org is not None, "seeded org must exist"
+        org_id = org.id
+    finally:
+        db.close()
+
+    result = enqueue_seed_default_sources(org_id)
+    assert result == "inline", (
+        f"expected 'inline' for the seeded org, got {result!r}"
+    )
 
 
-def test_enqueue_seed_default_sources_returns_none_on_error(monkeypatch: pytest.MonkeyPatch) -> None:
-    """send_task raises → helper logs a warning and returns None (never raises)."""
-
-    class _Celery:
-        def __init__(self, *_a: Any, **_k: Any) -> None:
-            pass
-
-        def conf_update(self, **_k: Any) -> None:
-            pass
-
-        def send_task(self, *_a: Any, **_k: Any) -> None:
-            raise ConnectionError("celery broker down")
-
-    monkeypatch.setattr("celery.Celery", _Celery)
-
+def test_enqueue_seed_default_sources_returns_none_on_invalid_org() -> None:
+    """Invalid org ID → helper logs a warning and returns None."""
     from app.core.task_queue import enqueue_seed_default_sources
-    assert enqueue_seed_default_sources("org-broken") is None
+
+    assert enqueue_seed_default_sources("nonexistent-org-id") is None
 
 
-# ── WU-A6: warning on broker-down path ────────────────────────────────
+# ── WU-A6: log on seed failure ─────────────────────────────────────────
 
 
-def test_register_logs_warning_when_broker_down(monkeypatch: pytest.MonkeyPatch) -> None:
-    """If the enqueue helper returns None, the request still 200s and a
-    structlog warning is emitted so on-call sees the broker outage.
-
-    Structlog writes JSON to stdout directly (see app/core/logging.py),
-    so pytest's caplog fixture cannot capture it; we use
-    ``structlog.testing.capture_logs()`` instead.
+def test_register_logs_info_when_broker_down(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Enqueue returns 'inline' (not None) — request does not log a warning.
+    The helper no longer returns None on success; it always returns 'inline'.
     """
     import structlog
-
-    monkeypatch.setattr(
-        "app.api.v1.auth.enqueue_seed_default_sources",
-        lambda _org_id: None,
-    )
 
     c = _client()
     with structlog.testing.capture_logs() as captured:
@@ -249,11 +211,12 @@ def test_register_logs_warning_when_broker_down(monkeypatch: pytest.MonkeyPatch)
 
     assert response.status_code == 200, response.text
     assert "access_token" in response.json()
+    # No warning expected — the inline path always succeeds.
     warning_events = [
         log for log in captured
         if log.get("log_level") == "warning" and "seed" in log.get("event", "")
     ]
-    assert warning_events, (
-        f"expected a structlog warning mentioning seed sources, "
-        f"got events: {[log.get('event') for log in captured]}"
+    assert len(warning_events) == 0, (
+        f"expected NO warning events for seed, got {len(warning_events)}: "
+        f"{[log.get('event') for log in warning_events]}"
     )

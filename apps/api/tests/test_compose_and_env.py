@@ -41,7 +41,7 @@ REQUIRED_SECRETS = ("INTERNAL_API_KEY",)
 _BASH_SUBST_RE = re.compile(r"\$\{[A-Z_][A-Z0-9_]*:\?[^}]+\}")
 
 # SERVICES that need INTERNAL_API_KEY in their environment: block.
-_SERVICES_REQUIRING_INTERNAL_API_KEY = ("api", "worker", "worker-beat")
+_SERVICES_REQUIRING_INTERNAL_API_KEY = ("api",)
 
 # Banner text that MUST appear at the top of both .env files. The exact
 # wording is what the verify report asked for; we match loosely on key
