@@ -105,7 +105,7 @@ class MincitConvocatoriasConnector:
         return candidates
 
     async def parse(self, raw: RawSourceResult) -> list[OpportunityCandidate]:
-        return self._parse_blocks(raw.content)[:40]
+        return self._parse_blocks(raw.content)[:150]
 
     async def validate(self, candidate: OpportunityCandidate) -> ValidationResult:
         return ValidationResult(

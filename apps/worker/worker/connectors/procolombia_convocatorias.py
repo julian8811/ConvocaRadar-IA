@@ -100,7 +100,7 @@ class ProcolombiaConvocatoriasConnector:
                     or "/articulos/" in loc.lower()
                     or "/convocatorias/" in loc.lower()
                 )
-            ][:30]
+            ][:60]
         except Exception:
             conv_urls = []
 
@@ -125,7 +125,6 @@ class ProcolombiaConvocatoriasConnector:
                 PROCOLOMBIA_GDRIVE_FOLDER,
                 headers={"User-Agent": BROWSER_UA},
                 fallback_content_type="text/html",
-                playwright_fallback=False,
                 timeout_seconds=20,
             )
             gdrive_subfolders = _extract_gdrive_subfolder_names(gdrive_html)
@@ -254,7 +253,7 @@ class ProcolombiaConvocatoriasConnector:
                     )
                     seen.add(fb["url"])
 
-        return candidates[:40]
+        return candidates[:100]
 
     async def validate(self, candidate: OpportunityCandidate) -> ValidationResult:
         host = urlparse(candidate.official_url).hostname or ""

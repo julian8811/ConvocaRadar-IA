@@ -13,6 +13,9 @@ APC_URLS = [
     "https://www.apccolombia.gov.co/seccion/modalidades-de-cooperacion",
     "https://www.apccolombia.gov.co/seccion/modalidades-de-cooperacion?page=2",
     "https://www.apccolombia.gov.co/seccion/modalidades-de-cooperacion?page=3",
+    "https://www.apccolombia.gov.co/seccion/modalidades-de-cooperacion?page=4",
+    "https://www.apccolombia.gov.co/seccion/modalidades-de-cooperacion?page=5",
+    "https://www.apccolombia.gov.co/seccion/modalidades-de-cooperacion?page=6",
     "https://www.apccolombia.gov.co/modalidades-de-cooperacion/convocatorias/otras-convocatorias",
 ]
 
@@ -95,7 +98,7 @@ class ApcColombiaConnector:
             summary = f"{status}. {summary}".strip()
         date_match = re.search(r"(\d{2}/\d{2}/\d{4}|\d{4}-\d{2}-\d{2})", container_text)
         open_date = parse_date_text(date_match.group(1) if date_match else container_text)
-        if _is_closed_text(f"{title} {container_text}"):
+        if _is_closed_text(title):
             return None
         return OpportunityCandidate(
             title=title[:180],
@@ -129,7 +132,7 @@ class ApcColombiaConnector:
                     candidates.append(candidate)
 
         if candidates:
-            return candidates[:50]
+            return candidates[:150]
 
         for page in pages:
             page_url = str(page["url"])
@@ -160,7 +163,7 @@ class ApcColombiaConnector:
                         language="es",
                     )
                 )
-        return candidates[:50]
+        return candidates[:100]
 
     async def validate(self, candidate: OpportunityCandidate) -> ValidationResult:
         if not candidate.title or not candidate.official_url:

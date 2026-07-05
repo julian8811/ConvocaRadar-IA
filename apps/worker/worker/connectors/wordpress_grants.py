@@ -159,7 +159,7 @@ class WordPressGrantsConnector:
                     close_date=close_date,
                 )
             )
-        return candidates[:120]
+        return candidates[:200]
 
     async def validate(self, candidate: OpportunityCandidate) -> ValidationResult:
         if not candidate.title or not candidate.official_url:

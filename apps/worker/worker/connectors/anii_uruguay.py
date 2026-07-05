@@ -37,15 +37,21 @@ class AniiUruguayConnector:
     async def fetch(self) -> RawSourceResult:
         pages: list[dict[str, str]] = []
         final_url = self.base_url
-        for url in ANII_CATEGORY_URLS:
-            page_url, content, _ = await fetch_httpx_text(
-                url,
-                headers={"User-Agent": BROWSER_UA},
-                fallback_content_type="text/html",
-                playwright_fallback=False,
-            )
-            final_url = page_url
-            pages.append({"url": page_url, "content": content})
+        for category_url in ANII_CATEGORY_URLS:
+            for page_num in range(3):
+                page_url = f"{category_url}?page={page_num}" if page_num > 0 else category_url
+                try:
+                    page_url_resolved, content, _ = await fetch_httpx_text(
+                        page_url,
+                        headers={"User-Agent": BROWSER_UA},
+                        fallback_content_type="text/html",
+                        playwright_fallback=False,
+                    )
+                    if page_num == 0:
+                        final_url = page_url_resolved
+                    pages.append({"url": page_url_resolved, "content": content})
+                except Exception:
+                    break
         combined = "\n".join(
             f"<!-- page:{page['url']} -->\n{page['content']}" for page in pages
         )
@@ -83,10 +89,7 @@ class AniiUruguayConnector:
                 if not ANII_CONVOCATORIA_PATTERN.search(path):
                     continue
                 lowered_title = title.lower()
-                lowered_href = href.lower()
                 if any(keyword in lowered_title for keyword in NOISE_TITLES):
-                    continue
-                if any(keyword in lowered_href for keyword in CLOSED_KEYWORDS):
                     continue
                 if any(keyword in lowered_title for keyword in ("informe", "resolución", "resolucion", "pdf")):
                     continue
@@ -114,7 +117,7 @@ class AniiUruguayConnector:
                         language="es",
                     )
                 )
-        return candidates[:80]
+        return candidates[:200]
 
     async def validate(self, candidate: OpportunityCandidate) -> ValidationResult:
         host = urlparse(candidate.official_url).hostname or ""
