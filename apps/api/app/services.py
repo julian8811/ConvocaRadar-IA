@@ -108,21 +108,6 @@ def source_due_for_scraping(source: Source, *, now: datetime | None = None) -> b
     return elapsed >= timedelta(days=1)
 
 
-def schedule_or_execute_source_run(
-    db: Session,
-    source: Source,
-    *,
-    organization_id: str | None = None,
-    prefer_worker_for_slow: bool = True,
-) -> SourceRun:
-    """Execute a source scrape inline — Celery/Redis have been removed.
-
-    All sources, including slow ones, run directly within the API
-    process. This simplifies the architecture and avoids the need for
-    a separate worker service or Redis broker.
-    """
-    return execute_source_run_locally(db, source, organization_id=organization_id)
-
 def slugify(value: str) -> str:
     value = re.sub(r"[^a-zA-Z0-9]+", "-", value.lower()).strip("-")
     return value or "item"

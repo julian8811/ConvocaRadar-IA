@@ -11,7 +11,7 @@ from app.db.seed import seed_default_sources
 from app.db.session import get_db, SessionLocal
 from app.models import Organization, Source, SourceRun, User
 from app.schemas import SourceCreate, SourceHealthRead, SourceRead, SourceRunRead, SourceUpdate
-from app.services import audit, execute_source_run_locally, schedule_or_execute_source_run, source_due_for_scraping, validate_source_url
+from app.services import audit, execute_source_run_locally, source_due_for_scraping, validate_source_url
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
