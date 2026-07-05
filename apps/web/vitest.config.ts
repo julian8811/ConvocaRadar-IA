@@ -14,5 +14,8 @@ export default defineConfig({
     css: false,
     environment: "happy-dom",
     setupFiles: [],
+    // SEC-RENDER-STARTUP: request() retry mechanism now delays up to ~91s.
+    // Increase testTimeout so the TypeError retry test doesn't time out.
+    testTimeout: 120_000,
   },
 });
