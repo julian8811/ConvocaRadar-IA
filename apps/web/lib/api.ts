@@ -105,10 +105,6 @@ function handleUnauthorized(path: string) {
   }
 }
 
-function isAuthPath(path: string) {
-  return path.startsWith("/auth/");
-}
-
 /**
  * SEC-1.5: wrap fetch with an AbortController that fires after 12s.
  * Exposed for testing — production code uses the `api` object below.

@@ -28,10 +28,6 @@ function formatNumber(value: number) {
   return new Intl.NumberFormat("es-CO", { maximumFractionDigits: 0 }).format(value);
 }
 
-function formatPercent(value: number) {
-  return `${Math.round(value)}%`;
-}
-
 function ClosingSoon7dWidget({ items }: { items: TriageOpportunityItem[] }) {
   if (items.length === 0) {
     return (
