@@ -2,35 +2,18 @@ from contextlib import asynccontextmanager
 from collections.abc import AsyncIterator
 from collections import defaultdict, deque
 import logging
-import os
-import subprocess
-import sys
 import time
 from pathlib import Path
 
-# ── Python buildpack path fix ──────────────────────────────────────────────
-# Render's Python buildpack does NOT copy apps/worker/worker/ into the same
-# path tree that the Dockerfile builds.  To make "from worker.connectors..."
-# and "celery -A worker.app.celery_app" work in the Python buildpack, add the
-# worker package's parent directory to sys.path.
-#
-# Dockerfile layout (works):
-#   /app/          ← PYTHONPATH root
-#   ├── app/       ← apps/api/app/
-#   └── worker/    ← apps/worker/worker/   (copied by COPY instruction)
-#
-# Python buildpack layout (needs fix):
-#   /opt/render/…/src/
-#   ├── apps/api/app/     ← main.py lives here
-#   └── apps/worker/worker/  ← NOT on sys.path by default
-#
-# Path resolution (absolute):
-#   main.py          = /…/apps/api/app/main.py
-#   .parents[2]      = /…/apps/              → apps/
-#   .parents[2]/worker/worker/ = apps/worker/worker/  → the worker package
-#   .parents[2]/worker/        = apps/worker/         → parent (for import worker)
+# ── Connector library path fix ────────────────────────────────────────────
+# The API imports ``worker.connectors`` for inline scraping. On Render's
+# Python buildpack the worker package lives at:
+#   /opt/render/…/src/apps/worker/worker/
+# but is not on sys.path. Add the worker package's parent so
+# ``from worker.connectors…`` resolves at runtime.
 _WORKER_PARENT = Path(__file__).resolve().parents[2] / "worker"
 if _WORKER_PARENT.is_dir():
+    import sys
     sys.path.insert(0, str(_WORKER_PARENT))
 # ────────────────────────────────────────────────────────────────────────────
 
@@ -72,63 +55,6 @@ if settings.sentry_dsn:
         logger.warning("Sentry DSN configured but sentry-sdk is not installed")
 
 
-# In-process Celery worker + beat. Render's free plan does not allow
-# background workers, so we run the Celery worker as a child process
-# inside the API container. Both share the same Python interpreter
-# and the same Redis broker; the worker picks up tasks enqueued by
-# the API (e.g. seed_default_sources_for_org on register). beat
-# schedules the periodic 30-min scrape + 5-min alert sweep.
-_INPROCESS_CELERY_WORKER: subprocess.Popen | None = None
-_INPROCESS_CELERY_BEAT: subprocess.Popen | None = None
-
-
-def _start_inprocess_celery() -> None:
-    """Spawn Celery worker + beat as detached subprocesses.
-
-    Failures are non-fatal: the API must keep starting even if Redis
-    is unreachable, because bootstrap.py will retry there too. Logs go
-    to /tmp/celery-{worker,beat}.log so they show up in Render's
-    "Logs" tab alongside the API's stdout.
-    """
-    global _INPROCESS_CELERY_WORKER, _INPROCESS_CELERY_BEAT
-    if os.getenv("DISABLE_INPROCESS_CELERY") == "1":
-        return
-    common = ["celery", "-A", "worker.app.celery_app", "--loglevel=info"]
-    try:
-        _INPROCESS_CELERY_WORKER = subprocess.Popen(
-            common + ["worker"],
-            stdout=open("/tmp/celery-worker.log", "ab"),
-            stderr=subprocess.STDOUT,
-        )
-        struct_logger.info("inprocess_celery_worker_started", pid=_INPROCESS_CELERY_WORKER.pid)
-    except Exception as exc:  # pragma: no cover - defensive
-        struct_logger.warning("inprocess_celery_worker_start_failed", error=str(exc))
-    try:
-        _INPROCESS_CELERY_BEAT = subprocess.Popen(
-            common + ["beat"],
-            stdout=open("/tmp/celery-beat.log", "ab"),
-            stderr=subprocess.STDOUT,
-        )
-        struct_logger.info("inprocess_celery_beat_started", pid=_INPROCESS_CELERY_BEAT.pid)
-    except Exception as exc:  # pragma: no cover - defensive
-        struct_logger.warning("inprocess_celery_beat_start_failed", error=str(exc))
-
-
-def _stop_inprocess_celery() -> None:
-    """Terminate the worker + beat subprocesses on API shutdown."""
-    for proc, name in [
-        (_INPROCESS_CELERY_WORKER, "celery_worker"),
-        (_INPROCESS_CELERY_BEAT, "celery_beat"),
-    ]:
-        if proc is None or proc.poll() is not None:
-            continue
-        try:
-            proc.terminate()
-            proc.wait(timeout=10)
-            struct_logger.info("inprocess_celery_stopped", component=name, pid=proc.pid)
-        except subprocess.TimeoutExpired:
-            proc.kill()
-            struct_logger.warning("inprocess_celery_killed_after_timeout", component=name)
 
 
 async def _run_periodic_source_sweep(interval_seconds: int = 1800) -> None:
@@ -229,18 +155,14 @@ async def _run_periodic_source_sweep(interval_seconds: int = 1800) -> None:
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     create_all()
     ensure_bootstrap_data()
-    _start_inprocess_celery()
-    # Background scheduler: every 30 minutes, run all enabled sources.
-    # Redis is not available on the free tier, so we use an asyncio
-    # loop instead of the Celery beat schedule. The loop is a daemon
-    # task — it does not block the API and retries on failure.
+    # Background scheduler: every 30 minutes, run all enabled sources
+    # via an asyncio loop instead of a Celery beat schedule.
     import asyncio
     scheduler_task = asyncio.create_task(_run_periodic_source_sweep())
     try:
         yield
     finally:
         scheduler_task.cancel()
-        _stop_inprocess_celery()
 
 
 app = FastAPI(title=settings.app_name, version="0.1.0", lifespan=lifespan)

@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_organization, get_current_user
 from app.db.session import get_db
-from app.core.task_queue import enqueue_scrape_source
+from app.services import execute_source_run_locally
 from app.models import Alert, AuditLog, Opportunity, OpportunityEmbedding, Organization, Report, Role, Source, SourceRun, Task, User
 from app.schemas import AdminMetricsRead, AuditLogRead, SourceRunOverviewRead
 from app.db.bootstrap import bootstrap_priority_sources
@@ -416,51 +416,7 @@ def retry_degraded_sources_admin(
         if pending_task:
             skipped += 1
             continue
-        started_at = datetime.now(UTC).replace(tzinfo=None)
-        run = SourceRun(
-            source_id=source.id,
-            status="scheduled",
-            started_at=None,
-            logs=[{"level": "info", "message": "Retry scheduled from admin", "health": health}],
-        )
-        db.add(run)
-        db.flush()
-        task = Task(
-            organization_id=source.organization_id,
-            source_run_id=run.id,
-            task_type="scrape_source",
-            provider="celery",
-            status="scheduled",
-            started_at=started_at,
-            payload={"source_key": source.key, "base_url": source.base_url, "source_type": source.source_type},
-        )
-        db.add(task)
-        db.flush()
-        external_id = enqueue_scrape_source(
-            source.key,
-            source.base_url,
-            source.source_type,
-            source_run_id=run.id,
-            task_id=task.id,
-            countdown_seconds=900,
-        )
-        if not external_id:
-            db.delete(task)
-            db.delete(run)
-            db.flush()
-            execute_source_run_locally(db, source, organization_id=source.organization_id)
-            scheduled += 1
-            continue
-        task.external_id = external_id
-        task.result = {"message": "Retry scheduled in 15 minutes", "health": health}
-        db.add(
-            AuditLog(
-                organization_id=source.organization_id,
-                action="schedule_source_retry",
-                resource_type="source_run",
-                resource_id=run.id,
-            )
-        )
+        execute_source_run_locally(db, source, organization_id=source.organization_id)
         scheduled += 1
     db.commit()
     return {"sources_checked": len(sources), "scheduled": scheduled, "skipped": skipped}

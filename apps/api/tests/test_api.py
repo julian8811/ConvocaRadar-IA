@@ -911,25 +911,25 @@ def test_failed_source_run_creates_health_alert() -> None:
     assert any("grants-gov" in alert.message for alert in alerts)
 
 
-def test_retry_degraded_sources_schedules_retry(monkeypatch) -> None:
+def test_retry_degraded_sources_runs_inline(monkeypatch) -> None:
+    """After Celery removal, retry-degraded runs the source inline."""
     c = client()
-    import app.api.v1.internal as internal_api
-
-    monkeypatch.setattr(internal_api, "enqueue_scrape_source", lambda *args, **kwargs: "celery-retry-123")
+    source_id: str | None = None
     db = SessionLocal()
     try:
         source = db.scalar(select(Source).where(Source.key == "grants-gov"))
         assert source is not None
+        source_id = source.id
         task_ids = list(
             db.scalars(
                 select(Task.id)
                 .join(SourceRun, SourceRun.id == Task.source_run_id)
-                .where(SourceRun.source_id == source.id)
+                .where(SourceRun.source_id == source_id)
             )
         )
         if task_ids:
             db.query(Task).filter(Task.id.in_(task_ids)).delete(synchronize_session=False)
-        run = SourceRun(source_id=source.id, status="failed", items_found=0, items_created=0, items_updated=0, logs=[])
+        run = SourceRun(source_id=source_id, status="failed", items_found=0, items_created=0, items_updated=0, logs=[])
         db.add(run)
         db.commit()
     finally:
@@ -946,18 +946,17 @@ def test_retry_degraded_sources_schedules_retry(monkeypatch) -> None:
     db = SessionLocal()
     try:
         alerts = list(db.scalars(select(Alert).where(Alert.alert_type == "source_health")))
-        scheduled_runs = list(db.scalars(select(SourceRun).where(SourceRun.status == "scheduled")))
+        # Source runs are now executed inline, so they won't stay in "scheduled" status.
+        created_runs = list(db.scalars(select(SourceRun).where(SourceRun.source_id == source_id)))
     finally:
         db.close()
     assert alerts
-    assert scheduled_runs
+    assert len(created_runs) >= 2  # original failed + new inline run
 
 
-def test_admin_retry_degraded_sources_schedules_retry(monkeypatch) -> None:
+def test_admin_retry_degraded_sources_runs_inline(monkeypatch) -> None:
+    """After Celery removal, admin retry-degraded runs the source inline."""
     c = client()
-    import app.api.v1.admin as admin_api
-
-    monkeypatch.setattr(admin_api, "enqueue_scrape_source", lambda *args, **kwargs: "celery-admin-retry-123")
     db = SessionLocal()
     try:
         source = db.scalar(select(Source).where(Source.key == "grants-gov"))
