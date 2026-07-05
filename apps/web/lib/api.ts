@@ -152,7 +152,8 @@ export async function request<T>(path: string, init: RequestInit = {}, timeoutMs
       return response.json() as Promise<T>;
     } catch (err) {
       const isServerWaking =
-        err instanceof TypeError && (err.message === "Failed to fetch" || err.message.includes("TypeError"));
+        err instanceof TypeError && (err.message === "Failed to fetch" || err.message.includes("TypeError"))
+        || err instanceof DOMException && err.name === "AbortError";
       if (!isServerWaking || attempt >= RETRY_DELAYS_MS.length) {
         throw err;
       }
@@ -234,12 +235,17 @@ export async function downloadOpportunityDocument(doc: OpportunityDocument) {
 
 export const api = {
   login: (email: string, password: string) =>
+    // SEC-RENDER-STARTUP: Render free tier cold-starts in 30-60s. Use 65s
+    // timeout so the first request after idle doesn't get aborted before
+    // the server wakes up. The retry mechanism in request() handles
+    // additional connection errors during wake-up.
     request<{ access_token: string }>("/auth/login", {
       method: "POST",
       body: JSON.stringify({ email, password }),
-    }),
+    }, 65_000),
   register: (payload: Record<string, unknown>) =>
-    request<{ access_token: string }>("/auth/register", { method: "POST", body: JSON.stringify(payload) }),
+    // Same cold-start concern as login.
+    request<{ access_token: string }>("/auth/register", { method: "POST", body: JSON.stringify(payload) }, 65_000),
   logout: () => request<{ detail: string }>("/auth/logout", { method: "POST" }),
   me: () => request<{ name: string; email: string; role: string }>("/me"),
   // PR B-2 (dashboard-redesign): the new 3-zone endpoints. Each zone
