@@ -1,22 +1,16 @@
 name: keep-alive
 
-# PR6: keep Render Free worker + beat service awake.
+# PR6: keep Render Free service awake.
 #
-# Render's free tier spins down web and worker services after 15 minutes
-# of inactivity. Cold starts take 30-60s and (worse) the worker drop
-# also takes a few minutes to reconnect to the Redis broker — during
-# which time any ``scrape_source`` task we enqueue is queued but not
-# processed. The previous on-call saw 3-4 minute gaps in worker
-# throughput every time the worker slept.
+# Render's free tier spins down web services after 15 minutes of
+# inactivity. Cold starts take 30-60s and cause "signal is aborted"
+# errors on the frontend.
 #
 # Pinging the API's ``/api/v1/health`` endpoint every 14 minutes keeps
-# BOTH the API and the worker warm: the API has its own background
-# keep-alive now, and the worker follows the API's health schedule via
-# the periodic Celery beat jobs. The 14-minute cadence is intentionally
-# one minute under Render's 15-minute sleep threshold so we never lose
-# the race.
+# the service warm. The 14-minute cadence is intentionally one minute
+# under Render's 15-minute sleep threshold so we never lose the race.
 #
-# Secret: BACKEND_URL (e.g. https://convotracker-api.onrender.com).
+# Secret: BACKEND_URL (e.g. https://convocaradar-ia.onrender.com).
 # This is set in the GitHub repo's Settings → Secrets → Actions.
 # ``--max-time 10`` caps the curl so a slow Render response never
 # blocks the runner.
