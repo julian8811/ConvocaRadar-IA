@@ -10,7 +10,7 @@ from worker.connectors.base import OpportunityCandidate, RawSourceResult, Valida
 from worker.connectors.common import clean_text, fetch_httpx_text, launch_chromium, parse_date_text
 
 
-INNPULSA_API_URL = "https://convocatorias.innpulsacolombia.com/api/convocatorias?active_only=true&include_private=false&include_archive=false"
+INNPULSA_API_URL = "https://convocatorias.innpulsacolombia.com/api/convocatorias?active_only=false&include_private=false&include_archive=false"
 INNPULSA_SITE_URL = "https://www.innpulsacolombia.com/convocatorias.html"
 INNPULSA_DETAIL_BASE = "https://convocatorias.innpulsacolombia.com/convocatoria/"
 INNPULSA_CLOSED_KEYWORDS = ("cerrada", "cerrado", "closed", "archivada", "archived", "finalizada", "finalized")
@@ -116,7 +116,6 @@ class InnpulsaConnector:
         status_lower = status.lower()
         if (
             status_lower in {"closed", "cerrada", "cerrado", "archived", "finalizada", "finished"}
-            or _is_closed_text(f"{title} {description} {status} {category} {purpose} {benefits}")
             or _is_past(parse_date_text(str(item.get("end_date") or "")))
         ):
             return None
@@ -278,7 +277,7 @@ class InnpulsaConnector:
                 seen.add(candidate.official_url)
                 candidates.append(candidate)
             if candidates:
-                return candidates[:60]
+                return candidates[:200]
 
         browser_cards = raw.metadata.get("cards") or []
         if browser_cards:
@@ -306,7 +305,7 @@ class InnpulsaConnector:
                     )
                 )
             if candidates:
-                return candidates[:50]
+                return candidates[:100]
 
         tree = HTMLParser(raw.content)
         candidates: list[OpportunityCandidate] = []
@@ -328,7 +327,7 @@ class InnpulsaConnector:
                 continue
             seen.add(candidate.official_url)
             candidates.append(candidate)
-        return candidates[:50]
+        return candidates[:100]
 
     async def validate(self, candidate: OpportunityCandidate) -> ValidationResult:
         if not candidate.title or not candidate.official_url:

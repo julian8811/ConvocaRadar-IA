@@ -74,24 +74,33 @@ class MincienciasConnector:
         self.base_url = base_url or MINCIENCIAS_URL
 
     async def fetch(self) -> RawSourceResult:
-        try:
-            final_url, content, content_type = await fetch_httpx_text(self.base_url, fallback_content_type="text/html")
-        except Exception:
-            from worker.config import get_settings
+        pages: list[dict[str, str]] = []
+        final_url = self.base_url
+        for page_num in range(5):
+            page_url = f"{self.base_url}?page={page_num}"
+            try:
+                url, content, content_type = await fetch_httpx_text(page_url, fallback_content_type="text/html")
+                pages.append({"url": url, "content": content, "content_type": content_type})
+                if page_num == 0:
+                    final_url = url
+            except Exception:
+                from worker.config import get_settings
 
-            settings = get_settings()
-            async with async_playwright() as playwright:
-                browser = await launch_chromium(playwright)
-                try:
-                    page = await browser.new_page(user_agent=settings.scraping_user_agent)
-                    await page.goto(self.base_url, wait_until="domcontentloaded", timeout=settings.scraping_timeout_seconds * 1000)
-                    await page.wait_for_timeout(4000)
-                    content = await page.content()
-                    content_type = "text/html"
-                    final_url = page.url
-                finally:
-                    await browser.close()
-        return RawSourceResult(source_key=self.source_key, url=final_url, content=content, content_type=content_type)
+                settings = get_settings()
+                async with async_playwright() as playwright:
+                    browser = await launch_chromium(playwright)
+                    try:
+                        page = await browser.new_page(user_agent=settings.scraping_user_agent)
+                        await page.goto(page_url, wait_until="domcontentloaded", timeout=settings.scraping_timeout_seconds * 1000)
+                        await page.wait_for_timeout(4000)
+                        content = await page.content()
+                        pages.append({"url": page.url, "content": content, "content_type": "text/html"})
+                        if page_num == 0:
+                            final_url = page.url
+                    finally:
+                        await browser.close()
+        combined = "\n<!-- MINCIENCIAS_PAGE_BREAK -->\n".join(page["content"] for page in pages)
+        return RawSourceResult(source_key=self.source_key, url=final_url, content=combined, content_type="text/html", metadata={"pages": pages})
 
     def _candidate_from_container(self, container: Node, raw_url: str) -> OpportunityCandidate | None:
         anchor = None
@@ -111,7 +120,7 @@ class MincienciasConnector:
             summary = title
         if not _is_candidate_text(title):
             return None
-        if _is_closed_text(f"{title} {text}"):
+        if _is_closed_text(title):
             return None
         return OpportunityCandidate(
             title=title[:180],
@@ -129,56 +138,63 @@ class MincienciasConnector:
         )
 
     async def parse(self, raw: RawSourceResult) -> list[OpportunityCandidate]:
-        tree = HTMLParser(raw.content)
         candidates: list[OpportunityCandidate] = []
         seen: set[str] = set()
-        selectors = ("tr", ".views-row", "article", ".view-content li", "li")
-        for selector in selectors:
-            for container in tree.css(selector):
-                candidate = self._candidate_from_container(container, raw.url)
-                if not candidate or candidate.official_url in seen:
-                    continue
-                seen.add(candidate.official_url)
-                candidates.append(candidate)
+
+        pages = raw.metadata.get("pages") or [{"url": raw.url, "content": raw.content}]
+        for page in pages:
+            page_url = page["url"]
+            tree = HTMLParser(page["content"])
+            selectors = ("tr", ".views-row", "article", ".view-content li", "li")
+            for selector in selectors:
+                for container in tree.css(selector):
+                    candidate = self._candidate_from_container(container, page_url)
+                    if not candidate or candidate.official_url in seen:
+                        continue
+                    seen.add(candidate.official_url)
+                    candidates.append(candidate)
 
         if candidates:
-            return candidates[:50]
+            return candidates[:200]
 
-        for link in tree.css("a[href]"):
-            title = _clean(link.text())
-            href = link.attributes.get("href") or ""
-            if not title or not href or not _is_candidate_text(title) or "/convocatorias/" not in href:
-                continue
-            official_url = urljoin(raw.url, href)
-            if official_url in seen:
-                continue
-            seen.add(official_url)
-            text = _clean(link.parent.text() if link.parent else title)
-            if _is_closed_text(f"{title} {text}"):
-                continue
-            candidates.append(
-                OpportunityCandidate(
-                    title=title[:180],
-                    entity="Minciencias",
-                    country="Colombia",
-                    official_url=official_url,
-                    summary=text[:900] or title,
-                    categories=["convocatorias", "ciencia", "innovacion"],
-                    topics=["minciencias"],
-                    raw_text=text[:5000],
-                    confidence_score=0.72,
-                    open_date=_parse_spanish_date(text),
-                    funding_amount_raw=_extract_money(text),
-                    language="es",
+        for page in pages:
+            page_url = page["url"]
+            tree = HTMLParser(page["content"])
+            for link in tree.css("a[href]"):
+                title = _clean(link.text())
+                href = link.attributes.get("href") or ""
+                if not title or not href or not _is_candidate_text(title) or "/convocatorias/" not in href:
+                    continue
+                official_url = urljoin(page_url, href)
+                if official_url in seen:
+                    continue
+                seen.add(official_url)
+                text = _clean(link.parent.text() if link.parent else title)
+                if _is_closed_text(title):
+                    continue
+                candidates.append(
+                    OpportunityCandidate(
+                        title=title[:180],
+                        entity="Minciencias",
+                        country="Colombia",
+                        official_url=official_url,
+                        summary=text[:900] or title,
+                        categories=["convocatorias", "ciencia", "innovacion"],
+                        topics=["minciencias"],
+                        raw_text=text[:5000],
+                        confidence_score=0.72,
+                        open_date=_parse_spanish_date(text),
+                        funding_amount_raw=_extract_money(text),
+                        language="es",
+                    )
                 )
-            )
-        return candidates[:50]
+        return candidates[:200]
 
     async def validate(self, candidate: OpportunityCandidate) -> ValidationResult:
         if not candidate.title or not candidate.official_url:
             return ValidationResult(ok=False, reason="Missing title or URL")
         if urlparse(candidate.official_url).netloc not in {"minciencias.gov.co", "www.minciencias.gov.co"}:
             return ValidationResult(ok=False, reason="URL is outside Minciencias")
-        if _is_closed_text(f"{candidate.title} {candidate.summary} {candidate.raw_text}"):
+        if _is_closed_text(f"{candidate.title} {candidate.summary}"):
             return ValidationResult(ok=False, reason="Opportunity appears closed")
         return ValidationResult(ok=True)

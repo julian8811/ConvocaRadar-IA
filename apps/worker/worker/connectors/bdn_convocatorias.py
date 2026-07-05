@@ -105,7 +105,7 @@ class BdnConvocatoriasConnector:
                     close_date=close_date,
                 )
             )
-        return candidates[:80]
+        return candidates[:150]
 
     async def validate(self, candidate: OpportunityCandidate) -> ValidationResult:
         return ValidationResult(ok=bool(candidate.title and "infosubvenciones.es" in candidate.official_url))

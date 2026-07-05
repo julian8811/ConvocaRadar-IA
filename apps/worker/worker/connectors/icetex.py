@@ -115,7 +115,7 @@ class IcetexConnector:
                     continue
                 seen.add(candidate.official_url)
                 candidates.append(candidate)
-        return candidates[:50]
+        return candidates[:150]
 
     async def validate(self, candidate: OpportunityCandidate) -> ValidationResult:
         if not candidate.title or not candidate.official_url:
