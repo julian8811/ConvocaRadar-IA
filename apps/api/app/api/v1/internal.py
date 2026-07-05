@@ -7,7 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import get_settings
 from app.core.email import send_email
-from app.core.task_queue import enqueue_scrape_source
+
 from app.db.session import get_db
 from app.models import Alert, AuditLog, Opportunity, Source, SourceRun, Task
 from app.schemas import ConnectorProbeRequest, OpportunityCreate, SourceRunComplete
@@ -212,25 +212,10 @@ def run_enabled_sources(db: Session = Depends(get_db)) -> dict[str, int]:
         db.flush()
         try:
             validate_source_url(source)
-            external_id = enqueue_scrape_source(
-                source.key,
-                source.base_url,
-                source.source_type,
-                source_run_id=run.id,
-                task_id=task.id,
-            )
-            if external_id:
-                task.provider = "celery"
-                task.status = "queued"
-                task.external_id = external_id
-                task.result = {"message": "Scrape task queued for worker"}
-                run.status = "queued"
-                run.logs = [*run.logs, {"level": "info", "message": "Scrape task queued", "task_id": task.id}]
-            else:
-                db.delete(task)
-                db.delete(run)
-                db.flush()
-                run = execute_source_run_locally(db, source, organization_id=source.organization_id)
+            db.delete(task)
+            db.delete(run)
+            db.flush()
+            run = execute_source_run_locally(db, source, organization_id=source.organization_id)
         except Exception as exc:
             finished_at = datetime.now(UTC).replace(tzinfo=None)
             run.status = "failed"
@@ -290,52 +275,8 @@ def retry_degraded_sources(db: Session = Depends(get_db)) -> dict[str, int]:
         if pending_task:
             skipped += 1
             continue
-        started_at = datetime.now(UTC).replace(tzinfo=None)
-        run = SourceRun(
-            source_id=source.id,
-            status="scheduled",
-            started_at=None,
-            logs=[{"level": "info", "message": "Retry scheduled after degraded source health", "health": health}],
-        )
-        db.add(run)
-        db.flush()
-        task = Task(
-            organization_id=source.organization_id,
-            source_run_id=run.id,
-            task_type="scrape_source",
-            provider="celery",
-            status="scheduled",
-            started_at=started_at,
-            payload={"source_key": source.key, "base_url": source.base_url, "source_type": source.source_type},
-        )
-        db.add(task)
-        db.flush()
-        external_id = enqueue_scrape_source(
-            source.key,
-            source.base_url,
-            source.source_type,
-            source_run_id=run.id,
-            task_id=task.id,
-            countdown_seconds=900,
-        )
-        if not external_id:
-            db.delete(task)
-            db.delete(run)
-            db.flush()
-            execute_source_run_locally(db, source, organization_id=source.organization_id)
-            scheduled += 1
-            continue
-        task.external_id = external_id
-        task.result = {"message": "Retry scheduled in 15 minutes", "health": health}
-        create_source_health_alert(db, source, reason=f"fuente {health}; reintento programado en 15 minutos")
-        db.add(
-            AuditLog(
-                organization_id=source.organization_id,
-                action="schedule_source_retry",
-                resource_type="source_run",
-                resource_id=run.id,
-            )
-        )
+        execute_source_run_locally(db, source, organization_id=source.organization_id)
+        create_source_health_alert(db, source, reason=f"fuente {health}; reintento ejecutado")
         scheduled += 1
     db.commit()
     return {"sources_checked": len(sources), "scheduled": scheduled, "skipped": skipped}

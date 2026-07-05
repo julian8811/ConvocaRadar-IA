@@ -176,198 +176,21 @@ def _find_source_id(db, key: str) -> str:
     return str(src.id)
 
 
-def test_run_source_routes_slow_source_to_worker(monkeypatch) -> None:
-    """PR5-1: POST /sources/{id}/run must use schedule_or_execute_source_run
-    (not execute_source_run_locally directly) so heavy HTML sources like
-    apc-colombia and minciencias are dispatched to the Celery worker instead
-    of blocking the request for 60-120s.
+def test_run_source_runs_inline(monkeypatch) -> None:
+    """After Celery/Redis removal, all sources run inline. The endpoint
+    calls execute_source_run_locally directly and returns a 'running'
+    SourceRun.
 
-    Regression guard for the apc-colombia / minciencias 120s timeout bug.
-    The test mocks schedule_or_execute_source_run and asserts the endpoint
-    called it (returning status='queued'). If the endpoint were to call
-    execute_source_run_locally directly (the bug), the response status
-    would be 'success' or 'degraded' (after a real HTTP scrape), not
-    'queued', and this test would fail.
-
-    NOTE: must be run alone (not in the same pytest session as the run-all
-    tests) when slow sources (apc-colombia, minciencias, etc.) are seeded
-    enabled, because the run-all background thread holds a write transaction
-    on the sources table for the duration of real HTTP calls (see PR4
-    apply-progress "Background thread DB lock" risk).
-
-    Run with: pytest tests/test_sources.py::test_run_source_routes_slow_source_to_worker -v
+    Run with: pytest tests/test_sources.py::test_run_source_runs_inline -v
     """
     c = _client_with_admin()
     db = SessionLocal()
     try:
-        # Use a seeded slow source — the only DB op we need is a SELECT.
-        slow_id = _find_source_id(db, "minciencias")
+        src_id = _find_source_id(db, "minciencias")
     finally:
         db.close()
 
-    # Track which dispatch function the endpoint actually called.
-    from app.api.v1 import sources as sources_module
-    from app.core import task_queue
-
-    schedule_calls: list[dict[str, object]] = []
     execute_calls: list[dict[str, object]] = []
-
-    def fake_schedule(db, source, *, organization_id=None, prefer_worker_for_slow=True):
-        schedule_calls.append({"source_key": source.key, "organization_id": organization_id})
-        # Build a real SourceRun so Pydantic response_model serialization works.
-        started_at = datetime.now(UTC).replace(tzinfo=None)
-        run = SourceRun(
-            source_id=source.id,
-            status="queued",
-            started_at=None,
-            logs=[{"level": "info", "message": "Slow source dispatched to worker (mocked)"}],
-        )
-        source.last_run_at = started_at
-        db.add(run)
-        db.flush()
-        return run
-
-    def fake_execute(db, source, organization_id=None):
-        execute_calls.append({"source_key": source.key})
-        raise AssertionError(
-            "run_source called execute_source_run_locally directly — "
-            "it MUST use schedule_or_execute_source_run so slow sources "
-            "are routed to the Celery worker (regression: PR5)"
-        )
-
-    # enqueue_scrape_source is imported inside schedule_or_execute_source_run
-    # via `from app.core.task_queue import enqueue_scrape_source`. We must
-    # patch the function on the task_queue module so the real
-    # schedule_or_execute_source_run (when called) sees our mock.
-    def fake_enqueue(source_key, base_url, source_type=None, *, source_run_id, task_id, countdown_seconds=None):
-        return f"celery-task-{source_key}"
-
-    monkeypatch.setattr(task_queue, "enqueue_scrape_source", fake_enqueue)
-    # Patch on the sources module so the run_source endpoint sees the
-    # mocked schedule function. We do NOT mock execute_source_run_locally
-    # here because the run-all background thread from previous tests would
-    # see the mock and crash. The endpoint's call is detected by
-    # schedule_calls/execute_calls inside the fake_schedule/fake_execute
-    # closures if execute_source_run_locally were ever called from the
-    # endpoint.
-    monkeypatch.setattr(sources_module, "schedule_or_execute_source_run", fake_schedule)
-
-    response = c.post(f"/api/v1/sources/{slow_id}/run")
-    assert response.status_code == 200, response.text
-    body = response.json()
-    # The endpoint must have called schedule_or_execute_source_run, NOT
-    # execute_source_run_locally. (If execute was called first, the
-    # AssertionError in fake_execute would have raised.)
-    assert len(schedule_calls) == 1, (
-        f"expected schedule_or_execute_source_run to be called once, got {len(schedule_calls)}"
-    )
-    assert schedule_calls[0]["source_key"] == "minciencias"
-    assert schedule_calls[0]["organization_id"] is not None
-    # And the response should reflect the worker-dispatched run.
-    assert body["status"] == "queued", (
-        f"expected status='queued' (worker dispatch), got {body['status']!r}"
-    )
-    assert body["source_id"] == slow_id
-    assert body.get("started_at") is None
-
-
-def test_run_source_runs_fast_source_inline(monkeypatch) -> None:
-    """PR5-2 triangulation: for a fast source (e.g. grants-gov-rss), the
-    endpoint must NOT enqueue a Celery task. The real
-    schedule_or_execute_source_run checks is_slow_scrape_source and falls
-    through to execute_source_run_locally for non-slow sources.
-
-    This guards against a regression where someone might disable the
-    is_slow_scrape_source check and queue ALL sources to the worker
-    (which would hammer the worker queue with every fast scrape).
-
-    Run with: pytest tests/test_sources.py::test_run_source_runs_fast_source_inline -v
-    """
-    c = _client_with_admin()
-    db = SessionLocal()
-    try:
-        # grants-gov-rss is NOT in SLOW_SCRAPE_SOURCE_KEYS and not "hybrid",
-        # so the real schedule_or_execute_source_run should fall through to
-        # execute_source_run_locally without calling enqueue_scrape_source.
-        fast_id = _find_source_id(db, "grants-gov-rss")
-    finally:
-        db.close()
-
-    enqueue_calls: list[dict[str, object]] = []
-
-    def fake_enqueue(source_key, base_url, source_type=None, *, source_run_id, task_id, countdown_seconds=None):
-        enqueue_calls.append({"source_key": source_key, "source_run_id": source_run_id})
-        return f"celery-task-{source_key}"
-
-    def fake_execute(db, source, organization_id=None):
-        # execute_source_run_locally is the expected path for fast sources.
-        # Return a SourceRun with status="running" so the test can confirm
-        # the endpoint went through this path (not the worker path).
-        run = SourceRun(
-            source_id=source.id,
-            status="running",
-            started_at=datetime.now(UTC).replace(tzinfo=None),
-            logs=[{"level": "info", "message": "Fast source executed inline (mocked)"}],
-        )
-        db.add(run)
-        db.flush()
-        return run
-
-    # Patch on the SERVICES module because schedule_or_execute_source_run
-    # calls execute_source_run_locally via its own module's namespace
-    # (services.execute_source_run_locally, not sources.execute_source_run_locally).
-    from app import services
-    from app.core import task_queue
-
-    monkeypatch.setattr(task_queue, "enqueue_scrape_source", fake_enqueue)
-    monkeypatch.setattr(services, "execute_source_run_locally", fake_execute)
-
-    response = c.post(f"/api/v1/sources/{fast_id}/run")
-    assert response.status_code == 200, response.text
-    body = response.json()
-    # The worker must NOT have been invoked for a fast source.
-    assert len(enqueue_calls) == 0, (
-        f"enqueue_scrape_source must NOT be called for fast sources, "
-        f"got {len(enqueue_calls)} calls: {enqueue_calls}"
-    )
-    # The run must be in 'running' state (inline execution), not 'queued'.
-    assert body["status"] == "running", (
-        f"expected status='running' (inline) for fast source, got {body['status']!r}"
-    )
-    assert body["source_id"] == fast_id
-    # And the run row's started_at is set (the inline path sets it).
-    assert body.get("started_at") is not None
-
-
-def test_run_source_handles_worker_unavailable(monkeypatch) -> None:
-    """PR5-2 triangulation: when the Celery enqueue fails (broker down,
-    Redis unavailable, celery not installed), schedule_or_execute_source_run
-    must fall back to execute_source_run_locally so the source still gets
-    scraped. This is the graceful-degradation contract — the operator sees
-    the run completed (with a 'degraded' or 'success' status) instead of
-    a 500 error.
-
-    Regression guard: a future change that surfaces the enqueue failure as
-    a 500 would break the offline-development workflow and any deployment
-    where the worker is temporarily down.
-
-    Run with: pytest tests/test_sources.py::test_run_source_handles_worker_unavailable -v
-    """
-    c = _client_with_admin()
-    db = SessionLocal()
-    try:
-        slow_id = _find_source_id(db, "minciencias")
-    finally:
-        db.close()
-
-    enqueue_calls: list[dict[str, object]] = []
-    execute_calls: list[dict[str, object]] = []
-
-    def fake_enqueue(source_key, base_url, source_type=None, *, source_run_id, task_id, countdown_seconds=None):
-        enqueue_calls.append({"source_key": source_key, "source_run_id": source_run_id})
-        # Simulate worker unavailable — return None as enqueue_scrape_source
-        # does in real life when the broker is down (see services.py:152-154).
-        return None
 
     def fake_execute(db, source, organization_id=None):
         execute_calls.append({"source_key": source.key})
@@ -375,119 +198,63 @@ def test_run_source_handles_worker_unavailable(monkeypatch) -> None:
             source_id=source.id,
             status="running",
             started_at=datetime.now(UTC).replace(tzinfo=None),
-            logs=[{"level": "info", "message": "Fallback to local execution (worker unavailable)"}],
+            logs=[{"level": "info", "message": "Mocked inline execution"}],
         )
         db.add(run)
         db.flush()
         return run
 
     from app import services
-    from app.core import task_queue
 
-    monkeypatch.setattr(task_queue, "enqueue_scrape_source", fake_enqueue)
     monkeypatch.setattr(services, "execute_source_run_locally", fake_execute)
 
-    response = c.post(f"/api/v1/sources/{slow_id}/run")
-    assert response.status_code == 200, (
-        f"endpoint must not 500 when worker is unavailable (graceful "
-        f"degradation), got {response.status_code}: {response.text}"
-    )
-    # The endpoint must have tried to enqueue (for the slow source)...
-    assert len(enqueue_calls) == 1, (
-        f"enqueue must be attempted once for slow source, got {len(enqueue_calls)}"
-    )
-    assert enqueue_calls[0]["source_key"] == "minciencias"
-    # ...and then fallen back to local execution.
+    response = c.post(f"/api/v1/sources/{src_id}/run")
+    assert response.status_code == 200, response.text
     assert len(execute_calls) == 1, (
-        f"execute_source_run_locally must be called as fallback when enqueue "
-        f"returns None, got {len(execute_calls)}"
+        f"expected execute_source_run_locally to be called once, got {len(execute_calls)}"
     )
+    assert execute_calls[0]["source_key"] == "minciencias"
     body = response.json()
-    # The run must be in 'running' state (local execution path).
     assert body["status"] == "running", (
-        f"expected status='running' (local fallback), got {body['status']!r}"
+        f"expected status='running' (inline), got {body['status']!r}"
     )
+    assert body["source_id"] == src_id
 
 
-def test_run_source_returns_immediately_for_slow_source(monkeypatch) -> None:
-    """PR5-2 triangulation: the original bug was a 120s request timeout
-    because the endpoint ran the scraper inline. After PR5, a slow source
-    must return in well under 5s because the actual scrape is dispatched
-    to the worker (which the request handler does not wait for).
+def test_run_source_returns_within_timeout(monkeypatch) -> None:
+    """All sources run inline now, but the endpoint must still return
+    within a reasonable time. Use a fast mock to verify the endpoint
+    itself is not the bottleneck.
 
-    We measure the endpoint latency with the worker dispatch mocked
-    (synthetic enqueue, no real HTTP) and assert it is under 2s. This
-    protects against a future regression that accidentally re-introduces
-    the inline call.
-
-    Run with: pytest tests/test_sources.py::test_run_source_returns_immediately_for_slow_source -v
+    Run with: pytest tests/test_sources.py::test_run_source_returns_within_timeout -v
     """
     import time
 
     c = _client_with_admin()
     db = SessionLocal()
     try:
-        slow_id = _find_source_id(db, "minciencias")
+        src_id = _find_source_id(db, "minciencias")
     finally:
         db.close()
 
+    def instant_execute(db, source, organization_id=None):
+        run = SourceRun(
+            source_id=source.id,
+            status="running",
+            started_at=datetime.now(UTC).replace(tzinfo=None),
+            logs=[],
+        )
+        db.add(run)
+        db.flush()
+        return run
+
     from app import services
-    from app.core import task_queue
 
-    def fake_enqueue(source_key, base_url, source_type=None, *, source_run_id, task_id, countdown_seconds=None):
-        return f"celery-task-{source_key}"
-
-    def slow_execute(db, source, organization_id=None):
-        # Simulate a slow local execution (the bug we're guarding against).
-        time.sleep(30)
-        return SourceRun(source_id=source.id, status="success")
-
-    monkeypatch.setattr(task_queue, "enqueue_scrape_source", fake_enqueue)
-    monkeypatch.setattr(services, "execute_source_run_locally", slow_execute)
+    monkeypatch.setattr(services, "execute_source_run_locally", instant_execute)
 
     start = time.monotonic()
-    response = c.post(f"/api/v1/sources/{slow_id}/run")
+    response = c.post(f"/api/v1/sources/{src_id}/run")
     elapsed = time.monotonic() - start
     assert response.status_code == 200, response.text
-    # The endpoint must return in < 2s for a slow source. If the
-    # implementation accidentally calls execute_source_run_locally, the
-    # time.sleep(30) above will cause this assertion to fail.
-    assert elapsed < 2.0, (
-        f"endpoint must return in <2s for slow source (worker dispatch), "
-        f"took {elapsed:.2f}s — likely a regression to inline execution"
-    )
-    body = response.json()
-    assert body["status"] == "queued", (
-        f"expected status='queued' (worker dispatch), got {body['status']!r}"
-    )
-
-
-# --- PR5 follow-up: apc-colombia must be in SLOW_SCRAPE_SOURCE_KEYS ---------
-# Regression guard for the orchestrator's curl test that showed
-# apc-colombia timing out at 120s under inline execution. The test for
-# run_source dispatch uses minciencias (which is in the set); this unit
-# test specifically pins apc-colombia so a future refactor of the set
-# can't silently drop it.
-
-
-def test_apc_colombia_is_classified_as_slow_source() -> None:
-    """apc-colombia must be in SLOW_SCRAPE_SOURCE_KEYS so its heavy HTML
-    page is dispatched to the worker instead of running inline (120s
-    timeout in Render free). Regression guard for the orchestrator's
-    curl test that hit the timeout on 2026-06-30.
-    """
-    from app.services import SLOW_SCRAPE_SOURCE_KEYS, is_slow_scrape_source
-
-    assert "apc-colombia" in SLOW_SCRAPE_SOURCE_KEYS, (
-        "apc-colombia must be in SLOW_SCRAPE_SOURCE_KEYS — its HTML page "
-        "is too heavy for inline execution under Render free's 30-90s "
-        "scraping timeout. Add it to the frozenset in services.py:72."
-    )
-    # Also confirm is_slow_scrape_source returns True for a Source-like
-    # object with that key (covers the SLOW_SCRAPE_SOURCE_TYPES branch
-    # as well, in case apc-colombia is later reclassified by source_type).
-    fake_source = SimpleNamespace(key="apc-colombia", source_type="html")
-    assert is_slow_scrape_source(fake_source) is True, (
-        "is_slow_scrape_source must return True for apc-colombia"
-    )
+    assert elapsed < 5.0, f"endpoint must return in <5s, took {elapsed:.2f}s"
 

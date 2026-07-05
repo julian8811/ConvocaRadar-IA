@@ -8,7 +8,6 @@ class Settings(BaseSettings):
     app_env: str = "development"
     app_name: str = "ConvocaRadar IA"
     database_url: str = "sqlite:///./convocaradar.db"
-    redis_url: str = "redis://localhost:6379/0"
     jwt_secret: str = Field(min_length=32)
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 60
@@ -30,8 +29,6 @@ class Settings(BaseSettings):
     scraping_max_source_seconds: int = 180
     scraping_max_concurrency: int = 5
     scraping_closing_soon_days: int = 10
-    scraping_execution_mode: str = "inline"
-    use_worker: bool = False
     internal_api_key: str = Field(min_length=32)
     storage_backend: str = "local"
     storage_dir: str = "./storage"

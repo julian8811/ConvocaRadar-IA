@@ -115,48 +115,12 @@ def schedule_or_execute_source_run(
     organization_id: str | None = None,
     prefer_worker_for_slow: bool = True,
 ) -> SourceRun:
-    from app.core.task_queue import enqueue_scrape_source
+    """Execute a source scrape inline — Celery/Redis have been removed.
 
-    if prefer_worker_for_slow and is_slow_scrape_source(source):
-        started_at = datetime.now(UTC).replace(tzinfo=None)
-        run = SourceRun(
-            source_id=source.id,
-            status="scheduled",
-            started_at=None,
-            logs=[{"level": "info", "message": "Slow source queued for worker execution"}],
-        )
-        source.last_run_at = started_at
-        db.add(run)
-        db.flush()
-        org_id = organization_id or source.organization_id or "00000000-0000-0000-0000-000000000000"
-        task = Task(
-            organization_id=org_id,
-            source_run_id=run.id,
-            task_type="scrape_source",
-            provider="celery",
-            status="scheduled",
-            started_at=started_at,
-            payload={"source_key": source.key, "base_url": source.base_url, "source_type": source.source_type},
-        )
-        db.add(task)
-        db.flush()
-        external_id = enqueue_scrape_source(
-            source.key,
-            source.base_url,
-            source.source_type,
-            source_run_id=run.id,
-            task_id=task.id,
-        )
-        if external_id:
-            task.external_id = external_id
-            task.status = "queued"
-            task.result = {"message": "Scrape task queued for worker"}
-            run.status = "queued"
-            run.logs = [*run.logs, {"level": "info", "message": "Scrape task queued", "task_id": task.id}]
-            return run
-        db.delete(task)
-        db.delete(run)
-        db.flush()
+    All sources, including slow ones, run directly within the API
+    process. This simplifies the architecture and avoids the need for
+    a separate worker service or Redis broker.
+    """
     return execute_source_run_locally(db, source, organization_id=organization_id)
 
 def slugify(value: str) -> str:
