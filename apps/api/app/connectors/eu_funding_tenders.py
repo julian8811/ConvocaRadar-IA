@@ -3,13 +3,14 @@ import re
 from datetime import UTC, datetime
 from urllib.parse import quote_plus
 
+from app.core.config import get_settings
 from app.connectors.common import fetch_httpx_text
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
 
 
 EU_PORTAL_URL = "https://ec.europa.eu/info/funding-tenders/opportunities/portal/screen/opportunities/calls-for-proposals"
 EU_TOPIC_URL = "https://ec.europa.eu/info/funding-tenders/opportunities/portal/screen/opportunities/topic-details/{identifier}"
-EU_SEARCH_URL = "https://api.tech.ec.europa.eu/search-api/prod/rest/search?apiKey=SEDIA&text={term}&pageSize=50&pageNumber=1"
+EU_SEARCH_URL_TEMPLATE = "https://api.tech.ec.europa.eu/search-api/prod/rest/search?apiKey={api_key}&text={term}&pageSize=50&pageNumber=1"
 EU_TERMS = ["2026", "open", "call", "funding", "research and innovation"]
 
 
@@ -77,8 +78,10 @@ class EuFundingTendersConnector:
         results: list[dict[str, object]] = []
         seen: set[str] = set()
         for term in EU_TERMS:
+            api_key = get_settings().sedia_api_key
+            search_url = f"https://api.tech.ec.europa.eu/search-api/prod/rest/search?apiKey={api_key}&text={quote_plus(term)}&pageSize=50&pageNumber=1"
             final_url, content, _ = await fetch_httpx_text(
-                f"https://api.tech.ec.europa.eu/search-api/prod/rest/search?apiKey=SEDIA&text={quote_plus(term)}&pageSize=50&pageNumber=1",
+                search_url,
                 method="POST",
                 fallback_content_type="application/json",
             )

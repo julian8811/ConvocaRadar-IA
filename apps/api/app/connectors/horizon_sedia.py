@@ -1,6 +1,7 @@
 import json
 from urllib.parse import quote_plus
 
+from app.core.config import get_settings
 from app.connectors.common import fetch_httpx_text
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
 from app.connectors.eu_funding_tenders import (
@@ -29,7 +30,7 @@ class HorizonSediaConnector:
         final_url = self.base_url
         for term in HORIZON_TERMS:
             search_url = (
-                f"{HORIZON_SEARCH_URL}?apiKey=SEDIA&text={quote_plus(term)}&pageSize=50&pageNumber=1"
+                f"{HORIZON_SEARCH_URL}?apiKey={get_settings().sedia_api_key}&text={quote_plus(term)}&pageSize=50&pageNumber=1"
             )
             final_url, content, _ = await fetch_httpx_text(
                 search_url,
