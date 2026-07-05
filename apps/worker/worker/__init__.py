@@ -1,1 +1,0 @@
-"""ConvocaRadar worker package."""
