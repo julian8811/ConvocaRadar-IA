@@ -6,7 +6,7 @@ services:
     dockerfilePath: apps/api/Dockerfile
     plan: free
     autoDeploy: true
-    healthCheckPath: /health
+    healthCheckPath: /api/v1/health/live
     envVars:
       - key: APP_ENV
         value: production
@@ -44,5 +44,3 @@ services:
         value: ConvocaRadar IA <onboarding@resend.dev>
       - key: SMTP_USE_TLS
         value: "true"
-      - key: SMTP_HOST
-        value: ""
