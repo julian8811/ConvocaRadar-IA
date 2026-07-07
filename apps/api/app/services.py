@@ -63,10 +63,10 @@ from app.schemas import (
 )
 
 
-def connector_for(source_key: str, base_url: str | None = None, source_type: str | None = None):
+def connector_for(source_key: str, base_url: str | None = None, source_type: str | None = None, *, entity_name: str | None = None, default_country: str | None = None, default_categories: list[str] | None = None):
     from app.connectors.factory import connector_for as worker_connector_for
 
-    return worker_connector_for(source_key, base_url, source_type)
+    return worker_connector_for(source_key, base_url, source_type, entity_name=entity_name, default_country=default_country, default_categories=default_categories)
 
 
 SLOW_SCRAPE_SOURCE_KEYS = frozenset(
