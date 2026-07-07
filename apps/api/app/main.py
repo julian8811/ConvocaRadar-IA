@@ -13,6 +13,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.api.v1.router import api_router
+from app.connectors.health_check import check_playwright_binary, check_pypdf_import
 from app.core.config import get_settings
 from app.core.logging import configure_logging
 from app.db.bootstrap import ensure_bootstrap_data
@@ -142,6 +143,12 @@ async def _run_periodic_source_sweep(interval_seconds: int = 1800) -> None:
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     create_all()
     ensure_bootstrap_data()
+
+    # Run scraper infrastructure health checks (non-blocking, warnings only).
+    # Both functions handle their own errors internally and return bool.
+    check_playwright_binary()
+    check_pypdf_import()
+
     # Background scheduler: every 30 minutes, run all enabled sources
     # via an asyncio loop instead of a Celery beat schedule.
     import asyncio

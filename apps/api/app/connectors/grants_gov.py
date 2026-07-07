@@ -56,7 +56,10 @@ class GrantsGovConnector:
     async def parse(self, raw: RawSourceResult) -> list[OpportunityCandidate]:
         if not raw.content.lstrip().startswith("{"):
             return await SimplerGrantsConnector(GRANTS_GOV_SEARCH_PAGE).parse(raw)
-        payload = json.loads(raw.content)
+        try:
+            payload = json.loads(raw.content)
+        except json.JSONDecodeError:
+            return []
         data = payload.get("data") or {}
         hits = data.get("oppHits") or []
         if not hits:
