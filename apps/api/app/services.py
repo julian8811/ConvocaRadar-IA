@@ -1933,10 +1933,12 @@ def get_closing_soon_7d(
     Filter: ``Opportunity.organization_id == org_id OR
             Opportunity.organization_id IS NULL`` AND
             ``Opportunity.close_date IS NOT NULL`` AND
-            ``Opportunity.close_date <= now + 7 days``.
+            ``now <= Opportunity.close_date <= now + 7 days``.
     Order: ``close_date ASC NULLS LAST``.
     """
-    cutoff = datetime.now(UTC).replace(tzinfo=None) + timedelta(days=7)
+    now = datetime.now(UTC).replace(tzinfo=None)
+    today_start = now.replace(hour=0, minute=0, second=0, microsecond=0)
+    cutoff = now + timedelta(days=7)
     stmt = (
         select(Opportunity, OpportunityScore, Source)
         .outerjoin(
@@ -1953,6 +1955,7 @@ def get_closing_soon_7d(
                 Opportunity.organization_id.is_(None),
             ),
             Opportunity.close_date.is_not(None),
+            Opportunity.close_date >= today_start,
             Opportunity.close_date <= cutoff,
         )
         .order_by(Opportunity.close_date.asc().nullslast())
