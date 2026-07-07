@@ -15,6 +15,7 @@ Four scenarios are tested per group:
 
 from __future__ import annotations
 
+from inspect import signature
 from unittest.mock import AsyncMock
 
 import pytest
@@ -252,4 +253,45 @@ def test_all_fixture_keys_exist() -> None:
     for _name, _sk, _st, fkey, _cn in GROUPS:
         assert fkey in FIXTURE_DATA, (
             f"fixture_key {fkey!r} not found in FIXTURE_DATA"
+        )
+
+
+# ── Signature compatibility between services wrapper and factory dispatcher ──
+
+
+def test_connector_for_signature_compatibility() -> None:
+    """services.connector_for must have the same signature as factory.connector_for.
+
+    The services module provides a thin wrapper that forwards keyword arguments
+    to the factory dispatcher. If the wrapper's signature drifts (e.g. a new
+    keyword argument is added only to the factory), callers in _scrape_source_candidates
+    will raise TypeError at runtime — as happened with entity_name/default_country/
+    default_categories in commit b0a5ca9.
+    """
+    from app.services import connector_for as services_fn
+    from app.connectors.factory import connector_for as factory_fn
+
+    services_sig = signature(services_fn)
+    factory_sig = signature(factory_fn)
+
+    services_params = list(services_sig.parameters.items())
+    factory_params = list(factory_sig.parameters.items())
+
+    assert len(services_params) == len(factory_params), (
+        f"Parameter count mismatch: services={len(services_params)}, "
+        f"factory={len(factory_params)}"
+    )
+
+    for (s_name, s_param), (f_name, f_param) in zip(services_params, factory_params):
+        assert s_name == f_name, (
+            f"Parameter name mismatch at position: "
+            f"services.{s_name!r} != factory.{f_name!r}"
+        )
+        assert s_param.kind == f_param.kind, (
+            f"Parameter kind mismatch for {s_name!r}: "
+            f"services.{s_param.kind} != factory.{f_param.kind}"
+        )
+        assert s_param.default == f_param.default, (
+            f"Parameter default mismatch for {s_name!r}: "
+            f"services.{s_param.default!r} != factory.{f_param.default!r}"
         )
