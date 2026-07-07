@@ -109,7 +109,7 @@ def _wordpress_connector(source_key: str, base_url: str) -> WordPressGrantsConne
     )
 
 
-def connector_for(source_key: str, base_url: str | None = None, source_type: str | None = None):
+def connector_for(source_key: str, base_url: str | None = None, source_type: str | None = None, *, entity_name: str | None = None, default_country: str | None = None, default_categories: list[str] | None = None):
     if source_key == "grants-gov":
         return GrantsGovConnector(base_url)
     if source_key == "minciencias":
@@ -184,4 +184,9 @@ def connector_for(source_key: str, base_url: str | None = None, source_type: str
         return RssConnector(source_key, base_url or "")
     if source_key.endswith("-rss") or (base_url or "").lower().endswith((".xml", ".rss")):
         return RssConnector(source_key, base_url or "")
-    return GenericHtmlConnector(source_key, base_url or "")
+    return GenericHtmlConnector(
+        source_key, base_url or "",
+        entity_name=entity_name,
+        default_country=default_country,
+        default_categories=default_categories,
+    )
