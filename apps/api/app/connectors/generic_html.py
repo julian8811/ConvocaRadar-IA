@@ -1,3 +1,4 @@
+import asyncio
 import json
 import re
 from datetime import UTC, datetime
@@ -7,6 +8,9 @@ from selectolax.parser import HTMLParser
 
 from app.connectors.common import clean_text, fetch_httpx_text, looks_like_noise_text, parse_date_text
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
+
+DEEP_FETCH_LIMIT = 10
+DETAIL_PAGE_TIMEOUT = 15
 
 
 CLOSED_KEYWORDS = (
@@ -305,6 +309,8 @@ class GenericHtmlConnector:
                         close_date=close_date,
                     )
                 )
+            if candidates:
+                candidates = await self._deep_fetch_candidates(candidates)
             return candidates[:50]
 
         tree = HTMLParser(raw.content)
@@ -343,6 +349,7 @@ class GenericHtmlConnector:
                     )
                 )
             if candidates:
+                candidates = await self._deep_fetch_candidates(candidates)
                 return candidates[:50]
         candidates: list[OpportunityCandidate] = []
         candidates_seen: set[str] = set()
@@ -462,7 +469,142 @@ class GenericHtmlConnector:
                             close_date=close_date,
                         )
                     )
+        # Deep fetch: enrich low-confidence candidates with detail-page data
+        if candidates:
+            candidates = await self._deep_fetch_candidates(candidates)
         return candidates[:50]
+
+    async def _enrich_from_detail(self, url: str) -> dict | None:
+        """Fetch a detail page and extract structured data.
+
+        Returns a dict with keys: title, summary, close_date, categories,
+        funding_amount_raw, or None if the page can't be fetched or has no
+        usable data.
+        """
+        try:
+            _, content, content_type = await fetch_httpx_text(
+                url,
+                timeout_seconds=DETAIL_PAGE_TIMEOUT,
+                retries=1,
+            )
+        except Exception:
+            return None
+
+        result: dict = {}
+
+        # 1. Try JSON-LD for highest-confidence data
+        tree = HTMLParser(content)
+        for script in tree.css("script[type='application/ld+json']"):
+            try:
+                payload = json.loads(script.text() or "{}")
+            except json.JSONDecodeError:
+                continue
+            for item in self._iter_items(payload):
+                title = str(item.get("name") or item.get("title") or "").strip()
+                if title:
+                    result["title"] = title
+                desc = str(item.get("description") or item.get("summary") or "").strip()
+                if desc:
+                    result["summary"] = desc
+                cd = self._candidate_close_date(item)
+                if cd:
+                    result["close_date"] = cd
+                cats = [str(v) for v in (item.get("categories") or [])[:4] if isinstance(v, str)]
+                if cats:
+                    result["categories"] = cats
+                amount = str(item.get("funding", item.get("fundingAmount", ""))).strip()
+                if amount:
+                    result["funding_amount_raw"] = amount
+                break  # First valid item is enough
+
+        # 2. Meta / Open Graph tags (fill gaps not covered by JSON-LD)
+        og_title = tree.css_first("meta[property='og:title']")
+        if og_title and "title" not in result:
+            value = (og_title.attributes.get("content") or "").strip()
+            if value:
+                result["title"] = value
+        og_desc = tree.css_first("meta[property='og:description']")
+        if og_desc and "summary" not in result:
+            value = (og_desc.attributes.get("content") or "").strip()
+            if value:
+                result["summary"] = value
+        meta_desc = tree.css_first("meta[name='description']")
+        if meta_desc and "summary" not in result:
+            value = (meta_desc.attributes.get("content") or "").strip()
+            if value:
+                result["summary"] = value
+
+        # 3. h1 fallback for title
+        if "title" not in result:
+            h1 = tree.css_first("h1")
+            if h1:
+                value = clean_text(h1.text())
+                if value:
+                    result["title"] = value
+
+        # 4. Article / main content for summary (last resort)
+        if "summary" not in result:
+            for tag in ("article", "[role='main']", "main", ".content", "#content"):
+                el = tree.css_first(tag)
+                if el:
+                    value = clean_text(el.text())[:700]
+                    if value:
+                        result["summary"] = value
+                        break
+
+        # 5. Scan all text for dates not captured by JSON-LD
+        if "close_date" not in result:
+            body = tree.css_first("body")
+            if body:
+                all_text = clean_text(body.text())
+                cd = parse_date_text(all_text)
+                if cd:
+                    result["close_date"] = cd
+
+        return result if result.get("title") else None
+
+    async def _deep_fetch_candidates(
+        self,
+        candidates: list[OpportunityCandidate],
+    ) -> list[OpportunityCandidate]:
+        """Enrich low-confidence candidates by fetching their detail pages.
+
+        Only processes candidates with confidence < 0.7, up to
+        ``DEEP_FETCH_LIMIT`` per call. Each detail page fetch is independent
+        and runs concurrently.
+        """
+        to_enrich = [c for c in candidates if c.confidence_score < 0.7][:DEEP_FETCH_LIMIT]
+        if not to_enrich:
+            return candidates
+
+        tasks = {c.official_url: self._enrich_from_detail(c.official_url) for c in to_enrich}
+        results = await asyncio.gather(*tasks.values(), return_exceptions=True)
+
+        url_to_data: dict[str, dict | None] = {}
+        for url, task in zip(tasks, results):
+            url_to_data[url] = task if isinstance(task, dict) else None
+
+        enriched: list[OpportunityCandidate] = []
+        for c in candidates:
+            detail = url_to_data.get(c.official_url)
+            if detail:
+                enriched.append(
+                    OpportunityCandidate(
+                        title=(detail.get("title") or c.title)[:180],
+                        entity=c.entity,
+                        country=c.country,
+                        official_url=c.official_url,
+                        summary=(detail.get("summary") or c.summary)[:700],
+                        categories=detail.get("categories", c.categories or self._default_categories),
+                        raw_text=c.raw_text,
+                        confidence_score=0.82,  # Confirmed via detail page
+                        close_date=detail.get("close_date") or c.close_date,
+                        funding_amount_raw=detail.get("funding_amount_raw") or c.funding_amount_raw,
+                    )
+                )
+            else:
+                enriched.append(c)
+        return enriched
 
     async def validate(self, candidate: OpportunityCandidate) -> ValidationResult:
         if not candidate.title or not candidate.official_url:
