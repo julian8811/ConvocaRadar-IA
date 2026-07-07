@@ -1441,6 +1441,17 @@ def seed_default_sources(
             "allowed_domains": ["darwininitiative.org.uk"],
             "scraping_frequency": "weekly",
         },
+        {
+            "key": "eureka-network-biotech",
+            "name": "Eureka Network — Biotech Call September 2026",
+            "base_url": "https://www.eurekanetwork.org/programmes-and-calls/network-projects/biotech-call-september-2026/",
+            "country": "Multinational",
+            "region": "Europe",
+            "source_type": "html",
+            "category": ["grants", "biotech", "research", "innovation", "eureka"],
+            "allowed_domains": ["eurekanetwork.org"],
+            "scraping_frequency": "weekly",
+        },
     ]
 
     inserted = 0
