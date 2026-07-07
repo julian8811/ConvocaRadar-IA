@@ -1430,6 +1430,17 @@ def seed_default_sources(
             "allowed_domains": ["eufundingportal.eu"],
             "scraping_frequency": "daily",
         },
+        {
+            "key": "darwin-initiative",
+            "name": "Darwin Initiative — UK Government Grants",
+            "base_url": "https://www.darwininitiative.org.uk/how-to-apply/",
+            "country": "United Kingdom",
+            "region": "Europe",
+            "source_type": "html",
+            "category": ["grants", "biodiversity", "conservation", "environment"],
+            "allowed_domains": ["darwininitiative.org.uk"],
+            "scraping_frequency": "weekly",
+        },
     ]
 
     inserted = 0
