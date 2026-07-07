@@ -6,7 +6,7 @@ import socket
 from datetime import datetime
 import unicodedata
 import ipaddress
-from urllib.parse import urljoin
+from urllib.parse import urljoin, urlparse
 
 import httpx
 
