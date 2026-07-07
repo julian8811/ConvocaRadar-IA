@@ -540,7 +540,7 @@ def seed_default_sources(
         {
             "key": "icfes-convocatorias",
             "name": "ICFES Convocatorias",
-            "enabled": false,
+            "enabled": False,
             "base_url": "https://www.icfes.gov.co/convocatorias",
             "country": "Colombia",
             "region": "LatAm",
@@ -563,7 +563,7 @@ def seed_default_sources(
         {
             "key": "agrosavia-convocatorias",
             "name": "AGROSAVIA Convocatorias",
-            "enabled": false,
+            "enabled": False,
             "base_url": "https://www.agrosavia.co/convocatorias",
             "country": "Colombia",
             "region": "LatAm",
@@ -652,7 +652,7 @@ def seed_default_sources(
         {
             "key": "innpulsa-colombia-startup",
             "name": "iNNpulsa Colombia — Startup y Emprendimiento",
-            "enabled": false,
+            "enabled": False,
             "base_url": "https://www.innpulsacolombia.com/convocatorias",
             "country": "Colombia",
             "region": "LatAm",
@@ -697,7 +697,7 @@ def seed_default_sources(
         {
             "key": "colombia-cientifica",
             "name": "Colombia Científica — Convocatorias",
-            "enabled": false,
+            "enabled": False,
             "base_url": "https://www.colombiacientifica.gov.co/convocatorias",
             "country": "Colombia",
             "region": "LatAm",
@@ -801,7 +801,7 @@ def seed_default_sources(
         {
             "key": "senescyt-ecuador",
             "name": "SENESCYT Ecuador — Becas",
-            "enabled": false,
+            "enabled": False,
             "base_url": "https://www.educacionsuperior.gob.ec/becas/",
             "country": "Ecuador",
             "region": "LatAm",
@@ -993,7 +993,7 @@ def seed_default_sources(
         {
             "key": "minsalud-convocatorias",
             "name": "MinSalud Colombia — Convocatorias",
-            "enabled": false,
+            "enabled": False,
             "base_url": "https://www.minsalud.gov.co/convocatorias",
             "country": "Colombia",
             "region": "LatAm",
@@ -1354,7 +1354,7 @@ def seed_default_sources(
         {
             "key": "koica-korea",
             "name": "KOICA Korea — Convocatorias",
-            "enabled": false,
+            "enabled": False,
             "base_url": "https://www.koica.go.kr/sites/koica_en/index.do",
             "country": "South Korea",
             "region": "Asia",
@@ -1366,7 +1366,7 @@ def seed_default_sources(
         {
             "key": "aecid-espana",
             "name": "AECID España — Cooperación Española",
-            "enabled": false,
+            "enabled": False,
             "base_url": "https://www.aecid.es/convocatorias",
             "country": "Spain",
             "region": "Europe",
@@ -1418,6 +1418,17 @@ def seed_default_sources(
             "category": ["convocatorias", "cooperacion", "investigacion"],
             "allowed_domains": ["um.dk", "www.um.dk"],
             "scraping_frequency": "weekly",
+        },
+        {
+            "key": "eu-funding-portal-international",
+            "name": "EU Funding Portal — Subvenciones Internacionales",
+            "base_url": "https://eufundingportal.eu/es/programa-cultural--social-y-deportivo./subvenciones-no-comunitarias/",
+            "country": "European Union",
+            "region": "Europe",
+            "source_type": "html",
+            "category": ["grants", "funding", "cooperacion", "internacional"],
+            "allowed_domains": ["eufundingportal.eu"],
+            "scraping_frequency": "daily",
         },
     ]
 
