@@ -1,4 +1,4 @@
-name: Health Check
+name: Render Health Check
 
 on:
   schedule:
