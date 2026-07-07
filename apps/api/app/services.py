@@ -859,7 +859,12 @@ def candidate_external_id(
 
 
 async def _scrape_source_candidates(source: Source, stats: dict[str, object] | None = None) -> list[OpportunityCreate]:
-    connector = connector_for(source.key, source.base_url, source.source_type)
+    connector = connector_for(
+        source.key, source.base_url, source.source_type,
+        entity_name=source.name,
+        default_country=source.country,
+        default_categories=source.category,
+    )
     raw = await connector.fetch()
     if stats is not None:
         stats["raw_url"] = raw.url
@@ -1124,6 +1129,7 @@ async def _scrape_source_candidates_with_timeout(
 ) -> list[OpportunityCreate]:
     settings = get_settings()
     timeout_seconds = max(settings.scraping_max_source_seconds, 30)
+    timeout_seconds = min(timeout_seconds, int(settings.per_connector_timeout_seconds))
     try:
         return await asyncio.wait_for(_scrape_source_candidates(source, stats), timeout=timeout_seconds)
     except TimeoutError as exc:

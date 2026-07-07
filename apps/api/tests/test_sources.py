@@ -170,6 +170,79 @@ def test_run_all_sources_logs_failure_when_execute_raises(monkeypatch) -> None:
     assert completed_events[0]["processed"] == 0
 
 
+def test_background_sweep_times_out_hanging_connector(monkeypatch) -> None:
+    """PR4-x: when execute_source_run_locally hangs, _background_sweep must
+    log a structured timeout event and count the source as failed.
+
+    The ThreadPoolExecutor wraps each call with a per-connector timeout.
+    This test makes execute_source_run_locally block indefinitely, sets a
+    very short timeout, and asserts that ``run_all.source_timeout`` is
+    emitted and the completed event reports failed > 0.
+    """
+    import threading as _threading
+    from app.api.v1 import sources as sources_module
+    from app.core.config import get_settings
+
+    # --- Patch execute to hang ---
+    block_forever = _threading.Event()
+
+    def hanging_execute(_db, _source, _organization_id=None):
+        block_forever.wait()  # never set → blocks forever
+
+    monkeypatch.setattr(sources_module, "execute_source_run_locally", hanging_execute)
+
+    # --- Set a very short timeout ---
+    monkeypatch.setenv("PER_CONNECTOR_TIMEOUT_SECONDS", "0.05")
+    get_settings.cache_clear()
+
+    # --- Make threading.Thread synchronous so the background sweep runs
+    #     in the test thread (and we can capture its logs).  The
+    #     ThreadPoolExecutor inside _background_sweep still uses the
+    #     original real thread class (via _original_thread_cls restore),
+    #     so hanging_execute blocks in a separate daemon thread.
+    def sync_thread(target, *args, **kwargs):
+        class SyncThread:
+            def __init__(self):
+                self._target = target
+            def start(self):
+                self._target()
+        return SyncThread()
+
+    monkeypatch.setattr(_threading, "Thread", sync_thread)
+
+    # --- Execute ---
+    c = _client_with_admin()
+    with structlog.testing.capture_logs() as captured:
+        response = c.post("/api/v1/sources/run-all")
+
+    # Restore cached settings so other tests are not affected.
+    get_settings.cache_clear()
+
+    assert response.status_code == 200
+
+    # --- Assertions ---
+    timeout_events = [
+        e for e in captured if e.get("event") == "run_all.source_timeout"
+    ]
+    assert len(timeout_events) >= 1, (
+        f"expected run_all.source_timeout event, "
+        f"got events: {[e.get('event') for e in captured]}"
+    )
+    te = timeout_events[0]
+    assert "timeout_seconds" in te
+    assert te["timeout_seconds"] == 0.05
+
+    # The completed event must report failed > 0.
+    completed_events = [
+        e for e in captured if e.get("event") == "run_all.completed"
+    ]
+    assert len(completed_events) >= 1
+    assert completed_events[0]["failed"] >= 1, (
+        f"expected completed event to report failures, "
+        f"got: {completed_events[0]}"
+    )
+
+
 def _find_source_id(db, key: str) -> str:
     src = db.scalar(select(Source).where(Source.key == key))
     assert src is not None, f"seeded source {key!r} not found"

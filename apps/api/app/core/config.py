@@ -25,13 +25,13 @@ class Settings(BaseSettings):
     sentry_dsn: str | None = None
     sentry_send_default_pii: bool = False
     scraping_user_agent: str = "ConvocaRadarBot/0.1"
-    scraping_timeout_seconds: int = 30
+    scraping_timeout_seconds: int = 180
     scraping_max_source_seconds: int = 180
     scraping_max_concurrency: int = 5
     scraping_closing_soon_days: int = 10
     internal_api_key: str = Field(min_length=32)
     sedia_api_key: str = "SEDIA"
-    per_connector_timeout_seconds: int = 180
+    per_connector_timeout_seconds: float = 180
     storage_backend: str = "local"
     storage_dir: str = "./storage"
     max_upload_bytes: int = 10_000_000
