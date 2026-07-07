@@ -39,7 +39,12 @@ export default function LoginPage() {
       router.push("/dashboard");
       router.refresh();
     } catch (error) {
-      const message = error instanceof Error ? error.message : "No se pudo iniciar sesión";
+      let message = "No se pudo iniciar sesión";
+      if (error instanceof TypeError && (error.message === "Failed to fetch" || error.message.includes("NetworkError"))) {
+        message = "El servidor no está disponible. Esperá unos segundos y volvé a intentar.";
+      } else if (error instanceof Error) {
+        message = error.message;
+      }
       setError(message);
       toast.error(message);
     } finally {
@@ -87,14 +92,19 @@ export default function LoginPage() {
                 {error}
               </div>
             ) : null}
-            <Button className="w-full" disabled={loading} type="button" onClick={() => signIn(email, password)}>
-              {loading ? "Ingresando..." : "Ingresar"}
-            </Button>
-            {isDev && (
-              <Button className="w-full" disabled={loading} type="button" variant="outline" onClick={() => signIn(localEmail, localPassword)}>
-                Entrar con cuenta local
+              <Button className="w-full" disabled={loading} type="button" onClick={() => signIn(email, password)}>
+                {loading ? "Ingresando..." : "Ingresar"}
               </Button>
-            )}
+              {isDev && (
+                <Button className="w-full" disabled={loading} type="button" variant="outline" onClick={() => signIn(localEmail, localPassword)}>
+                  Entrar con cuenta local
+                </Button>
+              )}
+              {API_URL?.includes("onrender") && (
+                <p className="mt-2 text-xs text-amber-600 dark:text-amber-400">
+                  El servidor puede tardar hasta 30s en responder si estaba en pausa.
+                </p>
+              )}
           </form>
           <p className="mt-4 text-xs text-slate-500">
             API configurada: <span className="font-mono">{API_URL}</span>
