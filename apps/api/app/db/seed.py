@@ -66,6 +66,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["grants", "federal funding"],
             "allowed_domains": ["simpler.grants.gov"],
+            "scraping_frequency": "daily",
         },
         {
             "key": "grants-gov-forecast",
@@ -76,6 +77,7 @@ def seed_default_sources(
             "source_type": "rss",
             "category": ["grants", "federal funding"],
             "allowed_domains": ["www.grants.gov"],
+            "scraping_frequency": "daily",
         },
         {
             "key": "grants-gov",
@@ -86,6 +88,7 @@ def seed_default_sources(
             "source_type": "api",
             "category": ["grants", "federal funding"],
             "allowed_domains": ["api.grants.gov"],
+            "scraping_frequency": "daily",
         },
         {
             "key": "grants-gov-rss",
@@ -96,6 +99,7 @@ def seed_default_sources(
             "source_type": "rss",
             "category": ["grants", "federal funding", "rss"],
             "allowed_domains": ["www.grants.gov"],
+            "scraping_frequency": "daily",
         },
         {
             "key": "nsf-funding-rss",
@@ -106,6 +110,7 @@ def seed_default_sources(
             "source_type": "rss",
             "category": ["grants", "research", "innovation"],
             "allowed_domains": ["nsf.gov"],
+            "scraping_frequency": "daily",
         },
         {
             "key": "nsf-funding",
@@ -116,6 +121,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["grants", "research", "innovation"],
             "allowed_domains": ["nsf.gov"],
+            "scraping_frequency": "daily",
         },
         {
             "key": "minciencias",
@@ -126,6 +132,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["convocatorias", "ciencia", "innovacion"],
             "allowed_domains": ["minciencias.gov.co"],
+            "scraping_frequency": "daily",
         },
         {
             "key": "icetex-vigentes",
@@ -136,6 +143,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["becas", "cooperacion", "educacion"],
             "allowed_domains": ["web.icetex.gov.co"],
+            "scraping_frequency": "daily",
         },
         {
             "key": "icetex-otras-becas",
@@ -146,6 +154,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["becas", "cooperacion", "educacion"],
             "allowed_domains": ["web.icetex.gov.co"],
+            "scraping_frequency": "weekly",
         },
         {
             "key": "mineducacion-becas",
@@ -156,6 +165,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["becas", "cooperacion", "educacion"],
             "allowed_domains": ["mineducacion.gov.co", "www.mineducacion.gov.co"],
+            "scraping_frequency": "weekly",
         },
         {
             "key": "innpulsa",
@@ -166,6 +176,7 @@ def seed_default_sources(
             "source_type": "api",
             "category": ["convocatorias", "emprendimiento", "innovacion"],
             "allowed_domains": ["innpulsacolombia.com", "convocatorias.innpulsacolombia.com"],
+            "scraping_frequency": "daily",
         },
         {
             "key": "apc-colombia",
@@ -176,6 +187,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["convocatorias", "cooperacion", "internacional"],
             "allowed_domains": ["apccolombia.gov.co"],
+            "scraping_frequency": "weekly",
         },
         {
             "key": "eu-funding-tenders",
@@ -186,6 +198,7 @@ def seed_default_sources(
             "source_type": "hybrid",
             "category": ["grants", "research", "innovation"],
             "allowed_domains": ["ec.europa.eu"],
+            "scraping_frequency": "daily",
         },
         {
             "key": "innovamos-global-innovation-fund",
@@ -196,6 +209,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["innovacion", "cooperacion", "financiacion"],
             "allowed_domains": ["innovamos.gov.co", "www.innovamos.gov.co"],
+            "scraping_frequency": "weekly",
         },
         {
             "key": "innovamos-fid",
@@ -206,6 +220,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["innovacion", "cooperacion", "financiacion"],
             "allowed_domains": ["innovamos.gov.co", "www.innovamos.gov.co"],
+            "scraping_frequency": "weekly",
         },
         {
             "key": "ukri-opportunities",
@@ -216,6 +231,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["grants", "research", "innovation"],
             "allowed_domains": ["ukri.org", "www.ukri.org"],
+            "scraping_frequency": "daily",
         },
         {
             "key": "unesco-call-for-proposals",
@@ -226,6 +242,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["cooperation", "research", "innovation"],
             "allowed_domains": ["unesco.org", "www.unesco.org"],
+            "scraping_frequency": "weekly",
         },
         {
             "key": "undef",
@@ -236,6 +253,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["cooperation", "governance", "funding"],
             "allowed_domains": ["un.org", "www.un.org"],
+            "scraping_frequency": "weekly",
         },
         {
             "key": "unwomen-innovate",
@@ -246,6 +264,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["innovation", "cooperation", "global"],
             "allowed_domains": ["unwomen.org"],
+            "scraping_frequency": "weekly",
         },
         {
             "key": "novo-nordisk-grants",

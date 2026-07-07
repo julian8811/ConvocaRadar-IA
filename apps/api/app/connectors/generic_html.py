@@ -49,9 +49,12 @@ class GenericHtmlConnector:
         "/node/41",  # Common Drupal pattern
     )
 
-    def __init__(self, source_key: str, base_url: str) -> None:
+    def __init__(self, source_key: str, base_url: str, *, entity_name: str | None = None, default_country: str | None = None, default_categories: list[str] | None = None) -> None:
         self.source_key = source_key
         self.base_url = base_url
+        self._entity_name = entity_name or source_key
+        self._default_country = default_country or "Por validar"
+        self._default_categories = default_categories or []
         self._resolved_url: str | None = None
 
     async def _try_url(self, url: str) -> tuple[str, str, str] | None:
@@ -291,8 +294,8 @@ class GenericHtmlConnector:
                 candidates.append(
                     OpportunityCandidate(
                         title=title[:180],
-                        entity=str(item.get("entity") or self.source_key),
-                        country=str(item.get("country") or "Por validar"),
+                        entity=str(item.get("entity") or self._entity_name),
+                        country=str(item.get("country") or self._default_country),
                         official_url=link,
                         summary=summary[:700] or title,
                         categories=[str(value) for value in (item.get("categories") or [])[:4] if isinstance(value, str)],
@@ -328,8 +331,8 @@ class GenericHtmlConnector:
                 candidates.append(
                     OpportunityCandidate(
                         title=title[:180],
-                        entity=str(item.get("entity") or self.source_key),
-                        country=str(item.get("country") or "Por validar"),
+                        entity=str(item.get("entity") or self._entity_name),
+                        country=str(item.get("country") or self._default_country),
                         official_url=link,
                         summary=summary[:700] or title,
                         categories=[str(value) for value in (item.get("categories") or [])[:4] if isinstance(value, str)] or ["opportunity"],
@@ -401,8 +404,8 @@ class GenericHtmlConnector:
                 candidates.append(
                     OpportunityCandidate(
                         title=title[:180],
-                        entity=self.source_key,
-                        country="Por validar",
+                        entity=self._entity_name,
+                        country=self._default_country,
                         official_url=official_url,
                         summary=text[:700] or title,
                         raw_text=text[:2500],
@@ -450,8 +453,8 @@ class GenericHtmlConnector:
                     candidates.append(
                         OpportunityCandidate(
                             title=text[:180],
-                            entity=self.source_key,
-                            country="Por validar",
+                            entity=self._entity_name,
+                            country=self._default_country,
                             official_url=official_url,
                             summary=text,
                             raw_text=text,
