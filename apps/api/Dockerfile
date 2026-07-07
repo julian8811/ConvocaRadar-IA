@@ -11,13 +11,17 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libgbm1 libpango-1.0-0 libcairo2 libasound2 libatspi2.0-0 \
     && rm -rf /var/lib/apt/lists/*
 
+# Set Playwright browser install path (separate from system site-packages)
+ENV PLAYWRIGHT_BROWSERS_PATH=/app/.playwright
+
 # Install Python deps from pyproject.toml
 COPY apps/api/pyproject.toml .
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
     pip install --no-cache-dir -e ".[dev]"
 
-# Install Playwright browsers (Chromium headless)
-RUN python -m playwright install chromium --with-deps
+# Install Playwright browsers (chromium + chromium-headless-shell)
+RUN python -m playwright install chromium chromium-headless-shell --with-deps \
+    && python -m playwright install --verify
 
 # Copy application code
 COPY apps/api/alembic.ini .

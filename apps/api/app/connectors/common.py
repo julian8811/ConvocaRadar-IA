@@ -6,7 +6,7 @@ import socket
 from datetime import datetime
 import unicodedata
 import ipaddress
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urljoin
 
 import httpx
 
@@ -34,6 +34,8 @@ async def render_page_html(
     post_wait_ms: int = 500,
     user_agent: str | None = None,
 ) -> tuple[str, str, str]:
+    from urllib.parse import urlparse
+
     settings = get_settings()
     parsed_url = urlparse(url)
     if parsed_url.scheme not in {"http", "https"} or _is_private_host(parsed_url.hostname or ""):
@@ -75,7 +77,7 @@ async def render_page_html(
                 import subprocess, sys as _sys
                 _sys.stdout.flush()
                 subprocess.run(
-                    [_sys.executable, "-m", "playwright", "install", "chromium"],
+                    [_sys.executable, "-m", "playwright", "install", "chromium", "chromium-headless-shell"],
                     capture_output=True, timeout=180,
                 )
                 continue
@@ -140,6 +142,7 @@ def _is_private_host(hostname: str) -> bool:
 
 
 def is_allowed_host(url: str, allowed_domains: list[str] | tuple[str, ...] | None = None) -> bool:
+    from urllib.parse import urlparse
     host = (urlparse(url).hostname or "").lower()
     if not host:
         return False
@@ -251,6 +254,8 @@ async def fetch_httpx_text(
     playwright_fallback: bool = True,
     timeout_seconds: int | None = None,
 ) -> tuple[str, str, str]:
+    from urllib.parse import urlparse
+
     settings = get_settings()
     request_headers = {"User-Agent": settings.scraping_user_agent}
     if headers:
@@ -297,6 +302,8 @@ async def fetch_httpx_bytes(
     retries: int = 2,
     fallback_content_type: str = "application/octet-stream",
 ) -> tuple[str, bytes, str]:
+    from urllib.parse import urlparse
+
     settings = get_settings()
     request_headers = {"User-Agent": settings.scraping_user_agent}
     if headers:
