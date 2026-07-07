@@ -1124,6 +1124,7 @@ async def _scrape_source_candidates_with_timeout(
 ) -> list[OpportunityCreate]:
     settings = get_settings()
     timeout_seconds = max(settings.scraping_max_source_seconds, 30)
+    timeout_seconds = min(timeout_seconds, int(settings.per_connector_timeout_seconds))
     try:
         return await asyncio.wait_for(_scrape_source_candidates(source, stats), timeout=timeout_seconds)
     except TimeoutError as exc:
