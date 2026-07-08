@@ -12,6 +12,7 @@ from app.schemas import AdminMetricsRead, AuditLogRead, SourceRunOverviewRead
 from app.db.bootstrap import bootstrap_priority_sources
 from app.db.seed import seed_default_sources
 from app.services import (
+    audit,
     backfill_close_dates,
     backfill_funding_amounts,
     deduplicate_opportunities,
