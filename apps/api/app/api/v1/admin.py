@@ -12,6 +12,7 @@ from app.schemas import AdminMetricsRead, AuditLogRead, SourceRunOverviewRead
 from app.db.bootstrap import bootstrap_priority_sources
 from app.db.seed import seed_default_sources
 from app.services import (
+    backfill_funding_amounts,
     deduplicate_opportunities,
     execute_source_run_locally,
     rebuild_opportunity_embeddings,
@@ -460,5 +461,22 @@ def bootstrap_data_admin(
             metadata_json=result if isinstance(result, dict) else {"status": str(result)},
         )
     )
+    db.commit()
+    return result
+
+
+@router.post("/admin/opportunities/backfill-funding")
+def backfill_funding_admin(
+    limit: int = 500,
+    organization: Organization = Depends(get_current_organization),
+    user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Parse existing ``funding_amount_raw`` strings into numeric value + currency
+    without calling the LLM. Uses local regex patterns. Runs on up to ``limit``
+    opportunities per call.
+    """
+    result = backfill_funding_amounts(db, organization.id, limit=limit)
+    audit(db, "backfill_funding_amounts", "opportunity", user, organization.id)
     db.commit()
     return result
