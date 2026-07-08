@@ -28,3 +28,4 @@ test_storage/
 *.crt
 *.cer
 .sdd-apply-env.sh
+apps/api/.coverage

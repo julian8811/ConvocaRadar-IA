@@ -427,6 +427,69 @@ def _parse_ai_close_date(value: object) -> datetime | None:
     return None
 
 
+def _parse_funding_amount(funding_raw: str | None) -> tuple[float | None, str | None]:
+    """Parse ``funding_amount_raw`` into (numeric_value, currency_code).
+
+    Handles formats like:
+      - ``USD 500,000`` / ``EUR 1.2 million`` / ``COP 5000000``
+      - ``$500,000`` / ``$5,000,000 COP`` / ``$1.2M``
+      - ``US$ 500,000`` / ``€ 1.200.000``
+      - ``5.000.000.000`` (Spanish notation, dots as thousands sep)
+    Returns ``(None, None)`` when no pattern matches.
+    """
+    if not funding_raw:
+        return None, None
+
+    text = funding_raw.strip()
+
+    # Detect currency from prefix/suffix
+    currency = "USD"  # default
+    currency_map = {
+        "USD": ["USD", "US$", "$"],
+        "EUR": ["EUR", "€"],
+        "COP": ["COP", "COL$"],
+        "GBP": ["GBP", "£"],
+        "BRL": ["BRL", "R$"],
+        "MXN": ["MXN", "MX$"],
+    }
+    upper = text.upper()
+    for code, symbols in currency_map.items():
+        for sym in symbols:
+            if sym in upper:
+                currency = code
+                break
+        if currency == code:
+            break
+
+    # Normalize: remove currency symbols and text, normalize Spanish notation
+    cleaned = re.sub(r"[^\d,.\s]", " ", text)
+    cleaned = re.sub(r"\s+", " ", cleaned).strip()
+
+    # Spanish notation: dots as thousands, commas as decimals → normalize
+    if re.search(r"\d\.\d{3}", cleaned):
+        cleaned = cleaned.replace(".", "")
+
+    cleaned = cleaned.replace(",", "").strip()
+
+    # Extract numeric value
+    numbers = re.findall(r"\d+(?:\.\d+)?", cleaned)
+    if not numbers:
+        return None, None
+
+    # Take the largest number (covers "USD 500,000 - USD 1,000,000" ranges)
+    value = max(float(n) for n in numbers)
+
+    # Handle million/k suffixes (already stripped by regex, but check raw text)
+    if re.search(r"(?:million|million|MM|m)\b", text, re.IGNORECASE):
+        value *= 1_000_000
+    elif re.search(r"\b[kK]\b", text) and value < 1_000_000:
+        value *= 1_000
+    elif text.upper().endswith("M") and value < 1_000_000:
+        value *= 1_000_000
+
+    return value, currency
+
+
 def enrich_opportunity_payload(data: OpportunityCreate) -> OpportunityCreate:
     raw_text = data.raw_text.strip()
     if not raw_text or len(raw_text) < 120:
@@ -456,6 +519,12 @@ def enrich_opportunity_payload(data: OpportunityCreate) -> OpportunityCreate:
     merged["restrictions"] = data.restrictions or list(extraction.get("restrictions") or [])
     merged["risk_flags"] = data.risk_flags or list(extraction.get("risks") or [])
     merged["funding_amount_raw"] = data.funding_amount_raw or extraction.get("funding_amount_raw")
+    # Parse funding amount into numeric value + currency
+    if not data.funding_amount_value:
+        parsed_value, parsed_currency = _parse_funding_amount(merged["funding_amount_raw"])
+        if parsed_value is not None:
+            merged["funding_amount_value"] = parsed_value
+            merged["funding_amount_currency"] = parsed_currency
     merged["language"] = data.language if data.language not in {"", "auto"} else str(extraction.get("language") or infer_language(raw_text, fallback="es"))
     merged["confidence_score"] = round(
         max(float(data.confidence_score), float(extraction.get("confidence") or data.confidence_score)),
@@ -613,6 +682,13 @@ def reanalyze_opportunity(db: Session, opportunity: Opportunity, *, force: bool 
     if force or not opportunity.funding_amount_raw:
         opportunity.funding_amount_raw = extraction.get("funding_amount_raw") or opportunity.funding_amount_raw
         changed = True
+    # Parse funding amount into numeric value + currency if not already set
+    if opportunity.funding_amount_raw and not opportunity.funding_amount_value:
+        parsed_value, parsed_currency = _parse_funding_amount(opportunity.funding_amount_raw)
+        if parsed_value is not None:
+            opportunity.funding_amount_value = parsed_value
+            opportunity.funding_amount_currency = parsed_currency
+            changed = True
     confidence = float(extraction.get("confidence") or opportunity.confidence_score or 0.5)
     if force or confidence > opportunity.confidence_score:
         opportunity.confidence_score = round(confidence, 2)

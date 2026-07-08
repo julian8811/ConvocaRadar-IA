@@ -67,7 +67,24 @@ export default function SourcesPage() {
   const actionLinkClass =
     "inline-flex h-8 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-xs font-medium text-slate-900 shadow-sm transition-colors hover:bg-slate-50 hover:text-slate-950 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800";
 
+  const [filterName, setFilterName] = useState("");
+  const [filterType, setFilterType] = useState("all");
+  const [filterStatus, setFilterStatus] = useState("all");
+
   const healthItems = useMemo(() => sourceHealth.data ?? [], [sourceHealth.data]);
+
+  const filteredSources = useMemo(() => {
+    if (!sources.data) return [];
+    return sources.data.filter((source) => {
+      if (filterName && !source.name.toLowerCase().includes(filterName.toLowerCase()) && !source.key.toLowerCase().includes(filterName.toLowerCase())) return false;
+      if (filterType !== "all" && source.source_type !== filterType) return false;
+      if (filterStatus !== "all") {
+        const healthItem = healthItems.find((h) => h.source_id === source.id);
+        if (!healthItem || healthItem.status !== filterStatus) return false;
+      }
+      return true;
+    });
+  }, [sources.data, healthItems, filterName, filterType, filterStatus]);
 
   const healthSummary = useMemo(() => {
     if (!healthItems.length) {
@@ -220,9 +237,43 @@ export default function SourcesPage() {
       {sources.data ? (
         <Card>
           <CardHeader className="border-b border-slate-200 dark:border-slate-700 pb-4">
-            <CardTitle className="text-slate-950 dark:text-white">Fuentes registradas</CardTitle>
+            <CardTitle className="text-slate-950 dark:text-white">
+              Fuentes registradas
+              <span className="ml-2 text-sm font-normal text-slate-500">({filteredSources.length} de {sources.data.length})</span>
+            </CardTitle>
             <CardDescription>Estado operativo y última ejecución de cada fuente.</CardDescription>
           </CardHeader>
+          <div className="flex flex-wrap items-center gap-3 border-b border-slate-200 px-4 py-3 dark:border-slate-700">
+            <input
+              className="h-9 w-full max-w-xs rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none transition-colors placeholder:text-slate-400 focus:border-sky-400 focus:ring-2 focus:ring-sky-400/20 dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100 dark:placeholder:text-slate-500"
+              placeholder="Buscar por nombre o clave..."
+              value={filterName}
+              onChange={(e) => setFilterName(e.target.value)}
+            />
+            <select
+              className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+              value={filterType}
+              onChange={(e) => setFilterType(e.target.value)}
+            >
+              <option value="all">Todos los tipos</option>
+              <option value="html">html</option>
+              <option value="api">api</option>
+              <option value="rss">rss</option>
+              <option value="hybrid">hybrid</option>
+              <option value="pdf">pdf</option>
+              <option value="manual">manual</option>
+            </select>
+            <select
+              className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+              value={filterStatus}
+              onChange={(e) => setFilterStatus(e.target.value)}
+            >
+              <option value="all">Todos los estados</option>
+              <option value="healthy">Sanas</option>
+              <option value="degraded">Degradadas</option>
+              <option value="failing">Fallando</option>
+            </select>
+          </div>
           <CardContent className="overflow-x-auto p-0">
             <Table>
               <TableHeader>
@@ -236,7 +287,7 @@ export default function SourcesPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {sources.data.map((source) => (
+                {filteredSources.map((source) => (
                   <TableRow key={source.id}>
                     <TableCell className="font-medium text-slate-950 dark:text-white">{source.name}</TableCell>
                     <TableCell>{source.source_type}</TableCell>
