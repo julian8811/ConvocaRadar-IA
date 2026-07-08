@@ -13,13 +13,12 @@
 "use client";
 
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
-import { ArrowRight, ListChecks, Sparkles, Target } from "lucide-react";
+import { ArrowRight, CalendarClock, Clock, Globe, ListChecks, Sparkles, Target, TrendingUp } from "lucide-react";
 import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ErrorState, EmptyState } from "@/components/ui/state";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { api } from "@/lib/api";
 import type { TriageOpportunityItem, TriageRead } from "@/lib/types";
 import { TriageSkeleton } from "@/components/dashboard/skeletons/TriageSkeleton";
@@ -32,7 +31,8 @@ function ClosingSoon7dWidget({ items }: { items: TriageOpportunityItem[] }) {
   if (items.length === 0) {
     return (
       <Card>
-        <CardContent className="p-4 text-sm text-slate-500 dark:text-slate-400">
+        <CardContent className="flex items-center gap-3 p-6 text-sm text-slate-500 dark:text-slate-400">
+          <CalendarClock className="h-5 w-5" />
           Sin cierres esta semana.
         </CardContent>
       </Card>
@@ -40,67 +40,71 @@ function ClosingSoon7dWidget({ items }: { items: TriageOpportunityItem[] }) {
   }
   return (
     <Card>
-      <div className="border-b border-slate-200 p-4 dark:border-slate-700">
-        <h2 className="text-sm font-semibold text-slate-950 dark:text-white">
-          Próximos cierres (7 días)
-        </h2>
-        <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
-          Convocatorias que cierran esta semana.
-        </p>
-      </div>
-      <div className="overflow-x-auto p-0">
-        <Table>
-          <TableHeader>
-            <TableRow>
-              <TableHead>Convocatoria</TableHead>
-              <TableHead>País</TableHead>
-              <TableHead>Cierra en</TableHead>
-              <TableHead>Monto</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {items.map((item) => (
-              <TableRow key={item.id}>
-                <TableCell>
-                  <Link
-                    href={`/opportunities/${item.id}`}
-                    className="font-medium text-slate-950 hover:text-cyan-700 dark:text-white dark:hover:text-cyan-200"
-                  >
-                    {item.title}
-                  </Link>
-                </TableCell>
-                <TableCell>{item.country || "Sin dato"}</TableCell>
-                <TableCell>
-                  {item.days_to_close !== null ? (
-                    <Badge
-                      tone={
-                        item.days_to_close <= 3
-                          ? "destructive"
-                          : item.days_to_close <= 7
-                            ? "medium"
-                            : "muted"
-                      }
-                    >
-                      {item.days_to_close === 0
-                        ? "Hoy"
-                        : item.days_to_close === 1
-                          ? "1 día"
-                          : `${item.days_to_close} días`}
-                    </Badge>
-                  ) : (
-                    <span className="text-xs text-slate-500 dark:text-slate-400">—</span>
+      <CardHeader className="border-b border-slate-200 pb-4 dark:border-slate-700">
+        <div className="flex items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2 text-slate-950 dark:text-white">
+              <CalendarClock className="h-5 w-5 text-cyan-600 dark:text-cyan-400" />
+              Próximos cierres
+            </CardTitle>
+            <CardDescription>Convocatorias que cierran esta semana.</CardDescription>
+          </div>
+          <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-cyan-100 text-sm font-bold text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200">
+            {items.length}
+          </span>
+        </div>
+      </CardHeader>
+      <CardContent className="grid gap-3 p-4 sm:grid-cols-2 xl:grid-cols-4">
+        {items.map((item) => {
+          const urgency = item.days_to_close !== null && item.days_to_close <= 3 ? "urgent" : item.days_to_close !== null && item.days_to_close <= 7 ? "soon" : "normal";
+          const borderColor = urgency === "urgent" ? "border-l-rose-500" : urgency === "soon" ? "border-l-amber-500" : "border-l-sky-500";
+          const daysText = item.days_to_close === 0 ? "Hoy" : item.days_to_close === 1 ? "1 día" : `${item.days_to_close} días`;
+          const progress = item.days_to_close !== null ? Math.max(0, Math.min(100, ((7 - item.days_to_close) / 7) * 100)) : 0;
+
+          return (
+            <Link key={item.id} href={`/opportunities/${item.id}`} className="group block">
+              <div className={`rounded-lg border border-slate-200 bg-white p-4 transition-all hover:shadow-md hover:border-slate-300 dark:border-slate-700 dark:bg-slate-900 dark:hover:border-slate-600 border-l-4 ${borderColor}`}>
+                <p className="line-clamp-2 text-sm font-medium text-slate-950 group-hover:text-cyan-700 dark:text-white dark:group-hover:text-cyan-300">
+                  {item.title}
+                </p>
+                <div className="mt-3 flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
+                  <span className="flex items-center gap-1">
+                    <Globe className="h-3 w-3" />
+                    {item.country || "—"}
+                  </span>
+                  {item.score !== null && (
+                    <span className="flex items-center gap-1">
+                      <TrendingUp className="h-3 w-3" />
+                      {item.score}
+                    </span>
                   )}
-                </TableCell>
-                <TableCell className="text-xs text-slate-500 dark:text-slate-400">
-                  {item.funding_amount !== null
-                    ? `${formatNumber(item.funding_amount)}${item.currency ? ` ${item.currency}` : ""}`
-                    : "Por validar"}
-                </TableCell>
-              </TableRow>
-            ))}
-          </TableBody>
-        </Table>
-      </div>
+                </div>
+                <div className="mt-3 flex items-center justify-between">
+                  <Badge tone={urgency === "urgent" ? "destructive" : urgency === "soon" ? "medium" : "muted"}>
+                    <Clock className="mr-1 h-3 w-3" />
+                    {daysText}
+                  </Badge>
+                  <span className="text-xs text-slate-500 dark:text-slate-400">
+                    {item.funding_amount !== null
+                      ? `${formatNumber(item.funding_amount)}${item.currency ? ` ${item.currency}` : ""}`
+                      : "—"}
+                  </span>
+                </div>
+                {item.days_to_close !== null && (
+                  <div className="mt-2 h-1 w-full overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800">
+                    <div
+                      className={`h-full rounded-full transition-all ${
+                        urgency === "urgent" ? "bg-rose-500" : urgency === "soon" ? "bg-amber-500" : "bg-sky-500"
+                      }`}
+                      style={{ width: `${progress}%` }}
+                    />
+                  </div>
+                )}
+              </div>
+            </Link>
+          );
+        })}
+      </CardContent>
     </Card>
   );
 }
@@ -225,16 +229,16 @@ export function TriageZone() {
   const closingSoonCount = data.closing_soon_7d?.length ?? 0;
   const reviewCount = data.review_queue?.length ?? 0;
 
-  // kpis: pull from the review queue + closing-soon 7d slice (slim, no entity/status).
-  const kpis = {
-    total_opportunities: closingSoonCount + reviewCount,
-    open_opportunities: 0,
-    closing_soon_opportunities: closingSoonCount,
-    high_match_opportunities: 0,
-  };
-
   return (
     <div className="space-y-4" data-zone="triage">
+      <KpiFooter
+        kpis={{
+          total_opportunities: closingSoonCount + reviewCount,
+          open_opportunities: closingSoonCount,
+          closing_soon_opportunities: closingSoonCount,
+          high_match_opportunities: reviewCount,
+        }}
+      />
       <div id="closing-soon-7d">
         <ClosingSoon7dWidget items={data.closing_soon_7d ?? []} />
       </div>
@@ -245,14 +249,6 @@ export function TriageZone() {
           hasReviewQueue={reviewCount > 0}
         />
       </div>
-      <details className="rounded-md border border-slate-200 bg-white p-4 shadow-sm dark:border-slate-800 dark:bg-slate-900">
-        <summary className="cursor-pointer text-sm font-medium text-slate-700 dark:text-slate-200">
-          Ver resumen numérico
-        </summary>
-        <div className="mt-3">
-          <KpiFooter kpis={kpis} />
-        </div>
-      </details>
     </div>
   );
 }
