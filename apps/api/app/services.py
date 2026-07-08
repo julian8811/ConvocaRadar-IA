@@ -2454,6 +2454,36 @@ def get_score_distribution(db: Session, organization_id: str) -> list[DashboardB
     ]
 
 
+def backfill_funding_amounts(db: Session, organization_id: str, *, limit: int = 500) -> dict[str, int]:
+    """Parse ``funding_amount_raw`` into ``funding_amount_value`` + ``funding_amount_currency``
+    for existing opportunities that have raw text but no parsed value yet.
+    Uses the local regex parser only — no AI calls.
+    """
+    scope = or_(
+        Opportunity.organization_id == organization_id,
+        Opportunity.organization_id.is_(None),
+    )
+    stmt = (
+        select(Opportunity)
+        .where(
+            scope,
+            Opportunity.funding_amount_raw.isnot(None),
+            Opportunity.funding_amount_value.is_(None),
+        )
+        .limit(limit)
+    )
+    opportunities = list(db.scalars(stmt))
+    updated = 0
+    for opp in opportunities:
+        parsed_value, parsed_currency = _parse_funding_amount(opp.funding_amount_raw)
+        if parsed_value is not None:
+            opp.funding_amount_value = parsed_value
+            opp.funding_amount_currency = parsed_currency
+            updated += 1
+    db.commit()
+    return {"total": len(opportunities), "updated": updated}
+
+
 def get_funding_ranges(db: Session, organization_id: str) -> list[DashboardBreakdownItem]:
     """Group opportunities by their funding amount range."""
     scope = or_(
