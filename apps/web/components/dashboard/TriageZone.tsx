@@ -191,25 +191,28 @@ function HeroActionList({ count, hasClosingSoon7d, hasReviewQueue }: {
   );
 }
 
+const KPI_ACCENTS = [
+  { border: "border-t-cyan-500" },
+  { border: "border-t-emerald-500" },
+  { border: "border-t-amber-500" },
+  { border: "border-t-violet-500" },
+];
+
 function KpiFooter({ kpis }: { kpis: { total_opportunities: number; open_opportunities: number; closing_soon_opportunities: number; high_match_opportunities: number } }) {
+  const items = [
+    { label: "Total convocatorias", value: kpis.total_opportunities, accent: KPI_ACCENTS[0] },
+    { label: "Con apertura próxima", value: kpis.open_opportunities, accent: KPI_ACCENTS[1] },
+    { label: "Cierran pronto", value: kpis.closing_soon_opportunities, accent: KPI_ACCENTS[2] },
+    { label: "En revisión", value: kpis.high_match_opportunities, accent: KPI_ACCENTS[3] },
+  ];
   return (
-    <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
-      <div className="rounded-md border border-slate-200 bg-white p-3 text-xs dark:border-slate-800 dark:bg-slate-900">
-        <p className="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Total convocatorias</p>
-        <p className="mt-1 text-lg font-semibold text-slate-950 dark:text-white">{formatNumber(kpis.total_opportunities)}</p>
-      </div>
-      <div className="rounded-md border border-slate-200 bg-white p-3 text-xs dark:border-slate-800 dark:bg-slate-900">
-        <p className="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Convocatorias abiertas</p>
-        <p className="mt-1 text-lg font-semibold text-slate-950 dark:text-white">{formatNumber(kpis.open_opportunities)}</p>
-      </div>
-      <div className="rounded-md border border-slate-200 bg-white p-3 text-xs dark:border-slate-800 dark:bg-slate-900">
-        <p className="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Cierran pronto</p>
-        <p className="mt-1 text-lg font-semibold text-slate-950 dark:text-white">{formatNumber(kpis.closing_soon_opportunities)}</p>
-      </div>
-      <div className="rounded-md border border-slate-200 bg-white p-3 text-xs dark:border-slate-800 dark:bg-slate-900">
-        <p className="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Alta compatibilidad</p>
-        <p className="mt-1 text-lg font-semibold text-slate-950 dark:text-white">{formatNumber(kpis.high_match_opportunities)}</p>
-      </div>
+    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      {items.map((item) => (
+        <div key={item.label} className={`rounded-lg border border-slate-200 bg-white p-4 transition-all hover:shadow-md dark:border-slate-800 dark:bg-slate-900 border-t-4 ${item.accent.border}`}>
+          <p className="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">{item.label}</p>
+          <p className="mt-1 text-2xl font-bold text-slate-950 dark:text-white">{formatNumber(item.value)}</p>
+        </div>
+      ))}
     </div>
   );
 }
