@@ -12,95 +12,170 @@
 "use client";
 
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
-import { CalendarClock, ListChecks, TrendingUp } from "lucide-react";
+import { CalendarClock, Clock, Globe, ListChecks, TrendingUp } from "lucide-react";
+import Link from "next/link";
 
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState, ErrorState } from "@/components/ui/state";
-import { Table, TableBody, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { api } from "@/lib/api";
 import type { PipelineOpportunityItem, PipelineRead, TriageRead } from "@/lib/types";
-import { OpportunityRow } from "@/components/dashboard/OpportunityRow";
 import { PipelineSkeleton } from "@/components/dashboard/skeletons/PipelineSkeleton";
 
-function TopScoredTable({ items }: { items: PipelineOpportunityItem[] }) {
+const REASONS_VISIBLE = 2;
+
+function formatNumber(value: number) {
+  return new Intl.NumberFormat("es-CO", { maximumFractionDigits: 0 }).format(value);
+}
+
+function TopScoredGrid({ items }: { items: PipelineOpportunityItem[] }) {
   if (items.length === 0) {
     return (
-      <EmptyState
-        title="Sin scores todavía"
-        detail="Completa tu perfil institucional y espera el cálculo automático de compatibilidad."
-      />
+      <CardContent className="p-6">
+        <EmptyState
+          title="Sin scores todavía"
+          detail="Completa tu perfil institucional y espera el cálculo automático de compatibilidad."
+        />
+      </CardContent>
     );
   }
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Convocatoria</TableHead>
-          <TableHead>País</TableHead>
-          <TableHead>Score</TableHead>
-          <TableHead>Razones</TableHead>
-          <TableHead>Monto</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {items.map((item) => (
-          <OpportunityRow key={item.id} item={item} showReasons />
-        ))}
-      </TableBody>
-    </Table>
+    <CardContent className="grid gap-4 p-4 sm:grid-cols-2 xl:grid-cols-4">
+      {items.map((item) => {
+        const scoreColor = item.score !== null && item.score >= 70 ? "text-emerald-600 dark:text-emerald-400" : item.score !== null && item.score >= 50 ? "text-amber-600 dark:text-amber-400" : "text-slate-500 dark:text-slate-400";
+        const scoreBg = item.score !== null && item.score >= 70 ? "bg-emerald-100 dark:bg-emerald-900/30" : item.score !== null && item.score >= 50 ? "bg-amber-100 dark:bg-amber-900/30" : "bg-slate-100 dark:bg-slate-800";
+        return (
+          <Link key={item.id} href={`/opportunities/${item.id}`} className="group block">
+            <div className="rounded-lg border border-slate-200 bg-white p-4 transition-all hover:shadow-md dark:border-slate-700 dark:bg-slate-900">
+              <div className="flex items-start justify-between gap-3">
+                <p className="flex-1 line-clamp-2 text-sm font-medium text-slate-950 group-hover:text-cyan-700 dark:text-white dark:group-hover:text-cyan-300">
+                  {item.title}
+                </p>
+                {item.score !== null && (
+                  <span className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold ${scoreColor} ${scoreBg}`}>
+                    {Math.round(item.score)}
+                  </span>
+                )}
+              </div>
+              <div className="mt-2 flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
+                <span className="flex items-center gap-1">
+                  <Globe className="h-3 w-3" />
+                  {item.country || "—"}
+                </span>
+                <span>{item.funding_amount !== null ? `${formatNumber(item.funding_amount)}${item.currency ? ` ${item.currency}` : ""}` : "—"}</span>
+              </div>
+              {item.reasons && item.reasons.length > 0 && (
+                <ul className="mt-3 space-y-1 border-t border-slate-100 pt-3 dark:border-slate-800">
+                  {item.reasons.slice(0, REASONS_VISIBLE).map((reason, i) => (
+                    <li key={i} className="flex items-start gap-2 text-xs text-slate-600 dark:text-slate-300">
+                      <span className="mt-1 h-1 w-1 shrink-0 rounded-full bg-slate-400" />
+                      {reason}
+                    </li>
+                  ))}
+                  {item.reasons.length > REASONS_VISIBLE && (
+                    <li className="text-xs font-medium text-cyan-700 dark:text-cyan-300">
+                      +{item.reasons.length - REASONS_VISIBLE} más
+                    </li>
+                  )}
+                </ul>
+              )}
+            </div>
+          </Link>
+        );
+      })}
+    </CardContent>
   );
 }
 
-function ClosingSoonTable({ items }: { items: PipelineOpportunityItem[] }) {
-  if (items.length === 0) {
-    return <EmptyState title="Sin cierres próximos" detail="No hay convocatorias con cierre cercano en este momento." />;
-  }
-  return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Convocatoria</TableHead>
-          <TableHead>País</TableHead>
-          <TableHead>Score</TableHead>
-          <TableHead>Cierra en</TableHead>
-          <TableHead>Monto</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {items.map((item) => (
-          <OpportunityRow key={item.id} item={item} showCountdown />
-        ))}
-      </TableBody>
-    </Table>
-  );
-}
-
-function ReviewQueueTable({ items }: { items: PipelineOpportunityItem[] }) {
+function ClosingSoonGrid({ items }: { items: PipelineOpportunityItem[] }) {
   if (items.length === 0) {
     return (
-      <EmptyState
-        title="No tenés items en revisión"
-        detail="Marcá una oportunidad como En revisión desde su detalle para empezar tu cola."
-      />
+      <CardContent className="p-6">
+        <EmptyState title="Sin cierres próximos" detail="No hay convocatorias con cierre cercano en este momento." />
+      </CardContent>
     );
   }
   return (
-    <Table>
-      <TableHeader>
-        <TableRow>
-          <TableHead>Convocatoria</TableHead>
-          <TableHead>País</TableHead>
-          <TableHead>Score</TableHead>
-          <TableHead>Cierra en</TableHead>
-          <TableHead>Monto</TableHead>
-        </TableRow>
-      </TableHeader>
-      <TableBody>
-        {items.map((item) => (
-          <OpportunityRow key={item.id} item={item} showStatusBadge showCountdown />
-        ))}
-      </TableBody>
-    </Table>
+    <CardContent className="grid gap-4 p-4 sm:grid-cols-2 xl:grid-cols-4">
+      {items.map((item) => {
+        const urgency = item.days_to_close !== null && item.days_to_close <= 3 ? "urgent" : item.days_to_close !== null && item.days_to_close <= 7 ? "soon" : "normal";
+        const borderColor = urgency === "urgent" ? "border-l-rose-500" : urgency === "soon" ? "border-l-amber-500" : "border-l-sky-500";
+        const daysText = item.days_to_close === 0 ? "Hoy" : item.days_to_close === 1 ? "1 día" : `${item.days_to_close} días`;
+        return (
+          <Link key={item.id} href={`/opportunities/${item.id}`} className="group block">
+            <div className={`rounded-lg border border-slate-200 bg-white p-4 transition-all hover:shadow-md dark:border-slate-700 dark:bg-slate-900 border-l-4 ${borderColor}`}>
+              <p className="line-clamp-2 text-sm font-medium text-slate-950 group-hover:text-cyan-700 dark:text-white dark:group-hover:text-cyan-300">
+                {item.title}
+              </p>
+              <div className="mt-2 flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
+                <span className="flex items-center gap-1">
+                  <Globe className="h-3 w-3" />
+                  {item.country || "—"}
+                </span>
+                {item.score !== null && <span>Score: {Math.round(item.score)}</span>}
+              </div>
+              <div className="mt-3 flex items-center justify-between">
+                <Badge tone={urgency === "urgent" ? "destructive" : urgency === "soon" ? "medium" : "muted"}>
+                  <Clock className="mr-1 h-3 w-3" />
+                  {daysText}
+                </Badge>
+                <span className="text-xs text-slate-500 dark:text-slate-400">
+                  {item.funding_amount !== null ? `${formatNumber(item.funding_amount)}${item.currency ? ` ${item.currency}` : ""}` : "—"}
+                </span>
+              </div>
+            </div>
+          </Link>
+        );
+      })}
+    </CardContent>
+  );
+}
+
+function ReviewQueueGrid({ items }: { items: PipelineOpportunityItem[] }) {
+  if (items.length === 0) {
+    return (
+      <CardContent className="p-6">
+        <EmptyState
+          title="No tenés items en revisión"
+          detail="Marcá una oportunidad como En revisión desde su detalle para empezar tu cola."
+        />
+      </CardContent>
+    );
+  }
+  return (
+    <CardContent className="grid gap-4 p-4 sm:grid-cols-2 xl:grid-cols-4">
+      {items.map((item) => {
+        const daysText = item.days_to_close === 0 ? "Hoy" : item.days_to_close === 1 ? "1 día" : item.days_to_close !== null ? `${item.days_to_close} días` : "—";
+        return (
+          <Link key={item.id} href={`/opportunities/${item.id}`} className="group block">
+            <div className="rounded-lg border border-sky-200 bg-white p-4 transition-all hover:shadow-md dark:border-sky-800 dark:bg-slate-900">
+              <div className="flex items-start justify-between gap-2">
+                <p className="flex-1 line-clamp-2 text-sm font-medium text-slate-950 group-hover:text-cyan-700 dark:text-white dark:group-hover:text-cyan-300">
+                  {item.title}
+                </p>
+                <Badge tone="review">Revisión</Badge>
+              </div>
+              <div className="mt-2 flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
+                <span className="flex items-center gap-1">
+                  <Globe className="h-3 w-3" />
+                  {item.country || "—"}
+                </span>
+                {item.score !== null && <span>Score: {Math.round(item.score)}</span>}
+                {item.days_to_close !== null && (
+                  <span className="flex items-center gap-1">
+                    <Clock className="h-3 w-3" />
+                    {daysText}
+                  </span>
+                )}
+              </div>
+              <span className="mt-2 block text-xs text-slate-500 dark:text-slate-400">
+                {item.funding_amount !== null ? `${formatNumber(item.funding_amount)}${item.currency ? ` ${item.currency}` : ""}` : "—"}
+              </span>
+            </div>
+          </Link>
+        );
+      })}
+    </CardContent>
   );
 }
 
@@ -142,9 +217,7 @@ export function PipelineZone() {
             Convocatorias con mejor score y las razones que lo explican.
           </CardDescription>
         </CardHeader>
-        <CardContent className="overflow-x-auto p-0">
-          <TopScoredTable items={topScored} />
-        </CardContent>
+        <TopScoredGrid items={topScored} />
       </Card>
 
       <Card>
@@ -157,9 +230,7 @@ export function PipelineZone() {
             Convocatorias con fecha de cierre cercana.
           </CardDescription>
         </CardHeader>
-        <CardContent className="overflow-x-auto p-0">
-          <ClosingSoonTable items={closingSoon} />
-        </CardContent>
+        <ClosingSoonGrid items={closingSoon} />
       </Card>
 
       <Card>
@@ -172,9 +243,7 @@ export function PipelineZone() {
             Items que marcaste como En revisión o Mantener.
           </CardDescription>
         </CardHeader>
-        <CardContent className="overflow-x-auto p-0">
-          <ReviewQueueTable items={reviewQueue as PipelineOpportunityItem[]} />
-        </CardContent>
+        <ReviewQueueGrid items={reviewQueue as PipelineOpportunityItem[]} />
       </Card>
     </div>
   );
