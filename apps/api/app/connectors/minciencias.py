@@ -8,7 +8,7 @@ from playwright.async_api import async_playwright
 from selectolax.parser import HTMLParser, Node
 
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
-from app.connectors.common import clean_text, fetch_httpx_text, launch_chromium, normalize_text
+from app.connectors.common import clean_text, extract_close_date, fetch_httpx_text, launch_chromium, normalize_text, parse_date_text
 
 
 MINCIENCIAS_URL = "https://minciencias.gov.co/convocatorias/todas"
@@ -38,7 +38,7 @@ def _clean(value: str | None) -> str:
 
 def _parse_spanish_date(text: str) -> datetime | None:
     normalized = normalize_text(text)
-    match = re.search(r"(?:lunes|martes|miercoles|jueves|viernes|sabado|domingo)?,?\s*([a-z]+)\s+(\d{1,2}),\s*(\d{4})", normalized)
+    match = re.search(r"(?:lunes|martes|miercoles|jueves|viernes|sabado|domingo)?,?\s*([a-z]+)\s+(\d{1,2}),?\s*(?:de\s+)?(\d{4})", normalized)
     if not match:
         return None
     month = MONTHS_ES.get(match.group(1))
@@ -48,6 +48,10 @@ def _parse_spanish_date(text: str) -> datetime | None:
         return datetime(int(match.group(3)), month, int(match.group(2)))
     except ValueError:
         return None
+
+
+# Extract close_date using the shared function from common.py
+_extract_close_date = extract_close_date
 
 
 def _extract_money(text: str) -> str | None:
@@ -132,8 +136,9 @@ class MincienciasConnector:
             topics=["minciencias"],
             raw_text=text[:5000],
             confidence_score=0.82,
-            open_date=_parse_spanish_date(text),
-            funding_amount_raw=_extract_money(text),
+                    open_date=_parse_spanish_date(text),
+                    close_date=_extract_close_date(text),
+                    funding_amount_raw=_extract_money(text),
             language="es",
         )
 
@@ -184,6 +189,7 @@ class MincienciasConnector:
                         raw_text=text[:5000],
                         confidence_score=0.72,
                         open_date=_parse_spanish_date(text),
+                        close_date=_extract_close_date(text),
                         funding_amount_raw=_extract_money(text),
                         language="es",
                     )

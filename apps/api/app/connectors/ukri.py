@@ -7,7 +7,7 @@ from urllib.parse import urljoin, urlparse
 from selectolax.parser import HTMLParser
 
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
-from app.connectors.common import clean_text, fetch_httpx_text, parse_date_text
+from app.connectors.common import clean_text, extract_close_date, fetch_httpx_text, parse_date_text
 
 
 UKRI_HOSTS = {"ukri.org", "www.ukri.org"}
@@ -70,6 +70,7 @@ class UKRIConnector:
                         raw_text=text[:2500],
                         confidence_score=0.7,
                         open_date=parse_date_text(text),
+                        close_date=extract_close_date(text),
                     )
                 )
 
