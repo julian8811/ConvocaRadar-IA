@@ -159,21 +159,64 @@ def safe_urljoin(base_url: str, href: str | None) -> str:
 
 def extract_close_date(text: str) -> datetime | None:
     """Extract a deadline/close date from text using Spanish & English patterns.
-    Looks for ``fecha de cierre``, ``deadline``, ``hasta el``, etc.
+    Tries keyword-prefixed patterns first (more reliable), then falls back to
+    any date-looking text near deadline keywords.
     """
     if not text:
         return None
-    for pattern in [
-        r"(?:fecha\s+(?:de\s+)?(?:\w+\s+)?(?:cierre|limite|maxima|maxima))\s*[:\-]?\s*([a-z]+\s+\d{1,2},?\s*(?:de\s+)?\d{4})",
-        r"(?:cierra|vence|finaliza|termina|deadline|closes)\s+(?:el\s+|on\s+)?(\d{1,2}\s+de\s+[a-z]+\s+de\s+\d{4}|\w+\s+\d{1,2},?\s+\d{4})",
+    _text = text[:3000]  # limit to first 3000 chars for performance
+
+    # ── Tier 1: Keyword-prefixed patterns (high precision) ──────────────
+    tier1 = [
+        # Spanish: "fecha de cierre: 8 de mayo de 2026"
+        r"(?:fecha\s+(?:de\s+)?(?:\w+\s+)?(?:cierre|limite|limite|maxima|maxima|tope))\s*[:\-]?\s*(\d{1,2}\s+de\s+[a-z]+\s+de\s+\d{4})",
+        # Spanish: "cierra el 08 de mayo de 2026"
+        r"(?:cierra|vence|finaliza|termina)\s+(?:el\s+)?(\d{1,2}\s+de\s+[a-z]+\s+de\s+\d{4})",
+        # English: "deadline: May 8, 2026"
+        r"(?:deadline|closing\s+date|submission\s+deadline|application\s+deadline|applications?\s+due|proposals?\s+due)\s*[:\-]?\s*([a-z]+\s+\d{1,2},?\s+\d{4})",
+        # Spanish/English: "hasta el 8 de mayo de 2026"
         r"(?:hasta\s+(?:el\s+)?(?:dia\s+)?)(\d{1,2}\s+de\s+[a-z]+\s+de\s+\d{4})",
-        r"(\d{1,2}[/-]\d{1,2}[/-]\d{4})",
-    ]:
-        match = re.search(pattern, text, flags=re.IGNORECASE)
+        # Spanish: "postulación hasta: 8/5/2026"
+        r"(?:postulacion|postulación|aplicacion|aplicación|envio|envío|recepcion|recepción|inscripcion|inscripción)\s+(?:hasta|cierra|finaliza)\s*(?:\:)?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{4}|\d{1,2}\s+de\s+[a-z]+\s+de\s+\d{4})",
+        # "plazo: 8 de mayo de 2026" / "plazo máximo: ..."
+        r"(?:plazo\s+(?:maximo|máximo|tope|max|)?)\s*[:\-]?\s*(\d{1,2}\s+de\s+[a-z]+\s+de\s+\d{4})",
+    ]
+    for pattern in tier1:
+        match = re.search(pattern, _text, flags=re.IGNORECASE)
         if match:
             parsed = parse_date_text(match.group(1))
             if parsed:
                 return parsed
+
+    # ── Tier 2: Any date after a deadline keyword (broader match) ───────
+    tier2 = [
+        # English: "closes May 8, 2026" / "due May 8, 2026" / "by May 8, 2026"
+        r"(?:closes|due date|due on|by\s+)\s*([a-z]+\s+\d{1,2},?\s+\d{4})",
+        # "before May 8, 2026" / "until May 8, 2026"
+        r"(?:before|until|antes\s+del|a\s+mas\s+tardar)\s+(\d{1,2}\s+de\s+[a-z]+\s+de\s+\d{4}|\w+\s+\d{1,2},?\s+\d{4})",
+        # Bare Spanish date after "el" ("recibimos hasta el 8 de mayo de 2026")
+        r"(?:hasta|antes\s+del)\s+(\d{1,2}\s+de\s+[a-z]+\s+de\s+\d{4})",
+        # Bare numeric date preceded by keyword
+        r"(?:cierre|deadline|closing|due)\s*[:\-]?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{4})",
+    ]
+    for pattern in tier2:
+        match = re.search(pattern, _text, flags=re.IGNORECASE)
+        if match:
+            parsed = parse_date_text(match.group(1))
+            if parsed:
+                return parsed
+
+    # ── Tier 3: Last resort — any ISO or slash date near keywords ───────
+    for pattern in [
+        r"(?:cierra|deadline|cierre|vence|closing|due)\s*(?:\:)?\s*(\d{1,2}/\d{1,2}/\d{4})",
+        r"(\d{4}-\d{2}-\d{2})",
+    ]:
+        match = re.search(pattern, _text, flags=re.IGNORECASE)
+        if match:
+            parsed = parse_date_text(match.group(1))
+            if parsed:
+                return parsed
+
     return None
 
 

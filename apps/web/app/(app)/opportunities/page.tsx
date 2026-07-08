@@ -147,20 +147,15 @@ export default function OpportunitiesPage() {
     [semanticResults.data?.items],
   );
   const items = useMemo(() => {
-    const applyStatus = (list: Opportunity[]) =>
-      list.filter((item) => {
-        if (!status) return true;
-        if (status === "open") return item.status !== "closed";
-        return item.status === status;
-      });
-
+    // Server-side handles all filtering (noise, status, search) via
+    // build_opportunity_query. Client-side filtering broke pagination
+    // because items.length no longer matched the server's page slice.
     if (searchMode === "semantic" && semanticQuery.trim().length >= 3) {
-      return sortItems(applyStatus(semanticItems));
+      return sortItems(semanticItems);
     }
-    const visibleItems = (opportunities.data?.items ?? []).filter((item) => !isNoiseVisibleText(item.title));
-    return sortItems(applyStatus(visibleItems));
-  }, [opportunities.data?.items, semanticItems, searchMode, semanticQuery, status]);
-  const total = searchMode === "semantic" && semanticQuery.trim().length >= 3 ? items.length : (opportunities.data?.total ?? 0);
+    return sortItems(opportunities.data?.items ?? []);
+  }, [opportunities.data?.items, semanticItems, searchMode, semanticQuery]);
+  const total = searchMode === "semantic" ? opportunities.data?.total ?? 0 : (opportunities.data?.total ?? 0);
   const totalPages = Math.max(Math.ceil(total / pageSize), 1);
   const openCount = items.filter((item) => item.status === "open").length;
   const closingSoon = items.filter((item) => item.status === "closing_soon").length;
@@ -189,7 +184,7 @@ export default function OpportunitiesPage() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <QuickStat label="Abiertas" value={total} detail="Convocatorias detectadas" tone="high" />
+        <QuickStat label="Total" value={total} detail="Convocatorias detectadas" tone="high" />
         <QuickStat label="Abiertas hoy" value={openCount} detail="Vigentes hoy" tone="open" />
         <QuickStat label="Cierran pronto" value={closingSoon} detail="Requieren seguimiento" tone="closing_soon" />
         <QuickStat label="Con fuente" value={withSource} detail={`${favorites} favoritas`} tone="medium" />
