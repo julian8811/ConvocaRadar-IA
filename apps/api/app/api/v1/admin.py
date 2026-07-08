@@ -16,6 +16,7 @@ from app.services import (
     backfill_close_dates,
     backfill_close_dates_ai,
     backfill_funding_amounts,
+    backfill_funding_amounts_ai,
     deduplicate_opportunities,
     execute_source_run_locally,
     rebuild_opportunity_embeddings,
@@ -548,5 +549,25 @@ def backfill_close_dates_ai_admin(
         raise HTTPException(status_code=400, detail="User has no organization")
     result = backfill_close_dates_ai(db, org_id, limit=limit)
     audit(db, "backfill_close_dates_ai", "opportunity", user, org_id)
+    db.commit()
+    return result
+
+
+@router.post("/admin/opportunities/backfill-funding-ai")
+def backfill_funding_amounts_ai_admin(
+    limit: int = Query(default=50, ge=1, le=200),
+    user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Use AI (LLM) to extract ``funding_amount_raw`` for opportunities missing it.
+
+    Calls the LLM (Groq) on each opportunity's text to find funding amounts
+    that regex patterns miss. Batch small (10-50) due to token cost.
+    """
+    org_id = user.organization_id
+    if not org_id:
+        raise HTTPException(status_code=400, detail="User has no organization")
+    result = backfill_funding_amounts_ai(db, org_id, limit=limit)
+    audit(db, "backfill_funding_amounts_ai", "opportunity", user, org_id)
     db.commit()
     return result

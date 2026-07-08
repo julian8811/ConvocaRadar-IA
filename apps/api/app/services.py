@@ -2731,6 +2731,50 @@ def backfill_close_dates_ai(db: Session, organization_id: str, *, limit: int = 1
     return {"total": len(opportunities), "processed": processed, "updated": updated}
 
 
+def backfill_funding_amounts_ai(db: Session, organization_id: str, *, limit: int = 100) -> dict[str, int]:
+    """Use AI (LLM) to extract ``funding_amount_raw`` for opportunities missing it.
+
+    Calls ``create_ai_extraction`` on each opportunity's combined text and
+    updates ``funding_amount_raw`` + ``funding_amount_value`` + 
+    ``funding_amount_currency`` if parsed. Regex is tried first; AI is the
+    fallback. Batch small (10-50) due to token cost.
+    """
+    scope = or_(
+        Opportunity.organization_id == organization_id,
+        Opportunity.organization_id.is_(None),
+    )
+    stmt = (
+        select(Opportunity)
+        .where(scope, Opportunity.funding_amount_raw.is_(None))
+        .order_by(Opportunity.confidence_score.desc())
+        .limit(limit)
+    )
+    opportunities = list(db.scalars(stmt))
+    processed = 0
+    updated = 0
+    for opp in opportunities:
+        try:
+            text = _opportunity_combined_text(opp)
+            if not text.strip():
+                continue
+            processed += 1
+            extraction = create_ai_extraction(text)
+            raw = extraction.get("funding_amount_raw")
+            if raw and isinstance(raw, str) and raw.strip():
+                opp.funding_amount_raw = raw.strip()
+                parsed_value, parsed_currency = _parse_funding_amount(raw)
+                if parsed_value is not None:
+                    opp.funding_amount_value = parsed_value
+                    opp.funding_amount_currency = parsed_currency
+                opp.updated_at = datetime.now(UTC).replace(tzinfo=None)
+                updated += 1
+        except Exception:
+            logger.warning("backfill_funding_amounts_ai.skip", opportunity_id=opp.id)
+            continue
+    db.commit()
+    return {"total": len(opportunities), "processed": processed, "updated": updated}
+
+
 def get_funding_ranges(db: Session, organization_id: str) -> list[DashboardBreakdownItem]:
     """Group opportunities by their funding amount range."""
     scope = or_(
