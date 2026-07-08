@@ -1312,9 +1312,14 @@ def execute_source_run_locally(db: Session, source: Source, organization_id: str
 
 def _semantic_score(text: str, profile_text: str) -> float:
     """Compare opportunity text with profile text using embedding similarity.
-    Returns a float in [0, 1] or 0 if embeddings are unavailable.
+    Returns a float in [0, 1] or 0 if embeddings are unavailable or empty input.
     """
+    if not text.strip() or not profile_text.strip():
+        return 0.0
     try:
+        from app.core.config import get_settings
+        if not get_settings().embedding_model:
+            return 0.0
         opp_vec = build_embedding(text[:2000])
         prof_vec = build_embedding(profile_text[:2000])
         return cosine_similarity(opp_vec, prof_vec)
@@ -1341,8 +1346,9 @@ def calculate_score(db: Session, opportunity: Opportunity, profile: Organization
         warnings.append("La convocatoria puede tener restricciones regionales.")
 
     # ── 2. Organization type eligibility (max 20) ─────────────────────────
-    if opportunity.eligible_applicants:
-        opp_types = {item.lower() for item in opportunity.eligible_applicants}
+    eligible = opportunity.eligible_applicants or []
+    if eligible:
+        opp_types = {item.lower() for item in eligible}
         if profile.organization_type in opp_types:
             score += 20
             reasons.append("Tu tipo de organización está en los beneficiarios elegibles.")
