@@ -496,6 +496,12 @@ def enrich_opportunity_payload(data: OpportunityCreate) -> OpportunityCreate:
         merged = data.model_dump()
         if merged.get("language") in {None, "", "auto"}:
             merged["language"] = infer_language(" ".join([data.title, data.summary, data.raw_text, data.description]), fallback="es")
+        # Try regex-based close_date extraction as fallback
+        if not merged.get("close_date") and raw_text:
+            from app.connectors.common import extract_close_date
+            parsed = extract_close_date(raw_text)
+            if parsed:
+                merged["close_date"] = parsed
         return OpportunityCreate(**merged)
     extraction = create_ai_extraction(raw_text)
     merged = data.model_dump()
@@ -526,6 +532,12 @@ def enrich_opportunity_payload(data: OpportunityCreate) -> OpportunityCreate:
         2,
     )
     merged["close_date"] = data.close_date or _parse_ai_close_date(extraction.get("close_date"))
+    # Fallback: try regex-based close_date extraction from raw_text
+    if not merged["close_date"] and raw_text:
+        from app.connectors.common import extract_close_date
+        parsed = extract_close_date(raw_text)
+        if parsed:
+            merged["close_date"] = parsed
     return OpportunityCreate(**merged)
 
 

@@ -157,6 +157,26 @@ def safe_urljoin(base_url: str, href: str | None) -> str:
     return urljoin(base_url, href or "")
 
 
+def extract_close_date(text: str) -> datetime | None:
+    """Extract a deadline/close date from text using Spanish & English patterns.
+    Looks for ``fecha de cierre``, ``deadline``, ``hasta el``, etc.
+    """
+    if not text:
+        return None
+    for pattern in [
+        r"(?:fecha\s+(?:de\s+)?(?:\w+\s+)?(?:cierre|limite|maxima|maxima))\s*[:\-]?\s*([a-z]+\s+\d{1,2},?\s*(?:de\s+)?\d{4})",
+        r"(?:cierra|vence|finaliza|termina|deadline|closes)\s+(?:el\s+|on\s+)?(\d{1,2}\s+de\s+[a-z]+\s+de\s+\d{4}|\w+\s+\d{1,2},?\s+\d{4})",
+        r"(?:hasta\s+(?:el\s+)?(?:dia\s+)?)(\d{1,2}\s+de\s+[a-z]+\s+de\s+\d{4})",
+        r"(\d{1,2}[/-]\d{1,2}[/-]\d{4})",
+    ]:
+        match = re.search(pattern, text, flags=re.IGNORECASE)
+        if match:
+            parsed = parse_date_text(match.group(1))
+            if parsed:
+                return parsed
+    return None
+
+
 def parse_date_text(text: str | None) -> datetime | None:
     value = clean_text(text)
     if not value:
