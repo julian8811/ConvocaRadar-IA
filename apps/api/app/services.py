@@ -705,52 +705,31 @@ def semantic_search_opportunities(
     *,
     limit: int = 10,
 ) -> list[tuple[Opportunity, float]]:
+    """Search opportunities by combining text ILIKE with embedding similarity.
+
+    1. First runs a text ILIKE search on title, entity, country, summary.
+    2. Then re-ranks results using embedding cosine similarity when available.
+    """
+    # Step 1: ILIKE text search (always returns something for common terms)
+    text_results = _text_search_opportunities(db, organization_id, query, limit=limit * 3)
+    if not text_results:
+        return []
+
+    # Step 2: Re-rank with embedding similarity if embeddings exist
     query_vector = build_embedding(query)
-    query_terms = {token for token in re.findall(r"[a-z0-9]+", query.lower()) if token}
-    scope = or_(Opportunity.organization_id == organization_id, Opportunity.organization_id.is_(None))
-    if _supports_vector_search(db):
-        distance_expr = OpportunityEmbedding.embedding.cosine_distance(query_vector)
-        rows = list(
-            db.execute(
-                select(Opportunity, distance_expr.label("distance"))
-                .join(OpportunityEmbedding, OpportunityEmbedding.opportunity_id == Opportunity.id)
-                .where(scope)
-                .order_by(distance_expr.asc(), Opportunity.created_at.desc())
-                .limit(limit * 4)
-            )
-        )
-        results: list[tuple[Opportunity, float]] = []
-        for opportunity, distance in rows:
-            similarity = round(max(0.0, 1.0 - float(distance or 0.0)), 4)
-            lexical = _lexical_search_score(query_terms, opportunity)
-            results.append((opportunity, round(min(1.0, (similarity * 0.8) + (lexical * 0.2)), 4)))
-        if results:
-            results.sort(key=lambda item: item[1], reverse=True)
-            return results[:limit]
-
-    # Fallback: text-based lexical search when vector search returns no results
-    # or pgvector is unavailable. This ensures the search bar always works.
-    lexical_results = _text_search_opportunities(db, organization_id, query, limit=limit)
-    if lexical_results:
-        return lexical_results
-
-    opportunities = list(
-        db.scalars(
-            select(Opportunity)
-            .where(scope)
-            .order_by(Opportunity.created_at.desc())
-            .limit(500)
-        )
-    )
     scored: list[tuple[Opportunity, float]] = []
-    for opportunity in opportunities:
+    for opportunity, _ in text_results:
         embedding = db.scalar(select(OpportunityEmbedding).where(OpportunityEmbedding.opportunity_id == opportunity.id))
-        if not embedding:
-            embedding = upsert_opportunity_embedding(db, opportunity)
-            db.flush()
-        similarity = cosine_similarity(query_vector, list(embedding.embedding or []))
-        lexical = _lexical_search_score(query_terms, opportunity)
-        scored.append((opportunity, round(min(1.0, (similarity * 0.7) + (lexical * 0.3)), 4)))
+        if embedding and embedding.embedding:
+            similarity = cosine_similarity(query_vector, list(embedding.embedding))
+        else:
+            similarity = 0.0
+        lexical = _lexical_search_score(
+            {token for token in re.findall(r"[a-z0-9]+", query.lower()) if token},
+            opportunity,
+        )
+        combined = round(min(1.0, (similarity * 0.6) + (lexical * 0.4)), 4)
+        scored.append((opportunity, combined))
     scored.sort(key=lambda item: item[1], reverse=True)
     return scored[:limit]
 
