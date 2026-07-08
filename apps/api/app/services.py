@@ -445,20 +445,17 @@ def _parse_funding_amount(funding_raw: str | None) -> tuple[float | None, str | 
     # Detect currency from prefix/suffix
     currency = "USD"  # default
     currency_map = {
-        "USD": ["USD", "US$", "$"],
-        "EUR": ["EUR", "€"],
         "COP": ["COP", "COL$"],
+        "EUR": ["EUR", "€"],
         "GBP": ["GBP", "£"],
         "BRL": ["BRL", "R$"],
         "MXN": ["MXN", "MX$"],
+        "USD": ["USD", "US$", "$"],
     }
     upper = text.upper()
     for code, symbols in currency_map.items():
-        for sym in symbols:
-            if sym in upper:
-                currency = code
-                break
-        if currency == code:
+        if any(sym in upper for sym in symbols):
+            currency = code
             break
 
     # Normalize: remove currency symbols and text, normalize Spanish notation
@@ -479,13 +476,11 @@ def _parse_funding_amount(funding_raw: str | None) -> tuple[float | None, str | 
     # Take the largest number (covers "USD 500,000 - USD 1,000,000" ranges)
     value = max(float(n) for n in numbers)
 
-    # Handle million/k suffixes (already stripped by regex, but check raw text)
-    if re.search(r"(?:million|million|MM|m)\b", text, re.IGNORECASE):
+    # Handle million/k suffixes
+    if re.search(r"(?:million|MM)\b", text, re.IGNORECASE) or text.upper().endswith("M"):
         value *= 1_000_000
-    elif re.search(r"\b[kK]\b", text) and value < 1_000_000:
+    elif re.search(r"(?:\b[kK]\b|[kK]$)", text) and value < 1_000_000:
         value *= 1_000
-    elif text.upper().endswith("M") and value < 1_000_000:
-        value *= 1_000_000
 
     return value, currency
 

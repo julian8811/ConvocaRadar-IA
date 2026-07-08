@@ -354,47 +354,41 @@ def run_all_sources(
         processed = 0
         failed = 0
         try:
-            for source in due_sources:
-                fresh = db2.merge(source)
-                # Tests may monkeypatch threading.Thread to make
-                # background work run synchronously. ThreadPoolExecutor
-                # internally uses threading.Thread (lazily, during
-                # submit), so we temporarily restore the original class.
-                saved_thread = _base_threading.Thread
-                _base_threading.Thread = _original_thread_cls
-                executor = concurrent.futures.ThreadPoolExecutor(max_workers=1)
-                fut = executor.submit(execute_source_run_locally, db2, fresh, org_id)
+            saved_thread = _base_threading.Thread
+            _base_threading.Thread = _original_thread_cls
+            max_workers = min(len(due_sources), 5) if due_sources else 1
+            with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as pool:
+                futs = {}
+                for source in due_sources:
+                    fresh = db2.merge(source)
+                    fut = pool.submit(execute_source_run_locally, db2, fresh, org_id)
+                    futs[fut] = fresh
                 _base_threading.Thread = saved_thread
-                try:
-                    fut.result(timeout=settings.per_connector_timeout_seconds)
-                    processed += 1
-                except concurrent.futures.TimeoutError:
-                    fut.cancel()
-                    failed += 1
-                    db2.rollback()
-                    struct_logger.error(
-                        "run_all.source_timeout",
-                        source_id=str(fresh.id),
-                        source_key=fresh.key,
-                        timeout_seconds=settings.per_connector_timeout_seconds,
-                    )
-                except Exception as exc:
-                    # PR4-4: log the failure with full context so the
-                    # run-all empty-run-list bug can be diagnosed from
-                    # the log output. Previously this except silently
-                    # swallowed the error and the operator had no
-                    # way to know why runs were not being created.
-                    db2.rollback()
-                    failed += 1
-                    struct_logger.error(
-                        "run_all.source_failed",
-                        source_id=str(fresh.id),
-                        source_key=fresh.key,
-                        error_type=type(exc).__name__,
-                        error_message=str(exc)[:500],
-                    )
-                finally:
-                    executor.shutdown(wait=False)
+                for fut in concurrent.futures.as_completed(futs, timeout=settings.per_connector_timeout_seconds * 2):
+                    fresh = futs[fut]
+                    try:
+                        fut.result(timeout=settings.per_connector_timeout_seconds)
+                        processed += 1
+                    except concurrent.futures.TimeoutError:
+                        fut.cancel()
+                        failed += 1
+                        db2.rollback()
+                        struct_logger.error(
+                            "run_all.source_timeout",
+                            source_id=str(fresh.id),
+                            source_key=fresh.key,
+                            timeout_seconds=settings.per_connector_timeout_seconds,
+                        )
+                    except Exception as exc:
+                        db2.rollback()
+                        failed += 1
+                        struct_logger.error(
+                            "run_all.source_failed",
+                            source_id=str(fresh.id),
+                            source_key=fresh.key,
+                            error_type=type(exc).__name__,
+                            error_message=str(exc)[:500],
+                        )
             db2.commit()
             struct_logger.info(
                 "run_all.completed",
