@@ -748,19 +748,29 @@ def _text_search_opportunities(
     (e.g. ``innovacion`` matches ``innovación``).
     """
     scope = or_(Opportunity.organization_id == organization_id, Opportunity.organization_id.is_(None))
-    tokens = [t for t in re.findall(r"[a-zA-ZáéíóúñüÁÉÍÓÚÑÜ]+", query) if len(t) >= 2]
+    _ACCENT_MAP = str.maketrans("áéíóúüñÁÉÍÓÚÜÑ", "aeiouunAEIOUUN")
+    tokens = [t.translate(_ACCENT_MAP) for t in re.findall(r"[a-zA-ZáéíóúñüÁÉÍÓÚÑÜ]+", query) if len(t) >= 2]
     if not tokens:
         return []
     stmt = select(Opportunity).where(scope)
+    # Build accent-insensitive filters: for each token, check both the original
+    # field and the field with accent characters replaced (so 'innovacion'
+    # matches both 'innovación' and 'innovacion').
+    from sqlalchemy import func as sa_func
+    _unaccent = lambda col: sa_func.replace(sa_func.replace(sa_func.replace(sa_func.replace(
+        sa_func.replace(sa_func.replace(sa_func.replace(sa_func.replace(
+            sa_func.replace(sa_func.replace(sa_func.replace(sa_func.replace(
+                col, "á", "a"), "é", "e"), "í", "i"), "ó", "o"), "ú", "u"),
+            "ñ", "n"), "Á", "A"), "É", "E"), "Í", "I"), "Ó", "O"), "Ú", "U"), "Ñ", "N")
     filters = []
     for token in tokens:
         like = f"%{token}%"
         filters.append(
             or_(
-                Opportunity.title.ilike(like),
-                Opportunity.entity.ilike(like),
-                Opportunity.country.ilike(like),
-                Opportunity.summary.ilike(like),
+                _unaccent(Opportunity.title).ilike(like),
+                _unaccent(Opportunity.entity).ilike(like),
+                _unaccent(Opportunity.country).ilike(like),
+                _unaccent(Opportunity.summary).ilike(like),
             )
         )
     stmt = stmt.where(and_(*filters))
