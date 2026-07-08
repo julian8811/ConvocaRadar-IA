@@ -495,16 +495,18 @@ def bootstrap_data_admin(
 @router.post("/admin/opportunities/backfill-funding")
 def backfill_funding_admin(
     limit: int = 500,
-    organization: Organization = Depends(get_current_organization),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ) -> dict:
     """Parse existing ``funding_amount_raw`` strings into numeric value + currency
     without calling the LLM. Uses local regex patterns. Runs on up to ``limit``
     opportunities per call.
     """
-    result = backfill_funding_amounts(db, organization.id, limit=limit)
-    audit(db, "backfill_funding_amounts", "opportunity", user, organization.id)
+    org_id = user.organization_id
+    if not org_id:
+        raise HTTPException(status_code=400, detail="User has no organization")
+    result = backfill_funding_amounts(db, org_id, limit=limit)
+    audit(db, "backfill_funding_amounts", "opportunity", user, org_id)
     db.commit()
     return result
 
@@ -512,14 +514,16 @@ def backfill_funding_admin(
 @router.post("/admin/opportunities/backfill-close-dates")
 def backfill_close_dates_admin(
     limit: int = 500,
-    organization: Organization = Depends(get_current_organization),
-    user: User = Depends(get_current_user),
+    user: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ) -> dict:
     """Extract ``close_date`` from existing title/summary/description/raw_text
     for opportunities that are missing it. Uses local regex — no AI calls.
     """
-    result = backfill_close_dates(db, organization.id, limit=limit)
-    audit(db, "backfill_close_dates", "opportunity", user, organization.id)
+    org_id = user.organization_id
+    if not org_id:
+        raise HTTPException(status_code=400, detail="User has no organization")
+    result = backfill_close_dates(db, org_id, limit=limit)
+    audit(db, "backfill_close_dates", "opportunity", user, org_id)
     db.commit()
     return result
