@@ -6,7 +6,7 @@ from urllib.parse import urljoin, urlparse
 
 from selectolax.parser import HTMLParser
 
-from app.connectors.common import clean_text, extract_close_date, fetch_httpx_text, looks_like_noise_text, parse_date_text
+from app.connectors.common import clean_text, extract_close_date, extract_funding_amount, fetch_httpx_text, looks_like_noise_text, parse_date_text
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
 
 DEEP_FETCH_LIMIT = 10
@@ -563,6 +563,15 @@ class GenericHtmlConnector:
                 cd = extract_close_date(all_text)
                 if cd:
                     result["close_date"] = cd
+
+        # 6. Scan all text for funding amounts not captured by JSON-LD
+        if "funding_amount_raw" not in result:
+            body = tree.css_first("body")
+            if body:
+                all_text = clean_text(body.text())
+                amount = extract_funding_amount(all_text)
+                if amount:
+                    result["funding_amount_raw"] = amount
 
         return result if result.get("title") else None
 
