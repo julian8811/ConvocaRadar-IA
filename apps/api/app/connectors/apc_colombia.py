@@ -96,8 +96,13 @@ class ApcColombiaConnector:
         status = "Abierta" if "abierta" in lowered else "Cerrada" if "cerrada" in lowered else ""
         if status and status.lower() not in summary.lower():
             summary = f"{status}. {summary}".strip()
-        date_match = re.search(r"(\d{2}/\d{2}/\d{4}|\d{4}-\d{2}-\d{2})", container_text)
-        open_date = parse_date_text(date_match.group(1) if date_match else container_text)
+        # Try Spanish dates first ("08 de mayo de 2026"), then numeric
+        sp_match = re.search(r"(\d{1,2})\s+de\s+([A-Za-záéíóúñ]+)\s+de\s+(\d{4})", container_text, flags=re.IGNORECASE)
+        if sp_match:
+            open_date = parse_date_text(f"{sp_match.group(1)} de {sp_match.group(2)} de {sp_match.group(3)}")
+        else:
+            date_match = re.search(r"(\d{2}/\d{2}/\d{4}|\d{4}-\d{2}-\d{2})", container_text)
+            open_date = parse_date_text(date_match.group(1) if date_match else container_text)
         if _is_closed_text(title):
             return None
         return OpportunityCandidate(
