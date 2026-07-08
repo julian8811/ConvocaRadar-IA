@@ -1307,14 +1307,12 @@ def execute_source_run_locally(db: Session, source: Source, organization_id: str
 
 def _semantic_score(text: str, profile_text: str) -> float:
     """Compare opportunity text with profile text using embedding similarity.
-    Returns a float in [0, 1] or 0 if embeddings are unavailable or empty input.
+    Uses local hash-based embeddings (no API key required).
+    Returns a float in [0, 1] or 0 if empty input.
     """
     if not text.strip() or not profile_text.strip():
         return 0.0
     try:
-        from app.core.config import get_settings
-        if not get_settings().embedding_model:
-            return 0.0
         opp_vec = build_embedding(text[:2000])
         prof_vec = build_embedding(profile_text[:2000])
         return cosine_similarity(opp_vec, prof_vec)
