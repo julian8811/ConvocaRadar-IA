@@ -4,7 +4,7 @@ import logging
 import threading as _base_threading
 
 import structlog
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 
 # Save the real threading.Thread so _background_sweep can restore it
 # temporarily when creating a ThreadPoolExecutor (avoids breakage when
@@ -271,6 +271,7 @@ def run_source(
 
 @router.post("/sources/run-all", response_model=dict)
 def run_all_sources(
+    force: bool = Query(default=False, description="Bypass due check and batch cap"),
     organization: Organization = Depends(get_current_organization),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -279,6 +280,10 @@ def run_all_sources(
 
     The sweep runs in a daemon thread so the HTTP response returns
     immediately. Use GET /api/v1/sources/health to monitor progress.
+
+    When ``force=true``, all sources are processed regardless of their
+    ``scraping_frequency`` or ``last_run_at``, and the 20-source batch
+    cap is lifted. Use this to recover sources after a code deploy.
 
     PR4-2: structured log lines are emitted at every decision point so
     the run-all empty-return bug can be diagnosed from the log output:
@@ -305,6 +310,7 @@ def run_all_sources(
     struct_logger.info(
         "run_all.sources_loaded",
         sources_loaded=len(sources),
+        force=force,
         org_id=org_id,
     )
 
@@ -315,12 +321,12 @@ def run_all_sources(
     now = datetime.now(UTC).replace(tzinfo=None)
     due_sources: list[Source] = []
     for source in sources:
-        if source_due_for_scraping(source, now=now):
+        if force or source_due_for_scraping(source, now=now):
             struct_logger.info(
                 "run_all.process",
                 source_id=str(source.id),
                 source_key=source.key,
-                reason="due",
+                reason="forced" if force else "due",
                 frequency=(source.scraping_frequency or "daily").lower(),
             )
             due_sources.append(source)
@@ -346,10 +352,11 @@ def run_all_sources(
         total=len(sources),
     )
 
-    # Free tier guard: cap at 20 sources per run-all to prevent overload
-    MAX_BATCH = 20
-    if len(due_sources) > MAX_BATCH:
-        due_sources = due_sources[:MAX_BATCH]
+    # Free tier guard: cap at 20 sources per run-all UNLESS force
+    if not force:
+        MAX_BATCH = 20
+        if len(due_sources) > MAX_BATCH:
+            due_sources = due_sources[:MAX_BATCH]
         struct_logger.info("run_all.capped", max_batch=MAX_BATCH)
 
     def _background_sweep() -> None:
