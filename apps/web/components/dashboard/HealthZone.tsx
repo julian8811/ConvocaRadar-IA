@@ -66,33 +66,30 @@ function SourceHealthBanner({ degraded, failing, sourceAlerts }: {
   );
 }
 
+const KPI_ACCENTS = [
+  { border: "border-t-cyan-500", icon: "M3 3h18v18H3z" },
+  { border: "border-t-emerald-500", icon: "M5 12h14" },
+  { border: "border-t-amber-500", icon: "M12 8v8" },
+  { border: "border-t-violet-500", icon: "M12 3v18" },
+];
+
 function KpiCards({ kpis }: { kpis: HealthRead["kpis"] }) {
+  const items = [
+    { label: "Total convocatorias", value: kpis.total, accent: KPI_ACCENTS[0] },
+    { label: "Convocatorias abiertas", value: kpis.open, accent: KPI_ACCENTS[1] },
+    { label: "Cierran pronto", value: kpis.closing_soon, accent: KPI_ACCENTS[2] },
+    { label: "Alta compatibilidad", value: kpis.high_match, accent: KPI_ACCENTS[3] },
+  ];
   return (
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
-      <Card>
-        <CardContent className="p-4">
-          <p className="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Total convocatorias</p>
-          <p className="mt-1 text-2xl font-semibold text-slate-950 dark:text-white">{formatNumber(kpis.total)}</p>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardContent className="p-4">
-          <p className="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Convocatorias abiertas</p>
-          <p className="mt-1 text-2xl font-semibold text-slate-950 dark:text-white">{formatNumber(kpis.open)}</p>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardContent className="p-4">
-          <p className="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Cierran pronto</p>
-          <p className="mt-1 text-2xl font-semibold text-slate-950 dark:text-white">{formatNumber(kpis.closing_soon)}</p>
-        </CardContent>
-      </Card>
-      <Card>
-        <CardContent className="p-4">
-          <p className="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Alta compatibilidad</p>
-          <p className="mt-1 text-2xl font-semibold text-slate-950 dark:text-white">{formatNumber(kpis.high_match)}</p>
-        </CardContent>
-      </Card>
+      {items.map((item) => (
+        <Card key={item.label} className={`border-t-4 ${item.accent.border} transition-all hover:shadow-lg`}>
+          <CardContent className="p-4">
+            <p className="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">{item.label}</p>
+            <p className="mt-1 text-3xl font-bold text-slate-950 dark:text-white">{formatNumber(item.value)}</p>
+          </CardContent>
+        </Card>
+      ))}
     </div>
   );
 }
