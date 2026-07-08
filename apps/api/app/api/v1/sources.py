@@ -346,6 +346,12 @@ def run_all_sources(
         total=len(sources),
     )
 
+    # Free tier guard: cap at 20 sources per run-all to prevent overload
+    MAX_BATCH = 20
+    if len(due_sources) > MAX_BATCH:
+        due_sources = due_sources[:MAX_BATCH]
+        struct_logger.info("run_all.capped", max_batch=MAX_BATCH)
+
     def _background_sweep() -> None:
         from app.core.config import get_settings
 
@@ -356,7 +362,7 @@ def run_all_sources(
         try:
             saved_thread = _base_threading.Thread
             _base_threading.Thread = _original_thread_cls
-            max_workers = min(len(due_sources), 5) if due_sources else 1
+            max_workers = min(len(due_sources), 2) if due_sources else 1
             with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as pool:
                 futs = {}
                 for source in due_sources:
