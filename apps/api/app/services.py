@@ -947,6 +947,32 @@ def is_noise_title(title: str | None) -> bool:
     # Multi-language scraped noise: "Cliquer ici", "click here", "Read more", PDF redirects
     if re.search(r"\b(cliquer ici|click here|read more|download pdf|view pdf|pdf)\b", lowered):
         return True
+    # ── Informational / non-call pages ──────────────────────────────────
+    # These are static content pages that got picked up from list views
+    # but are NOT time-bound calls, grants, or funding opportunities.
+    informational_markers = [
+        # Org/about pages
+        "sobre nosotros", "about us", "about the", "our team", "our mission",
+        "our work", "quienes somos", "quiénes somos", "nuestra historia",
+        "nuestro equipo", "directorio",
+        # Contact / legal
+        "contacto", "contact us", "términos", "terms and conditions",
+        "privacy policy", "política de privacidad", "politica de privacidad",
+        "preguntas frecuentes", "faq", "oficina", "office",
+        # General info pages (not calls)
+        "what we do", "cómo trabajamos", "como trabajamos",
+        "nuestro impacto", "our impact", "our approach", "nuestro enfoque",
+        "transparencia", "transparency", "informes", "reports",
+        "publicaciones", "publications", "noticias", "news",
+        "eventos", "events", "historias", "stories",
+        "member states", "estados miembros", "governance", "gobernanza",
+        "partners", "socios", "aliados",
+        # Leadership / people pages
+        "our leadership", "nuestro liderazgo", "director ejecutivo",
+        "executive director", "deputy director", "board", "consejo",
+    ]
+    if any(marker in lowered for marker in informational_markers):
+        return True
     return False
 
 

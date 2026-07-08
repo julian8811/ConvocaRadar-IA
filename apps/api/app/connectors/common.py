@@ -170,6 +170,8 @@ def extract_close_date(text: str) -> datetime | None:
     tier1 = [
         # Spanish: "fecha de cierre: 8 de mayo de 2026"
         r"(?:fecha\s+(?:de\s+)?(?:\w+\s+)?(?:cierre|limite|limite|maxima|maxima|tope))\s*[:\-]?\s*(\d{1,2}\s+de\s+[a-z]+\s+de\s+\d{4})",
+        # Spanish: "fecha de cierre de la convocatoria: 15/06/2026"
+        r"(?:fecha\s+(?:de\s+)?(?:\w+\s+)?(?:cierre|limite)\s+(?:de\s+la\s+)?(?:convocatoria|presentacion|presentación|solicitud))\s*[:\-]?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{4})",
         # Spanish: "cierra el 08 de mayo de 2026"
         r"(?:cierra|vence|finaliza|termina)\s+(?:el\s+)?(\d{1,2}\s+de\s+[a-z]+\s+de\s+\d{4})",
         # English: "deadline: May 8, 2026"
@@ -178,8 +180,14 @@ def extract_close_date(text: str) -> datetime | None:
         r"(?:hasta\s+(?:el\s+)?(?:dia\s+)?)(\d{1,2}\s+de\s+[a-z]+\s+de\s+\d{4})",
         # Spanish: "postulación hasta: 8/5/2026"
         r"(?:postulacion|postulación|aplicacion|aplicación|envio|envío|recepcion|recepción|inscripcion|inscripción)\s+(?:hasta|cierra|finaliza)\s*(?:\:)?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{4}|\d{1,2}\s+de\s+[a-z]+\s+de\s+\d{4})",
+        # Spanish: "convocatoria cierre: 15/06/2026" / "convocatoria cierra: 15/06/2026"
+        r"(?:convocatoria\s+)(?:cierre|cierra|finaliza|vence)\s*[:\-]?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{4})",
         # "plazo: 8 de mayo de 2026" / "plazo máximo: ..."
         r"(?:plazo\s+(?:maximo|máximo|tope|max|)?)\s*[:\-]?\s*(\d{1,2}\s+de\s+[a-z]+\s+de\s+\d{4})",
+        # "presentación de ofertas hasta: 15/06/2026"
+        r"(?:presentacion|presentación)\s+(?:de\s+)?(?:ofertas|solicitudes|propuestas)\s+(?:hasta|cierra|finaliza)\s*(?:\:)?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{4})",
+        # "apertura: ... cierre: ..." pattern (common in Latin American portals)
+        r"(?:cierre|fecha\s+de\s+cierre)\s*[:\-]?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{4})",
     ]
     for pattern in tier1:
         match = re.search(pattern, _text, flags=re.IGNORECASE)
@@ -291,6 +299,50 @@ def parse_date_text(text: str | None) -> datetime | None:
                 return datetime(int(spanish_match.group(3)), month, int(spanish_match.group(1)))
             except ValueError:
                 pass
+    return None
+
+
+def extract_funding_amount(text: str) -> str | None:
+    """Extract a funding amount from text using Spanish & English patterns.
+
+    Tries keyword-prefixed patterns first (higher precision), then falls
+    back to any amount-looking text. Returns the raw amount string or None.
+    """
+    if not text:
+        return None
+    _text = text[:3000]
+
+    # ── Tier 1: Keyword-prefixed patterns ──────────────────────────────
+    tier1 = [
+        # Spanish: "financiamiento: USD 500.000"
+        r"(?:financiamiento|presupuesto|monto|valor|recursos|fondos|aporte|subvencion|subvención|inversion|inversión|total|cuantía)\s*(?:maximo|máximo|total|estimado|disponible|asignado|solicitado)?\s*[:\-]?\s*([\w\s.$€£,]+?\d[\d.,\s]*(?:million|millón|millones|m|k|usd|cop|eur)?)",
+        # English: "budget: USD 500,000"
+        r"(?:budget|funding|grant\s+amount|award\s+amount|total\s+funding|project\s+budget|max\s+funding)\s*[:\-]?\s*([\w\s.$€£,]+?\d[\d.,\s]*(?:million|m|k|usd|cop|eur)?)",
+        # Spanish: "hasta USD 500.000"
+        r"(?:hasta|de\s+hasta|por\s+hasta)\s*([\w\s.$€£]*\d[\d.,]+\s*(?:USD|EUR|COP|usd|eur|cop)?)",
+        # English: "up to USD 500,000"
+        r"(?:up\s+to|of\s+up\s+to)\s*([\w\s.$€£]*\d[\d.,]+\s*(?:USD|EUR|COP|usd|eur|cop)?)",
+    ]
+    for pattern in tier1:
+        match = re.search(pattern, _text, flags=re.IGNORECASE)
+        if match:
+            result = match.group(1).strip()
+            if result:
+                return result
+
+    # ── Tier 2: Any currency amount with known prefix/suffix ───────────
+    tier2 = [
+        r"(\$[\d.,]+\s*(?:COP|USD|EUR)?)",
+        r"(USD\s*[\d.,]+)",
+        r"(EUR\s*[\d.,]+)",
+        r"(COP\s*[\d.,]+)",
+        r"(€\s*[\d.,]+)",
+    ]
+    for pattern in tier2:
+        match = re.search(pattern, _text, flags=re.IGNORECASE)
+        if match:
+            return match.group(1).strip()
+
     return None
 
 
