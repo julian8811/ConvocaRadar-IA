@@ -6,7 +6,7 @@ from urllib.parse import urljoin, urlparse
 
 from selectolax.parser import HTMLParser
 
-from app.connectors.common import clean_text, fetch_httpx_text, looks_like_noise_text, parse_date_text
+from app.connectors.common import clean_text, extract_close_date, fetch_httpx_text, looks_like_noise_text, parse_date_text
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
 
 DEEP_FETCH_LIMIT = 10
@@ -553,11 +553,14 @@ class GenericHtmlConnector:
                         break
 
         # 5. Scan all text for dates not captured by JSON-LD
+        # Use extract_close_date (keyword-prefixed patterns) over
+        # parse_date_text (any date) because the body text of a detail
+        # page almost always includes deadline keywords.
         if "close_date" not in result:
             body = tree.css_first("body")
             if body:
                 all_text = clean_text(body.text())
-                cd = parse_date_text(all_text)
+                cd = extract_close_date(all_text)
                 if cd:
                     result["close_date"] = cd
 

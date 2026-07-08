@@ -485,21 +485,43 @@ def _parse_funding_amount(funding_raw: str | None) -> tuple[float | None, str | 
     return value, currency
 
 
+def _combined_text(data: OpportunityCreate) -> str:
+    """Build a combined text blob from all available fields for regex extraction.
+
+    Many connectors only populate ``raw_text`` with the summary from a list
+    page, which rarely contains the close date — that information lives in
+    the title, description, or combined text. Merging all fields together
+    gives the regex-based ``extract_close_date`` a much better chance.
+    """
+    return " ".join(
+        part
+        for part in [data.title, data.summary, data.description, data.raw_text]
+        if part
+    )
+
+
 def enrich_opportunity_payload(data: OpportunityCreate) -> OpportunityCreate:
     raw_text = data.raw_text.strip()
+    combined = _combined_text(data)
     if not raw_text or len(raw_text) < 120:
         merged = data.model_dump()
         if merged.get("language") in {None, "", "auto"}:
             merged["language"] = infer_language(" ".join([data.title, data.summary, data.raw_text, data.description]), fallback="es")
+        # Try regex-based close_date extraction from combined text
+        if not merged.get("close_date") and combined:
+            from app.connectors.common import extract_close_date
+            parsed = extract_close_date(combined)
+            if parsed:
+                merged["close_date"] = parsed
         return OpportunityCreate(**merged)
     if data.summary and data.categories and data.requirements and data.confidence_score >= 0.75:
         merged = data.model_dump()
         if merged.get("language") in {None, "", "auto"}:
             merged["language"] = infer_language(" ".join([data.title, data.summary, data.raw_text, data.description]), fallback="es")
-        # Try regex-based close_date extraction as fallback
-        if not merged.get("close_date") and raw_text:
+        # Try regex-based close_date extraction from combined text
+        if not merged.get("close_date") and combined:
             from app.connectors.common import extract_close_date
-            parsed = extract_close_date(raw_text)
+            parsed = extract_close_date(combined)
             if parsed:
                 merged["close_date"] = parsed
         return OpportunityCreate(**merged)
@@ -532,10 +554,10 @@ def enrich_opportunity_payload(data: OpportunityCreate) -> OpportunityCreate:
         2,
     )
     merged["close_date"] = data.close_date or _parse_ai_close_date(extraction.get("close_date"))
-    # Fallback: try regex-based close_date extraction from raw_text
-    if not merged["close_date"] and raw_text:
+    # Fallback: try regex-based close_date extraction from combined text
+    if not merged["close_date"] and combined:
         from app.connectors.common import extract_close_date
-        parsed = extract_close_date(raw_text)
+        parsed = extract_close_date(combined)
         if parsed:
             merged["close_date"] = parsed
     return OpportunityCreate(**merged)
@@ -2558,6 +2580,44 @@ def get_score_distribution(db: Session, organization_id: str) -> list[DashboardB
         for k, v in buckets.items()
         if v > 0
     ]
+
+
+def _backfill_close_date_text(opp: Opportunity) -> str:
+    """Combine all text fields for close_date regex extraction."""
+    return " ".join(part for part in [opp.title, opp.summary, opp.description, opp.raw_text] if part)
+
+
+def backfill_close_dates(db: Session, organization_id: str, *, limit: int = 500) -> dict[str, int]:
+    """Extract ``close_date`` from existing text for opportunities that have
+    ``close_date IS NULL``. Uses the same regex-based ``extract_close_date``
+    function used during scraping (no AI calls).
+    """
+    from app.connectors.common import extract_close_date
+
+    scope = or_(
+        Opportunity.organization_id == organization_id,
+        Opportunity.organization_id.is_(None),
+    )
+    stmt = (
+        select(Opportunity)
+        .where(scope, Opportunity.close_date.is_(None))
+        .limit(limit)
+    )
+    opportunities = list(db.scalars(stmt))
+    updated = 0
+    for opp in opportunities:
+        text = _backfill_close_date_text(opp)
+        parsed = extract_close_date(text)
+        if parsed:
+            opp.close_date = parsed
+            opp.status = inferred_opportunity_status(
+                parsed,
+                " ".join([opp.summary or "", opp.raw_text or ""]),
+            )
+            opp.updated_at = datetime.now(UTC).replace(tzinfo=None)
+            updated += 1
+    db.commit()
+    return {"total": len(opportunities), "updated": updated}
 
 
 def backfill_funding_amounts(db: Session, organization_id: str, *, limit: int = 500) -> dict[str, int]:
