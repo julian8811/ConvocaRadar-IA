@@ -728,6 +728,12 @@ def semantic_search_opportunities(
             results.sort(key=lambda item: item[1], reverse=True)
             return results[:limit]
 
+    # Fallback: text-based lexical search when vector search returns no results
+    # or pgvector is unavailable. This ensures the search bar always works.
+    lexical_results = _text_search_opportunities(db, organization_id, query, limit=limit)
+    if lexical_results:
+        return lexical_results
+
     opportunities = list(
         db.scalars(
             select(Opportunity)
@@ -747,6 +753,37 @@ def semantic_search_opportunities(
         scored.append((opportunity, round(min(1.0, (similarity * 0.7) + (lexical * 0.3)), 4)))
     scored.sort(key=lambda item: item[1], reverse=True)
     return scored[:limit]
+
+
+def _text_search_opportunities(
+    db: Session,
+    organization_id: str,
+    query: str,
+    *,
+    limit: int = 10,
+) -> list[tuple[Opportunity, float]]:
+    """Simple full-text fallback search when vector search is unavailable
+    or returns no results. Searches title, entity, country, categories,
+    and summary using plain ILIKE matches.
+    """
+    scope = or_(Opportunity.organization_id == organization_id, Opportunity.organization_id.is_(None))
+    like = f"%{query}%"
+    stmt = (
+        select(Opportunity)
+        .where(
+            scope,
+            or_(
+                Opportunity.title.ilike(like),
+                Opportunity.entity.ilike(like),
+                Opportunity.country.ilike(like),
+                Opportunity.summary.ilike(like),
+            ),
+        )
+        .order_by(Opportunity.created_at.desc())
+        .limit(limit)
+    )
+    rows = list(db.scalars(stmt))
+    return [(row, 1.0) for row in rows]
 
 
 def _lexical_search_score(query_terms: set[str], opportunity: Opportunity) -> float:
