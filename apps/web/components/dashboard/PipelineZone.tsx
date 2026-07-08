@@ -1,18 +1,17 @@
 /**
  * PR B-2 (dashboard-redesign): Pipeline zone — the lists lane.
  *
- * Renders 3 widgets (each in its own Card):
- *   1. Top compatibilidad — table with Razones column (uses OpportunityRow with showReasons)
- *   2. Cierran pronto — table with Cierra en countdown column (uses OpportunityRow with showCountdown)
- *   3. Mi cola de revisión — review-queue table with En revisión badge (uses OpportunityRow with showStatusBadge)
+ * Renders 2 widgets (each in its own Card):
+ *   1. Top compatibilidad — cards with score badge and reasons
+ *   2. Mi cola de revisión — cards with review badge and countdown
  *
- * Each widget is independent. The empty state is rendered when the
- * corresponding slice is empty.
+ * Cierran pronto was removed since Próximos cierres (7 días) in TriageZone
+ * already covers the same data with a tighter window.
  */
 "use client";
 
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
-import { CalendarClock, Clock, Globe, ListChecks, TrendingUp } from "lucide-react";
+import { Clock, Globe, ListChecks, TrendingUp } from "lucide-react";
 import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
@@ -218,19 +217,6 @@ export function PipelineZone() {
           </CardDescription>
         </CardHeader>
         <TopScoredGrid items={topScored} />
-      </Card>
-
-      <Card>
-        <CardHeader className="border-b border-slate-200 pb-4 dark:border-slate-700">
-          <CardTitle className="flex items-center gap-2 text-slate-950 dark:text-white">
-            <CalendarClock className="h-4 w-4" />
-            Cierran pronto
-          </CardTitle>
-          <CardDescription>
-            Convocatorias con fecha de cierre cercana.
-          </CardDescription>
-        </CardHeader>
-        <ClosingSoonGrid items={closingSoon} />
       </Card>
 
       <Card>
