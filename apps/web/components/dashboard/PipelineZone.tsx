@@ -11,7 +11,7 @@
 "use client";
 
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
-import { Clock, Globe, ListChecks, TrendingUp } from "lucide-react";
+import { Clock, Globe, ListChecks } from "lucide-react";
 import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
@@ -21,69 +21,8 @@ import { api } from "@/lib/api";
 import type { PipelineOpportunityItem, PipelineRead, TriageRead } from "@/lib/types";
 import { PipelineSkeleton } from "@/components/dashboard/skeletons/PipelineSkeleton";
 
-const REASONS_VISIBLE = 2;
-
 function formatNumber(value: number) {
   return new Intl.NumberFormat("es-CO", { maximumFractionDigits: 0 }).format(value);
-}
-
-function TopScoredGrid({ items }: { items: PipelineOpportunityItem[] }) {
-  if (items.length === 0) {
-    return (
-      <CardContent className="p-6">
-        <EmptyState
-          title="Sin scores todavía"
-          detail="Completa tu perfil institucional y espera el cálculo automático de compatibilidad."
-        />
-      </CardContent>
-    );
-  }
-  return (
-    <CardContent className="grid gap-4 p-4 sm:grid-cols-2 xl:grid-cols-4">
-      {items.map((item) => {
-        const scoreColor = item.score !== null && item.score >= 70 ? "text-emerald-600 dark:text-emerald-400" : item.score !== null && item.score >= 50 ? "text-amber-600 dark:text-amber-400" : "text-slate-500 dark:text-slate-400";
-        const scoreBg = item.score !== null && item.score >= 70 ? "bg-emerald-100 dark:bg-emerald-900/30" : item.score !== null && item.score >= 50 ? "bg-amber-100 dark:bg-amber-900/30" : "bg-slate-100 dark:bg-slate-800";
-        return (
-          <Link key={item.id} href={`/opportunities/${item.id}`} className="group block">
-            <div className="rounded-lg border border-slate-200 bg-white p-4 transition-all hover:shadow-md dark:border-slate-700 dark:bg-slate-900">
-              <div className="flex items-start justify-between gap-3">
-                <p className="flex-1 line-clamp-2 text-sm font-medium text-slate-950 group-hover:text-cyan-700 dark:text-white dark:group-hover:text-cyan-300">
-                  {item.title}
-                </p>
-                {item.score !== null && (
-                  <span className={`inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-sm font-bold ${scoreColor} ${scoreBg}`}>
-                    {Math.round(item.score)}
-                  </span>
-                )}
-              </div>
-              <div className="mt-2 flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
-                <span className="flex items-center gap-1">
-                  <Globe className="h-3 w-3" />
-                  {item.country || "—"}
-                </span>
-                <span>{item.funding_amount !== null ? `${formatNumber(item.funding_amount)}${item.currency ? ` ${item.currency}` : ""}` : "—"}</span>
-              </div>
-              {item.reasons && item.reasons.length > 0 && (
-                <ul className="mt-3 space-y-1 border-t border-slate-100 pt-3 dark:border-slate-800">
-                  {item.reasons.slice(0, REASONS_VISIBLE).map((reason, i) => (
-                    <li key={i} className="flex items-start gap-2 text-xs text-slate-600 dark:text-slate-300">
-                      <span className="mt-1 h-1 w-1 shrink-0 rounded-full bg-slate-400" />
-                      {reason}
-                    </li>
-                  ))}
-                  {item.reasons.length > REASONS_VISIBLE && (
-                    <li className="text-xs font-medium text-cyan-700 dark:text-cyan-300">
-                      +{item.reasons.length - REASONS_VISIBLE} más
-                    </li>
-                  )}
-                </ul>
-              )}
-            </div>
-          </Link>
-        );
-      })}
-    </CardContent>
-  );
 }
 
 function ClosingSoonGrid({ items }: { items: PipelineOpportunityItem[] }) {
@@ -197,8 +136,6 @@ export function PipelineZone() {
   if (pipelineQuery.isLoading && triageQuery.isLoading) return <PipelineSkeleton />;
   if (pipelineQuery.error) return <ErrorState message={pipelineQuery.error.message} />;
 
-  const topScored = pipelineQuery.data?.top_scored ?? [];
-  const closingSoon = pipelineQuery.data?.closing_soon ?? [];
   const reviewQueue = (triageQuery.data?.review_queue ?? []).map((item) => ({
     ...item,
     reasons: [],
@@ -206,19 +143,6 @@ export function PipelineZone() {
 
   return (
     <div className="space-y-4" data-zone="pipeline">
-      <Card>
-        <CardHeader className="border-b border-slate-200 pb-4 dark:border-slate-700">
-          <CardTitle className="flex items-center gap-2 text-slate-950 dark:text-white">
-            <TrendingUp className="h-4 w-4" />
-            Top compatibilidad
-          </CardTitle>
-          <CardDescription>
-            Convocatorias con mejor score y las razones que lo explican.
-          </CardDescription>
-        </CardHeader>
-        <TopScoredGrid items={topScored} />
-      </Card>
-
       <Card>
         <CardHeader className="border-b border-slate-200 pb-4 dark:border-slate-700">
           <CardTitle className="flex items-center gap-2 text-slate-950 dark:text-white">
