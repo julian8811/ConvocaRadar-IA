@@ -1327,14 +1327,17 @@ def _semantic_score(text: str, profile_text: str) -> float:
         return 0.0
 
 
-def calculate_score(db: Session, opportunity: Opportunity, profile: OrganizationProfile) -> OpportunityScore:
+def _compute_score(opportunity: Opportunity, profile: OrganizationProfile) -> dict:
+    """Calculate score and reasons WITHOUT touching the DB session.
+    Returns ``{"raw": float, "reasons": list[str], "warnings": list[str]}``.
+    """
     score = 0.0
     reasons: list[str] = []
     warnings: list[str] = []
     profile_areas = {item.lower() for item in profile.areas_of_interest}
     opp_topics = {item.lower() for item in [*opportunity.categories, *opportunity.topics]}
 
-    # ── 1. Geographic alignment (max 15) ──────────────────────────────────
+    # Geographic alignment
     if opportunity.country == profile.country:
         score += 15
         reasons.append(f"La convocatoria es del mismo país ({profile.country}).")
@@ -1345,7 +1348,7 @@ def calculate_score(db: Session, opportunity: Opportunity, profile: Organization
         score += 5
         warnings.append("La convocatoria puede tener restricciones regionales.")
 
-    # ── 2. Organization type eligibility (max 20) ─────────────────────────
+    # Organization type
     eligible = opportunity.eligible_applicants or []
     if eligible:
         opp_types = {item.lower() for item in eligible}
@@ -1362,7 +1365,7 @@ def calculate_score(db: Session, opportunity: Opportunity, profile: Organization
         score += 15
         reasons.append("No hay restricciones explícitas de tipo de organización.")
 
-    # ── 3. Thematic overlap — granular (max 25) ───────────────────────────
+    # Thematic overlap
     if profile_areas and opp_topics:
         overlap = profile_areas.intersection(opp_topics)
         if overlap:
@@ -1378,47 +1381,29 @@ def calculate_score(db: Session, opportunity: Opportunity, profile: Organization
                 reasons.append(f"Coincidencia temática baja: {', '.join(sorted(overlap))}.")
         else:
             score += 5
-            warnings.append("Las temáticas de la convocatoria no coinciden con tus áreas de interés.")
+            warnings.append("Las temáticas no coinciden con tus áreas de interés.")
     elif not profile_areas:
         score += 5
-        warnings.append("Completa tus áreas de interés en el perfil para mejorar la comparación temática.")
+        warnings.append("Completa tus áreas de interés en el perfil.")
     else:
         score += 10
         reasons.append("Coincidencia temática base.")
 
-    # ── 4. Semantic similarity via embeddings (max 15) ────────────────────
-    opp_text = " ".join([opportunity.title or "", opportunity.summary or "", opportunity.description or ""])
-    prof_text = " ".join([profile.mission or "", profile.vision or "", profile.description or "", " ".join(profile.areas_of_interest)])
-    if opp_text.strip() and prof_text.strip():
-        sim = _semantic_score(opp_text, prof_text)
-        if sim >= 0.6:
-            score += 15
-            reasons.append("El contenido de la convocatoria es semánticamente afín al perfil.")
-        elif sim >= 0.4:
-            score += 10
-            reasons.append("Hay cierta afinidad semántica entre la convocatoria y el perfil.")
-        elif sim >= 0.2:
-            score += 5
-
-    # ── 5. Funding amount fit (max 15) ────────────────────────────────────
+    # Funding amount
     if opportunity.funding_amount_value:
         if profile.max_funding_amount:
             ratio = opportunity.funding_amount_value / profile.max_funding_amount
             if ratio <= 1.0:
-                if ratio <= 0.5:
-                    score += 15
-                    reasons.append("El monto está muy por debajo del máximo, excelente ajuste.")
-                else:
-                    score += 12
-                    reasons.append("El monto está dentro del rango preferido.")
+                score += 15 if ratio <= 0.5 else 12
+                reasons.append("El monto se ajusta al rango preferido." if ratio <= 1.0 else "")
             else:
                 score += 5
-                warnings.append("El monto supera el rango preferido configurado.")
+                warnings.append("El monto supera el rango preferido.")
         else:
             score += 8
             reasons.append("Monto disponible para revisión.")
 
-    # ── 6. Deadline proximity (max 5) ─────────────────────────────────────
+    # Deadline proximity
     if opportunity.close_date:
         remaining = (opportunity.close_date - datetime.now(UTC).replace(tzinfo=None)).days
         if remaining > 30:
@@ -1427,26 +1412,31 @@ def calculate_score(db: Session, opportunity: Opportunity, profile: Organization
         elif remaining > 7:
             score += 3
         elif remaining >= 0:
-            warnings.append("La convocatoria cierra pronto, se requiere acción inmediata.")
+            warnings.append("Cierra pronto, se requiere acción inmediata.")
 
-    # ── 7. Requirements & documents readiness (max 5) ─────────────────────
+    # Requirements
     if opportunity.requirements:
         score += 3
-        reasons.append("Hay requisitos identificados para planear la postulación.")
+        reasons.append("Hay requisitos identificados.")
     if opportunity.documents_required:
         score += 2
-        reasons.append("Se han identificado los documentos necesarios.")
+        reasons.append("Documentos necesarios identificados.")
 
     if score < 40 and not warnings:
-        warnings.append("La compatibilidad es baja con los datos disponibles.")
+        warnings.append("Compatibilidad baja con los datos disponibles.")
 
+    return {"raw": score, "reasons": reasons, "warnings": warnings}
+
+
+def calculate_score(db: Session, opportunity: Opportunity, profile: OrganizationProfile) -> OpportunityScore:
+    score = _compute_score(opportunity, profile)
     result = OpportunityScore(
         opportunity_id=opportunity.id,
         organization_id=profile.organization_id,
-        score=min(round(score, 1), 100),
-        priority=priority_for_score(min(score, 100)),
-        reasons=reasons,
-        warnings=warnings,
+        score=min(round(score["raw"], 1), 100),
+        priority=priority_for_score(min(score["raw"], 100)),
+        reasons=score["reasons"],
+        warnings=score["warnings"],
     )
     db.add(result)
     return result
@@ -2863,13 +2853,15 @@ def rescore_all_opportunities(
                 OpportunityScore.organization_id == organization_id,
             )
         )
-        new_score = calculate_score(db, opp, profile)
         if existing:
-            existing.score = new_score.score
-            existing.priority = new_score.priority
-            existing.reasons = new_score.reasons
-            existing.warnings = new_score.warnings
+            # Reuse existing row — update in place
+            score = _compute_score(opp, profile)
+            existing.score = min(round(score["raw"], 1), 100)
+            existing.priority = priority_for_score(existing.score)
+            existing.reasons = score["reasons"]
+            existing.warnings = score["warnings"]
         else:
+            new_score = calculate_score(db, opp, profile)
             db.add(new_score)
         rescored += 1
     db.commit()
