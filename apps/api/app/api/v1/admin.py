@@ -16,6 +16,7 @@ from app.services import (
     deduplicate_opportunities,
     execute_source_run_locally,
     rebuild_opportunity_embeddings,
+    rescore_all_opportunities,
     score_unscored_opportunities,
     send_weekly_digest,
     summarize_missing_opportunities,
@@ -317,6 +318,31 @@ def score_all_opportunities_admin(
         AuditLog(
             organization_id=organization.id,
             action="score_all_opportunities",
+            resource_type="opportunity",
+            resource_id=organization.id,
+            metadata_json={**result, "limit": limit},
+        )
+    )
+    db.commit()
+    return result
+
+
+@router.post("/admin/opportunities/rescore-all")
+def rescore_all_opportunities_admin(
+    limit: int = 10,
+    organization: Organization = Depends(get_current_organization),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Recalculate scores for ALL opportunities using the new multi-dimensional
+    scorer (overwrites existing scores). Runs on up to ``limit`` per call.
+    """
+    result = rescore_all_opportunities(db, organization.id, limit=limit)
+    db.add(
+        AuditLog(
+            organization_id=organization.id,
+            user_id=user.id,
+            action="rescore_all_opportunities",
             resource_type="opportunity",
             resource_id=organization.id,
             metadata_json={**result, "limit": limit},

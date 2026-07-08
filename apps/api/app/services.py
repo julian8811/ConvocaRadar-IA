@@ -2827,6 +2827,49 @@ def summarize_missing_opportunities(
     return {"processed": len(candidates), "summarized": summarized}
 
 
+def rescore_all_opportunities(
+    db: Session,
+    organization_id: str,
+    *,
+    limit: int = 10,
+) -> dict[str, int]:
+    """Recalculate scores for ALL opportunities for this org, overwriting
+    existing OpportunityScore rows. Uses the new multi-dimensional scorer.
+    """
+    organization = db.get(Organization, organization_id)
+    profile = db.scalar(
+        select(OrganizationProfile).where(OrganizationProfile.organization_id == organization_id)
+    )
+    if organization is None or profile is None:
+        return {"processed": 0, "rescored": 0}
+
+    scope = or_(
+        Opportunity.organization_id == organization_id,
+        Opportunity.organization_id.is_(None),
+    )
+    opportunities = list(db.scalars(select(Opportunity).where(scope).limit(limit)))
+    processed = len(opportunities)
+    rescored = 0
+    for opp in opportunities:
+        existing = db.scalar(
+            select(OpportunityScore).where(
+                OpportunityScore.opportunity_id == opp.id,
+                OpportunityScore.organization_id == organization_id,
+            )
+        )
+        new_score = calculate_score(db, opp, profile)
+        if existing:
+            existing.score = new_score.score
+            existing.priority = new_score.priority
+            existing.reasons = new_score.reasons
+            existing.warnings = new_score.warnings
+        else:
+            db.add(new_score)
+        rescored += 1
+    db.commit()
+    return {"processed": processed, "rescored": rescored}
+
+
 def score_unscored_opportunities(
     db: Session,
     organization_id: str,
