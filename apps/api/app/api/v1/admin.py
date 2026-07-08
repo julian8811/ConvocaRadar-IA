@@ -12,6 +12,7 @@ from app.schemas import AdminMetricsRead, AuditLogRead, SourceRunOverviewRead
 from app.db.bootstrap import bootstrap_priority_sources
 from app.db.seed import seed_default_sources
 from app.services import (
+    backfill_close_dates,
     backfill_funding_amounts,
     deduplicate_opportunities,
     execute_source_run_locally,
@@ -504,5 +505,21 @@ def backfill_funding_admin(
     """
     result = backfill_funding_amounts(db, organization.id, limit=limit)
     audit(db, "backfill_funding_amounts", "opportunity", user, organization.id)
+    db.commit()
+    return result
+
+
+@router.post("/admin/opportunities/backfill-close-dates")
+def backfill_close_dates_admin(
+    limit: int = 500,
+    organization: Organization = Depends(get_current_organization),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Extract ``close_date`` from existing title/summary/description/raw_text
+    for opportunities that are missing it. Uses local regex — no AI calls.
+    """
+    result = backfill_close_dates(db, organization.id, limit=limit)
+    audit(db, "backfill_close_dates", "opportunity", user, organization.id)
     db.commit()
     return result
