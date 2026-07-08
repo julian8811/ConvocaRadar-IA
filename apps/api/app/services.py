@@ -1310,6 +1310,18 @@ def execute_source_run_locally(db: Session, source: Source, organization_id: str
     return run
 
 
+def _semantic_score(text: str, profile_text: str) -> float:
+    """Compare opportunity text with profile text using embedding similarity.
+    Returns a float in [0, 1] or 0 if embeddings are unavailable.
+    """
+    try:
+        opp_vec = build_embedding(text[:2000])
+        prof_vec = build_embedding(profile_text[:2000])
+        return cosine_similarity(opp_vec, prof_vec)
+    except Exception:
+        return 0.0
+
+
 def calculate_score(db: Session, opportunity: Opportunity, profile: OrganizationProfile) -> OpportunityScore:
     score = 0.0
     reasons: list[str] = []
@@ -1317,44 +1329,107 @@ def calculate_score(db: Session, opportunity: Opportunity, profile: Organization
     profile_areas = {item.lower() for item in profile.areas_of_interest}
     opp_topics = {item.lower() for item in [*opportunity.categories, *opportunity.topics]}
 
-    if opportunity.country == profile.country or profile.eligible_international:
+    # ── 1. Geographic alignment (max 15) ──────────────────────────────────
+    if opportunity.country == profile.country:
         score += 15
-        reasons.append("La región de la convocatoria es compatible con el perfil.")
+        reasons.append(f"La convocatoria es del mismo país ({profile.country}).")
+    elif profile.eligible_international:
+        score += 10
+        reasons.append("La convocatoria es internacional, permitido por el perfil.")
     else:
+        score += 5
         warnings.append("La convocatoria puede tener restricciones regionales.")
 
-    if profile.organization_type in [item.lower() for item in opportunity.eligible_applicants] or not opportunity.eligible_applicants:
-        score += 20
-        reasons.append("El tipo de organización parece elegible.")
-    else:
-        warnings.append("El tipo de organización no aparece explícitamente como beneficiario.")
-
-    overlap = profile_areas.intersection(opp_topics)
-    if overlap:
-        score += 20
-        reasons.append(f"Coincidencia temática: {', '.join(sorted(overlap))}.")
-    elif not profile_areas:
-        score += 8
-        warnings.append("El perfil no tiene áreas de interés suficientes para una comparación fuerte.")
-
-    if opportunity.funding_amount_value:
-        score += 10
-        if profile.max_funding_amount and opportunity.funding_amount_value > profile.max_funding_amount:
-            warnings.append("El monto supera el rango preferido configurado.")
+    # ── 2. Organization type eligibility (max 20) ─────────────────────────
+    if opportunity.eligible_applicants:
+        opp_types = {item.lower() for item in opportunity.eligible_applicants}
+        if profile.organization_type in opp_types:
+            score += 20
+            reasons.append("Tu tipo de organización está en los beneficiarios elegibles.")
+        elif any(profile.organization_type.startswith(t.rstrip("s")) for t in opp_types):
+            score += 15
+            reasons.append("Tu organización es parcialmente elegible según los requisitos.")
         else:
-            score += 10
-            reasons.append("El monto encaja con las preferencias declaradas.")
+            score += 5
+            warnings.append("El tipo de organización no aparece como beneficiario explícito.")
+    else:
+        score += 15
+        reasons.append("No hay restricciones explícitas de tipo de organización.")
 
-    if opportunity.status == OpportunityStatus.open.value:
-        score += 10
-        reasons.append("La convocatoria está abierta.")
-    elif opportunity.status == OpportunityStatus.closing_soon.value:
+    # ── 3. Thematic overlap — granular (max 25) ───────────────────────────
+    if profile_areas and opp_topics:
+        overlap = profile_areas.intersection(opp_topics)
+        if overlap:
+            ratio = len(overlap) / max(len(profile_areas), 1)
+            if ratio >= 0.5:
+                score += 25
+                reasons.append(f"Alta coincidencia temática: {', '.join(sorted(overlap))}.")
+            elif ratio >= 0.25:
+                score += 18
+                reasons.append(f"Coincidencia temática media: {', '.join(sorted(overlap))}.")
+            else:
+                score += 12
+                reasons.append(f"Coincidencia temática baja: {', '.join(sorted(overlap))}.")
+        else:
+            score += 5
+            warnings.append("Las temáticas de la convocatoria no coinciden con tus áreas de interés.")
+    elif not profile_areas:
         score += 5
-        warnings.append("La convocatoria cierra pronto.")
-
-    if opportunity.requirements:
+        warnings.append("Completa tus áreas de interés en el perfil para mejorar la comparación temática.")
+    else:
         score += 10
+        reasons.append("Coincidencia temática base.")
+
+    # ── 4. Semantic similarity via embeddings (max 15) ────────────────────
+    opp_text = " ".join([opportunity.title or "", opportunity.summary or "", opportunity.description or ""])
+    prof_text = " ".join([profile.mission or "", profile.vision or "", profile.description or "", " ".join(profile.areas_of_interest)])
+    if opp_text.strip() and prof_text.strip():
+        sim = _semantic_score(opp_text, prof_text)
+        if sim >= 0.6:
+            score += 15
+            reasons.append("El contenido de la convocatoria es semánticamente afín al perfil.")
+        elif sim >= 0.4:
+            score += 10
+            reasons.append("Hay cierta afinidad semántica entre la convocatoria y el perfil.")
+        elif sim >= 0.2:
+            score += 5
+
+    # ── 5. Funding amount fit (max 15) ────────────────────────────────────
+    if opportunity.funding_amount_value:
+        if profile.max_funding_amount:
+            ratio = opportunity.funding_amount_value / profile.max_funding_amount
+            if ratio <= 1.0:
+                if ratio <= 0.5:
+                    score += 15
+                    reasons.append("El monto está muy por debajo del máximo, excelente ajuste.")
+                else:
+                    score += 12
+                    reasons.append("El monto está dentro del rango preferido.")
+            else:
+                score += 5
+                warnings.append("El monto supera el rango preferido configurado.")
+        else:
+            score += 8
+            reasons.append("Monto disponible para revisión.")
+
+    # ── 6. Deadline proximity (max 5) ─────────────────────────────────────
+    if opportunity.close_date:
+        remaining = (opportunity.close_date - datetime.now(UTC).replace(tzinfo=None)).days
+        if remaining > 30:
+            score += 5
+            reasons.append("Hay tiempo suficiente para preparar la postulación.")
+        elif remaining > 7:
+            score += 3
+        elif remaining >= 0:
+            warnings.append("La convocatoria cierra pronto, se requiere acción inmediata.")
+
+    # ── 7. Requirements & documents readiness (max 5) ─────────────────────
+    if opportunity.requirements:
+        score += 3
         reasons.append("Hay requisitos identificados para planear la postulación.")
+    if opportunity.documents_required:
+        score += 2
+        reasons.append("Se han identificado los documentos necesarios.")
 
     if score < 40 and not warnings:
         warnings.append("La compatibilidad es baja con los datos disponibles.")
@@ -1362,7 +1437,7 @@ def calculate_score(db: Session, opportunity: Opportunity, profile: Organization
     result = OpportunityScore(
         opportunity_id=opportunity.id,
         organization_id=profile.organization_id,
-        score=min(score, 100),
+        score=min(round(score, 1), 100),
         priority=priority_for_score(min(score, 100)),
         reasons=reasons,
         warnings=warnings,
