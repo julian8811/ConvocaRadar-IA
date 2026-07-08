@@ -1882,10 +1882,11 @@ def get_review_queue(
 
     Filter: ``Opportunity.organization_id == org_id`` AND
             ``Opportunity.user_status IN ('review', 'kept')`` AND
-            ``Opportunity.close_date IS NOT NULL``.
+            ``Opportunity.close_date >= today_start``.
     Order: ``close_date ASC NULLS LAST`` (soonest first).
     Score: joined from ``OpportunityScore`` for the given org, if any.
     """
+    today_start = datetime.now(UTC).replace(tzinfo=None).replace(hour=0, minute=0, second=0, microsecond=0)
     stmt = (
         select(Opportunity, OpportunityScore, Source)
         .outerjoin(
@@ -1899,7 +1900,7 @@ def get_review_queue(
         .where(
             Opportunity.organization_id == organization_id,
             Opportunity.user_status.in_(["review", "kept"]),
-            Opportunity.close_date.is_not(None),
+            Opportunity.close_date >= today_start,
         )
         .order_by(Opportunity.close_date.asc().nullslast())
         .limit(limit)
