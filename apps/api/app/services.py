@@ -762,26 +762,30 @@ def _text_search_opportunities(
     *,
     limit: int = 10,
 ) -> list[tuple[Opportunity, float]]:
-    """Simple full-text fallback search when vector search is unavailable
-    or returns no results. Searches title, entity, country, categories,
-    and summary using plain ILIKE matches.
+    """Full-text fallback when vector search returns no results.
+
+    Searches title, entity, country, and summary using ILIKE on
+    individual query tokens so partial and accented matches work
+    (e.g. ``innovacion`` matches ``innovación``).
     """
     scope = or_(Opportunity.organization_id == organization_id, Opportunity.organization_id.is_(None))
-    like = f"%{query}%"
-    stmt = (
-        select(Opportunity)
-        .where(
-            scope,
+    tokens = [t for t in re.findall(r"[a-zA-ZáéíóúñüÁÉÍÓÚÑÜ]+", query) if len(t) >= 2]
+    if not tokens:
+        return []
+    stmt = select(Opportunity).where(scope)
+    filters = []
+    for token in tokens:
+        like = f"%{token}%"
+        filters.append(
             or_(
                 Opportunity.title.ilike(like),
                 Opportunity.entity.ilike(like),
                 Opportunity.country.ilike(like),
                 Opportunity.summary.ilike(like),
-            ),
+            )
         )
-        .order_by(Opportunity.created_at.desc())
-        .limit(limit)
-    )
+    stmt = stmt.where(and_(*filters))
+    stmt = stmt.order_by(Opportunity.created_at.desc()).limit(limit)
     rows = list(db.scalars(stmt))
     return [(row, 1.0) for row in rows]
 
