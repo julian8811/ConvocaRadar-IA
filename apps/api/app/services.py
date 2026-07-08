@@ -1509,10 +1509,7 @@ def generate_report_html(title: str, organization: Organization, opportunities: 
         return "No disponible"
 
     def _link_for(item: Opportunity) -> str:
-        for candidate in (item.official_url, item.application_url):
-            if candidate and url_is_reachable(candidate):
-                return candidate
-        return "#"
+        return item.official_url or item.application_url or "#"
 
     featured = opportunities[:9]
     featured_cards = "\n".join(
