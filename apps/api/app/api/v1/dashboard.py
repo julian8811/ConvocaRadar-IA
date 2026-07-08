@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 import time
 
 from fastapi import APIRouter, Depends, Response
@@ -111,7 +111,15 @@ def _to_opportunity_item(opportunity: Opportunity, score: OpportunityScore | Non
 
 
 def _visible_opportunity(opportunity: Opportunity) -> bool:
-    return not is_noise_payload(opportunity.title, opportunity.summary, opportunity.raw_text)
+    """Filter out noise and closed/expired opportunities from dashboard views."""
+    if is_noise_payload(opportunity.title, opportunity.summary, opportunity.raw_text):
+        return False
+    # Hide opportunities that are marked as closed or have a past close_date
+    if opportunity.status == "closed":
+        return False
+    if opportunity.close_date and opportunity.close_date < datetime.now(UTC).replace(tzinfo=None) - timedelta(days=1):
+        return False
+    return True
 
 
 @router.get("/dashboard/summary", response_model=DashboardSummaryRead)

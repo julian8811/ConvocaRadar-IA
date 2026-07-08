@@ -910,6 +910,9 @@ def is_noise_title(title: str | None) -> bool:
         re.IGNORECASE,
     ) and re.search(r"[A-Z]{3,}\s*[-–—]\s*\d{3,}", cleaned):
         return True
+    # Multi-language scraped noise: "Cliquer ici", "click here", "Read more", PDF redirects
+    if re.search(r"\b(cliquer ici|click here|read more|download pdf|view pdf|pdf)\b", lowered):
+        return True
     return False
 
 
