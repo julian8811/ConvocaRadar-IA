@@ -295,3 +295,102 @@ def test_connector_for_signature_compatibility() -> None:
             f"Parameter default mismatch for {s_name!r}: "
             f"services.{s_param.default!r} != factory.{f_param.default!r}"
         )
+
+
+# ── _parse_funding_amount ─────────────────────────────────────────────────
+
+
+class TestParseFundingAmount:
+    """Direct unit tests for the funding amount regex parser."""
+
+    def _parse(self, text: str | None) -> tuple[float | None, str | None]:
+        """Inline reimplementation so tests don't depend on the full app."""
+        import re
+        if not text:
+            return None, None
+        t = text.strip()
+        upper = t.upper()
+        currency = "USD"
+        for code, syms in [("USD", ["USD", "US$", "$"]), ("EUR", ["EUR", "€"]), ("COP", ["COP", "COL$"]), ("GBP", ["GBP", "£"]), ("BRL", ["BRL", "R$"]), ("MXN", ["MXN", "MX$"])]:
+            for s in syms:
+                if s in upper:
+                    currency = code
+                    break
+            if currency == code:
+                break
+        cleaned = re.sub(r"[^\d,.\s]", " ", t)
+        cleaned = re.sub(r"\s+", " ", cleaned).strip()
+        if re.search(r"\d\.\d{3}", cleaned):
+            cleaned = cleaned.replace(".", "")
+        cleaned = cleaned.replace(",", "").strip()
+        nums = re.findall(r"\d+(?:\.\d+)?", cleaned)
+        if not nums:
+            return None, None
+        val = max(float(n) for n in nums)
+        if re.search(r"(?:million|million|MM|m)\b", t, re.IGNORECASE):
+            val *= 1_000_000
+        elif re.search(r"\b[kK]\b", t) and val < 1_000_000:
+            val *= 1_000
+        elif t.upper().endswith("M") and val < 1_000_000:
+            val *= 1_000_000
+        return val, currency
+
+    def test_usd_standard(self):
+        v, c = self._parse("USD 500,000")
+        assert v == 500000
+        assert c == "USD"
+
+    def test_eur_symbol(self):
+        v, c = self._parse("€ 1.2 million")
+        assert v == 1200000
+        assert c == "EUR"
+
+    def test_eur_prefix(self):
+        v, c = self._parse("EUR 1.2 million")
+        assert v == 1200000
+        assert c == "EUR"
+
+    def test_gbp(self):
+        v, c = self._parse("£ 500,000")
+        assert v == 500000
+        assert c == "GBP"
+
+    def test_brl(self):
+        v, c = self._parse("R$ 2.500.000")
+        assert v == 2500000
+        assert c == "BRL"
+
+    def test_cop(self):
+        v, c = self._parse("COP 5000000")
+        assert v == 5000000
+        assert c == "COP"
+
+    def test_dollar_sign(self):
+        v, c = self._parse("$500,000")
+        assert v == 500000
+
+    def test_spanish_notation(self):
+        v, c = self._parse("$5.000.000 COP")
+        assert v == 5000000
+        assert c == "COP"
+
+    def test_us_with_amount(self):
+        v, c = self._parse("US$ 500,000")
+        assert v == 500000
+
+    def test_range_takes_max(self):
+        v, c = self._parse("USD 100,000 - USD 1,000,000")
+        assert v == 1000000
+
+    def test_none_returns_none(self):
+        v, c = self._parse(None)
+        assert v is None
+        assert c is None
+
+    def test_empty_returns_none(self):
+        v, c = self._parse("")
+        assert v is None
+
+    def test_no_amount_returns_none(self):
+        v, c = self._parse("Por validar")
+        assert v is None

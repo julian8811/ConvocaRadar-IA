@@ -2650,6 +2650,61 @@ def backfill_funding_amounts(db: Session, organization_id: str, *, limit: int = 
     return {"total": len(opportunities), "updated": updated}
 
 
+def _opportunity_combined_text(opp: Opportunity) -> str:
+    """Combine all text fields of an opportunity for AI extraction."""
+    return " ".join(
+        part for part in [opp.title, opp.summary, opp.description, opp.raw_text]
+        if part
+    )
+
+
+def backfill_close_dates_ai(db: Session, organization_id: str, *, limit: int = 100) -> dict[str, int]:
+    """Use AI (LLM) to extract close_date for opportunities that are missing it.
+
+    Calls ``create_ai_extraction`` on each opportunity's combined text and
+    updates the record if a close_date is found. More expensive than the
+    regex-based backfill but can find dates in free-form text that the
+    regex patterns miss.
+
+    Processes up to ``limit`` opportunities per call. Each AI call costs
+    tokens so keep batches small (10-50 recommended).
+    """
+    scope = or_(
+        Opportunity.organization_id == organization_id,
+        Opportunity.organization_id.is_(None),
+    )
+    stmt = (
+        select(Opportunity)
+        .where(scope, Opportunity.close_date.is_(None))
+        .order_by(Opportunity.updated_at.desc())
+        .limit(limit)
+    )
+    opportunities = list(db.scalars(stmt))
+    processed = 0
+    updated = 0
+    for opp in opportunities:
+        try:
+            text = _opportunity_combined_text(opp)
+            if not text.strip():
+                continue
+            processed += 1
+            extraction = create_ai_extraction(text)
+            close_date = _parse_ai_close_date(extraction.get("close_date"))
+            if close_date:
+                opp.close_date = close_date
+                opp.status = inferred_opportunity_status(
+                    close_date,
+                    " ".join([opp.summary or "", opp.raw_text or ""]),
+                )
+                opp.updated_at = datetime.now(UTC).replace(tzinfo=None)
+                updated += 1
+        except Exception:
+            logger.warning("backfill_close_dates_ai.skip", opportunity_id=opp.id)
+            continue
+    db.commit()
+    return {"total": len(opportunities), "processed": processed, "updated": updated}
+
+
 def get_funding_ranges(db: Session, organization_id: str) -> list[DashboardBreakdownItem]:
     """Group opportunities by their funding amount range."""
     scope = or_(

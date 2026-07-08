@@ -1,6 +1,6 @@
 from datetime import UTC, datetime, timedelta
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, Query
 from sqlalchemy import func, or_, select
 from sqlalchemy.orm import Session
 
@@ -14,6 +14,7 @@ from app.db.seed import seed_default_sources
 from app.services import (
     audit,
     backfill_close_dates,
+    backfill_close_dates_ai,
     backfill_funding_amounts,
     deduplicate_opportunities,
     execute_source_run_locally,
@@ -526,5 +527,26 @@ def backfill_close_dates_admin(
         raise HTTPException(status_code=400, detail="User has no organization")
     result = backfill_close_dates(db, org_id, limit=limit)
     audit(db, "backfill_close_dates", "opportunity", user, org_id)
+    db.commit()
+    return result
+
+
+@router.post("/admin/opportunities/backfill-close-dates-ai")
+def backfill_close_dates_ai_admin(
+    limit: int = Query(default=50, ge=1, le=200),
+    user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Use AI (LLM) to extract ``close_date`` for opportunities missing it.
+
+    Calls the LLM (Groq) on each opportunity's text to find close dates
+    that regex patterns miss. More expensive but more thorough. Keep
+    batches small (10-50) due to API cost and latency.
+    """
+    org_id = user.organization_id
+    if not org_id:
+        raise HTTPException(status_code=400, detail="User has no organization")
+    result = backfill_close_dates_ai(db, org_id, limit=limit)
+    audit(db, "backfill_close_dates_ai", "opportunity", user, org_id)
     db.commit()
     return result
