@@ -469,7 +469,7 @@ def bootstrap_data_admin(
 def backfill_funding_admin(
     limit: int = 500,
     organization: Organization = Depends(get_current_organization),
-    user: User = Depends(require_admin),
+    user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ) -> dict:
     """Parse existing ``funding_amount_raw`` strings into numeric value + currency
