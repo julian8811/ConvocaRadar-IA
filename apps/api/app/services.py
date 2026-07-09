@@ -1102,6 +1102,10 @@ def build_opportunity_query(
     source_id: str | None = None,
     priority: str | None = None,
     search: str | None = None,
+    close_date_from: str | None = None,
+    close_date_to: str | None = None,
+    min_amount: float | None = None,
+    max_amount: float | None = None,
 ) -> Select[tuple[Opportunity]]:
     stmt = select(Opportunity).where(
         or_(Opportunity.organization_id == organization_id, Opportunity.organization_id.is_(None))
@@ -1129,6 +1133,22 @@ def build_opportunity_query(
         )
     stmt = stmt.where(~Opportunity.title.ilike("%@%"))
     stmt = stmt.where(~Opportunity.title.ilike("http%"))
+    if close_date_from:
+        try:
+            from_date = datetime.strptime(close_date_from, "%Y-%m-%d")
+            stmt = stmt.where(Opportunity.close_date >= from_date)
+        except ValueError:
+            pass
+    if close_date_to:
+        try:
+            to_date = datetime.strptime(close_date_to, "%Y-%m-%d")
+            stmt = stmt.where(Opportunity.close_date <= to_date.replace(hour=23, minute=59, second=59))
+        except ValueError:
+            pass
+    if min_amount is not None:
+        stmt = stmt.where(Opportunity.funding_amount_value.isnot(None), Opportunity.funding_amount_value >= min_amount)
+    if max_amount is not None:
+        stmt = stmt.where(Opportunity.funding_amount_value.isnot(None), Opportunity.funding_amount_value <= max_amount)
     if priority:
         stmt = stmt.join(OpportunityScore, OpportunityScore.opportunity_id == Opportunity.id).where(
             OpportunityScore.organization_id == organization_id,

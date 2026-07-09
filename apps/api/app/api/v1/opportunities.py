@@ -76,6 +76,10 @@ def list_opportunities(
     source_id: str | None = None,
     priority: str | None = None,
     search: str | None = None,
+    close_date_from: str | None = None,
+    close_date_to: str | None = None,
+    min_amount: float | None = None,
+    max_amount: float | None = None,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=25, ge=1, le=100),
     organization: Organization = Depends(get_current_organization),
@@ -89,6 +93,10 @@ def list_opportunities(
         source_id=source_id,
         priority=priority,
         search=search,
+        close_date_from=close_date_from,
+        close_date_to=close_date_to,
+        min_amount=min_amount,
+        max_amount=max_amount,
     )
     total = count_query(db, stmt)
     items = list(db.scalars(stmt.offset((page - 1) * page_size).limit(page_size)))
