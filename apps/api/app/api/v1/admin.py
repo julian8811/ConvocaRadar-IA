@@ -571,3 +571,32 @@ def backfill_funding_amounts_ai_admin(
     audit(db, "backfill_funding_amounts_ai", "opportunity", user, org_id)
     db.commit()
     return result
+
+
+@router.post("/admin/sources/clear-errors")
+def clear_source_errors(
+    error_pattern: str = Query(default="", description="Clear only sources whose last_error contains this text (case-insensitive). Empty = all."),
+    user: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Clear ``last_error``, ``last_success_at``, and mark enabled sources as healthy.
+
+    Useful after a code deploy that fixes a root cause — rather than waiting
+    for each source's daily scrape to clear the stale error, this endpoint
+    resets them immediately so the dashboard reflects the fix.
+
+    With ``error_pattern``, only sources whose ``last_error`` contains the
+    given text are cleared (e.g. ``?error_pattern=entity_name``).
+    """
+    scope = select(Source).where(Source.enabled.is_(True))
+    if error_pattern:
+        scope = scope.where(Source.last_error.ilike(f"%{error_pattern}%"))
+    sources = list(db.scalars(scope))
+    cleared = 0
+    for source in sources:
+        if source.last_error:
+            source.last_error = None
+            cleared += 1
+    db.commit()
+    audit(db, "clear_source_errors", "source", user, str(cleared))
+    return {"total": len(sources), "cleared": cleared, "error_pattern": error_pattern or "all"}
