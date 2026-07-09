@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/state";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { api, API_URL, TOKEN_COOKIE_NAME } from "@/lib/api";
+import { api } from "@/lib/api";
 import { decodeVisibleText, isNoiseVisibleText } from "@/lib/text";
 import type { Opportunity, Source } from "@/lib/types";
 
@@ -109,14 +109,8 @@ export default function OpportunitiesPage() {
 
   const setStatusBatch = useMutation({
     mutationFn: async (status: string) => {
-      const token = document.cookie.split("; ").find((r) => r.startsWith("convocaradar_token="))?.split("=")[1];
       const results = await Promise.allSettled(
-        Array.from(selected).map((id) =>
-          fetch(`${API_URL}/opportunities/${id}/status?status=${status}`, {
-            method: "POST", headers: { "Authorization": `Bearer ${token}`, "Content-Type": "application/json" },
-            credentials: "include",
-          })
-        )
+        Array.from(selected).map((id) => api.setOpportunityStatus(id, status))
       );
       return { total: selected.size, done: results.filter((r) => r.status === "fulfilled").length };
     },
@@ -126,11 +120,9 @@ export default function OpportunitiesPage() {
 
   const exportSelected = useMutation({
     mutationFn: async () => {
-      const token = document.cookie.split("; ").find((r) => r.startsWith("convocaradar_token="))?.split("=")[1];
-      const allSelected = Array.from(selected);
       const csvHeader = "title,entity,country,status,close_date,funding_amount,official_url\n";
       const rows = items.filter((i) => selected.has(i.id)).map((i) =>
-        `"${i.title}","${i.entity}","${i.country}","${i.status}",${i.close_date ?? ""},${i.funding_amount_raw ?? ""},"${i.official_url ?? ""}"`
+        `"${i.title.replace(/"/g, '""')}","${i.entity.replace(/"/g, '""')}","${i.country.replace(/"/g, '""')}","${i.status}",${i.close_date ?? ""},${i.funding_amount_raw ?? ""},"${(i.official_url ?? "").replace(/"/g, '""')}"`
       ).join("\n");
       const blob = new Blob([csvHeader + rows], { type: "text/csv" });
       const url = window.URL.createObjectURL(blob);
