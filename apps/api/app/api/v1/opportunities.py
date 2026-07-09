@@ -1,4 +1,5 @@
 import hashlib
+from datetime import UTC, datetime
 from pathlib import Path
 
 from fastapi import APIRouter, Depends, File, HTTPException, Query, UploadFile
@@ -24,6 +25,8 @@ from app.services import (
     build_opportunity_query,
     calculate_score,
     count_query,
+    export_csv,
+    export_xlsx,
     is_noise_payload,
     reanalyze_opportunity,
     semantic_search_opportunities,
@@ -343,3 +346,33 @@ def delete_document(
     audit(db, "delete_document", "opportunity_document", user, document.id)
     db.delete(document)
     db.commit()
+
+
+@router.get("/opportunities/export")
+def export_opportunities(
+    format: str = Query(default="csv", pattern="^(csv|xlsx)$"),
+    organization: Organization = Depends(get_current_organization),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> Response:
+    """Export all opportunities visible to the organization as CSV or XLSX.
+
+    Returns a downloadable file with columns: title, entity, country, status,
+    close_date, funding_amount, official_url.
+    """
+    scope = _opportunity_scope(organization.id)
+    opportunities = list(db.scalars(select(Opportunity).where(scope).order_by(Opportunity.created_at.desc())))
+
+    if format == "xlsx":
+        content = export_xlsx(opportunities)
+        return Response(
+            content,
+            media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            headers={"Content-Disposition": f"attachment; filename=convocatorias_{datetime.now(UTC).date().isoformat()}.xlsx"},
+        )
+    content = export_csv(opportunities)
+    return Response(
+        content,
+        media_type="text/csv",
+        headers={"Content-Disposition": f"attachment; filename=convocatorias_{datetime.now(UTC).date().isoformat()}.csv"},
+    )
