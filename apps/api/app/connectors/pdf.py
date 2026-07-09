@@ -4,7 +4,11 @@ import io
 import re
 from datetime import datetime
 
-from pypdf import PdfReader
+try:
+    from pypdf import PdfReader
+    HAS_PYPDF = True
+except ImportError:
+    HAS_PYPDF = False
 
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
 from app.connectors.common import fetch_httpx_bytes, normalize_text
@@ -108,6 +112,8 @@ class PdfConnector:
         return RawSourceResult(source_key=self.source_key, url=final_url, content=content.decode("latin-1", errors="ignore"), content_type=content_type)
 
     def _extract_text(self, raw: RawSourceResult) -> str:
+        if not HAS_PYPDF:
+            return ""
         reader = PdfReader(io.BytesIO(raw.content.encode("latin-1", errors="ignore")))
         parts: list[str] = []
         if reader.metadata and getattr(reader.metadata, "title", None):
