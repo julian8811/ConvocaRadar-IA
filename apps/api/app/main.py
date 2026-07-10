@@ -14,13 +14,16 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app.api.v1.router import api_router
 from app.connectors.health_check import check_playwright_binary, check_pypdf_import
-from app.core.config import get_settings
+from app.core.config import check_production_sqlite, get_settings
 from app.core.logging import configure_logging
 from app.db.bootstrap import ensure_bootstrap_data
 from app.db.session import create_all
 
 configure_logging()
 settings = get_settings()
+
+# Warn if someone deploys with the SQLite default in production
+check_production_sqlite()
 logger = logging.getLogger(__name__)
 struct_logger = structlog.get_logger(__name__)
 

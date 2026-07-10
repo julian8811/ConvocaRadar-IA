@@ -1,7 +1,12 @@
+import logging
+
 from functools import lru_cache
 
 from pydantic import Field, computed_field
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+logger = logging.getLogger(__name__)
 
 
 class Settings(BaseSettings):
@@ -65,6 +70,26 @@ def get_settings() -> Settings:
     if not settings.chat_model:
         settings.chat_model = settings.llm_model
     return settings
+
+
+def check_production_sqlite(app_env: str | None = None, database_url: str | None = None) -> None:
+    """Log a warning when DATABASE_URL uses SQLite in a production environment.
+
+    SQLite is not safe for concurrent production workloads — it can cause
+    data corruption under concurrent writes. This check warns operators who
+    forget to configure a real database in production.
+
+    Call this once during application startup.
+    """
+    env = (app_env or get_settings().app_env).strip().lower()
+    db_url = (database_url or get_settings().database_url).strip().lower()
+    if env == "production" and "sqlite" in db_url:
+        logger.warning(
+            "DATABASE_URL uses SQLite in APP_ENV=production. "
+            "SQLite is NOT safe for production — concurrent writes can "
+            "cause data corruption. Configure PostgreSQL via DATABASE_URL "
+            "in your environment."
+        )
 
 
 def effective_llm_provider(provider: str | None = None) -> str:
