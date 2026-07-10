@@ -466,17 +466,18 @@ async def _call_openai_embedding(text: str, *, dimensions: int) -> list[float] |
         "input": text[:8000],
         "dimensions": dimensions,
     }
-    async with httpx.AsyncClient(timeout=settings.llm_timeout_seconds) as client:
-        response = await client.post(
-            f"{settings.llm_api_base.rstrip('/')}/embeddings",
-            headers={
-                "Authorization": f"Bearer {settings.llm_api_key}",
-                "Content-Type": "application/json",
-            },
-            json=payload,
-        )
-        response.raise_for_status()
-        data = response.json()
+    client = await http_client()
+    response = await client.post(
+        f"{settings.llm_api_base.rstrip('/')}/embeddings",
+        headers={
+            "Authorization": f"Bearer {settings.llm_api_key}",
+            "Content-Type": "application/json",
+        },
+        json=payload,
+        timeout=settings.llm_timeout_seconds,
+    )
+    response.raise_for_status()
+    data = response.json()
     rows = data.get("data") or []
     if not rows:
         return None
@@ -486,21 +487,14 @@ async def _call_openai_embedding(text: str, *, dimensions: int) -> list[float] |
     return [round(float(item), 6) for item in vector]
 
 
-def build_embedding(text: str, *, dimensions: int | None = None) -> list[float]:
+async def build_embedding(text: str, *, dimensions: int | None = None) -> list[float]:
     settings = get_settings()
     target_dimensions = dimensions or settings.embedding_dimensions or 64
     if effective_llm_provider(settings.llm_provider) == "openai" and settings.llm_api_key and settings.embedding_model:
         try:
-            import asyncio
-            loop = asyncio.new_event_loop()
-            try:
-                remote = loop.run_until_complete(
-                    _call_openai_embedding(text, dimensions=target_dimensions)
-                )
-            finally:
-                loop.close()
-            if remote:
-                return remote
+            result = await _call_openai_embedding(text, dimensions=target_dimensions)
+            if result:
+                return result
         except Exception:
             pass
     vector = [0.0] * target_dimensions
@@ -516,6 +510,10 @@ def build_embedding(text: str, *, dimensions: int | None = None) -> list[float]:
     if norm == 0:
         return vector
     return [round(value / norm, 6) for value in vector]
+
+
+def build_embedding_sync(text: str, *, dimensions: int | None = None) -> list[float]:
+    return asyncio.run(build_embedding(text, dimensions=dimensions))
 
 
 def cosine_similarity(left: list[float], right: list[float]) -> float:
