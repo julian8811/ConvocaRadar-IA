@@ -11,6 +11,8 @@ from unittest.mock import patch
 
 import pytest
 
+pytestmark = pytest.mark.asyncio
+
 os.environ["DATABASE_URL"] = "sqlite:///./test_convocaradar.db"
 os.environ["STORAGE_BACKEND"] = "local"
 os.environ["STORAGE_DIR"] = "./test_storage"
@@ -78,14 +80,14 @@ def clear_db():
         db.close()
 
 
-def _make_opportunity(
+async def _make_opportunity(
     *,
     official_url: str | None = "https://example.com/opp",
     application_url: str | None = "https://example.com/apply",
 ) -> str:
     """Create a single fixture opportunity and return its id.
 
-    Mocks url_is_reachable so the create_opportunity path does not hit real HTTP.
+    Mocks url_is_reachable in _legacy.py so create_opportunity does not hit real HTTP.
     """
     db = SessionLocal()
     try:
@@ -94,8 +96,8 @@ def _make_opportunity(
         source = db.scalar(select(Source).where(Source.key == "grants-gov"))
         assert source is not None
 
-        with patch("app.services.url_is_reachable", return_value=True):
-            opportunity = create_opportunity(
+        with patch("app.services._legacy.url_is_reachable", return_value=True):
+            opportunity = await create_opportunity(
                 db,
                 OpportunityCreate(
                     source_id=source.id,
@@ -125,11 +127,11 @@ class TestUrlCheckEndpoint:
     The endpoint does NOT exist yet — these tests define what it should do.
     """
 
-    def test_url_check_returns_dict_with_bool_values(self) -> None:
+    async def test_url_check_returns_dict_with_bool_values(self) -> None:
         """url-check should return {"official_url": bool, "application_url": bool}."""
         c = client()
         auth = {"Authorization": f"Bearer {token(c)}"}
-        opportunity_id = _make_opportunity()
+        opportunity_id = await _make_opportunity()
 
         with patch("app.services.url_is_reachable", return_value=True):
             response = c.get(
@@ -145,11 +147,11 @@ class TestUrlCheckEndpoint:
         assert isinstance(data["official_url"], bool)
         assert isinstance(data["application_url"], bool)
 
-    def test_url_check_returns_true_for_reachable_urls(self) -> None:
+    async def test_url_check_returns_true_for_reachable_urls(self) -> None:
         """When both URLs are reachable, both should return True."""
         c = client()
         auth = {"Authorization": f"Bearer {token(c)}"}
-        opportunity_id = _make_opportunity()
+        opportunity_id = await _make_opportunity()
 
         with patch("app.services.url_is_reachable", return_value=True):
             response = c.get(
@@ -162,11 +164,11 @@ class TestUrlCheckEndpoint:
         assert data["official_url"] is True
         assert data["application_url"] is True
 
-    def test_url_check_returns_false_for_unreachable_urls(self) -> None:
+    async def test_url_check_returns_false_for_unreachable_urls(self) -> None:
         """When both URLs are unreachable, both should return False."""
         c = client()
         auth = {"Authorization": f"Bearer {token(c)}"}
-        opportunity_id = _make_opportunity()
+        opportunity_id = await _make_opportunity()
 
         with patch("app.services.url_is_reachable", return_value=False):
             response = c.get(
@@ -179,11 +181,11 @@ class TestUrlCheckEndpoint:
         assert data["official_url"] is False
         assert data["application_url"] is False
 
-    def test_url_check_with_none_official_url(self) -> None:
+    async def test_url_check_with_none_official_url(self) -> None:
         """When official_url is None, official_url should be False."""
         c = client()
         auth = {"Authorization": f"Bearer {token(c)}"}
-        opportunity_id = _make_opportunity(official_url=None)
+        opportunity_id = await _make_opportunity(official_url=None)
 
         with patch("app.services.url_is_reachable", return_value=True):
             response = c.get(
@@ -196,11 +198,11 @@ class TestUrlCheckEndpoint:
         assert data["official_url"] is False
         assert data["application_url"] is True
 
-    def test_url_check_with_none_application_url(self) -> None:
+    async def test_url_check_with_none_application_url(self) -> None:
         """When application_url is None, application_url should be False."""
         c = client()
         auth = {"Authorization": f"Bearer {token(c)}"}
-        opportunity_id = _make_opportunity(application_url=None)
+        opportunity_id = await _make_opportunity(application_url=None)
 
         with patch("app.services.url_is_reachable", return_value=True):
             response = c.get(
@@ -213,11 +215,11 @@ class TestUrlCheckEndpoint:
         assert data["official_url"] is True
         assert data["application_url"] is False
 
-    def test_url_check_with_both_none(self) -> None:
+    async def test_url_check_with_both_none(self) -> None:
         """When both URLs are None, both should be False without calling url_is_reachable."""
         c = client()
         auth = {"Authorization": f"Bearer {token(c)}"}
-        opportunity_id = _make_opportunity(official_url=None, application_url=None)
+        opportunity_id = await _make_opportunity(official_url=None, application_url=None)
 
         with patch("app.services.url_is_reachable", return_value=True) as mock_reachable:
             response = c.get(
@@ -232,7 +234,7 @@ class TestUrlCheckEndpoint:
         # url_is_reachable should NOT be called when both URLs are None
         mock_reachable.assert_not_called()
 
-    def test_url_check_returns_404_for_unknown_opportunity(self) -> None:
+    async def test_url_check_returns_404_for_unknown_opportunity(self) -> None:
         """Unknown opportunity id should return 404."""
         c = client()
         auth = {"Authorization": f"Bearer {token(c)}"}

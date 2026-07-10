@@ -104,6 +104,15 @@ class SlidingWindowLimiter:
             self._evict_oldest_if_needed()
             return True
 
+    def clear(self) -> None:
+        """Remove all tracked keys — reset the limiter to its initial state.
+
+        Thread-safe: acquires ``_lock`` before clearing. Intended for test
+        teardown and administrative reset.
+        """
+        with self._lock:
+            self._buckets.clear()
+
     def _evict_oldest_if_needed(self) -> None:
         """Drop the oldest-touched key when the cap is exceeded.
 

@@ -39,14 +39,17 @@ os.environ.setdefault("DISABLE_INPROCESS_CELERY", "1")
 import pytest  # noqa: E402
 
 import app.main as app_main  # noqa: E402
+from app.core.rate_limit import email_login_limiter  # noqa: E402
 
 
 @pytest.fixture(autouse=True)
 def _reset_rate_limit_bucket() -> None:
     """Clear the in-memory rate limit bucket before every test."""
     app_main.app.state.rate_limits.clear()
+    email_login_limiter.clear()
     yield
     app_main.app.state.rate_limits.clear()
+    email_login_limiter.clear()
 
 
 @pytest.fixture

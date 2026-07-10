@@ -140,14 +140,14 @@ class TestUrlIsReachableUsesSyncClient:
 
         close_sync_client()
 
-        with patch("app.services.sync_http_client") as mock_sync_client:
+        with patch("app.core.http_client.sync_http_client") as mock_sync_client:
             mock_client = MagicMock()
             mock_response = MagicMock()
             mock_response.status_code = 200
             mock_client.head.return_value = mock_response
             mock_sync_client.return_value = mock_client
 
-            with patch("app.services.is_public_http_url", return_value=True):
+            with patch("app.services.validation.is_public_http_url", return_value=True):
                 result = services_mod.url_is_reachable("https://example.com/alpha")
 
         assert result is True
@@ -162,14 +162,14 @@ class TestUrlIsReachableUsesSyncClient:
 
         close_sync_client()
 
-        with patch("app.services.sync_http_client") as mock_sync_client:
+        with patch("app.core.http_client.sync_http_client") as mock_sync_client:
             mock_client = MagicMock()
             mock_response = MagicMock()
             mock_response.status_code = 200
             mock_client.head.return_value = mock_response
             mock_sync_client.return_value = mock_client
 
-            with patch("app.services.is_public_http_url", return_value=True):
+            with patch("app.services.validation.is_public_http_url", return_value=True):
                 with patch("httpx.Client") as mock_httpx_client:
                     result = services_mod.url_is_reachable("https://example.com/beta")
 
@@ -185,7 +185,7 @@ class TestUrlIsReachableUsesSyncClient:
 
         close_sync_client()
 
-        with patch("app.services.sync_http_client") as mock_sync_client:
+        with patch("app.core.http_client.sync_http_client") as mock_sync_client:
             mock_client = MagicMock()
             # HEAD returns 405 → fall back to GET
             mock_head_response = MagicMock()
@@ -196,7 +196,7 @@ class TestUrlIsReachableUsesSyncClient:
             mock_client.get.return_value = mock_get_response
             mock_sync_client.return_value = mock_client
 
-            with patch("app.services.is_public_http_url", return_value=True):
+            with patch("app.services.validation.is_public_http_url", return_value=True):
                 result = services_mod.url_is_reachable("https://example.com/gamma")
 
         assert result is True

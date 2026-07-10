@@ -14,6 +14,8 @@ from unittest.mock import patch
 
 import pytest
 
+pytestmark = pytest.mark.asyncio
+
 os.environ["DATABASE_URL"] = "sqlite:///./test_convocaradar.db"
 os.environ["STORAGE_BACKEND"] = "local"
 os.environ["STORAGE_DIR"] = "./test_storage"
@@ -79,7 +81,7 @@ class TestNoNPlusOneSerialization:
     serialization. After removing them, the test should PASS.
     """
 
-    def _make_opportunities(self, count: int = 5) -> None:
+    async def _make_opportunities(self, count: int = 5) -> None:
         """Create test opportunities with URLs, bypassing url_is_reachable."""
         db = SessionLocal()
         try:
@@ -88,9 +90,9 @@ class TestNoNPlusOneSerialization:
             source = db.scalar(select(Source).where(Source.key == "grants-gov"))
             assert source is not None
 
-            with patch("app.services.url_is_reachable", return_value=True):
+            with patch("app.services._legacy.url_is_reachable", return_value=True):
                 for i in range(count):
-                    create_opportunity(
+                    await create_opportunity(
                         db,
                         OpportunityCreate(
                             source_id=source.id,
@@ -111,7 +113,7 @@ class TestNoNPlusOneSerialization:
         finally:
             db.close()
 
-    def test_listing_opportunities_does_not_call_url_is_reachable(self) -> None:
+    async def test_listing_opportunities_does_not_call_url_is_reachable(self) -> None:
         """GET /opportunities should NOT trigger url_is_reachable during serialization.
 
         This is the core N+1 regression test. If the model properties were
@@ -120,7 +122,7 @@ class TestNoNPlusOneSerialization:
         """
         c = client()
         auth = {"Authorization": f"Bearer {token(c)}"}
-        self._make_opportunities(count=5)
+        await self._make_opportunities(count=5)
 
         with patch("app.services.url_is_reachable") as mock_reachable:
             response = c.get("/api/v1/opportunities?page_size=100", headers=auth)
@@ -133,11 +135,11 @@ class TestNoNPlusOneSerialization:
         # the model @properties are triggering HTTP requests.
         mock_reachable.assert_not_called()
 
-    def test_opportunity_detail_does_not_call_url_is_reachable(self) -> None:
+    async def test_opportunity_detail_does_not_call_url_is_reachable(self) -> None:
         """GET /opportunities/{id} should NOT trigger url_is_reachable."""
         c = client()
         auth = {"Authorization": f"Bearer {token(c)}"}
-        self._make_opportunities(count=1)
+        await self._make_opportunities(count=1)
 
         # Grab an opportunity ID from the list
         list_resp = c.get("/api/v1/opportunities?page_size=1", headers=auth)
@@ -150,11 +152,11 @@ class TestNoNPlusOneSerialization:
         assert response.status_code == 200
         mock_reachable.assert_not_called()
 
-    def test_list_100_opportunities_no_nplus1(self) -> None:
+    async def test_list_100_opportunities_no_nplus1(self) -> None:
         """Listing 100 opportunities should complete without HTTP calls."""
         c = client()
         auth = {"Authorization": f"Bearer {token(c)}"}
-        self._make_opportunities(count=100)
+        await self._make_opportunities(count=100)
 
         with patch("app.services.url_is_reachable") as mock_reachable:
             response = c.get("/api/v1/opportunities?page_size=100", headers=auth)

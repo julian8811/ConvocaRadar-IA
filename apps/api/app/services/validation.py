@@ -193,15 +193,21 @@ def validate_source_url(source: object) -> None:
 
 @lru_cache(maxsize=4096)
 def url_is_reachable(url: str) -> bool:
-    """Check if a URL is reachable via HTTP HEAD/GET."""
+    """Check if a URL is reachable via HTTP HEAD/GET.
+
+    Uses the global sync HTTPX client for connection pooling.
+    """
     if not is_public_http_url(url):
         return False
     try:
-        with httpx.Client(follow_redirects=True, timeout=5.0, headers={"User-Agent": "ConvocaRadar/1.0"}) as client:
-            response = client.head(url)
-            if response.status_code in {405, 501}:
-                response = client.get(url)
-            return 200 <= response.status_code < 400
+        from app.core.http_client import sync_http_client
+
+        client = sync_http_client()
+        headers = {"User-Agent": "ConvocaRadar/1.0"}
+        response = client.head(url, follow_redirects=True, timeout=5.0, headers=headers)
+        if response.status_code in {405, 501}:
+            response = client.get(url, follow_redirects=True, timeout=5.0, headers=headers)
+        return 200 <= response.status_code < 400
     except httpx.HTTPError:
         return False
 
