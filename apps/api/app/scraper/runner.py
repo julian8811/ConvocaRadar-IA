@@ -11,6 +11,7 @@ from datetime import UTC, datetime
 from app.core.config import get_settings
 from app.models import Source, SourceRun, Task
 from app.schemas import OpportunityCreate
+from app.scraper.dom_monitor import compute_dom_hash
 from app.services import (
     candidate_external_id,
     create_opportunity,
@@ -50,6 +51,8 @@ async def _scrape_candidates(
         stats["raw_url"] = raw.url
         stats["raw_content_type"] = raw.content_type
         stats["raw_content_length"] = len(raw.content or "")
+        # Change D: compute DOM hash from raw page content
+        stats["dom_hash"] = compute_dom_hash(raw.content or "")
     candidates = await connector.parse(raw)
     if not candidates and source.key in {
         "grants-gov",
@@ -185,6 +188,11 @@ async def run_source_inline(
         opportunities = await _scrape_source_candidates_with_timeout(
             source, scrape_stats
         )
+        # Change D: update DOM hash and item count after parsing list page
+        _update_dom_hash(source, run, scrape_stats)
+        items_parsed = scrape_stats.get("candidates_parsed")
+        if isinstance(items_parsed, int):
+            source.last_item_count = items_parsed
         # Progress: fetch + parse complete
         _set_progress(run, {"fetch": _now(), "parse": _now()})
         db.flush()
@@ -270,6 +278,21 @@ async def run_source_inline(
                     "consecutive empty runs"
                 ),
             })
+        # Change D: track selector failures and auto-pause
+        if len(opportunities) == 0:
+            source.selector_failures = (source.selector_failures or 0) + 1
+        else:
+            source.selector_failures = 0
+        if (source.selector_failures or 0) >= 3:
+            source.auto_paused = True
+            run.logs.append({
+                "level": "warn",
+                "message": (
+                    f"Source auto-paused after {source.selector_failures} "
+                    "consecutive selector failures"
+                ),
+            })
+        db.flush()
     except asyncio.CancelledError:
         finished_at = datetime.now(UTC).replace(tzinfo=None)
         run.status = "failed"
@@ -317,3 +340,41 @@ def _set_progress(run: SourceRun, updates: dict[str, str]) -> None:
     current = dict(run.progress or {})
     current.update(updates)
     run.progress = current
+
+
+def _update_dom_hash(
+    source: Source,
+    run: SourceRun,
+    stats: dict[str, object],
+) -> None:
+    """Update source DOM hash from scrape stats and log changes.
+
+    Uses ``stats["dom_hash"]`` (computed during ``_scrape_candidates``) to
+    update the source's ``dom_hash``. If the hash has changed (or this is
+    the first scrape), logs a structural change warning.
+
+    Must be called after ``_scrape_source_candidates_with_timeout`` and
+    before ``db.flush()`` so the changes to ``source`` are persisted.
+    """
+    new_hash = stats.get("dom_hash")
+    if not isinstance(new_hash, str):
+        return
+
+    old_hash = source.dom_hash
+    source.dom_hash = new_hash
+
+    if old_hash is None:
+        run.logs.append({
+            "level": "info",
+            "message": "DOM hash recorded for the first time",
+            "dom_hash": new_hash[:16],
+        })
+    elif old_hash != new_hash:
+        source.dom_hash_changed_at = datetime.now(UTC).replace(tzinfo=None)
+        run.logs.append({
+            "level": "warn",
+            "message": "DOM hash changed — page structure may have changed",
+            "old_hash_prefix": old_hash[:16],
+            "new_hash_prefix": new_hash[:16],
+        })
+

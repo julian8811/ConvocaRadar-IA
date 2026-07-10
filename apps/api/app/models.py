@@ -169,6 +169,11 @@ class Source(Base):
     tier: Mapped[str | None] = mapped_column(String, nullable=True)  # "strategic", "complementary", "experimental"
     auto_paused: Mapped[bool] = mapped_column(Boolean, default=False)
     consecutive_empty_runs: Mapped[int] = mapped_column(Integer, default=0)
+    # Change D: DOM monitoring fields
+    dom_hash: Mapped[str | None] = mapped_column(String, nullable=True)
+    dom_hash_changed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
+    last_item_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
+    selector_failures: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
 
