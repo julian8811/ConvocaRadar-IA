@@ -243,6 +243,20 @@ async def run_source_inline(
                 source,
                 reason="no se detectaron oportunidades nuevas en la ultima corrida",
             )
+    except asyncio.CancelledError:
+        finished_at = datetime.now(UTC).replace(tzinfo=None)
+        run.status = "failed"
+        run.finished_at = finished_at
+        run.error_message = "Scrape cancelled (shutdown or timeout)"
+        run.logs = [
+            *run.logs,
+            {"level": "error", "message": "Scrape cancelled"},
+        ]
+        task.status = "failed"
+        task.finished_at = finished_at
+        task.error_message = "Scrape cancelled"
+        source.last_error = "Scrape cancelled"
+        raise  # Re-raise so the scheduler knows this task was cancelled
     except Exception as exc:
         finished_at = datetime.now(UTC).replace(tzinfo=None)
         run.status = "failed"

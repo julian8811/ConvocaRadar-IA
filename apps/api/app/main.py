@@ -78,6 +78,12 @@ async def _run_periodic_source_sweep(interval_seconds: int = 1800) -> None:
 
             db = SessionLocal()
             try:
+                # Recover stale runs before starting new sweeps
+                from app.scraper.recovery import mark_stale_runs_failed as _recover
+
+                _recovered = _recover(db)
+                if _recovered:
+                    struct_logger.info("stale_runs_recovered", count=_recovered)
                 orgs = db.scalars(select(Organization)).all()
                 if orgs:
                     sources = list(
