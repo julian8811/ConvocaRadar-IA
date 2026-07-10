@@ -12,6 +12,113 @@ from sqlalchemy.orm import Session
 from app.core.ai import build_embedding, cosine_similarity
 from app.models import Opportunity, OpportunityScore, OrganizationProfile, Priority
 
+# ── Source health score (Change C) ───────────────────────────────────────────
+
+
+def _normalize_avg_items(avg_items_found: float) -> float:
+    """Normalize avg_items_found (0+) to a 0-100 scale.
+
+    Caps at 50 items for a full score. Below that, scales linearly.
+    """
+    if avg_items_found <= 0:
+        return 0.0
+    return min(avg_items_found / 50.0 * 100.0, 100.0)
+
+
+def _normalize_freshness(freshness_days: int | None) -> float:
+    """Normalize freshness (days since last success) to a 0-100 scale.
+
+    0-1 days   → 100
+    2-7 days   → 80
+    8-30 days  → 50
+    31-90 days → 20
+    >90 days   → 0
+    None       → 0
+    """
+    if freshness_days is None:
+        return 0.0
+    if freshness_days <= 1:
+        return 100.0
+    if freshness_days <= 7:
+        return 80.0
+    if freshness_days <= 30:
+        return 50.0
+    if freshness_days <= 90:
+        return 20.0
+    return 0.0
+
+
+def calculate_source_health_score(
+    *,
+    success_rate: float,         # 0-100, weight 30%
+    avg_items_found: float,      # 0+, weight 20%
+    close_date_coverage: float,  # 0-100, weight 15%
+    amount_coverage: float,      # 0-100, weight 10%
+    url_coverage: float,         # 0-100, weight 10%
+    freshness_days: int | None,  # days since last success, weight 10%
+    selector_stability: float,   # 0-100, weight 5%
+) -> int:
+    """Calculate a 0-100 health score for a source.
+
+    Each metric is on a 0-100 scale (or normalized to it). The weighted
+    sum produces the final score, clamped to [0, 100] and rounded to int.
+
+    Weights:
+    - success_rate: 30%
+    - avg_items_found: 20% (normalized from unbounded 0+)
+    - close_date_coverage: 15%
+    - amount_coverage: 10%
+    - url_coverage: 10%
+    - freshness_days: 10% (decay curve)
+    - selector_stability: 5%
+    """
+    normalized_avg = _normalize_avg_items(avg_items_found)
+    normalized_freshness = _normalize_freshness(freshness_days)
+
+    raw = (
+        (success_rate * 0.30)
+        + (normalized_avg * 0.20)
+        + (close_date_coverage * 0.15)
+        + (amount_coverage * 0.10)
+        + (url_coverage * 0.10)
+        + (normalized_freshness * 0.10)
+        + (selector_stability * 0.05)
+    )
+    return max(0, min(100, round(raw)))
+
+
+def health_status_for_score(score: int) -> str:
+    """Map a 0-100 health score to a status label.
+
+    - 90-100: "healthy"
+    - 70-89: "stable"
+    - 50-69: "degraded"
+    - <50: "critical"
+    """
+    if score >= 90:
+        return "healthy"
+    if score >= 70:
+        return "stable"
+    if score >= 50:
+        return "degraded"
+    return "critical"
+
+
+def update_consecutive_empty_runs(items_found: int, current_count: int) -> int:
+    """Update consecutive_empty_runs count.
+
+    If items_found == 0, increment. Otherwise reset to 0.
+    """
+    return current_count + 1 if items_found == 0 else 0
+
+
+def should_auto_pause(new_count: int) -> bool:
+    """Check if the source should be auto-paused (>= 3 consecutive empty runs)."""
+    return new_count >= 3
+
+
+# ── Opportunity scoring (existing) ─────────────────────────────────────────
+
 
 def priority_for_score(score: float) -> str:
     """Map a numeric score to a priority label."""
