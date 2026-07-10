@@ -229,7 +229,7 @@ export default function OnboardingPage() {
                 <Input
                   name="min_funding_amount"
                   type="number"
-                  defaultValue={profileData.min_funding_amount ?? ""}
+                  defaultValue={String(profileData.min_funding_amount ?? "")}
                   placeholder="Ej: 50000"
                 />
               </div>
