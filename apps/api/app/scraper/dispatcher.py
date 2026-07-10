@@ -36,6 +36,10 @@ async def run_source(
     and an Arq job is enqueued (fire-and-forget). Otherwise the scrape runs
     inline via ``run_source_inline``.
     """
+    # Change C: skip auto-paused sources
+    if source.auto_paused:
+        return None
+
     # Check for an existing running run for this source
     existing = db.scalar(
         select(SourceRun).where(

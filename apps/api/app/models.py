@@ -165,6 +165,10 @@ class Source(Base):
     last_run_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     last_success_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Change C: health score & quality gate fields
+    tier: Mapped[str | None] = mapped_column(String, nullable=True)  # "strategic", "complementary", "experimental"
+    auto_paused: Mapped[bool] = mapped_column(Boolean, default=False)
+    consecutive_empty_runs: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
 
