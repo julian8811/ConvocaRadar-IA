@@ -15,6 +15,7 @@ from sqlalchemy.exc import SQLAlchemyError
 from app.api.v1.router import api_router
 from app.connectors.health_check import check_playwright_binary, check_pypdf_import
 from app.core.config import check_production_sqlite, get_settings
+from app.core.http_client import close_async_client, close_sync_client, http_client
 from app.core.logging import configure_logging
 from app.db.bootstrap import ensure_bootstrap_data
 from app.db.session import create_all
@@ -152,6 +153,10 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     check_playwright_binary()
     check_pypdf_import()
 
+    # Pre-warm the shared HTTPX client singletons for connection pooling.
+    # The call is lazy — it creates the client if not yet initialized.
+    await http_client()
+
     # Background scheduler: every 30 minutes, run all enabled sources
     # via an asyncio loop instead of a Celery beat schedule.
     import asyncio
@@ -160,6 +165,13 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         yield
     finally:
         scheduler_task.cancel()
+        # Gracefully release pooled connections on shutdown.
+        # close_sync_client is sync + blocking (TCP teardown); offload to
+        # a thread so it doesn't block the async lifespan handler.
+        import asyncio
+
+        await close_async_client()
+        await asyncio.to_thread(close_sync_client)
 
 
 app = FastAPI(title=settings.app_name, version="0.1.0", lifespan=lifespan)
