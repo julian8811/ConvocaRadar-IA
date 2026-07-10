@@ -242,8 +242,8 @@ def _source_health(db: Session, source: Source, raw_recent_runs: list[SourceRun]
         last_run_status=last_run_status,
         health_score=health_score,
         health_status=health_status,
-        tier=source.tier,
-        auto_paused=source.auto_paused,
+        tier=getattr(source, "tier", None),
+        auto_paused=getattr(source, "auto_paused", False),
     )
 
 

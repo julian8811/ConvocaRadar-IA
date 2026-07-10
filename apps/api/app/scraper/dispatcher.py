@@ -37,7 +37,7 @@ async def run_source(
     inline via ``run_source_inline``.
     """
     # Change C: skip auto-paused sources
-    if source.auto_paused:
+    if getattr(source, "auto_paused", False):
         return None
 
     # Check for an existing running run for this source
