@@ -13,6 +13,6 @@ for _pw_cache in "/opt/render/.cache/ms-playwright" "/root/.cache/ms-playwright"
     fi
 done
 # Run Alembic migrations at startup (idempotent — only new ones apply)
-alembic upgrade head 2>/dev/null || echo "Migration warning (non-fatal)"
+alembic upgrade head 2>&1 || echo "Migration warning (non-fatal)"
 
 exec uvicorn app.main:app --host 0.0.0.0 --port "${PORT:-8000}"
