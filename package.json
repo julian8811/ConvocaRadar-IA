@@ -7,6 +7,9 @@
     "apps/web",
     "packages/*"
   ],
+  "dependencies": {
+    "@tailwindcss/oxide-linux-x64-gnu": "^4.3.1"
+  },
   "scripts": {
     "dev:web": "pnpm --filter @convocaradar/web dev",
     "build:web": "pnpm --filter @convocaradar/web build",
