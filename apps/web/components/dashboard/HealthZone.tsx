@@ -15,13 +15,15 @@
 "use client";
 
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
-import { AlertTriangle, Database, MapPinned, TrendingUp } from "lucide-react";
+import { Activity, AlertTriangle, Database, MapPinned, TrendingUp } from "lucide-react";
 import Link from "next/link";
 
+import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { ErrorState } from "@/components/ui/state";
 import { api } from "@/lib/api";
 import type { DashboardDataCoverage, HealthRead, SourceHealth } from "@/lib/types";
+import { cn } from "@/lib/utils";
 import { HealthSkeleton } from "@/components/dashboard/skeletons/HealthSkeleton";
 import {
   StatusChart,
@@ -136,6 +138,66 @@ function DataCoverageStrip({ dataCoverage }: { dataCoverage: DashboardDataCovera
   );
 }
 
+function healthColor(score: number): string {
+  if (score >= 90) return "bg-emerald-500";
+  if (score >= 70) return "bg-amber-400";
+  if (score >= 50) return "bg-orange-500";
+  return "bg-red-500";
+}
+
+function healthLabel(status: string): string {
+  const map: Record<string, string> = {
+    healthy: "Saludable",
+    stable: "Estable",
+    degraded: "Degradada",
+    critical: "Crítica",
+  };
+  return map[status] ?? status;
+}
+
+function SourceHealthTable({ sources }: { sources: SourceHealth[] }) {
+  if (!sources.length) return null;
+  const sorted = [...sources].sort((a, b) => (b.health_score ?? 0) - (a.health_score ?? 0));
+  return (
+    <Card>
+      <CardHeader className="border-b border-slate-200 pb-4 dark:border-slate-700">
+        <CardTitle className="flex items-center gap-2 text-slate-950 dark:text-white">
+          <Activity className="h-4 w-4" />
+          Salud de fuentes
+        </CardTitle>
+        <CardDescription>Puntaje de salud compuesto (0-100) basado en tasa de éxito, cobertura y frescura.</CardDescription>
+      </CardHeader>
+      <CardContent className="p-0">
+        <div className="divide-y divide-slate-200 dark:divide-slate-800">
+          {sorted.map((s) => (
+            <div key={s.source_id} className="flex items-center gap-4 px-4 py-3 text-sm hover:bg-slate-50 dark:hover:bg-slate-900/50">
+              <div className="flex h-8 w-8 items-center justify-center" title={`Score: ${s.health_score}`}>
+                <div className={cn("h-2.5 w-2.5 rounded-full", healthColor(s.health_score))} />
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="truncate font-medium text-slate-950 dark:text-white">{s.name}</p>
+                <p className="truncate text-xs text-slate-500 dark:text-slate-400">{s.key}</p>
+              </div>
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold tabular-nums text-slate-700 dark:text-slate-300">{s.health_score}</span>
+                <span className="hidden text-xs text-slate-400 sm:inline">{healthLabel(s.health_status)}</span>
+                {s.tier && (
+                  <Badge variant="outline" className="text-[10px] uppercase tracking-wider">
+                    {s.tier === "strategic" ? "Estratégica" : s.tier === "complementary" ? "Complementaria" : "Experimental"}
+                  </Badge>
+                )}
+                {s.auto_paused && (
+                  <Badge variant="destructive" className="text-[10px]">Pausada</Badge>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
 export function HealthZone() {
   const query = useQuery<HealthRead>({
     queryKey: ["dashboard-health"],
@@ -243,9 +305,8 @@ export function HealthZone() {
         </Card>
       </div>
 
+      <SourceHealthTable sources={data.sources_health as SourceHealth[]} />
       <DataCoverageStrip dataCoverage={data.data_coverage} />
-      {/* Suppress unused-import warnings for types we re-export indirectly. */}
-      <span className="hidden" data-source-health-count={(data.sources_health as SourceHealth[]).length} />
     </div>
   );
 }
