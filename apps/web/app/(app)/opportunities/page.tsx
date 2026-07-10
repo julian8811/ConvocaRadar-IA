@@ -132,6 +132,7 @@ export default function OpportunitiesPage() {
     },
   });
 
+  // eslint-disable-next-line react-hooks/preserve-manual-memoization
   const items = useMemo(() => sortItems(opportunities.data?.items ?? []), [opportunities.data?.items]);
   const total = opportunities.data?.total ?? 0;
   const totalPages = Math.max(Math.ceil(total / pageSize), 1);
