@@ -102,15 +102,15 @@ function TagSelector({
 }
 
 export default function OnboardingPage() {
-  const profile = useQuery({ queryKey: ["profile"], queryFn: api.profile });
-  const organization = useQuery({ queryKey: ["organization"], queryFn: api.organization });
+  const profile = useQuery<Record<string, unknown>>({ queryKey: ["profile"], queryFn: api.profile });
+  const organization = useQuery<{ name: string; country: string; type: string }>({ queryKey: ["organization"], queryFn: api.organization });
   const save = useMutation({
     mutationFn: api.updateProfile,
     onSuccess: () => toast.success("Perfil institucional actualizado"),
   });
 
   const profileData = profile.data ?? {};
-  const orgData = organization.data ?? { name: "", country: "" };
+  const orgData = organization.data ?? { name: "", country: "", type: "" };
 
   // Hooks must be called unconditionally — before any early return
   const [areas, setAreas] = React.useState<string[]>(Array.isArray(profileData.areas_of_interest) ? profileData.areas_of_interest : []);
