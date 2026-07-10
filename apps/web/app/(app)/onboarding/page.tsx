@@ -110,7 +110,7 @@ export default function OnboardingPage() {
   });
 
   const profileData = profile.data ?? {};
-  const orgData = organization.data ?? {};
+  const orgData = organization.data ?? { name: "", country: "" };
 
   // Hooks must be called unconditionally — before any early return
   const [areas, setAreas] = React.useState<string[]>(Array.isArray(profileData.areas_of_interest) ? profileData.areas_of_interest : []);
