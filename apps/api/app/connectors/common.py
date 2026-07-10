@@ -13,6 +13,20 @@ import httpx
 from app.core.config import get_settings
 from app.core.http_client import http_client
 
+# Lazily-imported domain budget singleton — resolved at call time to
+# avoid circular imports during app bootstrap.
+_DOMAIN_BUDGET: object | None = None
+
+
+def _get_budget():
+    """Return the module-level DomainBudgetManager singleton."""
+    global _DOMAIN_BUDGET
+    if _DOMAIN_BUDGET is None:
+        from app.scraper.domain_budget import DomainBudgetManager
+
+        _DOMAIN_BUDGET = DomainBudgetManager()
+    return _DOMAIN_BUDGET
+
 CHROMIUM_CONTAINER_ARGS = ["--no-sandbox", "--disable-dev-shm-usage"]
 PLAYWRIGHT_BLOCKED_RESOURCE_TYPES = {"image", "media", "font"}
 BROWSER_UA = (
@@ -43,49 +57,63 @@ async def render_page_html(
         raise ValueError(f"Blocked unsafe URL: {url}")
     request_user_agent = user_agent or settings.scraping_user_agent
     navigation_timeout_ms = timeout_ms or settings.scraping_timeout_seconds * 1000
+
+    # Per-domain budget for Playwright — max 1 concurrent Playwright session
+    _budget = _get_budget()
+    _pw_budget_acquired = _budget.acquire("playwright")
+    if not _pw_budget_acquired:
+        raise RuntimeError(
+            f"Playwright budget exhausted for {url} — "
+            "max 1 concurrent Playwright session"
+        )
+
     from playwright.async_api import async_playwright
 
-    for attempt in range(2):
-        try:
-            async with async_playwright() as playwright:
-                browser = await launch_chromium(playwright)
-                try:
-                    page = await browser.new_page(user_agent=request_user_agent)
+    try:
+        for attempt in range(2):
+            try:
+                async with async_playwright() as playwright:
+                    browser = await launch_chromium(playwright)
+                    try:
+                        page = await browser.new_page(user_agent=request_user_agent)
 
-                    async def _route_handler(route) -> None:
-                        if route.request.resource_type in PLAYWRIGHT_BLOCKED_RESOURCE_TYPES:
-                            await route.abort()
-                            return
-                        await route.continue_()
+                        async def _route_handler(route) -> None:
+                            if route.request.resource_type in PLAYWRIGHT_BLOCKED_RESOURCE_TYPES:
+                                await route.abort()
+                                return
+                            await route.continue_()
 
-                    await page.route("**/*", _route_handler)
-                    await page.goto(url, wait_until=wait_until, timeout=navigation_timeout_ms)
-                    if wait_selector:
-                        try:
-                            await page.wait_for_selector(wait_selector, timeout=wait_selector_timeout_ms)
-                        except Exception:
-                            pass
-                    if post_wait_ms > 0:
-                        await page.wait_for_timeout(post_wait_ms)
-                    final_url = page.url
-                    if _is_private_host(urlparse(final_url).hostname or ""):
-                        raise ValueError(f"Blocked redirect to unsafe URL: {final_url}")
-                    return final_url, await page.content(), "text/html"
-                finally:
-                    await browser.close()
-        except Exception as exc:
-            if attempt == 0 and "Executable doesn't exist" in str(exc):
-                import subprocess, sys as _sys
-                _sys.stdout.flush()
-                subprocess.run(
-                    [_sys.executable, "-m", "playwright", "install", "chromium", "chromium-headless-shell"],
-                    capture_output=True, timeout=180,
-                )
-                continue
-            raise RuntimeError(
-                f"Playwright/Chromium not available: {exc}. "
-                "Install with: playwright install chromium"
-            ) from exc
+                        await page.route("**/*", _route_handler)
+                        await page.goto(url, wait_until=wait_until, timeout=navigation_timeout_ms)
+                        if wait_selector:
+                            try:
+                                await page.wait_for_selector(wait_selector, timeout=wait_selector_timeout_ms)
+                            except Exception:
+                                pass
+                        if post_wait_ms > 0:
+                            await page.wait_for_timeout(post_wait_ms)
+                        final_url = page.url
+                        if _is_private_host(urlparse(final_url).hostname or ""):
+                            raise ValueError(f"Blocked redirect to unsafe URL: {final_url}")
+                        return final_url, await page.content(), "text/html"
+                    finally:
+                        await browser.close()
+            except Exception as exc:
+                if attempt == 0 and "Executable doesn't exist" in str(exc):
+                    import subprocess, sys as _sys
+                    _sys.stdout.flush()
+                    subprocess.run(
+                        [_sys.executable, "-m", "playwright", "install", "chromium", "chromium-headless-shell"],
+                        capture_output=True, timeout=180,
+                    )
+                    continue
+                raise RuntimeError(
+                    f"Playwright/Chromium not available: {exc}. "
+                    "Install with: playwright install chromium"
+                ) from exc
+    finally:
+        if _pw_budget_acquired:
+            _budget.release("playwright")
 
 
 def clean_text(value: str | None) -> str:
@@ -380,36 +408,52 @@ async def fetch_httpx_text(
     if parsed_url.scheme not in {"http", "https"} or _is_private_host(parsed_url.hostname or ""):
         raise ValueError(f"Blocked unsafe URL: {url}")
     request_timeout = timeout_seconds or settings.scraping_timeout_seconds
-    last_error: Exception | None = None
-    for attempt in range(max(retries, 1)):
-        try:
-            client = await http_client()
-            response = await client.request(
-                method,
-                url,
-                json=payload,
-                timeout=request_timeout,
-                headers=request_headers,
-                follow_redirects=True,
-            )
-            if _is_private_host(urlparse(str(response.url)).hostname or ""):
-                raise ValueError(f"Blocked redirect to unsafe URL: {response.url}")
-            response.raise_for_status()
-            content_type = response.headers.get("content-type", fallback_content_type)
-            return str(response.url), response.text, content_type
-        except Exception as exc:  # pragma: no cover - network fallback path
-            last_error = exc
-            if attempt + 1 >= retries:
-                break
-    if not playwright_fallback:
-        raise last_error or RuntimeError(f"Failed to fetch {url}")
-    if _is_private_host(parsed_url.hostname or ""):
-        raise last_error or ValueError(f"Blocked unsafe URL: {url}")
-    return await render_page_html(
-        url,
-        user_agent=request_headers["User-Agent"],
-        timeout_ms=request_timeout * 1000,
-    )
+
+    # Per-domain budget check
+    _budget = _get_budget()
+    _delay = _budget.delay_for(url)
+    if _delay > 0:
+        import asyncio as _asyncio
+
+        await _asyncio.sleep(_delay)
+    _budget_acquired = _budget.acquire(url)
+    if not _budget_acquired:
+        raise RuntimeError(f"Domain budget exhausted for {url}")
+
+    try:
+        last_error: Exception | None = None
+        for attempt in range(max(retries, 1)):
+            try:
+                client = await http_client()
+                response = await client.request(
+                    method,
+                    url,
+                    json=payload,
+                    timeout=request_timeout,
+                    headers=request_headers,
+                    follow_redirects=True,
+                )
+                if _is_private_host(urlparse(str(response.url)).hostname or ""):
+                    raise ValueError(f"Blocked redirect to unsafe URL: {response.url}")
+                response.raise_for_status()
+                content_type = response.headers.get("content-type", fallback_content_type)
+                return str(response.url), response.text, content_type
+            except Exception as exc:  # pragma: no cover - network fallback path
+                last_error = exc
+                if attempt + 1 >= retries:
+                    break
+        if not playwright_fallback:
+            raise last_error or RuntimeError(f"Failed to fetch {url}")
+        if _is_private_host(parsed_url.hostname or ""):
+            raise last_error or ValueError(f"Blocked unsafe URL: {url}")
+        return await render_page_html(
+            url,
+            user_agent=request_headers["User-Agent"],
+            timeout_ms=request_timeout * 1000,
+        )
+    finally:
+        if _budget_acquired:
+            _budget.release(url)
 
 
 async def fetch_httpx_bytes(
@@ -430,25 +474,41 @@ async def fetch_httpx_bytes(
     parsed_url = urlparse(url)
     if parsed_url.scheme not in {"http", "https"} or _is_private_host(parsed_url.hostname or ""):
         raise ValueError(f"Blocked unsafe URL: {url}")
-    last_error: Exception | None = None
-    for attempt in range(max(retries, 1)):
-        try:
-            client = await http_client()
-            response = await client.request(
-                method,
-                url,
-                json=payload,
-                timeout=settings.scraping_timeout_seconds,
-                headers=request_headers,
-                follow_redirects=True,
-            )
-            if _is_private_host(urlparse(str(response.url)).hostname or ""):
-                raise ValueError(f"Blocked redirect to unsafe URL: {response.url}")
-            response.raise_for_status()
-            content_type = response.headers.get("content-type", fallback_content_type)
-            return str(response.url), response.content, content_type
-        except Exception as exc:  # pragma: no cover - network fallback path
-            last_error = exc
-            if attempt + 1 >= retries:
-                break
-    raise last_error or RuntimeError(f"Failed to fetch {url}")
+
+    # Per-domain budget check
+    _budget = _get_budget()
+    _delay = _budget.delay_for(url)
+    if _delay > 0:
+        import asyncio as _asyncio
+
+        await _asyncio.sleep(_delay)
+    _budget_acquired = _budget.acquire(url)
+    if not _budget_acquired:
+        raise RuntimeError(f"Domain budget exhausted for {url}")
+
+    try:
+        last_error: Exception | None = None
+        for attempt in range(max(retries, 1)):
+            try:
+                client = await http_client()
+                response = await client.request(
+                    method,
+                    url,
+                    json=payload,
+                    timeout=settings.scraping_timeout_seconds,
+                    headers=request_headers,
+                    follow_redirects=True,
+                )
+                if _is_private_host(urlparse(str(response.url)).hostname or ""):
+                    raise ValueError(f"Blocked redirect to unsafe URL: {response.url}")
+                response.raise_for_status()
+                content_type = response.headers.get("content-type", fallback_content_type)
+                return str(response.url), response.content, content_type
+            except Exception as exc:  # pragma: no cover - network fallback path
+                last_error = exc
+                if attempt + 1 >= retries:
+                    break
+        raise last_error or RuntimeError(f"Failed to fetch {url}")
+    finally:
+        if _budget_acquired:
+            _budget.release(url)
