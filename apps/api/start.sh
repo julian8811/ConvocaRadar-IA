@@ -12,8 +12,4 @@ for _pw_cache in "/opt/render/.cache/ms-playwright" "/root/.cache/ms-playwright"
         break
     fi
 done
-# Run Alembic migrations at startup (idempotent — only new ones apply)
-# Try alembic CLI first, fall back to Python entry point on Render
-alembic upgrade head 2>/dev/null || python -m alembic upgrade head 2>/dev/null || echo "Migration skipped (non-fatal)"
-
 exec uvicorn app.main:app --host 0.0.0.0 --port "${PORT:-8000}"
