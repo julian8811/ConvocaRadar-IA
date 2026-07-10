@@ -52,5 +52,6 @@ jobs:
           DATABASE_URL: sqlite:///./ci_convocaradar.db
           JWT_SECRET: ci_jwt_secret_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
           INTERNAL_API_KEY: ci_internal_api_key_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+          BOOTSTRAP_SOURCES_ON_STARTUP: "false"
 
 
