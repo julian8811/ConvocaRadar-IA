@@ -109,11 +109,17 @@ export default function OnboardingPage() {
     onSuccess: () => toast.success("Perfil institucional actualizado"),
   });
 
-  if (profile.isLoading || organization.isLoading) return <LoadingState label="Cargando perfil" />;
-  if (profile.error) return <ErrorState message={profile.error.message} />;
-
   const profileData = profile.data ?? {};
   const orgData = organization.data ?? {};
+
+  // Hooks must be called unconditionally — before any early return
+  const [areas, setAreas] = React.useState<string[]>(Array.isArray(profileData.areas_of_interest) ? profileData.areas_of_interest : []);
+  const [fundingTypes, setFundingTypes] = React.useState<string[]>(Array.isArray(profileData.funding_types) ? profileData.funding_types : []);
+  const [currencies, setCurrencies] = React.useState<string[]>(Array.isArray(profileData.preferred_currencies) ? profileData.preferred_currencies : ["COP", "USD"]);
+  const [regions, setRegions] = React.useState<string[]>(Array.isArray(profileData.regions_of_interest) ? profileData.regions_of_interest : ["LatAm"]);
+
+  if (profile.isLoading || organization.isLoading) return <LoadingState label="Cargando perfil" />;
+  if (profile.error) return <ErrorState message={profile.error.message} />;
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -134,11 +140,6 @@ export default function OnboardingPage() {
       application_capacity: form.get("application_capacity") || "medium",
     });
   }
-
-  const [areas, setAreas] = React.useState<string[]>(Array.isArray(profileData.areas_of_interest) ? profileData.areas_of_interest : []);
-  const [fundingTypes, setFundingTypes] = React.useState<string[]>(Array.isArray(profileData.funding_types) ? profileData.funding_types : []);
-  const [currencies, setCurrencies] = React.useState<string[]>(Array.isArray(profileData.preferred_currencies) ? profileData.preferred_currencies : ["COP", "USD"]);
-  const [regions, setRegions] = React.useState<string[]>(Array.isArray(profileData.regions_of_interest) ? profileData.regions_of_interest : ["LatAm"]);
 
   return (
     <section className="space-y-6">
