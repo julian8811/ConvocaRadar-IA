@@ -8,6 +8,7 @@ from selectolax.parser import HTMLParser, Node
 
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
 from app.connectors.common import clean_text, fetch_httpx_text, launch_chromium, parse_date_text
+from app.connectors.registry import register
 
 
 INNPULSA_API_URL = "https://convocatorias.innpulsacolombia.com/api/convocatorias?active_only=false&include_private=false&include_archive=false"
@@ -42,6 +43,7 @@ def _is_past(date_value: datetime | None) -> bool:
     return bool(date_value and date_value.date() < datetime.now(UTC).date())
 
 
+@register("innpulsa")
 class InnpulsaConnector:
     source_key = "innpulsa"
 
