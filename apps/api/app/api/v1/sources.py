@@ -16,9 +16,13 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_organization, get_current_user
 from app.db.seed import seed_default_sources
 from app.db.session import get_db, SessionLocal
-from app.models import Organization, Source, SourceRun, User
+from app.models import Opportunity, Organization, Source, SourceRun, User
 from app.schemas import SourceCreate, SourceHealthRead, SourceRead, SourceRunRead, SourceUpdate
 from app.services import audit, execute_source_run_locally, source_due_for_scraping, validate_source_url
+from app.services.scoring import (
+    calculate_source_health_score,
+    health_status_for_score,
+)
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -69,6 +73,44 @@ def _days_since_last_success(recent_runs: list[SourceRun], source: Source) -> in
     if not success_at:
         return None
     return max((datetime.now(UTC).replace(tzinfo=None) - success_at).days, 0)
+
+
+def _source_coverage_ratios(db: Session, source_id: str) -> tuple[float, float, float]:
+    """Compute close_date, amount, and URL coverage ratios for a source.
+
+    Returns ``(close_date_coverage, amount_coverage, url_coverage)`` each
+    as a percentage (0.0–100.0). Returns all zeros when the source has no
+    opportunities.
+    """
+    opportunity_scope = Opportunity.source_id == source_id
+    total_opps = db.scalar(
+        select(func.count()).select_from(Opportunity).where(opportunity_scope)
+    ) or 0
+    if total_opps == 0:
+        return 0.0, 0.0, 0.0
+    with_close_date = (
+        db.scalar(
+            select(func.count()).select_from(Opportunity)
+            .where(opportunity_scope, Opportunity.close_date.is_not(None))
+        ) or 0
+    )
+    with_amount = (
+        db.scalar(
+            select(func.count()).select_from(Opportunity)
+            .where(opportunity_scope, Opportunity.funding_amount_value.is_not(None))
+        ) or 0
+    )
+    with_url = (
+        db.scalar(
+            select(func.count()).select_from(Opportunity)
+            .where(opportunity_scope, Opportunity.official_url.is_not(None))
+        ) or 0
+    )
+    return (
+        round((with_close_date / total_opps) * 100, 2),
+        round((with_amount / total_opps) * 100, 2),
+        round((with_url / total_opps) * 100, 2),
+    )
 
 
 @router.get("/sources", response_model=list[SourceRead])
@@ -163,6 +205,21 @@ def _source_health(db: Session, source: Source, raw_recent_runs: list[SourceRun]
         status = "degraded"
     else:
         status = "healthy"
+
+    # Change C: compute coverage percentages from the source's opportunities
+    close_date_coverage, amount_coverage, url_coverage = _source_coverage_ratios(db, source.id)
+
+    health_score = calculate_source_health_score(
+        success_rate=success_rate,
+        avg_items_found=average_items_found,
+        close_date_coverage=close_date_coverage,
+        amount_coverage=amount_coverage,
+        url_coverage=url_coverage,
+        freshness_days=days_since_last_success,
+        selector_stability=success_rate,  # reuse success_rate as a selector stability proxy
+    )
+    health_status = health_status_for_score(health_score)
+
     return SourceHealthRead(
         source_id=source.id,
         key=source.key,
@@ -183,6 +240,10 @@ def _source_health(db: Session, source: Source, raw_recent_runs: list[SourceRun]
         last_run_duration_seconds=last_run_duration_seconds,
         days_since_last_success=days_since_last_success,
         last_run_status=last_run_status,
+        health_score=health_score,
+        health_status=health_status,
+        tier=source.tier,
+        auto_paused=source.auto_paused,
     )
 
 

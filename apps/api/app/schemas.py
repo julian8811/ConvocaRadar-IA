@@ -168,6 +168,11 @@ class SourceHealthRead(BaseModel):
     last_run_duration_seconds: float | None = None
     days_since_last_success: int | None = None
     last_run_status: str | None = None
+    # Change C: health score & quality gate
+    health_score: int = 0
+    health_status: str = "unknown"  # healthy/stable/degraded/critical
+    tier: str | None = None
+    auto_paused: bool = False
 
 
 class SourceRunRead(BaseModel):

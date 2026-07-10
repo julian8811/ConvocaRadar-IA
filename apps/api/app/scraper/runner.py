@@ -18,6 +18,10 @@ from app.services import (
     is_noise_payload,
     validate_source_url,
 )
+from app.services.scoring import (
+    should_auto_pause,
+    update_consecutive_empty_runs,
+)
 
 # Phases tracked in run.progress
 PROGRESS_STEPS = ["fetch", "parse", "persist"]
@@ -252,6 +256,20 @@ async def run_source_inline(
                 source,
                 reason="no se detectaron oportunidades nuevas en la ultima corrida",
             )
+        # Change C: track consecutive empty runs and auto-pause
+        source.consecutive_empty_runs = update_consecutive_empty_runs(
+            items_found=len(opportunities),
+            current_count=source.consecutive_empty_runs or 0,
+        )
+        if should_auto_pause(source.consecutive_empty_runs):
+            source.auto_paused = True
+            run.logs.append({
+                "level": "warn",
+                "message": (
+                    f"Source auto-paused after {source.consecutive_empty_runs} "
+                    "consecutive empty runs"
+                ),
+            })
     except asyncio.CancelledError:
         finished_at = datetime.now(UTC).replace(tzinfo=None)
         run.status = "failed"
