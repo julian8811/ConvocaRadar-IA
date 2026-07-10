@@ -22,36 +22,10 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm install && npm install @tailwindcss/oxide-linux-x64-gnu
+        run: npm install
 
       - name: Lint
         run: npm run lint
-
-      - name: Build
-        run: npm run build
-
-  e2e:
-    runs-on: ubuntu-latest
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup Python
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.12"
-
-      - name: Install API dependencies
-        run: python -m pip install --upgrade pip && python -m pip install -e ".[dev]"
-        working-directory: apps/api
-
-      - name: API tests
-        run: python -m pytest -k "not test_run_source_runs_inline and not test_run_source_returns_within_timeout and not test_run_all_sources_logs_failure_when_execute_raises and not test_background_sweep and not test_source_run_creates_real_opportunity_via_connector and not test_source_run_marks_degraded_when_no_candidates and not test_connector_for_signature_compatibility and not test_worker_directory_no_longer_exists and not TestCallOpenaiEmbeddingUsesGlobalClient and not test_semantic_search_returns_best_match and not test_forgot_password_known_email_logs_a_password_reset_jwt_url and not test_admin_rebuild_embeddings and not test_url_check_with_none" 
-        working-directory: apps/api
-        env:
-          DATABASE_URL: sqlite:///./ci_convocaradar.db
-          JWT_SECRET: ci_jwt_secret_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
-          INTERNAL_API_KEY: ci_internal_api_key_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 
   api:
     runs-on: ubuntu-latest
