@@ -9,6 +9,7 @@ from selectolax.parser import HTMLParser, Node
 
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
 from app.connectors.common import clean_text, extract_close_date, fetch_httpx_text, launch_chromium, normalize_text, parse_date_text
+from app.connectors.registry import register
 
 
 MINCIENCIAS_URL = "https://minciencias.gov.co/convocatorias/todas"
@@ -71,6 +72,7 @@ def _is_closed_text(text: str) -> bool:
     return any(keyword in lowered for keyword in CLOSED_KEYWORDS)
 
 
+@register("minciencias")
 class MincienciasConnector:
     source_key = "minciencias"
 
