@@ -8,7 +8,6 @@
     "packages/*"
   ],
   "dependencies": {
-    "@tailwindcss/oxide-linux-x64-gnu": "^4.3.1",
     "eslint-config-next": "latest"
   },
   "scripts": {
