@@ -14,6 +14,7 @@ import httpx
 from pydantic import ValidationError
 
 from app.core.config import effective_llm_provider, get_settings
+from app.core.http_client import http_client
 from app.schemas import AiOpportunityExtract
 
 MODEL_VERSION = "gemini-vertex" if get_settings().llm_api_key and get_settings().embedding_model else "local-heuristic-v2"
@@ -330,17 +331,18 @@ async def _call_llm(text: str) -> dict[str, Any] | None:
         "temperature": 0.1,
         "response_format": {"type": "json_object"},
     }
-    async with httpx.AsyncClient(timeout=settings.llm_timeout_seconds) as client:
-        response = await client.post(
-            f"{settings.llm_api_base.rstrip('/')}/chat/completions",
-            headers={
-                "Authorization": f"Bearer {settings.llm_api_key}",
-                "Content-Type": "application/json",
-            },
-            json=payload,
-        )
-        response.raise_for_status()
-        data = response.json()
+    client = await http_client()
+    response = await client.post(
+        f"{settings.llm_api_base.rstrip('/')}/chat/completions",
+        headers={
+            "Authorization": f"Bearer {settings.llm_api_key}",
+            "Content-Type": "application/json",
+        },
+        json=payload,
+        timeout=settings.llm_timeout_seconds,
+    )
+    response.raise_for_status()
+    data = response.json()
     content = (((data.get("choices") or [{}])[0]).get("message") or {}).get("content")
     if not content:
         return None

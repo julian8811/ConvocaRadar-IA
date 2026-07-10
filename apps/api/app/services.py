@@ -22,6 +22,7 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from app.core.config import get_settings
+from app.core.http_client import sync_http_client
 from app.core.ai import (
     build_embedding,
     build_local_extraction,
@@ -999,11 +1000,15 @@ def url_is_reachable(url: str) -> bool:
     if not is_public_http_url(url):
         return False
     try:
-        with httpx.Client(follow_redirects=True, timeout=5.0, headers={"User-Agent": "ConvocaRadar/1.0"}) as client:
-            response = client.head(url)
-            if response.status_code in {405, 501}:
-                response = client.get(url)
-            return 200 <= response.status_code < 400
+        client = sync_http_client()
+        # Explicit UA preserves the pre-PR-1 behavior — this endpoint is
+        # used for quick reachability checks and the original
+        # "ConvocaRadar/1.0" identifier is expected by some servers.
+        headers = {"User-Agent": "ConvocaRadar/1.0"}
+        response = client.head(url, follow_redirects=True, timeout=5.0, headers=headers)
+        if response.status_code in {405, 501}:
+            response = client.get(url, follow_redirects=True, timeout=5.0, headers=headers)
+        return 200 <= response.status_code < 400
     except httpx.HTTPError:
         return False
 
