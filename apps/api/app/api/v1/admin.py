@@ -454,13 +454,13 @@ def retry_degraded_sources_admin(
 
 
 @router.post("/admin/embeddings/rebuild")
-def rebuild_embeddings_admin(
+async def rebuild_embeddings_admin(
     organization: Organization = Depends(get_current_organization),
     _: User = Depends(require_admin),
     db: Session = Depends(get_db),
     limit: int | None = None,
 ) -> dict[str, int]:
-    result = rebuild_opportunity_embeddings(db, organization.id, limit=limit)
+    result = await rebuild_opportunity_embeddings(db, organization.id, limit=limit)
     db.add(
         AuditLog(
             organization_id=organization.id,

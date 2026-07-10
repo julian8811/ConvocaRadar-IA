@@ -110,7 +110,7 @@ def _token(c: TestClient) -> str:
     return response.json()["access_token"]
 
 
-def _make_opportunity(
+async def _make_opportunity(
     *,
     title: str,
     close_days: int | None = 30,
@@ -133,7 +133,7 @@ def _make_opportunity(
             if close_days is not None
             else None
         )
-        opportunity = create_opportunity(
+        opportunity = await create_opportunity(
             db,
             OpportunityCreate(
                 source_id=source.id,
@@ -234,7 +234,8 @@ def test_pipeline_returns_pipeline_read_shape() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_top_scored_capped_at_eight() -> None:
+@pytest.mark.asyncio
+async def test_top_scored_capped_at_eight() -> None:
     c = _client()
     auth = {"Authorization": f"Bearer {_token(c)}"}
 
@@ -248,7 +249,7 @@ def test_top_scored_capped_at_eight() -> None:
 
     # 10 scored opportunities with descending scores.
     for i in range(10):
-        opp_id = _make_opportunity(title=f"Pipeline Scored {i}", close_days=60)
+        opp_id = await _make_opportunity(title=f"Pipeline Scored {i}", close_days=60)
         _make_score(opportunity_id=opp_id, organization_id=org_id, score=100.0 - i)
 
     response = c.get("/api/v1/dashboard/pipeline", headers=auth)
@@ -257,7 +258,8 @@ def test_top_scored_capped_at_eight() -> None:
     assert len(payload["top_scored"]) <= 8
 
 
-def test_top_scored_items_have_numeric_score_and_reasons() -> None:
+@pytest.mark.asyncio
+async def test_top_scored_items_have_numeric_score_and_reasons() -> None:
     c = _client()
     auth = {"Authorization": f"Bearer {_token(c)}"}
 
@@ -269,7 +271,7 @@ def test_top_scored_items_have_numeric_score_and_reasons() -> None:
     finally:
         db.close()
 
-    opp_id = _make_opportunity(title="Pipeline With Reasons", close_days=45)
+    opp_id = await _make_opportunity(title="Pipeline With Reasons", close_days=45)
     _make_score(
         opportunity_id=opp_id,
         organization_id=org_id,
@@ -290,7 +292,8 @@ def test_top_scored_items_have_numeric_score_and_reasons() -> None:
     assert "Matches funding type X" in item["reasons"]
 
 
-def test_top_scored_ordered_by_score_desc() -> None:
+@pytest.mark.asyncio
+async def test_top_scored_ordered_by_score_desc() -> None:
     c = _client()
     auth = {"Authorization": f"Bearer {_token(c)}"}
 
@@ -302,9 +305,9 @@ def test_top_scored_ordered_by_score_desc() -> None:
     finally:
         db.close()
 
-    low_id = _make_opportunity(title="Pipeline Scored Low", close_days=50)
-    mid_id = _make_opportunity(title="Pipeline Scored Mid", close_days=50)
-    high_id = _make_opportunity(title="Pipeline Scored High", close_days=50)
+    low_id = await _make_opportunity(title="Pipeline Scored Low", close_days=50)
+    mid_id = await _make_opportunity(title="Pipeline Scored Mid", close_days=50)
+    high_id = await _make_opportunity(title="Pipeline Scored High", close_days=50)
     _make_score(opportunity_id=low_id, organization_id=org_id, score=40.0)
     _make_score(opportunity_id=mid_id, organization_id=org_id, score=70.0)
     _make_score(opportunity_id=high_id, organization_id=org_id, score=95.0)
@@ -322,13 +325,14 @@ def test_top_scored_ordered_by_score_desc() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_closing_soon_excludes_null_and_negative_days_to_close() -> None:
+@pytest.mark.asyncio
+async def test_closing_soon_excludes_null_and_negative_days_to_close() -> None:
     c = _client()
     auth = {"Authorization": f"Bearer {_token(c)}"}
 
     # Negative: already closed. None: no close date. Both must be excluded.
-    _make_opportunity(title="Pipeline Already Closed", close_days=-1)
-    _make_opportunity(title="Pipeline No Close Date", close_days=None)
+    await _make_opportunity(title="Pipeline Already Closed", close_days=-1)
+    await _make_opportunity(title="Pipeline No Close Date", close_days=None)
 
     response = c.get("/api/v1/dashboard/pipeline", headers=auth)
     assert response.status_code == 200
@@ -338,15 +342,16 @@ def test_closing_soon_excludes_null_and_negative_days_to_close() -> None:
     assert "Pipeline No Close Date" not in titles
 
 
-def test_closing_soon_includes_only_days_in_zero_to_thirty() -> None:
+@pytest.mark.asyncio
+async def test_closing_soon_includes_only_days_in_zero_to_thirty() -> None:
     c = _client()
     auth = {"Authorization": f"Bearer {_token(c)}"}
 
-    _make_opportunity(title="Pipeline Closing In 0 Days", close_days=0)
-    _make_opportunity(title="Pipeline Closing In 7 Days", close_days=7)
-    _make_opportunity(title="Pipeline Closing In 30 Days", close_days=30)
-    _make_opportunity(title="Pipeline Closing In 31 Days", close_days=31)
-    _make_opportunity(title="Pipeline Closing In 90 Days", close_days=90)
+    await _make_opportunity(title="Pipeline Closing In 0 Days", close_days=0)
+    await _make_opportunity(title="Pipeline Closing In 7 Days", close_days=7)
+    await _make_opportunity(title="Pipeline Closing In 30 Days", close_days=30)
+    await _make_opportunity(title="Pipeline Closing In 31 Days", close_days=31)
+    await _make_opportunity(title="Pipeline Closing In 90 Days", close_days=90)
 
     response = c.get("/api/v1/dashboard/pipeline", headers=auth)
     assert response.status_code == 200
@@ -359,12 +364,13 @@ def test_closing_soon_includes_only_days_in_zero_to_thirty() -> None:
     assert "Pipeline Closing In 90 Days" not in titles
 
 
-def test_closing_soon_capped_at_eight() -> None:
+@pytest.mark.asyncio
+async def test_closing_soon_capped_at_eight() -> None:
     c = _client()
     auth = {"Authorization": f"Bearer {_token(c)}"}
 
     for i in range(10):
-        _make_opportunity(title=f"Pipeline Closing Cap {i}", close_days=1 + i)
+        await _make_opportunity(title=f"Pipeline Closing Cap {i}", close_days=1 + i)
 
     response = c.get("/api/v1/dashboard/pipeline", headers=auth)
     assert response.status_code == 200
@@ -372,11 +378,12 @@ def test_closing_soon_capped_at_eight() -> None:
     assert len(payload["closing_soon"]) <= 8
 
 
-def test_closing_soon_items_have_numeric_days_to_close() -> None:
+@pytest.mark.asyncio
+async def test_closing_soon_items_have_numeric_days_to_close() -> None:
     c = _client()
     auth = {"Authorization": f"Bearer {_token(c)}"}
 
-    _make_opportunity(title="Pipeline Numeric Days", close_days=5)
+    await _make_opportunity(title="Pipeline Numeric Days", close_days=5)
 
     response = c.get("/api/v1/dashboard/pipeline", headers=auth)
     assert response.status_code == 200
@@ -387,13 +394,14 @@ def test_closing_soon_items_have_numeric_days_to_close() -> None:
     assert 0 <= item["days_to_close"] <= 30
 
 
-def test_closing_soon_ordered_by_close_date_asc() -> None:
+@pytest.mark.asyncio
+async def test_closing_soon_ordered_by_close_date_asc() -> None:
     c = _client()
     auth = {"Authorization": f"Bearer {_token(c)}"}
 
-    _make_opportunity(title="Pipeline Order 10", close_days=10)
-    _make_opportunity(title="Pipeline Order 2", close_days=2)
-    _make_opportunity(title="Pipeline Order 5", close_days=5)
+    await _make_opportunity(title="Pipeline Order 10", close_days=10)
+    await _make_opportunity(title="Pipeline Order 2", close_days=2)
+    await _make_opportunity(title="Pipeline Order 5", close_days=5)
 
     response = c.get("/api/v1/dashboard/pipeline", headers=auth)
     assert response.status_code == 200
