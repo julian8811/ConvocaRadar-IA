@@ -9,15 +9,19 @@ if a SourceRun with status='running' already exists, the call is skipped.
 """
 from __future__ import annotations
 
+# Arq is an optional dependency — installed as convocaradar-api[worker].
+# Import at module level (with fallback) so tests can monkeypatch without
+# needing arq installed.
+try:
+    from arq import create_pool  # noqa: F401
+    from arq.connections import RedisSettings  # noqa: F401
+except ImportError:
+    create_pool = None  # type: ignore[assignment,misc]
+    RedisSettings = None  # type: ignore[assignment,misc]
+
 from datetime import UTC, datetime
 
 from sqlalchemy import select
-
-# Arq is imported at module level so monkeypatching works in tests.
-# In production, redis_url must be set in the environment for these
-# imports to be exercised — otherwise the inline path is always taken.
-from arq import create_pool  # noqa: E402
-from arq.connections import RedisSettings  # noqa: E402
 
 from app.core.config import get_settings
 from app.models import Source, SourceRun
