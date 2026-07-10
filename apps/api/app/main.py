@@ -153,6 +153,11 @@ async def _run_periodic_source_sweep(interval_seconds: int = 1800) -> None:
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     create_all()
+    # Run pending Alembic migrations (idempotent — stamps + upgrades).
+    # This adds the new columns (tier, auto_paused, dom_hash, etc.) to the
+    # production DB without requiring a manual migration step.
+    from app.db.migrate import run_pending_migrations
+    run_pending_migrations()
     ensure_bootstrap_data()
 
     # Run scraper infrastructure health checks (non-blocking, warnings only).
