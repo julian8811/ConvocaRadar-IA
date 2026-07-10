@@ -13,7 +13,7 @@ export default defineConfig({
     passWithNoTests: true,
     css: false,
     environment: "happy-dom",
-    setupFiles: [],
+    setupFiles: ["./vitest.setup.ts"],
     // SEC-RENDER-STARTUP: request() retry mechanism now delays up to ~91s.
     // Increase testTimeout so the TypeError retry test doesn't time out.
     testTimeout: 120_000,

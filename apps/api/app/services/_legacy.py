@@ -22,8 +22,10 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from app.core.config import get_settings
+from app.core.http_client import sync_http_client
 from app.core.ai import (
     build_embedding,
+    build_embedding_sync,
     build_local_extraction,
     compose_embedding_text,
     cosine_similarity,
@@ -500,7 +502,7 @@ def _combined_text(data: OpportunityCreate) -> str:
     )
 
 
-def enrich_opportunity_payload(data: OpportunityCreate) -> OpportunityCreate:
+async def enrich_opportunity_payload(data: OpportunityCreate) -> OpportunityCreate:
     raw_text = data.raw_text.strip()
     combined = _combined_text(data)
     if not raw_text or len(raw_text) < 120:
@@ -525,7 +527,7 @@ def enrich_opportunity_payload(data: OpportunityCreate) -> OpportunityCreate:
             if parsed:
                 merged["close_date"] = parsed
         return OpportunityCreate(**merged)
-    extraction = create_ai_extraction(raw_text)
+    extraction = await create_ai_extraction(raw_text)
     merged = data.model_dump()
     merged["title"] = data.title or str(extraction.get("title") or merged["title"])
     merged["entity"] = data.entity or str(extraction.get("entity") or merged["entity"])
@@ -624,9 +626,9 @@ def opportunity_reanalysis_text(db: Session, opportunity: Opportunity) -> str:
     return compose_embedding_text(parts[0], "\n".join(part for part in parts[1:3] if part), "\n".join(part for part in parts[3:] if part))
 
 
-def upsert_opportunity_embedding(db: Session, opportunity: Opportunity) -> OpportunityEmbedding:
+async def upsert_opportunity_embedding(db: Session, opportunity: Opportunity) -> OpportunityEmbedding:
     source_text = opportunity_embedding_text(opportunity)
-    vector = build_embedding(source_text)
+    vector = await build_embedding(source_text)
     existing = _get_opportunity_embedding(db, opportunity.id)
     if existing:
         existing.organization_id = opportunity.organization_id
@@ -645,7 +647,7 @@ def upsert_opportunity_embedding(db: Session, opportunity: Opportunity) -> Oppor
     return embedding
 
 
-def rebuild_opportunity_embeddings(db: Session, organization_id: str, *, limit: int | None = None) -> dict[str, int]:
+async def rebuild_opportunity_embeddings(db: Session, organization_id: str, *, limit: int | None = None) -> dict[str, int]:
     scope = or_(Opportunity.organization_id == organization_id, Opportunity.organization_id.is_(None))
     stmt = select(Opportunity).where(scope).order_by(Opportunity.updated_at.desc())
     if limit is not None:
@@ -656,7 +658,7 @@ def rebuild_opportunity_embeddings(db: Session, organization_id: str, *, limit: 
     for opportunity in opportunities:
         existing = db.scalar(select(OpportunityEmbedding).where(OpportunityEmbedding.opportunity_id == opportunity.id))
         source_text = opportunity_embedding_text(opportunity)
-        vector = build_embedding(source_text)
+        vector = await build_embedding(source_text)
         if existing:
             existing.organization_id = opportunity.organization_id
             existing.source_text = source_text
@@ -681,11 +683,11 @@ def _supports_vector_search(db: Session) -> bool:
     return PGVECTOR_AVAILABLE and db.bind is not None and db.bind.dialect.name == "postgresql"
 
 
-def reanalyze_opportunity(db: Session, opportunity: Opportunity, *, force: bool = False) -> Opportunity:
+async def reanalyze_opportunity(db: Session, opportunity: Opportunity, *, force: bool = False) -> Opportunity:
     text = opportunity_reanalysis_text(db, opportunity)
     if not text.strip():
         return opportunity
-    extraction = create_ai_extraction(text)
+    extraction = await create_ai_extraction(text)
     changed = False
     if force or not opportunity.summary:
         opportunity.summary = str(extraction.get("summary") or opportunity.summary)
@@ -728,11 +730,11 @@ def reanalyze_opportunity(db: Session, opportunity: Opportunity, *, force: bool 
         changed = True
     if changed:
         opportunity.status = inferred_opportunity_status(opportunity.close_date, " ".join([opportunity.summary, opportunity.raw_text]))
-        upsert_opportunity_embedding(db, opportunity)
+        await upsert_opportunity_embedding(db, opportunity)
     return opportunity
 
 
-def semantic_search_opportunities(
+async def semantic_search_opportunities(
     db: Session,
     organization_id: str,
     query: str,
@@ -750,7 +752,7 @@ def semantic_search_opportunities(
         return []
 
     # Step 2: Re-rank with embedding similarity if embeddings exist
-    query_vector = build_embedding(query)
+    query_vector = await build_embedding(query)
     scored: list[tuple[Opportunity, float]] = []
     for opportunity, _ in text_results:
         embedding = db.scalar(select(OpportunityEmbedding).where(OpportunityEmbedding.opportunity_id == opportunity.id))
@@ -999,11 +1001,15 @@ def url_is_reachable(url: str) -> bool:
     if not is_public_http_url(url):
         return False
     try:
-        with httpx.Client(follow_redirects=True, timeout=5.0, headers={"User-Agent": "ConvocaRadar/1.0"}) as client:
-            response = client.head(url)
-            if response.status_code in {405, 501}:
-                response = client.get(url)
-            return 200 <= response.status_code < 400
+        client = sync_http_client()
+        # Explicit UA preserves the pre-PR-1 behavior — this endpoint is
+        # used for quick reachability checks and the original
+        # "ConvocaRadar/1.0" identifier is expected by some servers.
+        headers = {"User-Agent": "ConvocaRadar/1.0"}
+        response = client.head(url, follow_redirects=True, timeout=5.0, headers=headers)
+        if response.status_code in {405, 501}:
+            response = client.get(url, follow_redirects=True, timeout=5.0, headers=headers)
+        return 200 <= response.status_code < 400
     except httpx.HTTPError:
         return False
 
@@ -1168,8 +1174,8 @@ def build_opportunity_query(
     return stmt.order_by(Opportunity.close_date.asc().nullslast(), Opportunity.created_at.desc())
 
 
-def create_opportunity(db: Session, data: OpportunityCreate, organization_id: str | None = None) -> Opportunity:
-    data = enrich_opportunity_payload(data)
+async def create_opportunity(db: Session, data: OpportunityCreate, organization_id: str | None = None) -> Opportunity:
+    data = await enrich_opportunity_payload(data)
     normalized_title = data.title.strip()
     if is_noise_payload(normalized_title, data.summary, data.raw_text):
         raise ValueError("Opportunity title looks like scraping noise")
@@ -1223,7 +1229,7 @@ def create_opportunity(db: Session, data: OpportunityCreate, organization_id: st
         if existing_by_external_id:
             apply_scraped_values(existing_by_external_id)
             score_organization_id = existing_by_external_id.organization_id or score_organization_id
-            upsert_opportunity_embedding(db, existing_by_external_id)
+            await upsert_opportunity_embedding(db, existing_by_external_id)
             if score_organization_id:
                 profile = db.scalar(select(OrganizationProfile).where(OrganizationProfile.organization_id == score_organization_id))
                 if profile:
@@ -1241,7 +1247,7 @@ def create_opportunity(db: Session, data: OpportunityCreate, organization_id: st
         if existing_global:
             apply_scraped_values(existing_global)
             score_organization_id = existing_global.organization_id or score_organization_id
-            upsert_opportunity_embedding(db, existing_global)
+            await upsert_opportunity_embedding(db, existing_global)
             if score_organization_id:
                 profile = db.scalar(select(OrganizationProfile).where(OrganizationProfile.organization_id == score_organization_id))
                 if profile:
@@ -1252,7 +1258,7 @@ def create_opportunity(db: Session, data: OpportunityCreate, organization_id: st
     if duplicate:
         apply_scraped_values(duplicate)
         score_organization_id = duplicate.organization_id or score_organization_id
-        upsert_opportunity_embedding(db, duplicate)
+        await upsert_opportunity_embedding(db, duplicate)
         if score_organization_id:
             profile = db.scalar(select(OrganizationProfile).where(OrganizationProfile.organization_id == score_organization_id))
             if profile:
@@ -1270,7 +1276,7 @@ def create_opportunity(db: Session, data: OpportunityCreate, organization_id: st
         if existing_by_url:
             apply_scraped_values(existing_by_url)
             score_organization_id = existing_by_url.organization_id or score_organization_id
-            upsert_opportunity_embedding(db, existing_by_url)
+            await upsert_opportunity_embedding(db, existing_by_url)
             if score_organization_id:
                 profile = db.scalar(select(OrganizationProfile).where(OrganizationProfile.organization_id == score_organization_id))
                 if profile:
@@ -1285,7 +1291,7 @@ def create_opportunity(db: Session, data: OpportunityCreate, organization_id: st
     )
     if existing:
         apply_scraped_values(existing)
-        upsert_opportunity_embedding(db, existing)
+        await upsert_opportunity_embedding(db, existing)
         return existing
     values = data.model_dump()
     values.pop("title", None)
@@ -1300,7 +1306,7 @@ def create_opportunity(db: Session, data: OpportunityCreate, organization_id: st
     )
     db.add(opportunity)
     db.flush()
-    upsert_opportunity_embedding(db, opportunity)
+    await upsert_opportunity_embedding(db, opportunity)
     if score_organization_id:
         profile = db.scalar(select(OrganizationProfile).where(OrganizationProfile.organization_id == score_organization_id))
         if profile:
@@ -1321,101 +1327,19 @@ async def _scrape_source_candidates_with_timeout(
 
 
 def execute_source_run_locally(db: Session, source: Source, organization_id: str | None = None) -> SourceRun:
-    started_at = datetime.now(UTC).replace(tzinfo=None)
-    run = SourceRun(
-        source_id=source.id,
-        status="running",
-        started_at=started_at,
-        logs=[{"level": "info", "message": "Scraping MVP started"}],
-    )
-    source.last_run_at = started_at
-    db.add(run)
-    db.flush()
-    org_id = organization_id or source.organization_id or "00000000-0000-0000-0000-000000000000"
-    task = Task(
-        organization_id=org_id,
-        source_run_id=run.id,
-        task_type="scrape_source",
-        provider="local",
-        status="running",
-        started_at=started_at,
-        payload={"source_key": source.key, "base_url": source.base_url, "source_type": source.source_type},
-    )
-    db.add(task)
-    db.flush()
+    """Thin sync wrapper — delegates to app.scraper.runner.run_source_inline.
+
+    FastAPI sync endpoints run in a thread pool.  ``asyncio.run()`` in a
+    thread can deadlock with the parent event loop on some platforms, so
+    we use an explicit fresh loop (same pattern as the original).
+    """
+    from app.scraper.runner import run_source_inline
+
+    loop = asyncio.new_event_loop()
     try:
-        validate_source_url(source)
-        scrape_stats: dict[str, object] = {}
-        # FastAPI sync endpoints run in a thread pool. asyncio.run()
-        # in a thread can deadlock with the parent event loop on some
-        # platforms. Use an explicit fresh loop instead.
-        loop = asyncio.new_event_loop()
-        try:
-            opportunities = loop.run_until_complete(
-                _scrape_source_candidates_with_timeout(source, scrape_stats)
-            )
-        finally:
-            loop.close()
-        created = 0
-        updated = 0
-        failed_items = 0
-        for opportunity_data in opportunities:
-            try:
-                opportunity = create_opportunity(db, opportunity_data, organization_id=organization_id)
-                if opportunity.first_seen_at == opportunity.last_seen_at:
-                    created += 1
-                else:
-                    updated += 1
-            except Exception as exc:
-                failed_items += 1
-                run.logs.append(
-                    {
-                        "level": "warning",
-                        "message": "Candidate skipped during local persistence",
-                        "title": getattr(opportunity_data, "title", ""),
-                        "error": str(exc),
-                    }
-                )
-        db.flush()
-        finished_at = datetime.now(UTC).replace(tzinfo=None)
-        run.status = "degraded" if len(opportunities) == 0 else "success"
-        run.finished_at = finished_at
-        run.items_found = len(opportunities)
-        run.items_created = created
-        run.items_updated = updated
-        run.items_failed = failed_items
-        run.logs = [
-            *run.logs,
-            {"level": "info", "message": "Local connector executed", "task_id": task.id},
-            {"level": "info", "message": "Connector diagnostics", **scrape_stats},
-            {"level": "info", "message": "Candidates normalized", "items_found": len(opportunities), "items_failed": failed_items},
-        ]
-        task.status = run.status
-        task.finished_at = finished_at
-        task.result = {"items_found": len(opportunities), "items_created": created, "items_updated": updated}
-        if len(opportunities) > 0:
-            source.last_success_at = finished_at
-            source.last_error = None
-        if len(opportunities) == 0:
-            create_source_health_alert(
-                db,
-                source,
-                reason="no se detectaron oportunidades nuevas en la ultima corrida",
-            )
-    except Exception as exc:
-        finished_at = datetime.now(UTC).replace(tzinfo=None)
-        run.status = "failed"
-        run.finished_at = finished_at
-        run.items_failed = 1
-        run.error_message = str(exc)
-        run.logs = [*run.logs, {"level": "error", "message": str(exc)}]
-        task.status = "failed"
-        task.finished_at = finished_at
-        task.error_message = str(exc)
-        task.result = {"items_failed": 1}
-        source.last_error = str(exc)
-        create_source_health_alert(db, source, reason=str(exc))
-    return run
+        return loop.run_until_complete(run_source_inline(db, source, organization_id))
+    finally:
+        loop.close()
 
 
 def _semantic_score(text: str, profile_text: str) -> float:
@@ -1426,8 +1350,8 @@ def _semantic_score(text: str, profile_text: str) -> float:
     if not text.strip() or not profile_text.strip():
         return 0.0
     try:
-        opp_vec = build_embedding(text[:2000])
-        prof_vec = build_embedding(profile_text[:2000])
+        opp_vec = build_embedding_sync(text[:2000])
+        prof_vec = build_embedding_sync(profile_text[:2000])
         return cosine_similarity(opp_vec, prof_vec)
     except Exception:
         return 0.0
@@ -2056,8 +1980,8 @@ def create_heuristic_extraction(text: str) -> dict[str, object]:
     return build_local_extraction(text)
 
 
-def create_ai_extraction(text: str) -> dict[str, object]:
-    extraction = asyncio.run(extract_opportunity_structured(text))
+async def create_ai_extraction(text: str) -> dict[str, object]:
+    extraction = await extract_opportunity_structured(text)
     return extraction.data
 
 
@@ -2704,7 +2628,7 @@ def _opportunity_combined_text(opp: Opportunity) -> str:
     )
 
 
-def backfill_close_dates_ai(db: Session, organization_id: str, *, limit: int = 100) -> dict[str, int]:
+async def backfill_close_dates_ai(db: Session, organization_id: str, *, limit: int = 100) -> dict[str, int]:
     """Use AI (LLM) to extract close_date for opportunities that are missing it.
 
     Calls ``create_ai_extraction`` on each opportunity's combined text and
@@ -2734,7 +2658,7 @@ def backfill_close_dates_ai(db: Session, organization_id: str, *, limit: int = 1
             if not text.strip():
                 continue
             processed += 1
-            extraction = create_ai_extraction(text)
+            extraction = await create_ai_extraction(text)
             close_date = _parse_ai_close_date(extraction.get("close_date"))
             if close_date:
                 opp.close_date = close_date
@@ -2751,7 +2675,7 @@ def backfill_close_dates_ai(db: Session, organization_id: str, *, limit: int = 1
     return {"total": len(opportunities), "processed": processed, "updated": updated}
 
 
-def backfill_funding_amounts_ai(db: Session, organization_id: str, *, limit: int = 100) -> dict[str, int]:
+async def backfill_funding_amounts_ai(db: Session, organization_id: str, *, limit: int = 100) -> dict[str, int]:
     """Use AI (LLM) to extract ``funding_amount_raw`` for opportunities missing it.
 
     Calls ``create_ai_extraction`` on each opportunity's combined text and
@@ -2778,7 +2702,7 @@ def backfill_funding_amounts_ai(db: Session, organization_id: str, *, limit: int
             if not text.strip():
                 continue
             processed += 1
-            extraction = create_ai_extraction(text)
+            extraction = await create_ai_extraction(text)
             raw = extraction.get("funding_amount_raw")
             if raw and isinstance(raw, str) and raw.strip():
                 opp.funding_amount_raw = raw.strip()

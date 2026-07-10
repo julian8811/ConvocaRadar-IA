@@ -5,8 +5,15 @@ from sqlalchemy.orm import Session
 import structlog
 
 from app.api.deps import TOKEN_COOKIE_NAME, get_current_user
-from app.core.rate_limit import SlidingWindowLimiter
-from app.core.security import create_access_token, decode_access_token, hash_password, verify_password
+from app.core.rate_limit import SlidingWindowLimiter, email_login_limiter
+from app.core.security import (
+    create_access_token,
+    create_reset_token,
+    decode_access_token,
+    decode_reset_token,
+    hash_password,
+    verify_password,
+)
 from app.core.task_queue import enqueue_seed_default_sources
 from app.db.session import get_db
 from app.models import AuditLog, Organization, OrganizationProfile, Role, User
@@ -72,11 +79,12 @@ def _password_reset_url(token: str) -> str:
 
 
 def _set_token_cookie(response: Response, token: str) -> None:
-    """Set the JWT as an HttpOnly, SameSite=Lax cookie for browser-based auth.
+    """Set the JWT as an HttpOnly, SameSite=Strict cookie for browser-based auth.
 
     SEC-1.5: dual-support migration — the cookie is the new primary path; the
     Authorization: Bearer header remains supported by get_current_user for legacy
-    clients.
+    clients. SameSite=Strict blocks all cross-origin requests carrying the cookie,
+    preventing CSRF on top-level navigations (SEC-4).
     """
     response.set_cookie(
         key=TOKEN_COOKIE_NAME,
@@ -84,7 +92,7 @@ def _set_token_cookie(response: Response, token: str) -> None:
         max_age=TOKEN_COOKIE_MAX_AGE_SECONDS,
         httponly=True,
         secure=True,
-        samesite="lax",
+        samesite="strict",
         path="/",
     )
 
@@ -96,7 +104,7 @@ def _clear_token_cookie(response: Response) -> None:
         path="/",
         httponly=True,
         secure=True,
-        samesite="lax",
+        samesite="strict",
     )
 
 
@@ -161,7 +169,17 @@ def register(payload: RegisterRequest, response: Response, db: Session = Depends
 
 @router.post("/auth/login", response_model=Token)
 def login(payload: LoginRequest, response: Response, db: Session = Depends(get_db)) -> Token:
-    user = db.scalar(select(User).where(User.email == payload.email))
+    # SEC-4: rate-limit by email before password validation. 5 attempts
+    # per email per hour, 6th gets 429. The check fires before any DB
+    # query or password hash so a sustained attacker does not burn CPU.
+    email_key = payload.email.lower().strip()
+    if not email_login_limiter.check(email_key):
+        raise HTTPException(
+            status_code=429,
+            detail="Too many requests. Try again later.",
+        )
+
+    user = db.scalar(select(User).where(User.email == email_key))
     if not user or not verify_password(payload.password, user.password_hash):
         raise HTTPException(status_code=401, detail="Invalid credentials")
     token_str = create_access_token(
@@ -256,10 +274,9 @@ def forgot_password(
         # ``password_changed_at`` epoch. The reset-password endpoint
         # compares this claim against the live row to reject tokens
         # issued before the most recent change.
-        token = create_access_token(
+        token = create_reset_token(
             user.id,
             extra={"password_changed_at": _password_changed_at_epoch(user)},
-            scope="password_reset",
         )
         reset_url = _password_reset_url(token)
         logger.info(
@@ -363,10 +380,10 @@ def reset_password(
     invalid_detail = "Reset token is invalid or expired"
 
     try:
-        claims = decode_access_token(payload.token)
+        claims = decode_reset_token(payload.token)
     except ValueError:
         # Signature invalid or token expired (jose raises JWTError →
-        # ValueError via decode_access_token). Constant detail.
+        # ValueError via decode_reset_token). Constant detail.
         raise HTTPException(status_code=400, detail=invalid_detail)
 
     # Scope check — only password_reset tokens are accepted.

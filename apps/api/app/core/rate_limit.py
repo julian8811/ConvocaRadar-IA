@@ -104,6 +104,15 @@ class SlidingWindowLimiter:
             self._evict_oldest_if_needed()
             return True
 
+    def clear(self) -> None:
+        """Remove all tracked keys — reset the limiter to its initial state.
+
+        Thread-safe: acquires ``_lock`` before clearing. Intended for test
+        teardown and administrative reset.
+        """
+        with self._lock:
+            self._buckets.clear()
+
     def _evict_oldest_if_needed(self) -> None:
         """Drop the oldest-touched key when the cap is exceeded.
 
@@ -114,3 +123,9 @@ class SlidingWindowLimiter:
         while len(self._buckets) > self._max_keys:
             oldest_key = next(iter(self._buckets))
             del self._buckets[oldest_key]
+
+
+# SEC-4: per-email rate limiter for the login endpoint. 5 attempts per
+# email per hour, 6th is 429. Independent from the forgot-password limiter
+# so an attacker exhausting one flow does not block the other.
+email_login_limiter = SlidingWindowLimiter(max_requests=5, window_seconds=3600)

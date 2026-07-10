@@ -11,6 +11,7 @@ from urllib.parse import urljoin, urlparse
 import httpx
 
 from app.core.config import get_settings
+from app.core.http_client import http_client
 
 CHROMIUM_CONTAINER_ARGS = ["--no-sandbox", "--disable-dev-shm-usage"]
 PLAYWRIGHT_BLOCKED_RESOURCE_TYPES = {"image", "media", "font"}
@@ -382,17 +383,20 @@ async def fetch_httpx_text(
     last_error: Exception | None = None
     for attempt in range(max(retries, 1)):
         try:
-            async with httpx.AsyncClient(
+            client = await http_client()
+            response = await client.request(
+                method,
+                url,
+                json=payload,
                 timeout=request_timeout,
                 headers=request_headers,
                 follow_redirects=True,
-            ) as client:
-                response = await client.request(method, url, json=payload)
-                if _is_private_host(urlparse(str(response.url)).hostname or ""):
-                    raise ValueError(f"Blocked redirect to unsafe URL: {response.url}")
-                response.raise_for_status()
-                content_type = response.headers.get("content-type", fallback_content_type)
-                return str(response.url), response.text, content_type
+            )
+            if _is_private_host(urlparse(str(response.url)).hostname or ""):
+                raise ValueError(f"Blocked redirect to unsafe URL: {response.url}")
+            response.raise_for_status()
+            content_type = response.headers.get("content-type", fallback_content_type)
+            return str(response.url), response.text, content_type
         except Exception as exc:  # pragma: no cover - network fallback path
             last_error = exc
             if attempt + 1 >= retries:
@@ -429,17 +433,20 @@ async def fetch_httpx_bytes(
     last_error: Exception | None = None
     for attempt in range(max(retries, 1)):
         try:
-            async with httpx.AsyncClient(
+            client = await http_client()
+            response = await client.request(
+                method,
+                url,
+                json=payload,
                 timeout=settings.scraping_timeout_seconds,
                 headers=request_headers,
                 follow_redirects=True,
-            ) as client:
-                response = await client.request(method, url, json=payload)
-                if _is_private_host(urlparse(str(response.url)).hostname or ""):
-                    raise ValueError(f"Blocked redirect to unsafe URL: {response.url}")
-                response.raise_for_status()
-                content_type = response.headers.get("content-type", fallback_content_type)
-                return str(response.url), response.content, content_type
+            )
+            if _is_private_host(urlparse(str(response.url)).hostname or ""):
+                raise ValueError(f"Blocked redirect to unsafe URL: {response.url}")
+            response.raise_for_status()
+            content_type = response.headers.get("content-type", fallback_content_type)
+            return str(response.url), response.content, content_type
         except Exception as exc:  # pragma: no cover - network fallback path
             last_error = exc
             if attempt + 1 >= retries:

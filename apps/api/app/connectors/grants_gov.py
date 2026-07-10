@@ -3,6 +3,7 @@ from datetime import datetime
 
 from app.connectors.common import fetch_httpx_text
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
+from app.connectors.registry import register
 from app.connectors.simpler_grants import SimplerGrantsConnector
 
 
@@ -22,6 +23,7 @@ def _parse_grants_date(value: str | None) -> datetime | None:
     return None
 
 
+@register("grants-gov")
 class GrantsGovConnector:
     source_key = "grants-gov"
 

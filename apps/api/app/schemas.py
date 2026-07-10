@@ -182,6 +182,8 @@ class SourceRunRead(BaseModel):
     items_failed: int
     error_message: str | None = None
     logs: list[dict[str, Any]]
+    # PR2: per-phase progress tracking (fetch/parse/persist ISO timestamps)
+    progress: dict[str, str] | None = None
 
     model_config = {"from_attributes": True}
 
@@ -286,8 +288,6 @@ class OpportunityRead(OpportunityCreate):
     status: str
     user_status: str
     is_favorite: bool
-    official_url_is_reachable: bool = False
-    application_url_is_reachable: bool = False
     first_seen_at: datetime
     last_seen_at: datetime
     created_at: datetime

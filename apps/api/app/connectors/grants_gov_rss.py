@@ -2,6 +2,7 @@ from __future__ import annotations
 
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
 from app.connectors.common import fetch_httpx_text
+from app.connectors.registry import register
 from app.connectors.rss import RssConnector
 from app.connectors.simpler_grants import SimplerGrantsConnector
 
@@ -11,6 +12,7 @@ GRANTS_GOV_FORECAST_URL = "https://www.grants.gov/rss/GG_ForecastOpportunities.x
 GRANTS_GOV_SEARCH_PAGE = "https://simpler.grants.gov/search"
 
 
+@register("grants-gov-rss")
 class GrantsGovRssConnector:
     def __init__(self, source_key: str = "grants-gov-rss", base_url: str | None = None) -> None:
         self.source_key = source_key
