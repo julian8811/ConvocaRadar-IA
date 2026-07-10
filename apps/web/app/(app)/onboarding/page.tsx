@@ -238,7 +238,7 @@ export default function OnboardingPage() {
                 <Input
                   name="max_funding_amount"
                   type="number"
-                  defaultValue={profileData.max_funding_amount ?? ""}
+                  defaultValue={String(profileData.max_funding_amount ?? "")}
                   placeholder="Ej: 500000"
                 />
               </div>
