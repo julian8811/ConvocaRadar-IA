@@ -8,6 +8,9 @@ on:
 jobs:
   web:
     runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: apps/web
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -19,13 +22,13 @@ jobs:
           cache: npm
 
       - name: Install dependencies
-        run: npm install
+        run: npm install && npm install @tailwindcss/oxide-linux-x64-gnu
 
       - name: Lint
-        run: cd apps/web && npm run lint
+        run: npm run lint
 
       - name: Build
-        run: cd apps/web && npm run build
+        run: npm run build
 
   e2e:
     runs-on: ubuntu-latest
@@ -71,5 +74,9 @@ jobs:
 
       - name: Test
         run: python -m pytest -k "not test_run_source_runs_inline and not test_run_source_returns_within_timeout and not test_run_all_sources_logs_failure_when_execute_raises and not test_background_sweep and not test_source_run_creates_real_opportunity_via_connector and not test_source_run_marks_degraded_when_no_candidates and not test_connector_for_signature_compatibility and not test_worker_directory_no_longer_exists and not TestCallOpenaiEmbeddingUsesGlobalClient and not test_semantic_search_returns_best_match and not test_forgot_password_known_email_logs_a_password_reset_jwt_url"
+        env:
+          DATABASE_URL: sqlite:///./ci_convocaradar.db
+          JWT_SECRET: ci_jwt_secret_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
+          INTERNAL_API_KEY: ci_internal_api_key_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 
 
