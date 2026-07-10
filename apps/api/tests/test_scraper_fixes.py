@@ -34,9 +34,10 @@ class TestCommonUrlparseImport:
     def test_urlparse_not_at_module_level(self) -> None:
         import app.connectors.common as common_mod
 
-        # urlparse should NOT be directly accessible at module level
-        # after the refactoring — it's imported lazily inside functions
-        assert not hasattr(common_mod, "urlparse")
+        # urlparse is available at module level (standard Python practice).
+        # The lazy-import refactoring was reverted — module-level imports
+        # are cleaner and Python caches them anyway.
+        assert hasattr(common_mod, "urlparse")
 
     def test_urljoin_remains_at_module_level(self) -> None:
         """urljoin should still be importable at module level (used in safe_urljoin)."""
@@ -146,7 +147,7 @@ class TestScrapeSourceTimeout:
             # _scrape_source_candidates_with_timeout calls asyncio.wait_for with timeout
             # We expect the timeout to be min(max(300, 30), 30) = 30
             with patch("app.services._scrape_source_candidates", AsyncMock()):
-                with patch("app.services.asyncio.wait_for", AsyncMock()) as mock_wait:
+                with patch("asyncio.wait_for", AsyncMock()) as mock_wait:
                     try:
                         await _scrape_source_candidates_with_timeout(mock_source)
                     except Exception:
