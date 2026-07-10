@@ -100,6 +100,10 @@ export type SourceHealth = {
   average_items_found: number;
   last_run_duration_seconds: number | null;
   days_since_last_success: number | null;
+  health_score: number;
+  health_status: "healthy" | "stable" | "degraded" | "critical" | string;
+  tier: string | null;
+  auto_paused: boolean;
 };
 
 export type SourceRun = {
