@@ -167,6 +167,7 @@ class ConfigurableHtmlConnector:
             "list_selector": None,
             "title_selector": None,
             "link_selector": None,
+            "content_selector": None,
         }
 
     @property

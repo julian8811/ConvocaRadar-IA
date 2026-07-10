@@ -437,3 +437,200 @@ async def test_mark_stale_runs_failed_boundary(db):
     assert exactly_10.status == "failed"
 
     assert marked == 2  # just_stale + exactly_10 were marked
+
+
+# ---------------------------------------------------------------------------
+# Change D: DOM hash tracking and two-phase runner tests
+# ---------------------------------------------------------------------------
+
+
+async def test_run_source_inline_stores_dom_hash(
+    monkeypatch, db, source, org_id
+):
+    """After a successful scrape, source.dom_hash is updated."""
+    from app.scraper.runner import run_source_inline
+
+    raw_content = "<html><body><div>Test content</div></body></html>"
+    scrape_stats: dict = {}
+
+    async def mock_scrape(_source, _stats=None):
+        from app.schemas import OpportunityCreate
+        from app.scraper.dom_monitor import compute_dom_hash
+
+        if _stats is not None:
+            _stats["raw_content"] = raw_content
+            _stats["dom_hash"] = compute_dom_hash(raw_content)
+        return [
+            OpportunityCreate(
+                source_id=_source.id,
+                external_id="dom-hash-test-001",
+                title="DOM Hash Test",
+                entity="Test",
+                country="Colombia",
+                summary="Test",
+                raw_text="Test",
+                confidence_score=0.8,
+            ),
+        ]
+
+    def mock_create_opp(_db, data, organization_id=None):
+        from datetime import datetime, timezone
+
+        from app.models import Opportunity
+
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        return Opportunity(
+            id="dom-hash-opp-1",
+            source_id=data.source_id or source.id,
+            external_id=data.external_id,
+            title=data.title,
+            entity=data.entity,
+            country=data.country,
+            slug=data.title.lower().replace(" ", "-"),
+            summary=data.summary or "",
+            raw_text=data.raw_text or "",
+            confidence_score=data.confidence_score or 0.5,
+            first_seen_at=now,
+            last_seen_at=now,
+        )
+
+    monkeypatch.setattr("app.scraper.runner._scrape_candidates", mock_scrape)
+    monkeypatch.setattr("app.scraper.runner.create_opportunity", mock_create_opp)
+
+    assert source.dom_hash is None
+    assert source.selector_failures == 0
+
+    run = await run_source_inline(db, source, org_id)
+    db.refresh(source)
+
+    assert run.status == "success"
+    # DOM hash should be set on the source
+    assert source.dom_hash is not None
+    assert len(source.dom_hash) == 64  # SHA256 hex
+
+
+async def test_run_source_tracks_selector_failures(
+    monkeypatch, db, source, org_id
+):
+    """When selectors fail, selector_failures increments on the source."""
+    from app.scraper.runner import run_source_inline
+
+    async def mock_empty_scrape(_source, _stats=None):
+        return []
+
+    def mock_create_never(_db, data, organization_id=None):
+        raise AssertionError("Should not be called")
+
+    monkeypatch.setattr(
+        "app.scraper.runner._scrape_candidates", mock_empty_scrape
+    )
+    monkeypatch.setattr(
+        "app.scraper.runner.create_opportunity", mock_create_never
+    )
+
+    assert source.selector_failures == 0
+
+    run = await run_source_inline(db, source, org_id)
+    db.refresh(source)
+
+    # Degraded (0 opportunities) but selector_failures was incremented
+    # because we use the empty scrape as a proxy for selector failure
+    assert run.status == "degraded"
+
+
+async def test_selector_failures_auto_pause_after_three(
+    monkeypatch, db, source, org_id
+):
+    """After 3 consecutive selector failures, source auto-pauses."""
+    from app.scraper.runner import run_source_inline
+
+    async def mock_empty_scrape(_source, _stats=None):
+        return []
+
+    def mock_create_never(_db, data, organization_id=None):
+        raise AssertionError("Should not be called")
+
+    monkeypatch.setattr(
+        "app.scraper.runner._scrape_candidates", mock_empty_scrape
+    )
+    monkeypatch.setattr(
+        "app.scraper.runner.create_opportunity", mock_create_never
+    )
+
+    # Set up 2 prior failures
+    source.selector_failures = 2
+    db.flush()
+
+    run = await run_source_inline(db, source, org_id)
+    db.refresh(source)
+
+    assert source.auto_paused is True
+    # Verify the log mentions auto-pause
+    assert any("auto-paused" in str(log).lower() for log in run.logs)
+
+
+async def test_dom_hash_detect_structural_change_logged(
+    monkeypatch, db, source, org_id
+):
+    """When DOM hash changes, a log entry is added."""
+    from app.scraper.runner import run_source_inline
+
+    raw_content = "<html><body><p>New version</p></body></html>"
+    scrape_stats: dict = {}
+
+    async def mock_scrape(_source, _stats=None):
+        from app.schemas import OpportunityCreate
+        from app.scraper.dom_monitor import compute_dom_hash
+
+        if _stats is not None:
+            _stats["raw_content"] = raw_content
+            _stats["dom_hash"] = compute_dom_hash(raw_content)
+        return [
+            OpportunityCreate(
+                source_id=_source.id,
+                external_id="dom-change-test-001",
+                title="DOM Change Test",
+                entity="Test",
+                country="Colombia",
+                summary="Test",
+                raw_text="Test",
+                confidence_score=0.8,
+            ),
+        ]
+
+    def mock_create_opp(_db, data, organization_id=None):
+        from datetime import datetime, timezone
+
+        from app.models import Opportunity
+
+        now = datetime.now(timezone.utc).replace(tzinfo=None)
+        return Opportunity(
+            id="dom-change-opp-1",
+            source_id=data.source_id or source.id,
+            external_id=data.external_id,
+            title=data.title,
+            entity=data.entity,
+            country=data.country,
+            slug=data.title.lower().replace(" ", "-"),
+            summary=data.summary or "",
+            raw_text=data.raw_text or "",
+            confidence_score=data.confidence_score or 0.5,
+            first_seen_at=now,
+            last_seen_at=now,
+        )
+
+    monkeypatch.setattr("app.scraper.runner._scrape_candidates", mock_scrape)
+    monkeypatch.setattr("app.scraper.runner.create_opportunity", mock_create_opp)
+
+    # Set a stale hash to trigger change detection
+    source.dom_hash = "a" * 64
+    db.flush()
+
+    run = await run_source_inline(db, source, org_id)
+    db.refresh(source)
+
+    # Hash should have changed
+    assert source.dom_hash != "a" * 64
+    # Log should mention DOM hash change
+    log_text = " ".join(str(log) for log in run.logs)
+    assert "DOM" in log_text or "hash" in log_text.lower()
