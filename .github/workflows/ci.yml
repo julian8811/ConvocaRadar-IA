@@ -8,9 +8,6 @@ on:
 jobs:
   web:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps/web
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -19,25 +16,25 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
+          cache: pnpm
+
+      - name: Install pnpm
+        run: npm install -g pnpm
 
       - name: Install dependencies
-        run: npm install
+        run: pnpm install
 
       - name: Lint
-        run: npm run lint
+        run: pnpm --filter @convocaradar/web lint
 
       - name: Test
-        run: npm run test -- --run
+        run: pnpm --filter @convocaradar/web test -- --run
 
       - name: Build
-        run: npm run build
+        run: pnpm --filter @convocaradar/web build
 
   e2e:
     runs-on: ubuntu-latest
-    defaults:
-      run:
-        working-directory: apps/web
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -46,7 +43,10 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
+          cache: pnpm
+
+      - name: Install pnpm
+        run: npm install -g pnpm
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -60,8 +60,6 @@ jobs:
       - name: Seed API database
         run: |
           python -m app.db.seed
-          # Also create the local admin user — seed() only creates the
-          # org + sources; seed_admin is the explicit step for users.
           E2E_ADMIN_PW=ConvocaRadarLocal123! \
             python -m app.db.seed_admin \
             --email admin@convocaradar.io \
@@ -70,7 +68,6 @@ jobs:
         env:
           DATABASE_URL: sqlite:///./ci_convocaradar.db
           BOOTSTRAP_SOURCES_ON_STARTUP: "false"
-          # Tier 1 hardening: Settings refuses to start without these.
           JWT_SECRET: ci_jwt_secret_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
           INTERNAL_API_KEY: ci_internal_api_key_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
           E2E_ADMIN_PW: ConvocaRadarLocal123!
@@ -85,18 +82,18 @@ jobs:
           INTERNAL_API_KEY: ci_internal_api_key_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 
       - name: Install web dependencies
-        run: npm install
+        run: pnpm install --filter @convocaradar/web
 
       - name: Install Playwright
-        run: npx playwright install chromium
+        run: pnpm --filter @convocaradar/web exec playwright install chromium
 
       - name: Build web
-        run: npm run build
+        run: pnpm --filter @convocaradar/web build
         env:
           NEXT_PUBLIC_API_URL: http://127.0.0.1:8000/api/v1
 
       - name: Start web
-        run: npm run start -- --hostname 127.0.0.1 --port 3001 &
+        run: pnpm --filter @convocaradar/web start -- --hostname 127.0.0.1 --port 3001 &
         env:
           NEXT_PUBLIC_API_URL: http://127.0.0.1:8000/api/v1
 
@@ -109,7 +106,7 @@ jobs:
           exit 1
 
       - name: Playwright E2E
-        run: npm run test:e2e
+        run: pnpm --filter @convocaradar/web test:e2e
         env:
           PLAYWRIGHT_BASE_URL: http://127.0.0.1:3001
           NEXT_PUBLIC_API_URL: http://127.0.0.1:8000/api/v1
