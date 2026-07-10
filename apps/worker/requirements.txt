@@ -1,0 +1,6 @@
+arq>=0.26.0
+httpx>=0.27.0
+psycopg[binary]>=3.2.1
+sqlalchemy>=2.0.32
+structlog>=24.4.0
+pydantic-settings>=2.4.0

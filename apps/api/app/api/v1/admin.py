@@ -6,9 +6,8 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_organization, get_current_user
 from app.db.session import get_db
-from app.services import execute_source_run_locally
 from app.models import Alert, AuditLog, Opportunity, OpportunityEmbedding, Organization, Report, Role, Source, SourceRun, Task, User
-from app.schemas import AdminMetricsRead, AuditLogRead, SourceRunOverviewRead
+from app.schemas import AdminMetricsRead, AuditLogRead, SourceRunRead, SourceRunOverviewRead
 from app.db.bootstrap import bootstrap_priority_sources
 from app.db.seed import seed_default_sources
 from app.services import (
@@ -600,3 +599,25 @@ def clear_source_errors(
     db.commit()
     audit(db, "clear_source_errors", "source", user, str(cleared))
     return {"total": len(sources), "cleared": cleared, "error_pattern": error_pattern or "all"}
+
+
+# ---------------------------------------------------------------------------
+# PR2: Worker / run-status endpoint
+# ---------------------------------------------------------------------------
+
+
+@router.get("/admin/worker/runs/{run_id}", response_model=SourceRunRead)
+def get_worker_run(
+    run_id: str,
+    _: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> SourceRun:
+    """Return a single SourceRun by ID, regardless of org.
+
+    Admin-only. Used by the worker and dashboards to inspect a specific
+    run's status, progress, logs, and results.
+    """
+    run = db.scalar(select(SourceRun).where(SourceRun.id == run_id))
+    if not run:
+        raise HTTPException(status_code=404, detail="SourceRun not found")
+    return run
