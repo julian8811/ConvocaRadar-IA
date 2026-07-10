@@ -9,13 +9,13 @@ router = APIRouter(prefix="/ai")
 
 
 @router.post("/extract-opportunity", response_model=AiOpportunityExtract)
-def extract_opportunity(payload: AiTextRequest, user: User = Depends(get_current_user)) -> dict[str, object]:
-    return create_ai_extraction(payload.text)
+async def extract_opportunity(payload: AiTextRequest, user: User = Depends(get_current_user)) -> dict[str, object]:
+    return await create_ai_extraction(payload.text)
 
 
 @router.post("/classify-opportunity")
-def classify_opportunity(payload: AiTextRequest, user: User = Depends(get_current_user)) -> dict[str, object]:
-    extraction = create_ai_extraction(payload.text)
+async def classify_opportunity(payload: AiTextRequest, user: User = Depends(get_current_user)) -> dict[str, object]:
+    extraction = await create_ai_extraction(payload.text)
     return {
         "category": extraction["category"],
         "confidence": extraction["confidence"],
@@ -25,8 +25,8 @@ def classify_opportunity(payload: AiTextRequest, user: User = Depends(get_curren
 
 
 @router.post("/score-opportunity")
-def score_opportunity(payload: AiTextRequest, user: User = Depends(get_current_user)) -> dict[str, object]:
-    extraction = create_ai_extraction(payload.text)
+async def score_opportunity(payload: AiTextRequest, user: User = Depends(get_current_user)) -> dict[str, object]:
+    extraction = await create_ai_extraction(payload.text)
     score = round(float(extraction.get("confidence", 0.5)) * 100)
     return {
         "score": score,

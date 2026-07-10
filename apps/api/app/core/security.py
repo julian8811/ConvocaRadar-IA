@@ -78,3 +78,47 @@ def decode_access_token(token: str) -> dict[str, Any]:
         return jwt.decode(token, settings.jwt_secret, algorithms=[settings.jwt_algorithm])
     except JWTError as exc:
         raise ValueError("Invalid token") from exc
+
+
+def create_reset_token(
+    subject: str,
+    extra: dict[str, Any] | None = None,
+    scope: str = "password_reset",
+) -> str:
+    """Mint a JWT for password-reset flows, signed with ``reset_token_secret``.
+
+    Parameters
+    ----------
+    subject:
+        The user id (or any stable identifier) to embed as the ``sub`` claim.
+    extra:
+        Optional bag of extra claims (e.g. ``{"password_changed_at": ...}``).
+    scope:
+        The token's intended purpose. Defaults to ``"password_reset"``. The
+        reset-password endpoint checks this claim.
+
+    Notes
+    -----
+    Uses ``reset_token_secret`` (separate from ``jwt_secret``) so a
+    compromise of one key does not compromise the other token type. The
+    expiry matches ``access_token_expire_minutes``.
+    """
+    settings = get_settings()
+    expires = datetime.now(UTC) + timedelta(minutes=settings.access_token_expire_minutes)
+    payload: dict[str, Any] = {"sub": subject, "exp": expires, "scope": scope}
+    if extra:
+        payload.update(extra)
+    return jwt.encode(payload, settings.reset_token_secret, algorithm=settings.jwt_algorithm)
+
+
+def decode_reset_token(token: str) -> dict[str, Any]:
+    """Decode and validate a reset token signed with ``reset_token_secret``.
+
+    Raises ``ValueError`` if the token is expired, malformed, or signed
+    with the wrong key (e.g. an access token using ``jwt_secret``).
+    """
+    settings = get_settings()
+    try:
+        return jwt.decode(token, settings.reset_token_secret, algorithms=[settings.jwt_algorithm])
+    except JWTError as exc:
+        raise ValueError("Invalid token") from exc

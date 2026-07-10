@@ -62,27 +62,17 @@ vi.mock("lucide-react", () => {
   };
 });
 
-// Plotly chart components use dynamic import (next/dynamic) which isn't
-// available in the vitest happy-dom environment. Stub them with inert
-// placeholder divs so the HealthZone renders without trying to load the
-// real Plotly bundle.
-vi.mock("@/components/dashboard/charts/PlotlyStatusChart", () => ({
-  PlotlyStatusChart: () => <div data-testid="plotly-status-chart" />,
-}));
-vi.mock("@/components/dashboard/charts/PlotlyCountryChart", () => ({
-  PlotlyCountryChart: () => <div data-testid="plotly-country-chart" />,
-}));
-vi.mock("@/components/dashboard/charts/PlotlyScoreChart", () => ({
-  PlotlyScoreChart: () => <div data-testid="plotly-score-chart" />,
-}));
-vi.mock("@/components/dashboard/charts/PlotlyFundingChart", () => ({
-  PlotlyFundingChart: () => <div data-testid="plotly-funding-chart" />,
-}));
-vi.mock("@/components/dashboard/charts/PlotlySourceChart", () => ({
-  PlotlySourceChart: () => <div data-testid="plotly-source-chart" />,
-}));
-vi.mock("@/components/dashboard/charts/PlotlyCategoryChart", () => ({
-  PlotlyCategoryChart: () => <div data-testid="plotly-category-chart" />,
+// Charts are now Recharts-based. The barrel import at
+// @/components/dashboard/charts resolves to the new Recharts components.
+// We stub the barrel so HealthZone doesn't need the full Recharts SVG
+// rendering in happy-dom.
+vi.mock("@/components/dashboard/charts", () => ({
+  StatusChart: () => <div data-testid="recharts-status-chart" />,
+  CountryChart: () => <div data-testid="recharts-country-chart" />,
+  ScoreChart: () => <div data-testid="recharts-score-chart" />,
+  FundingChart: () => <div data-testid="recharts-funding-chart" />,
+  SourceChart: () => <div data-testid="recharts-source-chart" />,
+  CategoryChart: () => <div data-testid="recharts-category-chart" />,
 }));
 
 function makeWrapper() {

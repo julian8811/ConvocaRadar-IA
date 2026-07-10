@@ -24,7 +24,7 @@ from jose import jwt
 from sqlalchemy import select
 
 from app.core.config import get_settings
-from app.core.security import create_access_token, hash_password
+from app.core.security import create_access_token, create_reset_token, hash_password
 from app.db.seed import seed
 from app.db.session import SessionLocal
 from app.main import app
@@ -65,12 +65,15 @@ def _get_user(email: str) -> User | None:
         db.close()
 
 
-def _mint_reset_token(user_id: str, *, password_changed_at: int = 0, scope: str = "password_reset") -> str:
-    """Mint a JWT the same way the forgot-password endpoint does."""
-    return create_access_token(
+def _mint_reset_token(user_id: str, *, password_changed_at: int = 0) -> str:
+    """Mint a JWT the same way the forgot-password endpoint does.
+
+    Uses ``create_reset_token`` (signed with ``reset_token_secret``) so
+    the reset-password endpoint's ``decode_reset_token`` can decode it.
+    """
+    return create_reset_token(
         user_id,
         extra={"password_changed_at": password_changed_at},
-        scope=scope,
     )
 
 
@@ -168,7 +171,7 @@ def test_reset_password_expired_jwt_returns_400() -> None:
             "scope": "password_reset",
             "password_changed_at": 0,
         },
-        settings.jwt_secret,
+        settings.reset_token_secret,
         algorithm=settings.jwt_algorithm,
     )
     c = TestClient(app)
@@ -193,11 +196,13 @@ def test_reset_password_wrong_scope_returns_400() -> None:
     scope check on reset-password is missing.
     """
     user_id = _create_user(email="reset-wrong-scope@example.com")
-    access_token = create_access_token(user_id, scope="access")
+    # Mint a token with reset_token_secret but wrong scope ("access").
+    # This must fail at the scope check, not the signature check.
+    wrong_scope_token = create_reset_token(user_id, scope="access")
     c = TestClient(app)
     response = c.post(
         "/api/v1/auth/reset-password",
-        json={"token": access_token, "new_password": "brand-new-secret-4"},
+        json={"token": wrong_scope_token, "new_password": "brand-new-secret-4"},
     )
     assert response.status_code in (400, 401), (
         f"Expected 400/401 on wrong-scope JWT, got {response.status_code}: {response.text}"

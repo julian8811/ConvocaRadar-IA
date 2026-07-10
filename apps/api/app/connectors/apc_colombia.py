@@ -7,6 +7,7 @@ from selectolax.parser import HTMLParser
 
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
 from app.connectors.common import clean_text, fetch_httpx_text, normalize_text, parse_date_text
+from app.connectors.registry import register
 
 
 APC_URLS = [
@@ -63,6 +64,7 @@ def _is_generic_title(value: str) -> bool:
     return any(lowered.startswith(keyword) for keyword in GENERIC_TITLE_KEYWORDS)
 
 
+@register("apc-colombia")
 class ApcColombiaConnector:
     source_key = "apc-colombia"
 

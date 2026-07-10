@@ -23,12 +23,14 @@ import { ErrorState } from "@/components/ui/state";
 import { api } from "@/lib/api";
 import type { DashboardDataCoverage, HealthRead, SourceHealth } from "@/lib/types";
 import { HealthSkeleton } from "@/components/dashboard/skeletons/HealthSkeleton";
-import { PlotlyCountryChart } from "@/components/dashboard/charts/PlotlyCountryChart";
-import { PlotlyStatusChart } from "@/components/dashboard/charts/PlotlyStatusChart";
-import { PlotlyScoreChart } from "@/components/dashboard/charts/PlotlyScoreChart";
-import { PlotlyFundingChart } from "@/components/dashboard/charts/PlotlyFundingChart";
-import { PlotlySourceChart } from "@/components/dashboard/charts/PlotlySourceChart";
-import { PlotlyCategoryChart } from "@/components/dashboard/charts/PlotlyCategoryChart";
+import {
+  StatusChart,
+  CountryChart,
+  ScoreChart,
+  FundingChart,
+  SourceChart,
+  CategoryChart,
+} from "@/components/dashboard/charts";
 
 function formatNumber(value: number) {
   return new Intl.NumberFormat("es-CO", { maximumFractionDigits: 0 }).format(value);
@@ -165,7 +167,7 @@ export function HealthZone() {
             <CardDescription>Distribución agregada en servidor, sin muestreo parcial.</CardDescription>
           </CardHeader>
           <CardContent className="pt-5">
-            <PlotlyStatusChart data={data.status_breakdown} />
+            <StatusChart data={data.status_breakdown} />
           </CardContent>
         </Card>
 
@@ -178,7 +180,7 @@ export function HealthZone() {
             <CardDescription>Top países con mayor volumen detectado.</CardDescription>
           </CardHeader>
           <CardContent className="pt-5">
-            <PlotlyCountryChart data={data.country_breakdown} />
+            <CountryChart data={data.country_breakdown} />
           </CardContent>
         </Card>
       </div>
@@ -193,7 +195,7 @@ export function HealthZone() {
             <CardDescription>Cuántas convocatorias en cada rango de compatibilidad.</CardDescription>
           </CardHeader>
           <CardContent className="pt-5">
-            <PlotlyScoreChart data={data.score_distribution} />
+            <ScoreChart data={data.score_distribution} />
           </CardContent>
         </Card>
 
@@ -206,7 +208,7 @@ export function HealthZone() {
             <CardDescription>Distribución por monto de financiamiento.</CardDescription>
           </CardHeader>
           <CardContent className="pt-5">
-            <PlotlyFundingChart data={data.funding_ranges} />
+            <FundingChart data={data.funding_ranges} />
           </CardContent>
         </Card>
       </div>
@@ -221,7 +223,7 @@ export function HealthZone() {
             <CardDescription>Top fuentes que más convocatorias aportan.</CardDescription>
           </CardHeader>
           <CardContent className="pt-5">
-            <PlotlySourceChart data={data.source_contribution} />
+            <SourceChart data={data.source_contribution} />
           </CardContent>
         </Card>
       </div>
@@ -236,7 +238,7 @@ export function HealthZone() {
             <CardDescription>Distribución por tipo: innovación, investigación, emprendimiento, etc.</CardDescription>
           </CardHeader>
           <CardContent className="pt-5">
-            <PlotlyCategoryChart data={data.category_distribution} />
+            <CategoryChart data={data.category_distribution} />
           </CardContent>
         </Card>
       </div>

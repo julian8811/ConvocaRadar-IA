@@ -5,9 +5,8 @@ import json
 from datetime import UTC, datetime
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
-import httpx
-
 from app.core.config import get_settings
+from app.core.http_client import http_client
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
 from app.connectors.common import clean_text, is_allowed_host, parse_date_text
 
@@ -90,20 +89,25 @@ class WordPressGrantsConnector:
         all_items: list[dict[str, object]] = []
         final_url = self.base_url
         total_pages = 1
-        async with httpx.AsyncClient(timeout=settings.scraping_timeout_seconds, headers=headers, follow_redirects=True) as client:
-            for page in range(1, 51):
-                page_url = _with_page(self.base_url, page)
-                response = await client.get(page_url)
-                response.raise_for_status()
-                final_url = str(response.url)
-                if page == 1:
-                    total_pages = int(response.headers.get("X-WP-TotalPages", "1") or "1")
-                payload = response.json()
-                if not isinstance(payload, list) or not payload:
-                    break
-                all_items.extend(item for item in payload if isinstance(item, dict))
-                if page >= total_pages:
-                    break
+        client = await http_client()
+        for page in range(1, 51):
+            page_url = _with_page(self.base_url, page)
+            response = await client.get(
+                page_url,
+                timeout=settings.scraping_timeout_seconds,
+                headers=headers,
+                follow_redirects=True,
+            )
+            response.raise_for_status()
+            final_url = str(response.url)
+            if page == 1:
+                total_pages = int(response.headers.get("X-WP-TotalPages", "1") or "1")
+            payload = response.json()
+            if not isinstance(payload, list) or not payload:
+                break
+            all_items.extend(item for item in payload if isinstance(item, dict))
+            if page >= total_pages:
+                break
         content = json.dumps(all_items, ensure_ascii=False)
         return RawSourceResult(
             source_key=self.source_key,

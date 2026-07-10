@@ -62,14 +62,14 @@ def token(c: TestClient) -> str:
     return response.json()["access_token"]
 
 
-def create_fixture_opportunity(*, close_days: int = 30) -> str:
+async def create_fixture_opportunity(*, close_days: int = 30) -> str:
     db = SessionLocal()
     try:
         organization = db.scalar(select(Organization).where(Organization.slug == "convocaradar-local"))
         assert organization is not None
         source = db.scalar(select(Source).where(Source.key == "grants-gov"))
         assert source is not None
-        opportunity = create_opportunity(
+        opportunity = await create_opportunity(
             db,
             OpportunityCreate(
                 source_id=source.id,
@@ -109,10 +109,11 @@ def test_login_and_me() -> None:
     assert response.json()["email"] == "admin@convocaradar.io"
 
 
-def test_opportunities_and_score() -> None:
+@pytest.mark.asyncio
+async def test_opportunities_and_score() -> None:
     c = client()
     auth = {"Authorization": f"Bearer {token(c)}"}
-    opportunity_id = create_fixture_opportunity()
+    opportunity_id = await create_fixture_opportunity()
     response = c.get("/api/v1/opportunities", headers=auth)
     assert response.status_code == 200
     items = response.json()["items"]
@@ -128,10 +129,11 @@ def test_opportunities_and_score() -> None:
     assert score.json()["priority"] in {"high", "medium", "low", "not_recommended"}
 
 
-def test_semantic_search_returns_best_match() -> None:
+@pytest.mark.asyncio
+async def test_semantic_search_returns_best_match() -> None:
     c = client()
     auth = {"Authorization": f"Bearer {token(c)}"}
-    opportunity_id = create_fixture_opportunity()
+    opportunity_id = await create_fixture_opportunity()
     response = c.get("/api/v1/opportunities/semantic-search?query=research%20innovation%20grant", headers=auth)
     assert response.status_code == 200
     payload = response.json()
@@ -148,10 +150,11 @@ def test_semantic_search_returns_best_match() -> None:
     assert embedding.embedding
 
 
-def test_text_search_matches_description_and_summary() -> None:
+@pytest.mark.asyncio
+async def test_text_search_matches_description_and_summary() -> None:
     c = client()
     auth = {"Authorization": f"Bearer {token(c)}"}
-    opportunity_id = create_fixture_opportunity()
+    opportunity_id = await create_fixture_opportunity()
     response = c.get("/api/v1/opportunities?search=prueba%20creada%20para%20validar", headers=auth)
     assert response.status_code == 200
     payload = response.json()
@@ -159,7 +162,8 @@ def test_text_search_matches_description_and_summary() -> None:
     assert any(item["id"] == opportunity_id for item in payload["items"])
 
 
-def test_reanalyze_opportunity_improves_payload() -> None:
+@pytest.mark.asyncio
+async def test_reanalyze_opportunity_improves_payload() -> None:
     c = client()
     auth = {"Authorization": f"Bearer {token(c)}"}
     db = SessionLocal()
@@ -167,7 +171,7 @@ def test_reanalyze_opportunity_improves_payload() -> None:
         organization = db.scalar(select(Organization).where(Organization.slug == "convocaradar-local"))
         source = db.scalar(select(Source).where(Source.key == "grants-gov"))
         assert organization is not None and source is not None
-        opportunity = create_opportunity(
+        opportunity = await create_opportunity(
             db,
             OpportunityCreate(
                 source_id=source.id,
@@ -200,10 +204,11 @@ def test_reanalyze_opportunity_improves_payload() -> None:
     assert payload["confidence_score"] >= 0.2
 
 
-def test_bulk_reanalyze_opportunities() -> None:
+@pytest.mark.asyncio
+async def test_bulk_reanalyze_opportunities() -> None:
     c = client()
     auth = {"Authorization": f"Bearer {token(c)}"}
-    opportunity_id = create_fixture_opportunity()
+    opportunity_id = await create_fixture_opportunity()
     response = c.post("/api/v1/opportunities/reanalyze-all?force=true&limit=25", headers=auth)
     assert response.status_code == 200
     payload = response.json()
@@ -294,10 +299,11 @@ def test_sources_health_endpoint() -> None:
     assert "average_items_found" in source_health[0]
 
 
-def test_opportunity_document_lifecycle() -> None:
+@pytest.mark.asyncio
+async def test_opportunity_document_lifecycle() -> None:
     c = client()
     auth = {"Authorization": f"Bearer {token(c)}"}
-    opportunity_id = create_fixture_opportunity()
+    opportunity_id = await create_fixture_opportunity()
 
     upload = c.post(
         f"/api/v1/opportunities/{opportunity_id}/documents",
@@ -365,10 +371,11 @@ def test_rate_limit_blocks_repeated_requests(monkeypatch) -> None:
     assert second.status_code == 429
 
 
-def test_report_creation() -> None:
+@pytest.mark.asyncio
+async def test_report_creation() -> None:
     c = client()
     auth = {"Authorization": f"Bearer {token(c)}"}
-    create_fixture_opportunity()
+    await create_fixture_opportunity()
     response = c.post("/api/v1/reports", headers=auth, json={"title": "Reporte institucional", "format": "html"})
     assert response.status_code == 200
     html = response.json()["html_content"]
@@ -442,13 +449,14 @@ def test_ai_structured_extraction_ignores_scraping_noise() -> None:
     assert payload["confidence"] >= 0.5
 
 
-def test_create_opportunity_enriches_incomplete_payload() -> None:
+@pytest.mark.asyncio
+async def test_create_opportunity_enriches_incomplete_payload() -> None:
     db = SessionLocal()
     try:
         organization = db.scalar(select(Organization).where(Organization.slug == "convocaradar-local"))
         source = db.scalar(select(Source).where(Source.key == "grants-gov"))
         assert organization is not None and source is not None
-        opportunity = create_opportunity(
+        opportunity = await create_opportunity(
             db,
             OpportunityCreate(
                 source_id=source.id,
@@ -479,14 +487,15 @@ def test_create_opportunity_enriches_incomplete_payload() -> None:
     assert opportunity.confidence_score >= 0.35
 
 
-def test_create_opportunity_rejects_noise_title() -> None:
+@pytest.mark.asyncio
+async def test_create_opportunity_rejects_noise_title() -> None:
     db = SessionLocal()
     try:
         organization = db.scalar(select(Organization).where(Organization.slug == "convocaradar-local"))
         source = db.scalar(select(Source).where(Source.key == "grants-gov"))
         assert organization is not None and source is not None
         with pytest.raises(ValueError, match="scraping noise"):
-            create_opportunity(
+            await create_opportunity(
                 db,
                 OpportunityCreate(
                     source_id=source.id,
@@ -512,7 +521,8 @@ def test_opportunity_dedup_key_uses_grants_gov_id() -> None:
     assert key == "grants-gov:2831"
 
 
-def test_create_opportunity_merges_cross_source_grants_gov_duplicates() -> None:
+@pytest.mark.asyncio
+async def test_create_opportunity_merges_cross_source_grants_gov_duplicates() -> None:
     seed()
     db = SessionLocal()
     try:
@@ -523,7 +533,7 @@ def test_create_opportunity_merges_cross_source_grants_gov_duplicates() -> None:
 
         shared_url = "https://www.grants.gov/search-results-detail/2831"
         shared_raw = json.dumps({"id": "2831", "number": "OFOP0002831", "agencyName": "DOS-IND"})
-        first = create_opportunity(
+        first = await create_opportunity(
             db,
             OpportunityCreate(
                 source_id=grants_source.id,
@@ -538,7 +548,7 @@ def test_create_opportunity_merges_cross_source_grants_gov_duplicates() -> None:
             ),
             organization_id=organization.id,
         )
-        second = create_opportunity(
+        second = await create_opportunity(
             db,
             OpportunityCreate(
                 source_id=usaid_source.id,
@@ -564,7 +574,8 @@ def test_create_opportunity_merges_cross_source_grants_gov_duplicates() -> None:
     assert second_entity == "USAID"
 
 
-def test_deduplicate_opportunities_removes_existing_duplicates() -> None:
+@pytest.mark.asyncio
+async def test_deduplicate_opportunities_removes_existing_duplicates() -> None:
     seed()
     db = SessionLocal()
     try:
@@ -575,7 +586,7 @@ def test_deduplicate_opportunities_removes_existing_duplicates() -> None:
 
         shared_url = "https://www.grants.gov/search-results-detail/4242"
         shared_raw = json.dumps({"id": "4242", "number": "OFOP0004242"})
-        first = create_opportunity(
+        first = await create_opportunity(
             db,
             OpportunityCreate(
                 source_id=grants_source.id,
@@ -917,10 +928,11 @@ def test_send_pending_alert_uses_email_delivery_flow() -> None:
     assert any(item["action"] == "send_alert" and item["resource_id"] == alert_id for item in logs.json())
 
 
-def test_generate_recommended_alerts_for_closing_soon() -> None:
+@pytest.mark.asyncio
+async def test_generate_recommended_alerts_for_closing_soon() -> None:
     c = client()
     auth = {"Authorization": f"Bearer {token(c)}"}
-    create_fixture_opportunity(close_days=3)
+    await create_fixture_opportunity(close_days=3)
 
     generated = c.post("/api/v1/alerts/generate", headers=auth)
     assert generated.status_code == 200
@@ -964,10 +976,11 @@ def test_admin_metrics() -> None:
     assert "stale_sources" in payload
 
 
-def test_dashboard_summary() -> None:
+@pytest.mark.asyncio
+async def test_dashboard_summary() -> None:
     c = client()
     auth = {"Authorization": f"Bearer {token(c)}"}
-    create_fixture_opportunity(close_days=5)
+    await create_fixture_opportunity(close_days=5)
     response = c.get("/api/v1/dashboard/summary", headers=auth)
     assert response.status_code == 200
     payload = response.json()
@@ -1009,10 +1022,11 @@ def test_admin_bootstrap_data_endpoint() -> None:
     assert payload["status"] in {"completed", "skipped"}
 
 
-def test_admin_rebuild_embeddings() -> None:
+@pytest.mark.asyncio
+async def test_admin_rebuild_embeddings() -> None:
     c = client()
     auth = {"Authorization": f"Bearer {token(c)}"}
-    opportunity_id = create_fixture_opportunity()
+    opportunity_id = await create_fixture_opportunity()
     response = c.post("/api/v1/admin/embeddings/rebuild?limit=10", headers=auth)
     assert response.status_code == 200
     payload = response.json()

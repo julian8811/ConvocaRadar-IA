@@ -103,7 +103,7 @@ def _admin_token(c: TestClient) -> str:
     return response.json()["access_token"]
 
 
-def _make_opportunity(
+async def _make_opportunity(
     *,
     title: str,
     summary: str = "",
@@ -116,7 +116,7 @@ def _make_opportunity(
         assert organization is not None
         source = db.scalar(select(Source).where(Source.key == "grants-gov"))
         assert source is not None
-        opportunity = create_opportunity(
+        opportunity = await create_opportunity(
             db,
             OpportunityCreate(
                 source_id=source.id,
@@ -155,11 +155,12 @@ def _make_opportunity(
         db.close()
 
 
-def test_summarize_all_fills_missing_summaries() -> None:
+@pytest.mark.asyncio
+async def test_summarize_all_fills_missing_summaries() -> None:
     c = _client()
     auth = {"Authorization": f"Bearer {_admin_token(c)}"}
-    _make_opportunity(title="Convocatoria A sin resumen", summary="")
-    _make_opportunity(title="Convocatoria B con resumen", summary="Resumen previo")
+    await _make_opportunity(title="Convocatoria A sin resumen", summary="")
+    await _make_opportunity(title="Convocatoria B con resumen", summary="Resumen previo")
 
     response = c.post("/api/v1/admin/opportunities/summarize-all", headers=auth)
     assert response.status_code == 200, response.text
@@ -191,11 +192,12 @@ def test_summarize_all_requires_admin() -> None:
     assert response.status_code == 200
 
 
-def test_score_all_creates_scores_for_unscored() -> None:
+@pytest.mark.asyncio
+async def test_score_all_creates_scores_for_unscored() -> None:
     c = _client()
     auth = {"Authorization": f"Bearer {_admin_token(c)}"}
-    _make_opportunity(title="Sin score 1")
-    _make_opportunity(title="Sin score 2")
+    await _make_opportunity(title="Sin score 1")
+    await _make_opportunity(title="Sin score 2")
 
     response = c.post("/api/v1/admin/opportunities/score-all?limit=5", headers=auth)
     assert response.status_code == 200, response.text
@@ -211,10 +213,11 @@ def test_score_all_creates_scores_for_unscored() -> None:
         db.close()
 
 
-def test_score_all_is_idempotent() -> None:
+@pytest.mark.asyncio
+async def test_score_all_is_idempotent() -> None:
     c = _client()
     auth = {"Authorization": f"Bearer {_admin_token(c)}"}
-    _make_opportunity(title="Solo una vez")
+    await _make_opportunity(title="Solo una vez")
 
     first = c.post("/api/v1/admin/opportunities/score-all", headers=auth)
     assert first.status_code == 200
@@ -227,10 +230,11 @@ def test_score_all_is_idempotent() -> None:
     assert second.json()["scored"] == 0
 
 
-def test_send_digest_dry_run_when_smtp_not_configured() -> None:
+@pytest.mark.asyncio
+async def test_send_digest_dry_run_when_smtp_not_configured() -> None:
     c = _client()
     auth = {"Authorization": f"Bearer {_admin_token(c)}"}
-    _make_opportunity(title="Digest item", days_ago=2)
+    await _make_opportunity(title="Digest item", days_ago=2)
 
     response = c.post("/api/v1/admin/alerts/send-digest", headers=auth)
     assert response.status_code == 200, response.text

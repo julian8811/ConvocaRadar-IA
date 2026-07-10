@@ -44,6 +44,9 @@ dev = [
   "coverage>=7.6.1",
   "ruff>=0.6.2"
 ]
+worker = [
+  "arq>=0.26.0",
+]
 
 [tool.pytest.ini_options]
 testpaths = ["tests"]

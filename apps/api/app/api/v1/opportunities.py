@@ -104,13 +104,13 @@ def list_opportunities(
 
 
 @router.get("/opportunities/semantic-search", response_model=OpportunitySemanticList)
-def semantic_search(
+async def semantic_search(
     query: str = Query(min_length=2),
     limit: int = Query(default=10, ge=1, le=25),
     organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ) -> OpportunitySemanticList:
-    matches = semantic_search_opportunities(db, organization.id, query, limit=limit)
+    matches = await semantic_search_opportunities(db, organization.id, query, limit=limit)
     return OpportunitySemanticList(
         query=query,
         items=[{"opportunity": opportunity, "similarity": similarity} for opportunity, similarity in matches],
@@ -157,7 +157,7 @@ def get_opportunity(
 
 
 @router.patch("/opportunities/{opportunity_id}", response_model=OpportunityRead)
-def update_opportunity(
+async def update_opportunity(
     opportunity_id: str,
     payload: OpportunityUpdate,
     organization: Organization = Depends(get_current_organization),
@@ -167,7 +167,7 @@ def update_opportunity(
     opportunity = _get_opportunity_for_org(db, opportunity_id, organization)
     for key, value in payload.model_dump(exclude_unset=True).items():
         setattr(opportunity, key, value)
-    upsert_opportunity_embedding(db, opportunity)
+    await upsert_opportunity_embedding(db, opportunity)
     profile = db.scalar(select(OrganizationProfile).where(OrganizationProfile.organization_id == organization.id))
     if profile:
         calculate_score(db, opportunity, profile)
@@ -248,7 +248,7 @@ def score_opportunity(
 
 
 @router.post("/opportunities/{opportunity_id}/reanalyze", response_model=OpportunityRead)
-def reanalyze_single_opportunity(
+async def reanalyze_single_opportunity(
     opportunity_id: str,
     force: bool = False,
     organization: Organization = Depends(get_current_organization),
@@ -257,7 +257,7 @@ def reanalyze_single_opportunity(
     db: Session = Depends(get_db),
 ) -> Opportunity:
     opportunity = _get_opportunity_for_org(db, opportunity_id, organization)
-    reanalyze_opportunity(db, opportunity, force=force)
+    await reanalyze_opportunity(db, opportunity, force=force)
     calculate_score(db, opportunity, profile)
     audit(db, "reanalyze_opportunity", "opportunity", user, opportunity.id)
     db.commit()
@@ -266,7 +266,7 @@ def reanalyze_single_opportunity(
 
 
 @router.post("/opportunities/reanalyze-all")
-def reanalyze_all_opportunities(
+async def reanalyze_all_opportunities(
     force: bool = False,
     limit: int = Query(default=100, ge=1, le=500),
     organization: Organization = Depends(get_current_organization),
@@ -288,7 +288,7 @@ def reanalyze_all_opportunities(
     for opportunity in opportunities:
         processed += 1
         before_summary = opportunity.summary
-        reanalyze_opportunity(db, opportunity, force=force)
+        await reanalyze_opportunity(db, opportunity, force=force)
         calculate_score(db, opportunity, profile)
         if opportunity.summary != before_summary:
             updated += 1
@@ -369,6 +369,21 @@ def download_document(
         media_type=document.file_type,
         headers={"Content-Disposition": f'attachment; filename="{document.file_name}"'},
     )
+
+
+@router.get("/opportunities/{opportunity_id}/url-check")
+async def check_opportunity_urls(
+    opportunity_id: str,
+    organization: Organization = Depends(get_current_organization),
+    db: Session = Depends(get_db),
+) -> dict[str, bool]:
+    opportunity = _get_opportunity_for_org(db, opportunity_id, organization)
+    from app.services import url_is_reachable
+
+    return {
+        "official_url": url_is_reachable(opportunity.official_url) if opportunity.official_url else False,
+        "application_url": url_is_reachable(opportunity.application_url) if opportunity.application_url else False,
+    }
 
 
 @router.delete("/opportunity-documents/{document_id}", status_code=204)

@@ -112,7 +112,7 @@ def _token(c: TestClient) -> str:
     return response.json()["access_token"]
 
 
-def _make_opportunity(
+async def _make_opportunity(
     *,
     title: str,
     close_days: int | None = 30,
@@ -136,7 +136,7 @@ def _make_opportunity(
             if close_days is not None
             else None
         )
-        opportunity = create_opportunity(
+        opportunity = await create_opportunity(
             db,
             OpportunityCreate(
                 source_id=source.id,
@@ -234,16 +234,17 @@ def test_triage_returns_triage_read_shape() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_review_queue_filters_by_user_status() -> None:
+@pytest.mark.asyncio
+async def test_review_queue_filters_by_user_status() -> None:
     c = _client()
     auth = {"Authorization": f"Bearer {_token(c)}"}
 
     # Seed one of each user_status. Only "review" and "kept" must appear in
     # review_queue.
-    _make_opportunity(title="Triage Review Item", close_days=10, user_status="review")
-    _make_opportunity(title="Triage Kept Item", close_days=12, user_status="kept")
-    _make_opportunity(title="Triage Dismissed Item", close_days=8, user_status="dismissed")
-    _make_opportunity(title="Triage Default Item", close_days=6, user_status="default")
+    await _make_opportunity(title="Triage Review Item", close_days=10, user_status="review")
+    await _make_opportunity(title="Triage Kept Item", close_days=12, user_status="kept")
+    await _make_opportunity(title="Triage Dismissed Item", close_days=8, user_status="dismissed")
+    await _make_opportunity(title="Triage Default Item", close_days=6, user_status="default")
 
     response = c.get("/api/v1/dashboard/triage", headers=auth)
     assert response.status_code == 200
@@ -256,13 +257,14 @@ def test_review_queue_filters_by_user_status() -> None:
     assert "Triage Default Item" not in titles
 
 
-def test_review_queue_capped_at_eight() -> None:
+@pytest.mark.asyncio
+async def test_review_queue_capped_at_eight() -> None:
     c = _client()
     auth = {"Authorization": f"Bearer {_token(c)}"}
 
     # Seed 10 review items with ascending close dates.
     for i in range(10):
-        _make_opportunity(
+        await _make_opportunity(
             title=f"Triage Review Cap {i}",
             close_days=5 + i,
             user_status="review",
@@ -274,16 +276,17 @@ def test_review_queue_capped_at_eight() -> None:
     assert len(payload["review_queue"]) <= 8
 
 
-def test_review_queue_ordered_by_close_date_asc() -> None:
+@pytest.mark.asyncio
+async def test_review_queue_ordered_by_close_date_asc() -> None:
     c = _client()
     auth = {"Authorization": f"Bearer {_token(c)}"}
 
     # 3 review items with close_date at +5d, +10d, +20d
     # The spec requires close_date IS NOT NULL in the review_queue filter,
     # so all items here have a real close date and ordering is simply ASC.
-    _make_opportunity(title="Review 20 days", close_days=20, user_status="review")
-    _make_opportunity(title="Review 5 days", close_days=5, user_status="review")
-    _make_opportunity(title="Review 10 days", close_days=10, user_status="review")
+    await _make_opportunity(title="Review 20 days", close_days=20, user_status="review")
+    await _make_opportunity(title="Review 5 days", close_days=5, user_status="review")
+    await _make_opportunity(title="Review 10 days", close_days=10, user_status="review")
 
     response = c.get("/api/v1/dashboard/triage", headers=auth)
     assert response.status_code == 200
@@ -299,14 +302,15 @@ def test_review_queue_ordered_by_close_date_asc() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_closing_soon_7d_includes_only_close_within_seven_days() -> None:
+@pytest.mark.asyncio
+async def test_closing_soon_7d_includes_only_close_within_seven_days() -> None:
     c = _client()
     auth = {"Authorization": f"Bearer {_token(c)}"}
 
-    _make_opportunity(title="Closing In 3 Days", close_days=3, user_status="default")
-    _make_opportunity(title="Closing In 7 Days", close_days=7, user_status="default")
-    _make_opportunity(title="Closing In 14 Days", close_days=14, user_status="default")
-    _make_opportunity(title="Closing In 0 Days", close_days=0, user_status="default")
+    await _make_opportunity(title="Closing In 3 Days", close_days=3, user_status="default")
+    await _make_opportunity(title="Closing In 7 Days", close_days=7, user_status="default")
+    await _make_opportunity(title="Closing In 14 Days", close_days=14, user_status="default")
+    await _make_opportunity(title="Closing In 0 Days", close_days=0, user_status="default")
 
     response = c.get("/api/v1/dashboard/triage", headers=auth)
     assert response.status_code == 200
@@ -319,12 +323,13 @@ def test_closing_soon_7d_includes_only_close_within_seven_days() -> None:
     assert "Closing In 14 Days" not in titles
 
 
-def test_closing_soon_7d_capped_at_eight() -> None:
+@pytest.mark.asyncio
+async def test_closing_soon_7d_capped_at_eight() -> None:
     c = _client()
     auth = {"Authorization": f"Bearer {_token(c)}"}
 
     for i in range(10):
-        _make_opportunity(
+        await _make_opportunity(
             title=f"Closing Cap {i}",
             close_days=1 + i,
             user_status="default",
@@ -336,13 +341,14 @@ def test_closing_soon_7d_capped_at_eight() -> None:
     assert len(payload["closing_soon_7d"]) <= 8
 
 
-def test_closing_soon_7d_ordered_by_close_date_asc() -> None:
+@pytest.mark.asyncio
+async def test_closing_soon_7d_ordered_by_close_date_asc() -> None:
     c = _client()
     auth = {"Authorization": f"Bearer {_token(c)}"}
 
-    _make_opportunity(title="Closing Order 5", close_days=5, user_status="default")
-    _make_opportunity(title="Closing Order 1", close_days=1, user_status="default")
-    _make_opportunity(title="Closing Order 3", close_days=3, user_status="default")
+    await _make_opportunity(title="Closing Order 5", close_days=5, user_status="default")
+    await _make_opportunity(title="Closing Order 1", close_days=1, user_status="default")
+    await _make_opportunity(title="Closing Order 3", close_days=3, user_status="default")
 
     response = c.get("/api/v1/dashboard/triage", headers=auth)
     assert response.status_code == 200
@@ -363,7 +369,8 @@ def test_closing_soon_7d_ordered_by_close_date_asc() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_review_queue_item_includes_score_from_opportunity_score() -> None:
+@pytest.mark.asyncio
+async def test_review_queue_item_includes_score_from_opportunity_score() -> None:
     c = _client()
     auth = {"Authorization": f"Bearer {_token(c)}"}
 
@@ -375,7 +382,7 @@ def test_review_queue_item_includes_score_from_opportunity_score() -> None:
     finally:
         db.close()
 
-    opp_id = _make_opportunity(title="Scored Review Item", close_days=4, user_status="review")
+    opp_id = await _make_opportunity(title="Scored Review Item", close_days=4, user_status="review")
     _make_score(opportunity_id=opp_id, organization_id=org_id, score=87.5)
 
     response = c.get("/api/v1/dashboard/triage", headers=auth)
@@ -386,11 +393,12 @@ def test_review_queue_item_includes_score_from_opportunity_score() -> None:
     assert item["title"] == "Scored Review Item"
 
 
-def test_closing_soon_7d_item_includes_source_key() -> None:
+@pytest.mark.asyncio
+async def test_closing_soon_7d_item_includes_source_key() -> None:
     c = _client()
     auth = {"Authorization": f"Bearer {_token(c)}"}
 
-    _make_opportunity(title="With Source Key", close_days=2, user_status="default")
+    await _make_opportunity(title="With Source Key", close_days=2, user_status="default")
 
     response = c.get("/api/v1/dashboard/triage", headers=auth)
     assert response.status_code == 200

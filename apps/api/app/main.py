@@ -14,13 +14,17 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from app.api.v1.router import api_router
 from app.connectors.health_check import check_playwright_binary, check_pypdf_import
-from app.core.config import get_settings
+from app.core.config import check_production_sqlite, get_settings
+from app.core.http_client import close_async_client, close_sync_client, http_client
 from app.core.logging import configure_logging
 from app.db.bootstrap import ensure_bootstrap_data
 from app.db.session import create_all
 
 configure_logging()
 settings = get_settings()
+
+# Warn if someone deploys with the SQLite default in production
+check_production_sqlite()
 logger = logging.getLogger(__name__)
 struct_logger = structlog.get_logger(__name__)
 
@@ -68,8 +72,8 @@ async def _run_periodic_source_sweep(interval_seconds: int = 1800) -> None:
         try:
             from app.db.session import SessionLocal
             from app.models import Organization, Source
+            from app.scraper.dispatcher import run_source
             from app.services import (
-                execute_source_run_locally,
                 send_weekly_digest,
                 source_due_for_scraping,
             )
@@ -77,6 +81,12 @@ async def _run_periodic_source_sweep(interval_seconds: int = 1800) -> None:
 
             db = SessionLocal()
             try:
+                # Recover stale runs before starting new sweeps
+                from app.scraper.recovery import mark_stale_runs_failed as _recover
+
+                _recovered = _recover(db)
+                if _recovered:
+                    struct_logger.info("stale_runs_recovered", count=_recovered)
                 orgs = db.scalars(select(Organization)).all()
                 if orgs:
                     sources = list(
@@ -90,8 +100,9 @@ async def _run_periodic_source_sweep(interval_seconds: int = 1800) -> None:
                         if not source_due_for_scraping(source):
                             continue
                         try:
-                            execute_source_run_locally(db, source, organization_id=orgs[0].id)
-                            run_count += 1
+                            result = await run_source(db, source, organization_id=orgs[0].id)
+                            if result is not None:
+                                run_count += 1
                         except Exception as exc:
                             db.rollback()
                             struct_logger.warning(
@@ -149,6 +160,10 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     check_playwright_binary()
     check_pypdf_import()
 
+    # Pre-warm the shared HTTPX client singletons for connection pooling.
+    # The call is lazy — it creates the client if not yet initialized.
+    await http_client()
+
     # Background scheduler: every 30 minutes, run all enabled sources
     # via an asyncio loop instead of a Celery beat schedule.
     import asyncio
@@ -157,6 +172,13 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         yield
     finally:
         scheduler_task.cancel()
+        # Gracefully release pooled connections on shutdown.
+        # close_sync_client is sync + blocking (TCP teardown); offload to
+        # a thread so it doesn't block the async lifespan handler.
+        import asyncio
+
+        await close_async_client()
+        await asyncio.to_thread(close_sync_client)
 
 
 app = FastAPI(title=settings.app_name, version="0.1.0", lifespan=lifespan)
@@ -300,6 +322,13 @@ async def rate_limit_middleware(request: Request, call_next):
     return await call_next(request)
 
 
+# SEC-4: CORS hardening — only known origins are allowed. The
+# ``allow_origin_regex`` parameter has been removed because a regex like
+# ``r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"`` can match unintended
+# origins (e.g. ``http://localhost.evil.com``). In production, validate
+# that only known origins (frontend_url, Vercel, dev localhost) are in
+# the list. The ``allow_origins`` list is explicit: no wildcards, no
+# patterns.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -314,7 +343,6 @@ app.add_middleware(
         "http://localhost:3006",
         "http://127.0.0.1:3006",
     ],
-    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

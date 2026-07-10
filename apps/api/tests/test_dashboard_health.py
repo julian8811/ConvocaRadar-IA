@@ -119,7 +119,7 @@ def _token(c: TestClient) -> str:
     return response.json()["access_token"]
 
 
-def _make_opportunity(
+async def _make_opportunity(
     *,
     title: str,
     close_days: int | None = 30,
@@ -139,7 +139,7 @@ def _make_opportunity(
             if close_days is not None
             else None
         )
-        opportunity = create_opportunity(
+        opportunity = await create_opportunity(
             db,
             OpportunityCreate(
                 source_id=source.id,
@@ -215,11 +215,12 @@ def test_health_returns_health_read_shape() -> None:
     assert "source_alerts" in payload, payload
 
 
-def test_health_kpis_have_expected_fields() -> None:
+@pytest.mark.asyncio
+async def test_health_kpis_have_expected_fields() -> None:
     c = _client()
     auth = {"Authorization": f"Bearer {_token(c)}"}
-    _make_opportunity(title="Health KPI A", close_days=10)
-    _make_opportunity(title="Health KPI B", close_days=2, status="closing_soon")
+    await _make_opportunity(title="Health KPI A", close_days=10)
+    await _make_opportunity(title="Health KPI B", close_days=2, status="closing_soon")
     response = c.get("/api/v1/dashboard/health", headers=auth)
     assert response.status_code == 200
     payload = response.json()
@@ -235,11 +236,12 @@ def test_health_kpis_have_expected_fields() -> None:
     assert kpis["closing_soon"] >= 1
 
 
-def test_health_status_and_country_breakdowns_are_lists() -> None:
+@pytest.mark.asyncio
+async def test_health_status_and_country_breakdowns_are_lists() -> None:
     c = _client()
     auth = {"Authorization": f"Bearer {_token(c)}"}
-    _make_opportunity(title="Health Status A", close_days=10, country="Colombia")
-    _make_opportunity(title="Health Status B", close_days=10, country="Brazil")
+    await _make_opportunity(title="Health Status A", close_days=10, country="Colombia")
+    await _make_opportunity(title="Health Status B", close_days=10, country="Brazil")
     response = c.get("/api/v1/dashboard/health", headers=auth)
     assert response.status_code == 200
     payload = response.json()
@@ -270,12 +272,13 @@ def test_health_data_coverage_embeddings_is_none_when_no_opportunities() -> None
     assert coverage["embeddings_coverage"] is None
 
 
-def test_health_data_coverage_embeddings_is_number_when_opportunities_present() -> None:
+@pytest.mark.asyncio
+async def test_health_data_coverage_embeddings_is_number_when_opportunities_present() -> None:
     """When the org has opportunities, embeddings_coverage MUST be a number
     (0..100). 0.0 is valid (opps exist, none embedded) and is NOT null."""
     c = _client()
     auth = {"Authorization": f"Bearer {_token(c)}"}
-    _make_opportunity(title="Health With Opp No Embed", close_days=10, with_embedding=False)
+    await _make_opportunity(title="Health With Opp No Embed", close_days=10, with_embedding=False)
     response = c.get("/api/v1/dashboard/health", headers=auth)
     assert response.status_code == 200
     payload = response.json()
@@ -286,14 +289,15 @@ def test_health_data_coverage_embeddings_is_number_when_opportunities_present() 
     assert 0 <= coverage["embeddings_coverage"] <= 100
 
 
-def test_health_data_coverage_embeddings_partial() -> None:
+@pytest.mark.asyncio
+async def test_health_data_coverage_embeddings_partial() -> None:
     """When some opps have embeddings, embeddings_coverage reflects the ratio."""
     c = _client()
     auth = {"Authorization": f"Bearer {_token(c)}"}
     # create_opportunity auto-creates an embedding. Wipe all auto-created
     # embeddings first so we have full control: 1 of 2 opps has an embedding.
-    _make_opportunity(title="Health Emb A", close_days=10, with_embedding=False)
-    _make_opportunity(title="Health Emb B", close_days=10, with_embedding=False)
+    await _make_opportunity(title="Health Emb A", close_days=10, with_embedding=False)
+    await _make_opportunity(title="Health Emb B", close_days=10, with_embedding=False)
     db = SessionLocal()
     try:
         # Drop every embedding and re-add exactly one (for the first opp).

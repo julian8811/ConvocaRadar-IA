@@ -1,3 +1,4 @@
+from app.connectors.registry import get_connector
 from app.connectors.generic_html import GenericHtmlConnector
 from app.connectors.grants_gov import GrantsGovConnector
 from app.connectors.grants_gov_rss import GrantsGovRssConnector
@@ -110,6 +111,24 @@ def _wordpress_connector(source_key: str, base_url: str) -> WordPressGrantsConne
 
 
 def connector_for(source_key: str, base_url: str | None = None, source_type: str | None = None, *, entity_name: str | None = None, default_country: str | None = None, default_categories: list[str] | None = None):
+    # ── Special construction cases (non-standard __init__) ────────────────
+    # These connectors take ``source_key`` as a positional argument, so
+    # the standard ``cls(base_url, **kwargs)`` registry pattern doesn't
+    # fit.  They *are* registered for introspection but must be constructed
+    # explicitly here during the gradual migration.
+    if source_key in {"grants-gov-rss", "grants-gov-forecast"}:
+        return GrantsGovRssConnector(source_key, base_url or "")
+
+    # ── Connector registry (gradual migration) ───────────────────────────
+    # Registered connectors with standard ``__init__(self, base_url)`` are
+    # handled here.  Unregistered keys raise ``KeyError`` and fall through
+    # to the traditional if-elif chain below.
+    try:
+        return get_connector(source_key, base_url)
+    except KeyError:
+        pass
+
+    # ── Traditional if-elif chain ────────────────────────────────────────
     if source_key == "grants-gov":
         return GrantsGovConnector(base_url)
     if source_key == "minciencias":
@@ -138,8 +157,6 @@ def connector_for(source_key: str, base_url: str | None = None, source_type: str
         return UNDEFConnector(base_url)
     if source_key == "simpler-grants":
         return SimplerGrantsConnector(base_url)
-    if source_key in {"grants-gov-rss", "grants-gov-forecast"}:
-        return GrantsGovRssConnector(source_key, base_url or "")
     if source_key == "unwomen-innovate":
         return UnwomenInnovateConnector(base_url)
     if source_key == "horizon-europe-sedia":

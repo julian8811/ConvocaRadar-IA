@@ -92,7 +92,7 @@ def _token(c: TestClient) -> str:
     return response.json()["access_token"]
 
 
-def _seed_opportunity(title: str = "Convocatoria abierta para consultoria") -> None:
+async def _seed_opportunity(title: str = "Convocatoria abierta para consultoria") -> None:
     """Seed an opportunity so the summary has a non-empty payload."""
     db = SessionLocal()
     try:
@@ -104,7 +104,7 @@ def _seed_opportunity(title: str = "Convocatoria abierta para consultoria") -> N
         assert source is not None
         from datetime import UTC, datetime, timedelta
 
-        create_opportunity(
+        await create_opportunity(
             db,
             OpportunityCreate(
                 source_id=source.id,
@@ -149,10 +149,11 @@ def test_summary_alias_requires_auth() -> None:
 # ---------------------------------------------------------------------------
 
 
-def test_summary_alias_keeps_legacy_shape() -> None:
+@pytest.mark.asyncio
+async def test_summary_alias_keeps_legacy_shape() -> None:
     c = _client()
     auth = {"Authorization": f"Bearer {_token(c)}"}
-    _seed_opportunity()
+    await _seed_opportunity()
     response = c.get("/api/v1/dashboard/summary", headers=auth)
     assert response.status_code == 200
     payload = response.json()

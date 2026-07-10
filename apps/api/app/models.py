@@ -183,6 +183,8 @@ class SourceRun(Base):
     items_failed: Mapped[int] = mapped_column(Integer, default=0)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     logs: Mapped[list[dict]] = mapped_column(JSON, default=list)
+    # PR2: progress tracking — updated by runner after fetch/parse/persist steps
+    progress: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 
@@ -243,22 +245,6 @@ class Opportunity(Base):
     last_seen_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
-
-    @property
-    def official_url_is_reachable(self) -> bool:
-        if not self.official_url:
-            return False
-        from app.services import url_is_reachable
-
-        return url_is_reachable(self.official_url)
-
-    @property
-    def application_url_is_reachable(self) -> bool:
-        if not self.application_url:
-            return False
-        from app.services import url_is_reachable
-
-        return url_is_reachable(self.application_url)
 
 
 class OpportunityDocument(Base):
