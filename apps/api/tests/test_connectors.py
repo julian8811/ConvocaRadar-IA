@@ -311,12 +311,14 @@ class TestParseFundingAmount:
         t = text.strip()
         upper = t.upper()
         currency = "USD"
-        for code, syms in [("USD", ["USD", "US$", "$"]), ("EUR", ["EUR", "€"]), ("COP", ["COP", "COL$"]), ("GBP", ["GBP", "£"]), ("BRL", ["BRL", "R$"]), ("MXN", ["MXN", "MX$"])]:
+        for code, syms in [("COP", ["COP", "COL$"]), ("BRL", ["BRL", "R$"]), ("MXN", ["MXN", "MX$"]), ("GBP", ["GBP", "£"]), ("EUR", ["EUR", "€"]), ("USD", ["USD", "US$", "$"])]:
+            found = False
             for s in syms:
                 if s in upper:
                     currency = code
+                    found = True
                     break
-            if currency == code:
+            if found:
                 break
         cleaned = re.sub(r"[^\d,.\s]", " ", t)
         cleaned = re.sub(r"\s+", " ", cleaned).strip()
