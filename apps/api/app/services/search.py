@@ -161,7 +161,7 @@ def _lexical_search_score(query_terms: set[str], opportunity: Opportunity) -> fl
     return round(min(1.0, coverage + title_boost + category_boost), 4)
 
 
-def semantic_search_opportunities(
+async def semantic_search_opportunities(
     db: Session,
     organization_id: str,
     query: str,
@@ -177,7 +177,7 @@ def semantic_search_opportunities(
     if not text_results:
         return []
 
-    query_vector = build_embedding(query)
+    query_vector = await build_embedding(query)
     scored: list[tuple[Opportunity, float]] = []
     for opportunity, _ in text_results:
         embedding = db.scalar(select(OpportunityEmbedding).where(OpportunityEmbedding.opportunity_id == opportunity.id))
