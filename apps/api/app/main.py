@@ -69,8 +69,8 @@ async def _run_periodic_source_sweep(interval_seconds: int = 1800) -> None:
         try:
             from app.db.session import SessionLocal
             from app.models import Organization, Source
+            from app.scraper.dispatcher import run_source
             from app.services import (
-                execute_source_run_locally,
                 send_weekly_digest,
                 source_due_for_scraping,
             )
@@ -91,8 +91,9 @@ async def _run_periodic_source_sweep(interval_seconds: int = 1800) -> None:
                         if not source_due_for_scraping(source):
                             continue
                         try:
-                            execute_source_run_locally(db, source, organization_id=orgs[0].id)
-                            run_count += 1
+                            result = await run_source(db, source, organization_id=orgs[0].id)
+                            if result is not None:
+                                run_count += 1
                         except Exception as exc:
                             db.rollback()
                             struct_logger.warning(

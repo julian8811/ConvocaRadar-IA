@@ -1326,101 +1326,19 @@ async def _scrape_source_candidates_with_timeout(
 
 
 def execute_source_run_locally(db: Session, source: Source, organization_id: str | None = None) -> SourceRun:
-    started_at = datetime.now(UTC).replace(tzinfo=None)
-    run = SourceRun(
-        source_id=source.id,
-        status="running",
-        started_at=started_at,
-        logs=[{"level": "info", "message": "Scraping MVP started"}],
-    )
-    source.last_run_at = started_at
-    db.add(run)
-    db.flush()
-    org_id = organization_id or source.organization_id or "00000000-0000-0000-0000-000000000000"
-    task = Task(
-        organization_id=org_id,
-        source_run_id=run.id,
-        task_type="scrape_source",
-        provider="local",
-        status="running",
-        started_at=started_at,
-        payload={"source_key": source.key, "base_url": source.base_url, "source_type": source.source_type},
-    )
-    db.add(task)
-    db.flush()
+    """Thin sync wrapper — delegates to app.scraper.runner.run_source_inline.
+
+    FastAPI sync endpoints run in a thread pool.  ``asyncio.run()`` in a
+    thread can deadlock with the parent event loop on some platforms, so
+    we use an explicit fresh loop (same pattern as the original).
+    """
+    from app.scraper.runner import run_source_inline
+
+    loop = asyncio.new_event_loop()
     try:
-        validate_source_url(source)
-        scrape_stats: dict[str, object] = {}
-        # FastAPI sync endpoints run in a thread pool. asyncio.run()
-        # in a thread can deadlock with the parent event loop on some
-        # platforms. Use an explicit fresh loop instead.
-        loop = asyncio.new_event_loop()
-        try:
-            opportunities = loop.run_until_complete(
-                _scrape_source_candidates_with_timeout(source, scrape_stats)
-            )
-        finally:
-            loop.close()
-        created = 0
-        updated = 0
-        failed_items = 0
-        for opportunity_data in opportunities:
-            try:
-                opportunity = create_opportunity(db, opportunity_data, organization_id=organization_id)
-                if opportunity.first_seen_at == opportunity.last_seen_at:
-                    created += 1
-                else:
-                    updated += 1
-            except Exception as exc:
-                failed_items += 1
-                run.logs.append(
-                    {
-                        "level": "warning",
-                        "message": "Candidate skipped during local persistence",
-                        "title": getattr(opportunity_data, "title", ""),
-                        "error": str(exc),
-                    }
-                )
-        db.flush()
-        finished_at = datetime.now(UTC).replace(tzinfo=None)
-        run.status = "degraded" if len(opportunities) == 0 else "success"
-        run.finished_at = finished_at
-        run.items_found = len(opportunities)
-        run.items_created = created
-        run.items_updated = updated
-        run.items_failed = failed_items
-        run.logs = [
-            *run.logs,
-            {"level": "info", "message": "Local connector executed", "task_id": task.id},
-            {"level": "info", "message": "Connector diagnostics", **scrape_stats},
-            {"level": "info", "message": "Candidates normalized", "items_found": len(opportunities), "items_failed": failed_items},
-        ]
-        task.status = run.status
-        task.finished_at = finished_at
-        task.result = {"items_found": len(opportunities), "items_created": created, "items_updated": updated}
-        if len(opportunities) > 0:
-            source.last_success_at = finished_at
-            source.last_error = None
-        if len(opportunities) == 0:
-            create_source_health_alert(
-                db,
-                source,
-                reason="no se detectaron oportunidades nuevas en la ultima corrida",
-            )
-    except Exception as exc:
-        finished_at = datetime.now(UTC).replace(tzinfo=None)
-        run.status = "failed"
-        run.finished_at = finished_at
-        run.items_failed = 1
-        run.error_message = str(exc)
-        run.logs = [*run.logs, {"level": "error", "message": str(exc)}]
-        task.status = "failed"
-        task.finished_at = finished_at
-        task.error_message = str(exc)
-        task.result = {"items_failed": 1}
-        source.last_error = str(exc)
-        create_source_health_alert(db, source, reason=str(exc))
-    return run
+        return loop.run_until_complete(run_source_inline(db, source, organization_id))
+    finally:
+        loop.close()
 
 
 def _semantic_score(text: str, profile_text: str) -> float:
