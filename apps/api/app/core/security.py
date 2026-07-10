@@ -108,17 +108,22 @@ def create_reset_token(
     payload: dict[str, Any] = {"sub": subject, "exp": expires, "scope": scope}
     if extra:
         payload.update(extra)
-    return jwt.encode(payload, settings.reset_token_secret, algorithm=settings.jwt_algorithm)
+    secret = settings.reset_token_secret or settings.jwt_secret
+    return jwt.encode(payload, secret, algorithm=settings.jwt_algorithm)
 
 
 def decode_reset_token(token: str) -> dict[str, Any]:
     """Decode and validate a reset token signed with ``reset_token_secret``.
+
+    Falls back to ``jwt_secret`` when ``reset_token_secret`` is not configured,
+    so the application works without the new env var on existing deployments.
 
     Raises ``ValueError`` if the token is expired, malformed, or signed
     with the wrong key (e.g. an access token using ``jwt_secret``).
     """
     settings = get_settings()
     try:
-        return jwt.decode(token, settings.reset_token_secret, algorithms=[settings.jwt_algorithm])
+        secret = settings.reset_token_secret or settings.jwt_secret
+        return jwt.decode(token, secret, algorithms=[settings.jwt_algorithm])
     except JWTError as exc:
         raise ValueError("Invalid token") from exc
