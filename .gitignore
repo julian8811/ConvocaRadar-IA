@@ -29,3 +29,4 @@ test_storage/
 *.cer
 .sdd-apply-env.sh
 apps/api/.coverage
+scripts/__pycache__/
