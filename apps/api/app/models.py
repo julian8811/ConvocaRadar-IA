@@ -244,22 +244,6 @@ class Opportunity(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
 
-    @property
-    def official_url_is_reachable(self) -> bool:
-        if not self.official_url:
-            return False
-        from app.services import url_is_reachable
-
-        return url_is_reachable(self.official_url)
-
-    @property
-    def application_url_is_reachable(self) -> bool:
-        if not self.application_url:
-            return False
-        from app.services import url_is_reachable
-
-        return url_is_reachable(self.application_url)
-
 
 class OpportunityDocument(Base):
     __tablename__ = "opportunity_documents"

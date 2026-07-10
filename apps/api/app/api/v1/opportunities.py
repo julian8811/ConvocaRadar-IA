@@ -371,6 +371,21 @@ def download_document(
     )
 
 
+@router.get("/opportunities/{opportunity_id}/url-check")
+async def check_opportunity_urls(
+    opportunity_id: str,
+    organization: Organization = Depends(get_current_organization),
+    db: Session = Depends(get_db),
+) -> dict[str, bool]:
+    opportunity = _get_opportunity_for_org(db, opportunity_id, organization)
+    from app.services import url_is_reachable
+
+    return {
+        "official_url": url_is_reachable(opportunity.official_url) if opportunity.official_url else False,
+        "application_url": url_is_reachable(opportunity.application_url) if opportunity.application_url else False,
+    }
+
+
 @router.delete("/opportunity-documents/{document_id}", status_code=204)
 def delete_document(
     document_id: str,

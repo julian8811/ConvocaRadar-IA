@@ -286,8 +286,6 @@ class OpportunityRead(OpportunityCreate):
     status: str
     user_status: str
     is_favorite: bool
-    official_url_is_reachable: bool = False
-    application_url_is_reachable: bool = False
     first_seen_at: datetime
     last_seen_at: datetime
     created_at: datetime
