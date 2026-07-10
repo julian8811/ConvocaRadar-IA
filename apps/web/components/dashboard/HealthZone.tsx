@@ -182,12 +182,12 @@ function SourceHealthTable({ sources }: { sources: SourceHealth[] }) {
                 <span className="text-xs font-semibold tabular-nums text-slate-700 dark:text-slate-300">{s.health_score}</span>
                 <span className="hidden text-xs text-slate-400 sm:inline">{healthLabel(s.health_status)}</span>
                 {s.tier && (
-                  <Badge variant="outline" className="text-[10px] uppercase tracking-wider">
+                  <Badge tone="muted" className="text-[10px] uppercase tracking-wider">
                     {s.tier === "strategic" ? "Estratégica" : s.tier === "complementary" ? "Complementaria" : "Experimental"}
                   </Badge>
                 )}
                 {s.auto_paused && (
-                  <Badge variant="destructive" className="text-[10px]">Pausada</Badge>
+                  <Badge tone="destructive" className="text-[10px]">Pausada</Badge>
                 )}
               </div>
             </div>
