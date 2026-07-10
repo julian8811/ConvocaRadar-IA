@@ -16,7 +16,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: pnpm
 
       - name: Install pnpm
         run: npm install -g pnpm
@@ -43,7 +42,6 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: pnpm
 
       - name: Install pnpm
         run: npm install -g pnpm
@@ -82,7 +80,7 @@ jobs:
           INTERNAL_API_KEY: ci_internal_api_key_aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
 
       - name: Install web dependencies
-        run: pnpm install --filter @convocaradar/web
+        run: pnpm install
 
       - name: Install Playwright
         run: pnpm --filter @convocaradar/web exec playwright install chromium
