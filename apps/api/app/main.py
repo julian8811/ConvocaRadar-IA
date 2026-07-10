@@ -322,6 +322,13 @@ async def rate_limit_middleware(request: Request, call_next):
     return await call_next(request)
 
 
+# SEC-4: CORS hardening — only known origins are allowed. The
+# ``allow_origin_regex`` parameter has been removed because a regex like
+# ``r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"`` can match unintended
+# origins (e.g. ``http://localhost.evil.com``). In production, validate
+# that only known origins (frontend_url, Vercel, dev localhost) are in
+# the list. The ``allow_origins`` list is explicit: no wildcards, no
+# patterns.
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
@@ -336,7 +343,6 @@ app.add_middleware(
         "http://localhost:3006",
         "http://127.0.0.1:3006",
     ],
-    allow_origin_regex=r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

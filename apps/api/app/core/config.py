@@ -35,6 +35,7 @@ class Settings(BaseSettings):
     scraping_max_concurrency: int = 5
     scraping_closing_soon_days: int = 10
     internal_api_key: str = Field(min_length=32)
+    reset_token_secret: str = Field(min_length=32)
     sedia_api_key: str = "SEDIA"
     per_connector_timeout_seconds: float = 180
     storage_backend: str = "local"

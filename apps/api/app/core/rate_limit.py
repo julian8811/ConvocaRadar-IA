@@ -114,3 +114,9 @@ class SlidingWindowLimiter:
         while len(self._buckets) > self._max_keys:
             oldest_key = next(iter(self._buckets))
             del self._buckets[oldest_key]
+
+
+# SEC-4: per-email rate limiter for the login endpoint. 5 attempts per
+# email per hour, 6th is 429. Independent from the forgot-password limiter
+# so an attacker exhausting one flow does not block the other.
+email_login_limiter = SlidingWindowLimiter(max_requests=5, window_seconds=3600)

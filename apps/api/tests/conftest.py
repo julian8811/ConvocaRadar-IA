@@ -27,6 +27,7 @@ os.environ.setdefault("STORAGE_BACKEND", "local")
 os.environ.setdefault("STORAGE_DIR", "./test_storage")
 os.environ.setdefault("SMTP_HOST", "")
 os.environ.setdefault("JWT_SECRET", "a" * 64)
+os.environ.setdefault("RESET_TOKEN_SECRET", "b" * 64)
 os.environ.setdefault("INTERNAL_API_KEY", "a" * 64)
 os.environ.setdefault("BOOTSTRAP_SOURCES_ON_STARTUP", "false")
 # In-process Celery (worker + beat) is started by the FastAPI lifespan
