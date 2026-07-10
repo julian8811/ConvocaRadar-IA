@@ -1,7 +1,7 @@
 """Inline scraper runner — extracted from app.services.
 
 Phase 1: pure extraction of scraping lifecycle. No Redis, no Celery.
-Phase 2: services.py will call this module via thin wrappers.
+Phase 2 (PR2): updated to track progress after each lifecycle phase.
 """
 from __future__ import annotations
 
@@ -18,6 +18,9 @@ from app.services import (
     is_noise_payload,
     validate_source_url,
 )
+
+# Phases tracked in run.progress
+PROGRESS_STEPS = ["fetch", "parse", "persist"]
 
 
 async def _scrape_candidates(
@@ -178,6 +181,9 @@ async def run_source_inline(
         opportunities = await _scrape_source_candidates_with_timeout(
             source, scrape_stats
         )
+        # Progress: fetch + parse complete
+        _set_progress(run, {"fetch": _now(), "parse": _now()})
+        db.flush()
         created = 0
         updated = 0
         failed_items = 0
@@ -200,6 +206,9 @@ async def run_source_inline(
                         "error": str(exc),
                     }
                 )
+        db.flush()
+        # Progress: persist complete
+        _set_progress(run, {"persist": _now()})
         db.flush()
         finished_at = datetime.now(UTC).replace(tzinfo=None)
         run.status = "degraded" if len(opportunities) == 0 else "success"
@@ -274,3 +283,19 @@ async def run_source_inline(
         source.last_error = str(exc)
         create_source_health_alert(db, source, reason=str(exc))
     return run
+
+
+def _now() -> str:
+    """Return current UTC datetime as ISO string."""
+    return datetime.now(UTC).replace(tzinfo=None).isoformat()
+
+
+def _set_progress(run: SourceRun, updates: dict[str, str]) -> None:
+    """Update run.progress with the given key/value pairs.
+
+    Merges the updates into the existing progress dict (or creates one).
+    Each key is a lifecycle phase name; each value is an ISO datetime string.
+    """
+    current = dict(run.progress or {})
+    current.update(updates)
+    run.progress = current

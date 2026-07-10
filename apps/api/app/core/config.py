@@ -53,6 +53,9 @@ class Settings(BaseSettings):
     smtp_use_tls: bool = True
     frontend_url: str = "http://localhost:3000"
     backend_url: str = "http://localhost:8000"
+    # PR2: Redis / worker dispatch
+    redis_url: str | None = None
+    worker_max_concurrency: int = 4
     rate_limit_requests_per_minute: int = 120
     rate_limit_window_seconds: int = 60
 

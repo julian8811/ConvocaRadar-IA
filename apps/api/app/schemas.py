@@ -182,6 +182,8 @@ class SourceRunRead(BaseModel):
     items_failed: int
     error_message: str | None = None
     logs: list[dict[str, Any]]
+    # PR2: per-phase progress tracking (fetch/parse/persist ISO timestamps)
+    progress: dict[str, str] | None = None
 
     model_config = {"from_attributes": True}
 

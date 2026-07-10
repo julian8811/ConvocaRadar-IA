@@ -183,6 +183,8 @@ class SourceRun(Base):
     items_failed: Mapped[int] = mapped_column(Integer, default=0)
     error_message: Mapped[str | None] = mapped_column(Text, nullable=True)
     logs: Mapped[list[dict]] = mapped_column(JSON, default=list)
+    # PR2: progress tracking — updated by runner after fetch/parse/persist steps
+    progress: Mapped[dict | None] = mapped_column(JSON, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 
