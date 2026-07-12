@@ -1,3 +1,6 @@
 {
-  "outputDirectory": ".next"
+  "rootDirectory": "apps/web",
+  "outputDirectory": ".next",
+  "buildCommand": "pnpm build",
+  "installCommand": "pnpm install --no-frozen-lockfile"
 }
