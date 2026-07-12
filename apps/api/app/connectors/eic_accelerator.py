@@ -1,3 +1,4 @@
+# DEPRECATED: source disabled in seed.py
 import json
 from urllib.parse import quote_plus
 

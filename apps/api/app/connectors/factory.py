@@ -30,7 +30,7 @@ from app.connectors.heading_list_html import HeadingListHtmlConnector
 from app.connectors.idrc_funding import IdrcFundingConnector
 from app.connectors.usaid_grants import UsaidGrantsConnector
 from app.connectors.giz_funding import GizFundingConnector
-from app.connectors.cordis_h2020 import CordisH2020Connector
+# from app.connectors.cordis_h2020 import CordisH2020Connector  # Removed: Horizon 2020 ended in 2020
 from app.connectors.eic_accelerator import EicAcceleratorConnector
 from app.connectors.global_innovation_fund import GlobalInnovationFundConnector
 from app.connectors.procolombia_convocatorias import ProcolombiaConvocatoriasConnector
@@ -178,8 +178,8 @@ def connector_for(source_key: str, base_url: str | None = None, source_type: str
         return UsaidGrantsConnector(base_url)
     if source_key == "giz-funding":
         return GizFundingConnector(base_url)
-    if source_key == "cordis-h2020":
-        return CordisH2020Connector(base_url)
+    # if source_key == "cordis-h2020":  # Removed: Horizon 2020 ended in 2020
+    #     return CordisH2020Connector(base_url)
     if source_key == "eic-accelerator":
         return EicAcceleratorConnector(base_url)
     if source_key == "global-innovation-fund":

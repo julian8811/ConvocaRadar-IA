@@ -1,3 +1,4 @@
+# DEPRECATED: source disabled in seed.py
 from __future__ import annotations
 
 from urllib.parse import urljoin, urlparse
