@@ -18,6 +18,7 @@ from app.db.seed import seed_default_sources
 from app.db.session import get_db, SessionLocal
 from app.models import Opportunity, Organization, Source, SourceRun, User
 from app.schemas import SourceCreate, SourceHealthRead, SourceRead, SourceRunRead, SourceUpdate
+from app.scraper.dispatcher import run_source as dispatcher_run_source
 from app.services import audit, execute_source_run_locally, source_due_for_scraping, validate_source_url
 from app.services.scoring import (
     calculate_source_health_score,
@@ -25,6 +26,19 @@ from app.services.scoring import (
 )
 
 router = APIRouter()
+
+
+def _run_source_via_dispatcher(db, source, org_id):
+    """Sync wrapper — calls dispatcher.run_source via asyncio.run().
+
+    The background sweep runs in a thread (not in the asyncio event loop),
+    so we use ``asyncio.run()`` to create a fresh event loop, execute the
+    async dispatcher, and close the loop — matching the pattern used by
+    the old ``execute_source_run_locally`` wrapper.
+    """
+    import asyncio
+
+    return asyncio.run(dispatcher_run_source(db, source, org_id))
 logger = logging.getLogger(__name__)
 struct_logger = structlog.get_logger(__name__)
 
@@ -435,7 +449,7 @@ def run_all_sources(
                 futs = {}
                 for source in due_sources:
                     fresh = db2.merge(source)
-                    fut = pool.submit(execute_source_run_locally, db2, fresh, org_id)
+                    fut = pool.submit(_run_source_via_dispatcher, db2, fresh, org_id)
                     futs[fut] = fresh
                 _base_threading.Thread = saved_thread
                 for fut in concurrent.futures.as_completed(futs, timeout=settings.per_connector_timeout_seconds * 2):

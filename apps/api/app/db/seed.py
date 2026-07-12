@@ -192,6 +192,7 @@ def seed_default_sources(
         {
             "key": "eu-funding-tenders",
             "name": "EU Funding & Tenders",
+            "enabled": False,
             "base_url": "https://ec.europa.eu/info/funding-tenders/opportunities/portal/screen/opportunities/calls-for-proposals",
             "country": "European Union",
             "region": "Europe",
@@ -526,21 +527,29 @@ def seed_default_sources(
         {
             "key": "bancoldex-convocatorias",
             "name": "Bancóldex Convocatorias",
-            "base_url": "https://www.bancoldex.com/convocatorias",
+            "base_url": "https://www.bancoldex.com/sobre-bancoldex/contrataciones/invitaciones-contratar",
             "country": "Colombia",
             "region": "LatAm",
             "source_type": "html",
             "category": ["convocatorias", "financiamiento", "emprendimiento"],
             "allowed_domains": ["bancoldex.com", "www.bancoldex.com"],
             "scraping_frequency": "weekly",
+            "connector_config": {
+                "list_selectors": ["tbody tr", "table.views-table tbody tr"],
+                "title_selectors": ["td:nth-child(2)", "td:nth-child(2) a"],
+                "link_selectors": ["td:nth-child(1) a", "td:nth-child(7) a"],
+                "content_selectors": ["article.node--type-contrato", ".node__content"],
+                "date_labels": ["Fecha de cierre:", "Fecha de apertura:"],
+                "detail_enrichment": True,
+            },
         },
         {
             "key": "findeter-convocatorias",
             "name": "Findeter Convocatorias",
-            "base_url": "https://www.findeter.gov.co/convocatorias",
+            "base_url": "https://www.findeter.gov.co/sitemap.xml",
             "country": "Colombia",
             "region": "LatAm",
-            "source_type": "html",
+            "source_type": "api",
             "category": ["convocatorias", "financiamiento", "infraestructura"],
             "allowed_domains": ["findeter.gov.co", "www.findeter.gov.co"],
             "scraping_frequency": "weekly",
@@ -638,12 +647,12 @@ def seed_default_sources(
         {
             "key": "uniandes-investigacion",
             "name": "Universidad de los Andes — Investigación",
-            "base_url": "https://investigaciones.uniandes.edu.co/convocatorias/",
+            "base_url": "https://www.uniandes.edu.co/investigacioncreacion/",
             "country": "Colombia",
             "region": "LatAm",
             "source_type": "html",
             "category": ["convocatorias", "investigacion", "academia"],
-            "allowed_domains": ["uniandes.edu.co", "investigaciones.uniandes.edu.co"],
+            "allowed_domains": ["uniandes.edu.co", "www.uniandes.edu.co", "investigaciones.uniandes.edu.co"],
             "scraping_frequency": "daily",
         },
         {
@@ -920,6 +929,7 @@ def seed_default_sources(
         {
             "key": "celac-convocatorias",
             "name": "CELAC — Convocatorias Regionales",
+            "enabled": False,
             "base_url": "https://celacinternational.org/convocatorias/",
             "country": "International",
             "region": "LatAm",
@@ -953,6 +963,7 @@ def seed_default_sources(
         {
             "key": "parlatino-convocatorias",
             "name": "Parlatino — Convocatorias",
+            "enabled": False,
             "base_url": "https://parlatino.org/convocatorias/",
             "country": "International",
             "region": "LatAm",
@@ -1274,10 +1285,10 @@ def seed_default_sources(
         {
             "key": "world-bank-procurement",
             "name": "World Bank — Procurement and Grants",
-            "base_url": "https://projects.worldbank.org/en/projects-operations/procurement",
+            "base_url": "https://search.worldbank.org/api/v2/procnotices",
             "country": "International",
             "region": "Global",
-            "source_type": "html",
+            "source_type": "api",
             "category": ["convocatorias", "financiamiento", "desarrollo"],
             "allowed_domains": ["worldbank.org", "projects.worldbank.org"],
             "scraping_frequency": "daily",
@@ -1285,13 +1296,21 @@ def seed_default_sources(
         {
             "key": "undp-funding",
             "name": "UNDP — Funding Opportunities",
-            "base_url": "https://www.undp.org/procurement",
+            "base_url": "https://procurement-notices.undp.org/",
             "country": "International",
             "region": "Global",
             "source_type": "html",
             "category": ["convocatorias", "financiamiento", "desarrollo"],
-            "allowed_domains": ["undp.org", "www.undp.org"],
+            "allowed_domains": ["undp.org", "www.undp.org", "procurement-notices.undp.org"],
             "scraping_frequency": "daily",
+            "connector_config": {
+                "list_selectors": ["a.vacanciesTableLink.vacanciesTable__row"],
+                "title_selectors": ["div.vacanciesTable__cell:first-child span"],
+                "link_selectors": ["a", "."],
+                "content_selectors": ["main", ".view_negotiation", "body"],
+                "date_labels": ["Deadline:"],
+                "detail_enrichment": True,
+            },
         },
         {
             "key": "ford-foundation-grants",
@@ -1491,6 +1510,7 @@ def seed_default_sources(
                 source.category = definition["category"]
                 source.scraping_frequency = definition.get("scraping_frequency", "daily")
                 source.allowed_domains = definition["allowed_domains"]
+                source.connector_config = definition.get("connector_config")
                 source.enabled = True
                 updated += 1
             else:
@@ -1509,6 +1529,7 @@ def seed_default_sources(
                 category=definition["category"],
                 scraping_frequency=definition.get("scraping_frequency", "daily"),
                 allowed_domains=definition["allowed_domains"],
+                connector_config=definition.get("connector_config"),
             )
         )
         inserted += 1

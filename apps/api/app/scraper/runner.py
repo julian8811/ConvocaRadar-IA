@@ -12,6 +12,7 @@ from app.core.config import get_settings
 from app.models import Source, SourceRun, Task
 from app.schemas import OpportunityCreate
 from app.scraper.dom_monitor import compute_dom_hash
+from app.scraper.errors import ErrorType, classify_error
 from app.services import (
     candidate_external_id,
     create_opportunity,
@@ -300,7 +301,11 @@ async def run_source_inline(
         run.error_message = "Scrape cancelled (shutdown or timeout)"
         run.logs = [
             *run.logs,
-            {"level": "error", "message": "Scrape cancelled"},
+            {
+                "level": "error",
+                "message": "Scrape cancelled",
+                "error_type": "TIMEOUT",
+            },
         ]
         task.status = "failed"
         task.finished_at = finished_at
@@ -309,20 +314,29 @@ async def run_source_inline(
         raise  # Re-raise so the scheduler knows this task was cancelled
     except Exception as exc:
         finished_at = datetime.now(UTC).replace(tzinfo=None)
-        run.status = "failed"
+        error_type = classify_error(exc)
+        error_type_value = error_type.value
+        run.status = "degraded" if error_type == ErrorType.PARSE else "failed"
         run.finished_at = finished_at
         run.items_failed = 1
         run.error_message = str(exc)
         run.logs = [
             *run.logs,
-            {"level": "error", "message": str(exc)},
+            {
+                "level": "error",
+                "message": str(exc),
+                "error_type": error_type_value,
+            },
         ]
-        task.status = "failed"
+        task.status = run.status
         task.finished_at = finished_at
         task.error_message = str(exc)
         task.result = {"items_failed": 1}
         source.last_error = str(exc)
-        create_source_health_alert(db, source, reason=str(exc))
+        # ERR-4: only create health alert for PARSE / UNKNOWN
+        # (TIMEOUT and NETWORK are transient — no alert needed)
+        if error_type not in (ErrorType.TIMEOUT, ErrorType.NETWORK):
+            create_source_health_alert(db, source, reason=str(exc))
     return run
 
 
