@@ -137,12 +137,12 @@ describe("Dashboard 3-zone structure (PR B-2)", () => {
     await waitFor(() => {
       expect(screen.getByText(/qu[ée]\s+hago\s+hoy/i)).toBeDefined();
     });
-    expect(screen.getByText(/top compatibilidad/i)).toBeDefined();
+    expect(screen.getByText(/mi cola de revisión/i)).toBeDefined();
     expect(screen.getByText(/estado de convocatorias/i)).toBeDefined();
 
     // DOM order: Triage zone appears before Pipeline zone appears before Health zone.
     const triageHeading = screen.getByText(/qu[ée]\s+hago\s+hoy/i);
-    const pipelineHeading = screen.getByText(/top compatibilidad/i);
+    const pipelineHeading = screen.getByText(/mi cola de revisión/i);
     const healthHeading = screen.getByText(/estado de convocatorias/i);
     expect(
       triageHeading.compareDocumentPosition(pipelineHeading) & Node.DOCUMENT_POSITION_FOLLOWING,
