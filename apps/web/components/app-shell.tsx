@@ -11,7 +11,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { LoadingState } from "@/components/ui/state";
 import { ThemeToggle } from "@/components/theme-toggle";
-import { api, clearToken, getToken } from "@/lib/api";
+import { api, clearToken } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
 const mainNav = [
@@ -77,15 +77,15 @@ export function AppShell({ children }: { children: ReactNode }) {
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [headerSearch, setHeaderSearch] = useState("");
-  const [hasToken] = useState(() => Boolean(getToken()));
 
-  // SEC-1.5: retry: 1 with retryDelay: 1000 so transient network blips are
-  // absorbed by react-query. We must still distinguish AbortError from real
-  // auth failures in the useEffect below.
+  // Auth is cookie-based (HttpOnly, SameSite=None). There's no client-side
+  // token to check — we always call /me and let the API validate the cookie.
+  // Non-AbortError failures are treated as session-expired and redirect to
+  // /login. AbortError (transient network/server-waking) shows a retry UI
+  // instead.
   const me = useQuery({
     queryKey: ["me"],
     queryFn: api.me,
-    enabled: hasToken,
     retry: 1,
     retryDelay: 1000,
   });
@@ -104,15 +104,10 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [me.isSuccess]);
 
   // SEC-1.5 error routing:
-  //   - No token at all      → /login (immediate)
   //   - Non-AbortError       → /login (real auth failure, no retry UI)
   //   - AbortError w/ manual retry done → /login?reason=session_expired
   //   - AbortError first time → show the error UI with "Reintentar" button
   useEffect(() => {
-    if (!hasToken) {
-      router.replace("/login");
-      return;
-    }
     if (!me.isError) return;
     if (!isAbortError(me.error)) {
       clearToken();
@@ -124,7 +119,7 @@ export function AppShell({ children }: { children: ReactNode }) {
       // again. The cookie will be replaced if they authenticate again.
       router.replace("/login?reason=session_expired");
     }
-  }, [hasToken, me.isError, me.error, manualRetryDone, router]);
+  }, [me.isError, me.error, manualRetryDone, router]);
 
   const handleRetry = useCallback(() => {
     setManualRetryDone(true);
@@ -173,7 +168,7 @@ export function AppShell({ children }: { children: ReactNode }) {
   // SEC-1.5: render the AbortError UI in place of children. Keeps the
   // sidebar/header visible so the user can still navigate.
   const showAbortErrorUI = Boolean(
-    hasToken && me.isError && isAbortError(me.error) && !manualRetryDone,
+    me.isError && isAbortError(me.error) && !manualRetryDone,
   );
 
   const sidebar = (
@@ -257,7 +252,7 @@ export function AppShell({ children }: { children: ReactNode }) {
         </header>
 
         <div className="mx-auto max-w-7xl px-4 py-6 lg:px-6">
-          {!hasToken || me.isLoading ? (
+          {me.isLoading ? (
             <LoadingState label="Validando sesión" />
           ) : showAbortErrorUI ? (
             <Card className="border-amber-200 bg-amber-50 dark:border-amber-400/30 dark:bg-amber-400/10" role="alert">

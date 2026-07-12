@@ -79,12 +79,12 @@ def _password_reset_url(token: str) -> str:
 
 
 def _set_token_cookie(response: Response, token: str) -> None:
-    """Set the JWT as an HttpOnly, SameSite=Strict cookie for browser-based auth.
+    """Set the JWT as an HttpOnly, SameSite=None cookie for browser-based auth.
 
     SEC-1.5: dual-support migration — the cookie is the new primary path; the
     Authorization: Bearer header remains supported by get_current_user for legacy
-    clients. SameSite=Strict blocks all cross-origin requests carrying the cookie,
-    preventing CSRF on top-level navigations (SEC-4).
+    clients. SameSite=None (with Secure=True) allows the cookie to be sent on
+    cross-origin fetch calls from the frontend (Vercel) to the API (Render).
     """
     response.set_cookie(
         key=TOKEN_COOKIE_NAME,
@@ -92,7 +92,7 @@ def _set_token_cookie(response: Response, token: str) -> None:
         max_age=TOKEN_COOKIE_MAX_AGE_SECONDS,
         httponly=True,
         secure=True,
-        samesite="strict",
+        samesite="none",
         path="/",
     )
 
@@ -104,7 +104,7 @@ def _clear_token_cookie(response: Response) -> None:
         path="/",
         httponly=True,
         secure=True,
-        samesite="strict",
+        samesite="none",
     )
 
 

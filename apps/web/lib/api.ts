@@ -52,7 +52,9 @@ function getDefaultApiUrl() {
       return "http://127.0.0.1:8000/api/v1";
     }
   }
-  return "https://api.convocaradar.com/api/v1";
+  // No production fallback — NEXT_PUBLIC_API_URL must be set explicitly.
+  // This avoids deploying against a non-existent domain.
+  return "";
 }
 
 /**
@@ -119,11 +121,15 @@ export async function request<T>(path: string, init: RequestInit = {}, timeoutMs
     const controller = new AbortController();
     const timeout = setTimeout(() => controller.abort(), timeoutMs);
 
+    // CSRF protection: custom header triggers a CORS preflight that checks
+    // the origin against the server's allowlist. The server rejects state-
+    // changing requests (POST/PUT/PATCH/DELETE) without this header.
     // Legacy Bearer fallback: only in non-production, only if a token is in
     // localStorage. In production this is always null.
     const legacyToken = readLegacyToken();
     const headers: Record<string, string> = {
       "Content-Type": "application/json",
+      "X-CSRF-Protection": "1",
       ...(init.headers as Record<string, string> | undefined),
     };
     if (legacyToken) {
