@@ -557,6 +557,7 @@ def seed_default_sources(
         {
             "key": "fondo-nacional-garantias",
             "name": "Fondo Nacional de Garantías",
+            "enabled": False,
             "base_url": "https://www.fng.gov.co/convocatorias",
             "country": "Colombia",
             "region": "LatAm",
@@ -580,6 +581,7 @@ def seed_default_sources(
         {
             "key": "invima-convocatorias",
             "name": "INVIMA Convocatorias",
+            "enabled": False,
             "base_url": "https://www.invima.gov.co/convocatorias",
             "country": "Colombia",
             "region": "LatAm",
@@ -592,6 +594,7 @@ def seed_default_sources(
             "key": "agrosavia-convocatorias",
             "name": "AGROSAVIA Convocatorias",
             "enabled": False,
+            "enabled": False,
             "base_url": "https://www.agrosavia.co/convocatorias",
             "country": "Colombia",
             "region": "LatAm",
@@ -603,6 +606,7 @@ def seed_default_sources(
         {
             "key": "dane-convocatorias",
             "name": "DANE Convocatorias y Concursos",
+            "enabled": False,
             "base_url": "https://www.dane.gov.co/index.php/convocatorias-y-concursos",
             "country": "Colombia",
             "region": "LatAm",
@@ -614,6 +618,7 @@ def seed_default_sources(
         {
             "key": "ideam-convocatorias",
             "name": "IDEAM Convocatorias",
+            "enabled": False,
             "base_url": "https://www.ideam.gov.co/web/entidad/convocatorias",
             "country": "Colombia",
             "region": "LatAm",
@@ -658,6 +663,7 @@ def seed_default_sources(
         {
             "key": "sgc-colombia",
             "name": "Servicio Geológico Colombiano — Convocatorias",
+            "enabled": False,
             "base_url": "https://www.sgc.gov.co/convocatorias",
             "country": "Colombia",
             "region": "LatAm",
@@ -681,6 +687,7 @@ def seed_default_sources(
             "key": "innpulsa-colombia-startup",
             "name": "iNNpulsa Colombia — Startup y Emprendimiento",
             "enabled": False,
+            "enabled": False,
             "base_url": "https://www.innpulsacolombia.com/convocatorias",
             "country": "Colombia",
             "region": "LatAm",
@@ -692,6 +699,7 @@ def seed_default_sources(
         {
             "key": "dian-contratacion",
             "name": "DIAN Contratación y Convocatorias",
+            "enabled": False,
             "base_url": "https://www.dian.gov.co/dian/entidad/Paginas/Contratacion.aspx",
             "country": "Colombia",
             "region": "LatAm",
@@ -868,6 +876,7 @@ def seed_default_sources(
         {
             "key": "fonacyt-bolivia",
             "name": "FONACYT Bolivia",
+            "enabled": False,
             "base_url": "https://www.facebook.com/FonacytBolivia",
             "country": "Bolivia",
             "region": "LatAm",
@@ -901,6 +910,7 @@ def seed_default_sources(
         {
             "key": "caf-convocatorias",
             "name": "CAF — Convocatorias para el Desarrollo",
+            "enabled": False,
             "base_url": "https://www.caf.com/es/oportunidades/consultoria-y-contrataciones/",
             "country": "International",
             "region": "LatAm",
@@ -1028,6 +1038,7 @@ def seed_default_sources(
         {
             "key": "minagricultura-convocatorias",
             "name": "MinAgricultura Colombia",
+            "enabled": False,
             "base_url": "https://www.minagricultura.gov.co/convocatorias/Paginas/default.aspx",
             "country": "Colombia",
             "region": "LatAm",
@@ -1039,6 +1050,7 @@ def seed_default_sources(
         {
             "key": "minsalud-convocatorias",
             "name": "MinSalud Colombia — Convocatorias",
+            "enabled": False,
             "enabled": False,
             "base_url": "https://www.minsalud.gov.co/convocatorias",
             "country": "Colombia",
@@ -1073,6 +1085,7 @@ def seed_default_sources(
         {
             "key": "uis-investigacion",
             "name": "UIS — Convocatorias de Investigación",
+            "enabled": False,
             "base_url": "https://www.uis.edu.co/webUIS/es/investigacionExtension/convocatorias.html",
             "country": "Colombia",
             "region": "LatAm",
@@ -1084,6 +1097,7 @@ def seed_default_sources(
         {
             "key": "javeriana-investigacion",
             "name": "Pontificia Universidad Javeriana — Convocatorias",
+            "enabled": False,
             "base_url": "https://www.javeriana.edu.co/investigacion/convocatorias",
             "country": "Colombia",
             "region": "LatAm",
@@ -1106,6 +1120,7 @@ def seed_default_sources(
         {
             "key": "uptc-investigacion",
             "name": "UPTC — Convocatorias de Investigación",
+            "enabled": False,
             "base_url": "https://www.uptc.edu.co/investigacion/convocatorias",
             "country": "Colombia",
             "region": "LatAm",
@@ -1161,6 +1176,7 @@ def seed_default_sources(
         {
             "key": "sennova-sena",
             "name": "SENNOVA SENA — Innovación y Desarrollo Tecnológico",
+            "enabled": False,
             "base_url": "https://www.sena.edu.co/es-co/trabajo/Paginas/sennova.aspx",
             "country": "Colombia",
             "region": "LatAm",
@@ -1187,6 +1203,7 @@ def seed_default_sources(
         {
             "key": "finep-brasil",
             "name": "FINEP Brasil — Innovación y Tecnología",
+            "enabled": False,
             "base_url": "https://www.finep.gov.br/chamadas-publicas",
             "country": "Brazil",
             "region": "LatAm",
@@ -1209,6 +1226,7 @@ def seed_default_sources(
         {
             "key": "embrapii-brasil",
             "name": "EMBRAPII Brasil — Innovación Industrial",
+            "enabled": False,
             "base_url": "https://embrapii.org.br/editais/",
             "country": "Brazil",
             "region": "LatAm",
@@ -1231,6 +1249,7 @@ def seed_default_sources(
         {
             "key": "faperj-brasil",
             "name": "FAPERJ Río de Janeiro",
+            "enabled": False,
             "base_url": "https://www.faperj.br/?id=3689.2.7",
             "country": "Brazil",
             "region": "LatAm",
@@ -1253,6 +1272,7 @@ def seed_default_sources(
         {
             "key": "sebrae-brasil",
             "name": "SEBRAE Brasil — Emprendimiento",
+            "enabled": False,
             "base_url": "https://www.sebrae.com.br/sites/PortalSebrae/editais",
             "country": "Brazil",
             "region": "LatAm",
@@ -1264,6 +1284,7 @@ def seed_default_sources(
         {
             "key": "bndes-brasil",
             "name": "BNDES Brasil — Financiamiento",
+            "enabled": False,
             "base_url": "https://www.bndes.gov.br/wps/portal/site/home/apoio/chamadas-publicas",
             "country": "Brazil",
             "region": "LatAm",
