@@ -25,6 +25,9 @@ _COLUMNS: dict[str, list[sa.Column]] = {
         sa.Column("selector_failures", sa.Integer(), server_default=sa.text("0")),
         sa.Column("connector_config", sa.JSON(), nullable=True),
     ],
+    "source_runs": [
+        sa.Column("progress", sa.JSON(), nullable=True),
+    ],
     "users": [
         sa.Column("password_changed_at", sa.DateTime(), nullable=True),
     ],
