@@ -119,27 +119,24 @@ def test_run_all_sources_endpoint_response_unchanged_by_instrumentation() -> Non
 
 
 def test_run_all_sources_logs_failure_when_execute_raises(monkeypatch) -> None:
-    """PR4-4: when execute_source_run_locally raises, the background sweep
+    """PR4-4: when dispatcher.run_source raises, the background sweep
     must log a structured error event with full context (source key, error
     type, error message).
 
     Previously the except silently swallowed the error, leaving the
     operator with no way to know why runs were not being created.
     """
-    # Make all sources unowned so the endpoint picks them up.
     c = _client_with_admin()
 
-    # Make execute_source_run_locally raise a deterministic error.
     from app.api.v1 import sources as sources_module
 
-    def fake_execute(db, source, organization_id=None):
+    async def fake_run_source(db, source, organization_id=None):
         raise RuntimeError("simulated scraper failure for test")
 
-    # Disable the slow-scrape path so all sources go through execute.
-    monkeypatch.setattr(sources_module, "execute_source_run_locally", fake_execute)
-    # Make threading.Thread synchronous so we can capture the background
-    # thread's log output. Use a target wrapper that runs the function
-    # directly instead of in a thread.
+    # Patch at sources_module level because the module already has a
+    # local reference via ``from X import Y`` — patching the dispatcher
+    # module itself would not affect it.
+    monkeypatch.setattr(sources_module, "dispatcher_run_source", fake_run_source)
     import threading as _threading
     def sync_thread(target, *args, **kwargs):
         class SyncThread:
@@ -171,25 +168,27 @@ def test_run_all_sources_logs_failure_when_execute_raises(monkeypatch) -> None:
 
 
 def test_background_sweep_times_out_hanging_connector(monkeypatch) -> None:
-    """PR4-x: when execute_source_run_locally hangs, _background_sweep must
+    """PR4-x: when dispatcher.run_source hangs, _background_sweep must
     log a structured timeout event and count the source as failed.
 
     The ThreadPoolExecutor wraps each call with a per-connector timeout.
-    This test makes execute_source_run_locally block indefinitely, sets a
-    very short timeout, and asserts that ``run_all.source_timeout`` is
-    emitted and the completed event reports failed > 0.
+    This test makes the dispatcher block indefinitely, sets a very short
+    timeout, and asserts that ``run_all.source_timeout`` is emitted and the
+    completed event reports failed > 0.
     """
     import threading as _threading
     from app.api.v1 import sources as sources_module
     from app.core.config import get_settings
 
-    # --- Patch execute to hang ---
+    # --- Patch dispatcher to hang ---
     block_forever = _threading.Event()
 
-    def hanging_execute(_db, _source, _organization_id=None):
+    async def hanging_run_source(_db, _source, _organization_id=None):
         block_forever.wait()  # never set → blocks forever
 
-    monkeypatch.setattr(sources_module, "execute_source_run_locally", hanging_execute)
+    # Patch at sources_module level because it holds a local reference
+    # via ``from app.scraper.dispatcher import run_source as dispatcher_run_source``.
+    monkeypatch.setattr(sources_module, "dispatcher_run_source", hanging_run_source)
 
     # --- Set a very short timeout ---
     monkeypatch.setenv("PER_CONNECTOR_TIMEOUT_SECONDS", "0.05")
@@ -241,6 +240,47 @@ def test_background_sweep_times_out_hanging_connector(monkeypatch) -> None:
         f"expected completed event to report failures, "
         f"got: {completed_events[0]}"
     )
+
+
+def test_run_all_sources_uses_dispatcher_instead_of_locally(monkeypatch) -> None:
+    """Phase 3: _background_sweep must call dispatcher.run_source instead of
+    execute_source_run_locally. Assert the dispatcher is invoked per source.
+    """
+    import threading as _threading
+    from unittest.mock import AsyncMock
+
+    from app.api.v1 import sources as sources_module
+    from app.scraper.dispatcher import run_source
+
+    call_log: list[dict[str, object]] = []
+
+    async def mock_run_source(db, source, organization_id=None):
+        call_log.append({"source_key": source.key, "org_id": organization_id})
+        return None
+
+    monkeypatch.setattr(sources_module, "dispatcher_run_source", mock_run_source)
+
+    def sync_thread(target, *args, **kwargs):
+        class SyncThread:
+            def __init__(self):
+                self._target = target
+            def start(self):
+                self._target()
+        return SyncThread()
+
+    monkeypatch.setattr(_threading, "Thread", sync_thread)
+
+    c = _client_with_admin()
+    with structlog.testing.capture_logs():
+        response = c.post("/api/v1/sources/run-all")
+
+    assert response.status_code == 200
+    assert len(call_log) >= 1, (
+        f"expected dispatcher.run_source to be called at least once, "
+        f"got {len(call_log)} calls"
+    )
+    assert call_log[0]["source_key"] is not None
+    assert call_log[0]["org_id"] is not None
 
 
 def _find_source_id(db, key: str) -> str:

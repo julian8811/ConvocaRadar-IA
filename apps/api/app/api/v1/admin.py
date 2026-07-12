@@ -602,6 +602,55 @@ def clear_source_errors(
 
 
 # ---------------------------------------------------------------------------
+# Phase 4: Probe endpoint
+# ---------------------------------------------------------------------------
+
+
+@router.post("/admin/sources/probe-all")
+async def probe_all_sources(
+    source_key: list[str] | None = Query(default=None, description="Optional source key(s) to probe (repeatable: ?source_key=a&source_key=b)"),
+    organization: Organization = Depends(get_current_organization),
+    admin: User = Depends(require_admin),
+    db: Session = Depends(get_db),
+) -> dict:
+    """Run a connector probe against enabled sources.
+
+    Tests each source's connector by calling ``fetch()`` and ``parse()``
+    with a 15-second timeout. Results are classified as:
+    - GREEN — candidates found
+    - YELLOW — connector responded but 0 candidates
+    - RED — connector raised an exception
+
+    Pass ``?source_key=minciencias`` to probe a single source, or
+    ``?source_key=minciencias&source_key=colciencias`` for multiple.
+    """
+    from app.scraper.probe import run_probe
+
+    report = await run_probe(db, source_key=source_key)
+
+    report_dict = report.to_dict()
+
+    db.add(
+        AuditLog(
+            organization_id=organization.id,
+            user_id=admin.id,
+            action="source_probe",
+            resource_type="source",
+            metadata_json={
+                "total": report.total,
+                "green": report.green,
+                "yellow": report.yellow,
+                "red": report.red,
+                "source_key": source_key,
+            },
+        )
+    )
+    db.commit()
+
+    return report_dict
+
+
+# ---------------------------------------------------------------------------
 # PR2: Worker / run-status endpoint
 # ---------------------------------------------------------------------------
 

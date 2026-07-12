@@ -55,7 +55,7 @@ class DomainBudgetManager:
         "beta.grants.gov": {"max_concurrent": 3, "delay_seconds": 0},
         "minciencias.gov.co": {"max_concurrent": 1, "delay_seconds": 2},
         "innpulsacolombia.com": {"max_concurrent": 1, "delay_seconds": 1},
-        "*playwright*": {"max_concurrent": 1, "delay_seconds": 0},
+        "*playwright*": {"max_concurrent": 5, "delay_seconds": 0},
     }
 
     _FALLBACK: dict[str, int] = {"max_concurrent": 2, "delay_seconds": 0}

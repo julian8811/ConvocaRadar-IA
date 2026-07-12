@@ -169,6 +169,8 @@ class Source(Base):
     tier: Mapped[str | None] = mapped_column(String, nullable=True)  # "strategic", "complementary", "experimental"
     auto_paused: Mapped[bool] = mapped_column(Boolean, default=False)
     consecutive_empty_runs: Mapped[int] = mapped_column(Integer, default=0)
+    # connector_config: declarative scraping config (JSON)
+    connector_config: Mapped[dict | None] = mapped_column(JSON, nullable=True, default=None)
     # Change D: DOM monitoring fields
     dom_hash: Mapped[str | None] = mapped_column(String, nullable=True)
     dom_hash_changed_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)

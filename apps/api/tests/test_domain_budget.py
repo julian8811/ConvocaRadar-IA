@@ -144,19 +144,27 @@ def test_delay_after_elapsed() -> None:
 
 
 def test_playwright_glob_matches_url_containing_playwright() -> None:
-    """URLs whose domain contains 'playwright' should get max_concurrent=1."""
+    """URLs whose domain contains 'playwright' should get max_concurrent=5."""
     manager = DomainBudgetManager()
     assert manager.acquire("https://playwright.internal/page") is True
-    assert manager.acquire("https://playwright.internal/page2") is False
+    assert manager.acquire("https://playwright.internal/page2") is True
+    assert manager.acquire("https://playwright.internal/page3") is True
+    assert manager.acquire("https://playwright.internal/page4") is True
+    assert manager.acquire("https://playwright.internal/page5") is True
+    assert manager.acquire("https://playwright.internal/page6") is False
 
 
 def test_playwright_glob_release() -> None:
     """Releasing a Playwright slot should allow a new acquisition."""
     manager = DomainBudgetManager()
     assert manager.acquire("https://my-playwright-service.test/a") is True
-    assert manager.acquire("https://my-playwright-service.test/b") is False
-    manager.release("https://my-playwright-service.test/a")
+    assert manager.acquire("https://my-playwright-service.test/b") is True
     assert manager.acquire("https://my-playwright-service.test/c") is True
+    assert manager.acquire("https://my-playwright-service.test/d") is True
+    assert manager.acquire("https://my-playwright-service.test/e") is True
+    assert manager.acquire("https://my-playwright-service.test/f") is False
+    manager.release("https://my-playwright-service.test/a")
+    assert manager.acquire("https://my-playwright-service.test/f") is True
 
 
 # ---------------------------------------------------------------------------
