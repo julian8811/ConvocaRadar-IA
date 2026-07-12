@@ -792,6 +792,14 @@ def seed_default_sources(
             "category": ["convocatorias", "ciencia", "investigacion"],
             "allowed_domains": ["anid.cl", "www.anid.cl"],
             "scraping_frequency": "daily",
+            "connector_config": {
+                "list_selectors": [".jet-listing-grid__item"],
+                "title_selectors": ["h3"],
+                "link_selectors": ["a[href*='concursos/']"],
+                "content_selectors": [".jet-listing-grid__item"],
+                "date_labels": ["Inicio:", "Cierre:", "Fecha estimada de fallo:"],
+                "detail_enrichment": False,
+            },
         },
         {
             "key": "conicet-argentina",
