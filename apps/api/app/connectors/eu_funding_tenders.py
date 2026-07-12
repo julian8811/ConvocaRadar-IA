@@ -1,3 +1,4 @@
+# DEPRECATED: source disabled in seed.py
 import json
 import re
 from datetime import UTC, datetime
