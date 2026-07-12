@@ -64,7 +64,7 @@ async def render_page_html(
     if not _pw_budget_acquired:
         raise RuntimeError(
             f"Playwright budget exhausted for {url} — "
-            "max 1 concurrent Playwright session"
+            f"max {_budget._max_concurrent_for('playwright')} concurrent Playwright sessions"
         )
 
     from playwright.async_api import async_playwright

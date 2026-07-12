@@ -160,7 +160,7 @@ async def _probe_one_source(
             source_key=source_key,
             status="RED",
             candidates_count=None,
-            error_message="Probe timed out after 15s",
+            error_message=f"Probe timed out after {_PROBE_TIMEOUT}s",
             elapsed_seconds=round(elapsed, 3),
         )
     except Exception as exc:
