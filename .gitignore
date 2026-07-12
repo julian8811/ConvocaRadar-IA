@@ -30,3 +30,8 @@ test_storage/
 .sdd-apply-env.sh
 apps/api/.coverage
 scripts/__pycache__/
+apps/web/test-results/
+apps/web/.vercel/
+apps/web/tsconfig.tsbuildinfo
+*.egg-info/
+sdd/

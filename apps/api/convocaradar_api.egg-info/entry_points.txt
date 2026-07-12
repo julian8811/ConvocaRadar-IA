@@ -1,3 +1,0 @@
-[console_scripts]
-convocaradar-backfill-close-dates = app.db.backfill_close_dates:main
-convocaradar-seed-admin = app.db.seed_admin:main
