@@ -8,7 +8,12 @@
  * with a network error.
  *
  * Fix: use `||` instead of `??` so the empty string also triggers the
- * fallback to the default URL.
+ * fallback to `getDefaultApiUrl()`.
+ *
+ * As of the SameSite fix, the production fallback has been removed:
+ * `getDefaultApiUrl()` returns `""` when not on localhost, so missing
+ * or empty NEXT_PUBLIC_API_URL yields `API_URL=""` — a fail-fast signal
+ * that the env var must be set explicitly.
  */
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -18,25 +23,18 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
-/**
- * The "default" URL the module falls back to when no env var is set.
- * `getDefaultApiUrl()` is not exported, but it returns the production
- * URL when `window.location.hostname` is NOT `localhost` or `127.0.0.1`.
- * happy-dom defaults hostname to "localhost" so we stub it for these
- * tests to make the assertion deterministic.
- */
-const EXPECTED_DEFAULT_API_URL = "https://api.convocaradar.com/api/v1";
+const EXPECTED_DEFAULT_API_URL = "";
 
 async function loadApiModule() {
   vi.resetModules();
   return import("@/lib/api");
 }
 
-describe("PR 3 — API_URL env-var fallback (?? → ||)", () => {
+describe("API_URL — env-var fallback", () => {
   beforeEach(() => {
     // happy-dom defaults hostname to "localhost" which would make
     // getDefaultApiUrl() return the dev URL. Stub it so the default
-    // matches the production URL we're asserting against.
+    // matches the production behaviour: no fallback URL.
     Object.defineProperty(window.location, "hostname", {
       value: "app.example.com",
       writable: true,
@@ -44,16 +42,16 @@ describe("PR 3 — API_URL env-var fallback (?? → ||)", () => {
     });
   });
 
-  it("falls back to the default URL when NEXT_PUBLIC_API_URL is the empty string", async () => {
+  it("returns empty string when NEXT_PUBLIC_API_URL is empty (fail-fast)", async () => {
     vi.stubEnv("NEXT_PUBLIC_API_URL", "");
     const { API_URL } = await loadApiModule();
-    expect(API_URL).toBe(EXPECTED_DEFAULT_API_URL);
+    expect(API_URL).toBe("");
   });
 
-  it("falls back to the default URL when NEXT_PUBLIC_API_URL is unset (undefined)", async () => {
+  it("returns empty string when NEXT_PUBLIC_API_URL is undefined (fail-fast)", async () => {
     vi.stubEnv("NEXT_PUBLIC_API_URL", undefined);
     const { API_URL } = await loadApiModule();
-    expect(API_URL).toBe(EXPECTED_DEFAULT_API_URL);
+    expect(API_URL).toBe("");
   });
 
   it("uses the env value when NEXT_PUBLIC_API_URL is a non-empty string", async () => {

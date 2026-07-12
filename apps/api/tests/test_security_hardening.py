@@ -41,7 +41,13 @@ from app.api.v1.auth import _set_token_cookie, TOKEN_COOKIE_NAME
 
 
 # ---------------------------------------------------------------------------
-# 1. SameSite=Strict on the auth cookie
+# 1. SameSite=None on the auth cookie
+#
+# The frontend (Vercel) and API (Render) are on different registrable
+# domains, so SameSite=Strict would block the cookie from being sent on
+# cross-origin fetch calls. SameSite=None (with Secure=True) allows the
+# cookie to be sent cross-origin, which is required for the app to work.
+# CSRF protection relies on explicit CORS origin allowlisting.
 # ---------------------------------------------------------------------------
 
 
@@ -54,8 +60,8 @@ def _extract_cookie_samesite(set_cookie_header: str) -> str | None:
     return None
 
 
-def test_set_token_cookie_uses_samesite_strict() -> None:
-    """_set_token_cookie must set SameSite=Strict on the auth cookie.
+def test_set_token_cookie_uses_samesite_none() -> None:
+    """_set_token_cookie must set SameSite=None on the auth cookie.
 
     We test directly by calling _set_token_cookie with a real Starlette
     Response and inspecting the Set-Cookie header.
@@ -68,16 +74,16 @@ def test_set_token_cookie_uses_samesite_strict() -> None:
     set_cookie = resp.headers.get("set-cookie", "")
     assert set_cookie, "No Set-Cookie header — _set_token_cookie did not fire"
     samesite = _extract_cookie_samesite(set_cookie)
-    assert samesite == "strict", (
-        f"Expected SameSite=Strict, got SameSite={samesite!r}. "
+    assert samesite == "none", (
+        f"Expected SameSite=None, got SameSite={samesite!r}. "
         f"Full Set-Cookie: {set_cookie}. "
-        "Change _set_token_cookie in app/api/v1/auth.py to use "
-        "samesite='strict' instead of samesite='lax'."
+        "The frontend (Vercel) and API (Render) are on different domains, "
+        "so SameSite=None with Secure=True is required."
     )
 
 
-def test_login_cookie_has_samesite_strict() -> None:
-    """The actual /auth/login endpoint returns a SameSite=Strict cookie.
+def test_login_cookie_has_samesite_none() -> None:
+    """The actual /auth/login endpoint returns a SameSite=None cookie.
 
     This is the integration test: we log in with valid credentials and
     check the Set-Cookie header on the 200 response.
@@ -112,14 +118,14 @@ def test_login_cookie_has_samesite_strict() -> None:
     set_cookie = response.headers.get("set-cookie", "")
     assert set_cookie, "No Set-Cookie header on login response"
     samesite = _extract_cookie_samesite(set_cookie)
-    assert samesite == "strict", (
-        f"Login cookie SameSite={samesite!r}, expected 'strict'. "
+    assert samesite == "none", (
+        f"Login cookie SameSite={samesite!r}, expected 'none'. "
         f"Full Set-Cookie: {set_cookie}"
     )
 
 
-def test_register_cookie_has_samesite_strict() -> None:
-    """The /auth/register endpoint returns a SameSite=Strict cookie."""
+def test_register_cookie_has_samesite_none() -> None:
+    """The /auth/register endpoint returns a SameSite=None cookie."""
     import uuid as uuid_module
 
     seed()
@@ -145,8 +151,8 @@ def test_register_cookie_has_samesite_strict() -> None:
     set_cookie = response.headers.get("set-cookie", "")
     assert set_cookie, "No Set-Cookie header on register response"
     samesite = _extract_cookie_samesite(set_cookie)
-    assert samesite == "strict", (
-        f"Register cookie SameSite={samesite!r}, expected 'strict'. "
+    assert samesite == "none", (
+        f"Register cookie SameSite={samesite!r}, expected 'none'. "
         f"Full Set-Cookie: {set_cookie}"
     )
 
@@ -161,12 +167,12 @@ def test_register_cookie_has_samesite_strict() -> None:
         db.close()
 
 
-def test_logout_clears_cookie_with_samesite_strict() -> None:
-    """The /auth/logout endpoint deletes the cookie with SameSite=Strict.
+def test_logout_clears_cookie_with_samesite_none() -> None:
+    """The /auth/logout endpoint deletes the cookie with SameSite=None.
 
     The delete_cookie call also carries a SameSite attribute in the
     Set-Cookie header (the Max-Age=0 / expires=past directive). We
-    check that SameSite=Strict is present on the deletion header too.
+    check that SameSite=None is present on the deletion header too.
     """
     c = TestClient(app)
     response = c.post("/api/v1/auth/logout")
@@ -174,8 +180,8 @@ def test_logout_clears_cookie_with_samesite_strict() -> None:
     set_cookie = response.headers.get("set-cookie", "")
     assert set_cookie, "No Set-Cookie header on logout"
     samesite = _extract_cookie_samesite(set_cookie)
-    assert samesite == "strict", (
-        f"Logout cookie SameSite={samesite!r}, expected 'strict'. "
+    assert samesite == "none", (
+        f"Logout cookie SameSite={samesite!r}, expected 'none'. "
         f"Full Set-Cookie: {set_cookie}"
     )
 

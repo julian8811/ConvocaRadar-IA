@@ -14,6 +14,39 @@ from app.models import Organization, OrganizationProfile, User
 # the cookie on login/logout/register.
 TOKEN_COOKIE_NAME = "convocaradar_token"
 
+
+def verify_csrf(request: Request) -> None:
+    """Verify that authenticated state-changing requests include a CSRF header.
+
+    The frontend (Vercel) and API (Render) are on different registrable
+    domains, so the auth cookie must use SameSite=None — which means the
+    browser sends it on cross-origin requests initiated by other sites.
+    To prevent CSRF, this dependency requires a custom ``X-CSRF-Protection``
+    header on every POST/PUT/PATCH/DELETE request that carries an auth cookie.
+
+    Custom headers trigger a CORS preflight (OPTIONS) that checks the
+    request origin against the server's explicit allowlist. An attacker's
+    site cannot forge a custom header from a ``<form>`` or ``<img>`` tag,
+    and ``fetch()`` from an unlisted origin is blocked by CORS before the
+    actual request is sent.
+
+    Requests without an auth cookie have no session to protect and are
+    allowed through (they will be rejected by ``get_current_user`` if
+    the endpoint requires authentication).
+    """
+    if request.method in {"GET", "HEAD", "OPTIONS", "TRACE"}:
+        return
+    # No session to protect — skip CSRF check
+    cookie_token = request.cookies.get(TOKEN_COOKIE_NAME)
+    if not cookie_token:
+        return
+    csrf_header = request.headers.get("x-csrf-protection")
+    if not csrf_header:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="CSRF protection: missing X-CSRF-Protection header",
+        )
+
 # auto_error=False: don't raise when no header is present, so the cookie
 # fallback can take over (SEC-1.5 dual-support).
 bearer = HTTPBearer(auto_error=False)
