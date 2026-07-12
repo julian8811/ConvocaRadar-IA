@@ -3,13 +3,7 @@
   "private": true,
   "version": "0.2.0",
   "packageManager": "pnpm@9.15.4",
-  "workspaces": [
-    "apps/web",
-    "packages/*"
-  ],
-  "dependencies": {
-    "eslint-config-next": "latest"
-  },
+
   "scripts": {
     "dev:web": "pnpm --filter @convocaradar/web dev",
     "build:web": "pnpm --filter @convocaradar/web build",
