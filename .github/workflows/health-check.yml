@@ -22,27 +22,25 @@ jobs:
         id: health
         continue-on-error: true
         run: |
-          python scripts/check_sources_health.py --json > /tmp/health-report.json 2>&1
-          echo "exit_code=$?" >> $GITHUB_OUTPUT
+          python scripts/check_sources_health.py --json > /tmp/health-report.json 2>/tmp/health-check-err.log
 
       - name: Summarize results
         id: summary
+        shell: python3 {0}
         run: |
-          python3 -c "
-import json, os
-with open('/tmp/health-report.json') as f:
-    data = json.load(f)
-total = data['total']
-ok = data['ok']
-broken = data['broken']
-pct = round((ok / total) * 100) if total > 0 else 0
-github_output = os.environ.get('GITHUB_OUTPUT', '/dev/null')
-with open(github_output, 'a') as out:
-    out.write(f'total={total}\n')
-    out.write(f'ok={ok}\n')
-    out.write(f'broken={broken}\n')
-    out.write(f'pct={pct}\n')
-"
+          import json, os
+          with open('/tmp/health-report.json') as f:
+              data = json.load(f)
+          total = data['total']
+          ok = data['ok']
+          broken = data['broken']
+          pct = round((ok / total) * 100) if total > 0 else 0
+          github_output = os.environ.get('GITHUB_OUTPUT', '/dev/null')
+          with open(github_output, 'a') as out:
+              out.write(f'total={total}\n')
+              out.write(f'ok={ok}\n')
+              out.write(f'broken={broken}\n')
+              out.write(f'pct={pct}\n')
 
       - name: Create issue on broken sources
         if: steps.summary.outputs.broken != '0'
