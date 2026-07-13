@@ -1556,7 +1556,7 @@ def seed_default_sources(
                 source.scraping_frequency = definition.get("scraping_frequency", "daily")
                 source.allowed_domains = definition["allowed_domains"]
                 source.connector_config = definition.get("connector_config")
-                source.enabled = True
+                source.enabled = definition.get("enabled", True)
                 updated += 1
             else:
                 # Source is owned by another org — do not steal.
@@ -1575,6 +1575,7 @@ def seed_default_sources(
                 scraping_frequency=definition.get("scraping_frequency", "daily"),
                 allowed_domains=definition["allowed_domains"],
                 connector_config=definition.get("connector_config"),
+                enabled=definition.get("enabled", True),
             )
         )
         inserted += 1
