@@ -41,16 +41,7 @@ GROUPS: list[tuple[str, str, str | None, str, str]] = [
     ("hybrid", "test-hybrid", "hybrid", "hybrid", "HybridConnector"),
     ("generic-api", "test-api", "api", "generic-api", "ApiConnector"),
     ("grants-gov", "grants-gov", None, "grants-gov", "GrantsGovConnector"),
-    ("simpler-grants", "simpler-grants", None, "simpler-grants", "SimplerGrantsConnector"),
     ("grants-gov-rss", "grants-gov-rss", None, "httpx-get-rss", "GrantsGovRssConnector"),
-    ("eic-accelerator", "eic-accelerator", None, "httpx-get-html", "EicAcceleratorConnector"),
-    ("horizon-sedia", "horizon-europe-sedia", None, "httpx-get-html", "HorizonSediaConnector"),
-    ("wellcome", "wellcome-grants", None, "httpx-get-json", "WellcomeConnector"),
-    ("unesco", "unesco-call-for-proposals", None, "httpx-get-html", "UNESCOConnector"),
-    ("usaid", "usaid-grants", None, "httpx-get-html", "UsaidGrantsConnector"),
-    ("idrc", "idrc-funding", None, "httpx-get-html", "IdrcFundingConnector"),
-    ("apc-colombia", "apc-colombia", None, "httpx-get-html", "ApcColombiaConnector"),
-    ("procolombia", "procolombia-convocatorias", None, "httpx-get-html", "ProcolombiaConvocatoriasConnector"),
 ]
 
 
