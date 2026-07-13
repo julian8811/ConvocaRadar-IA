@@ -35,3 +35,12 @@ apps/web/.vercel/
 apps/web/tsconfig.tsbuildinfo
 *.egg-info/
 sdd/
+.vercel
+.windsurf/
+.atl/
+
+# Local test DB
+test_convocaradar.db
+.env
+openspec/
+sdd/

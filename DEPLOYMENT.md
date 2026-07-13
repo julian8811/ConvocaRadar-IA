@@ -4,18 +4,13 @@
 
 ```
 Frontend (Vercel) ──→ API (Render) ──→ Database (Neon)
-                    │                  └── PostgreSQL + pgvector
-                    │
-                    └── [Optional] Worker (Render)
-                        └── Redis (Upstash) — only when REDIS_URL configured
+                                        └── PostgreSQL + pgvector
 ```
 
 - **Frontend**: Vercel Hobby — Next.js App Router
 - **API**: Render Web Service — FastAPI + SQLAlchemy
 - **Database**: Neon Free — PostgreSQL + pgvector
-- **Worker**: Render Web Service (optional) — Arq processor when Redis available
 - **Storage**: Cloudflare R2 or local filesystem
-- **Cache/Queue**: Upstash Redis (optional, enables Arq worker dispatch)
 
 ## Required variables
 
@@ -32,20 +27,10 @@ See `.env.example` for all configurable variables.
 
 Deploys run via GitHub Actions (`.github/workflows/deploy.yml`):
 
-1. **CI** runs on push/PR to `main` — lint + test API + test web + E2E
+1. **CI** runs on push/PR to `main` — lint + test API + test web
 2. **Deploy** triggers when CI succeeds on `main`:
    - Render API: triggers redeploy via Render API
-   - Vercel: `vercel deploy --prod --cwd ./apps/web`
-
-## Worker deployment
-
-The `apps/worker/` package is a standalone Arq processor:
-
-```bash
-docker compose --profile with-redis up worker
-```
-
-Or on Render: create a web service from `apps/worker/Dockerfile`, set `REDIS_URL`.
+   - Vercel: `vercel deploy --prod`
 
 ## Local development
 

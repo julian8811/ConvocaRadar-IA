@@ -23,7 +23,7 @@ from app.db.session import SessionLocal  # noqa: E402
 from app.core.ai import embedding_model_version  # noqa: E402
 import app.main as app_main  # noqa: E402
 from app.main import app  # noqa: E402
-from app.models import Alert, Opportunity, OpportunityEmbedding, OpportunityScore, Organization, Role, Source, SourceRun, Task, User  # noqa: E402
+from app.models import Opportunity, OpportunityEmbedding, OpportunityScore, Organization, Role, Source, SourceRun, Task, User  # noqa: E402
 from app.schemas import OpportunityCreate  # noqa: E402
 from app.services import create_opportunity, deduplicate_opportunities, is_private_url, opportunity_dedup_key  # noqa: E402
 
