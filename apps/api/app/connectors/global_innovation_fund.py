@@ -1,6 +1,6 @@
+from __future__ import annotations
 from app.connectors.registry import register
 # DEPRECATED: source disabled in seed.py
-from __future__ import annotations
 
 import re
 from urllib.parse import urljoin, urlparse
