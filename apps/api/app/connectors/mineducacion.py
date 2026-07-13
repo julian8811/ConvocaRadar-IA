@@ -1,3 +1,4 @@
+from app.connectors.registry import register
 from __future__ import annotations
 
 import re
@@ -54,6 +55,7 @@ def _country(text: str) -> str:
 
 
 
+@register("mineducacion-becas")
 class MineducacionConnector:
     source_key = "mineducacion-becas"
 

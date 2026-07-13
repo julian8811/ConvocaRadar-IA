@@ -1,3 +1,4 @@
+from app.connectors.registry import register
 # DEPRECATED: source disabled in seed.py
 from __future__ import annotations
 
@@ -14,6 +15,7 @@ IDRC_FUNDING_URL = "https://idrc-crdi.ca/en/funding"
 CLOSED_KEYWORDS = ("closed", "evaluation of", "upcoming funding opportunity")
 
 
+@register("idrc-funding")
 class IdrcFundingConnector:
     source_key = "idrc-funding"
 

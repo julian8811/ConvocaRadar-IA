@@ -1,3 +1,4 @@
+from app.connectors.registry import register
 from __future__ import annotations
 
 import re
@@ -41,6 +42,7 @@ def _is_closed(candidate: OpportunityCandidate) -> bool:
     return any(keyword in lowered for keyword in NSF_CLOSED_KEYWORDS)
 
 
+@register("nsf-funding")
 class NSFFundingConnector:
     source_key = "nsf-funding"
 
@@ -135,6 +137,7 @@ class NSFFundingConnector:
         return ValidationResult(ok=True)
 
 
+@register("nsf-funding-rss")
 class NSFFundingRssConnector(RssConnector):
     def __init__(self, source_key: str, base_url: str) -> None:
         super().__init__(

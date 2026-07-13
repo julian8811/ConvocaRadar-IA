@@ -1,3 +1,4 @@
+from app.connectors.registry import register
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -38,6 +39,7 @@ def _is_closed(candidate: OpportunityCandidate) -> bool:
     return "closed" in normalized or "cerrado" in normalized or "closed call" in normalized
 
 
+@register("unesco-call-for-proposals")
 class UNESCOConnector:
     source_key = "unesco-call-for-proposals"
 

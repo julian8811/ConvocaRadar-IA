@@ -129,65 +129,15 @@ def connector_for(source_key: str, base_url: str | None = None, source_type: str
     except KeyError:
         pass
 
-    # ── Traditional if-elif chain ────────────────────────────────────────
-    if source_key == "grants-gov":
-        return GrantsGovConnector(base_url)
-    if source_key == "minciencias":
-        return MincienciasConnector(base_url)
-    if source_key in {"icetex-vigentes", "icetex-otras-becas"}:
-        return IcetexConnector(base_url)
-    if source_key == "mineducacion-becas":
-        return MineducacionConnector(base_url)
-    if source_key == "innpulsa":
-        return InnpulsaConnector(base_url)
-    if source_key == "apc-colombia":
-        return ApcColombiaConnector(base_url)
-    if source_key == "eu-funding-tenders":
-        return EuFundingTendersConnector(base_url)
-    if source_key == "nsf-funding":
-        return NSFFundingConnector(base_url)
-    if source_key == "nsf-funding-rss":
-        return NSFFundingRssConnector(source_key, base_url or "")
-    if source_key in {"innovamos-global-innovation-fund", "innovamos-fid"}:
-        return InnovamosConnector(source_key, base_url)
-    if source_key == "ukri-opportunities":
-        return UKRIConnector(base_url)
-    if source_key == "unesco-call-for-proposals":
-        return UNESCOConnector(base_url)
-    if source_key == "undef":
-        return UNDEFConnector(base_url)
-    if source_key == "simpler-grants":
-        return SimplerGrantsConnector(base_url)
-    if source_key == "unwomen-innovate":
-        return UnwomenInnovateConnector(base_url)
-    if source_key == "horizon-europe-sedia":
-        return HorizonSediaConnector(base_url)
-    if source_key == "wellcome-grants":
-        return WellcomeConnector(base_url)
-    if source_key == "mincit-innovacion":
-        return MincitConvocatoriasConnector(base_url)
-    if source_key == "lundbeck-foundation":
-        return _heading_list_connector(source_key, base_url or "")
-    if source_key == "velux-foundation":
+    # ── Traditional if-elif chain (connectors that use non-standard
+    #    __init__ or special construction. Standard connectors are
+    #    resolved via @register() in the registry above). ──────────────
+    if source_key in {"lundbeck-foundation", "velux-foundation"}:
         return _heading_list_connector(source_key, base_url or "")
     if source_key in BDN_CONVOCATORIAS_SOURCE_KEYS:
         return _bdn_connector(source_key, base_url or "")
-    if source_key == "idrc-funding":
-        return IdrcFundingConnector(base_url)
-    if source_key == "usaid-grants":
-        return UsaidGrantsConnector(base_url)
     if source_key == "giz-funding":
         return GizFundingConnector(base_url)
-    # if source_key == "cordis-h2020":  # Removed: Horizon 2020 ended in 2020
-    #     return CordisH2020Connector(base_url)
-    if source_key == "eic-accelerator":
-        return EicAcceleratorConnector(base_url)
-    if source_key == "global-innovation-fund":
-        return GlobalInnovationFundConnector(base_url)
-    if source_key == "procolombia-convocatorias":
-        return ProcolombiaConvocatoriasConnector(base_url)
-    if source_key == "anii-uruguay":
-        return AniiUruguayConnector(base_url)
     if source_key in WORDPRESS_GRANT_SOURCE_KEYS or "/wp-json/wp/v2/" in (base_url or ""):
         return _wordpress_connector(source_key, base_url or "")
     if source_type == "manual":

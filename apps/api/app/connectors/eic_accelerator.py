@@ -1,3 +1,4 @@
+from app.connectors.registry import register
 # DEPRECATED: source disabled in seed.py
 import json
 from urllib.parse import quote_plus
@@ -19,6 +20,7 @@ EIC_SEARCH_URL = "https://api.tech.ec.europa.eu/search-api/prod/rest/search"
 EIC_TERMS = ["EIC Accelerator", "EIC Transition", "EIC Pathfinder"]
 
 
+@register("eic-accelerator")
 class EicAcceleratorConnector:
     source_key = "eic-accelerator"
 

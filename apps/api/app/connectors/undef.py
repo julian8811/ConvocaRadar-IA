@@ -1,3 +1,4 @@
+from app.connectors.registry import register
 from __future__ import annotations
 
 import re
@@ -18,6 +19,7 @@ def _clean(value: str | None) -> str:
     return re.sub(r"\s+", " ", value or "").strip()
 
 
+@register("undef")
 class UNDEFConnector:
     source_key = "undef"
 

@@ -1,3 +1,4 @@
+from app.connectors.registry import register
 from __future__ import annotations
 
 import asyncio
@@ -14,6 +15,7 @@ MINCIT_LISTING_PATHS = ("/listado-convocatorias/7", "/listado-convocatorias/19",
 MINCIT_REQUEST_HEADERS = {"User-Agent": BROWSER_UA, "Accept": "text/html,application/xhtml+xml"}
 
 
+@register("mincit-innovacion")
 class MincitConvocatoriasConnector:
     source_key = "mincit-innovacion"
 

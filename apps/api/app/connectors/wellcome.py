@@ -1,3 +1,4 @@
+from app.connectors.registry import register
 from __future__ import annotations
 
 import asyncio
@@ -27,6 +28,7 @@ def _strip_html(value: str | None) -> str:
     return clean_text(re.sub(r"<[^>]+>", " ", value or ""))
 
 
+@register("wellcome-grants")
 class WellcomeConnector:
     source_key = "wellcome-grants"
 
