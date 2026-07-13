@@ -257,77 +257,57 @@ def extract_close_date(text: str) -> datetime | None:
     return None
 
 
+def _parse_spanish_month(text: str, month_group: int, day_group: int, year_group: int, match) -> datetime | None:
+    """Try to parse a Spanish date using the module-level month map."""
+    month = _SPANISH_MONTHS.get(match.group(month_group).lower())
+    if month is None:
+        return None
+    try:
+        return datetime(int(match.group(year_group)), month, int(match.group(day_group)))
+    except ValueError:
+        return None
+
+
 def parse_date_text(text: str | None) -> datetime | None:
     value = clean_text(text)
     if not value:
         return None
-    iso_match = re.search(r"\b(\d{4}-\d{2}-\d{2})\b", value)
+    # 1. ISO format: 2027-06-30
+    iso_match = _ISO_DATE.search(value)
     if iso_match:
         try:
             return datetime.strptime(iso_match.group(1), "%Y-%m-%d")
         except ValueError:
             pass
-    slash_match = re.search(r"\b(\d{1,2}/\d{1,2}/\d{4})\b", value)
+    # 2. Slash format: 06/30/2027 or 30/06/2027
+    slash_match = _SLASH_DATE.search(value)
     if slash_match:
         for fmt in ("%m/%d/%Y", "%d/%m/%Y"):
             try:
                 return datetime.strptime(slash_match.group(1), fmt)
             except ValueError:
                 continue
-    month_match = re.search(r"\b([A-Za-z]{3,9})\s+(\d{1,2}),\s+(\d{4})\b", value)
-    if month_match:
-        candidate = f"{month_match.group(1).title()} {month_match.group(2)}, {month_match.group(3)}"
+    # 3. English: "June 30, 2027" or "Jun 30, 2027"
+    eng_match = _ENGLISH_DATE.search(value)
+    if eng_match:
+        candidate = f"{eng_match.group(1).title()} {eng_match.group(2)}, {eng_match.group(3)}"
         for fmt in ("%B %d, %Y", "%b %d, %Y"):
             try:
                 return datetime.strptime(candidate, fmt)
             except ValueError:
                 continue
-    spanish_month_match = re.search(r"\b([A-Za-záéíóúñ]+)\s+(\d{1,2}),\s+(\d{4})\b", value, flags=re.IGNORECASE)
-    if spanish_month_match:
-        months = {
-            "enero": 1,
-            "febrero": 2,
-            "marzo": 3,
-            "abril": 4,
-            "mayo": 5,
-            "junio": 6,
-            "julio": 7,
-            "agosto": 8,
-            "septiembre": 9,
-            "setiembre": 9,
-            "octubre": 10,
-            "noviembre": 11,
-            "diciembre": 12,
-        }
-        month = months.get(spanish_month_match.group(1).lower())
-        if month:
-            try:
-                return datetime(int(spanish_month_match.group(3)), month, int(spanish_month_match.group(2)))
-            except ValueError:
-                pass
-    spanish_match = re.search(r"\b(\d{1,2})\s+de\s+([A-Za-záéíóúñ]+)\s+de\s+(\d{4})\b", value, flags=re.IGNORECASE)
-    if spanish_match:
-        months = {
-            "enero": 1,
-            "febrero": 2,
-            "marzo": 3,
-            "abril": 4,
-            "mayo": 5,
-            "junio": 6,
-            "julio": 7,
-            "agosto": 8,
-            "septiembre": 9,
-            "setiembre": 9,
-            "octubre": 10,
-            "noviembre": 11,
-            "diciembre": 12,
-        }
-        month = months.get(spanish_match.group(2).lower())
-        if month:
-            try:
-                return datetime(int(spanish_match.group(3)), month, int(spanish_match.group(1)))
-            except ValueError:
-                pass
+    # 4. Spanish comma: "junio 30, 2027"
+    es_comma = _SPANISH_DATE_COMMA.search(value)
+    if es_comma:
+        result = _parse_spanish_month(text, 1, 2, 3, es_comma)
+        if result:
+            return result
+    # 5. Spanish "de": "30 de junio de 2027"
+    es_de = _SPANISH_DATE_DE.search(value)
+    if es_de:
+        result = _parse_spanish_month(text, 2, 1, 3, es_de)
+        if result:
+            return result
     return None
 
 
@@ -388,6 +368,20 @@ def unique_links(links: list[str]) -> list[str]:
 
 
 FETCH_TIMEOUT_CAP = 120  # Hard cap per request (seconds), even if config says higher
+
+# ── Date parsing constants ────────────────────────────────────────────────
+_SPANISH_MONTHS: dict[str, int] = {
+    "enero": 1, "febrero": 2, "marzo": 3, "abril": 4,
+    "mayo": 5, "junio": 6, "julio": 7, "agosto": 8,
+    "septiembre": 9, "setiembre": 9, "octubre": 10,
+    "noviembre": 11, "diciembre": 12,
+}
+
+_ISO_DATE = re.compile(r"\b(\d{4}-\d{2}-\d{2})\b")
+_SLASH_DATE = re.compile(r"\b(\d{1,2}/\d{1,2}/\d{4})\b")
+_ENGLISH_DATE = re.compile(r"\b([A-Za-z]{3,9})\s+(\d{1,2}),\s+(\d{4})\b")
+_SPANISH_DATE_COMMA = re.compile(r"\b([A-Za-záéíóúñ]+)\s+(\d{1,2}),\s+(\d{4})\b", flags=re.IGNORECASE)
+_SPANISH_DATE_DE = re.compile(r"\b(\d{1,2})\s+de\s+([A-Za-záéíóúñ]+)\s+de\s+(\d{4})\b", flags=re.IGNORECASE)
 
 # Content-Type patterns that indicate JSON responses, even when the
 # server sends a different Content-Type header. Some API endpoints
