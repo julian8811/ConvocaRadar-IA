@@ -1,14 +1,27 @@
 "use client";
 
-import { useMemo } from "react";
+import { useMemo, useCallback } from "react";
 import {
   BarChart,
   Bar,
   XAxis,
   YAxis,
   ResponsiveContainer,
+  Tooltip,
 } from "recharts";
 import type { DashboardBreakdownItem } from "@/lib/types";
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function SourceTooltip({ active, payload }: { active?: boolean; payload?: any[] }) {
+  if (!active || !payload?.length) return null;
+  const item = payload[0];
+  return (
+    <div className="rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm shadow-lg dark:border-slate-700 dark:bg-slate-800">
+      <p className="font-medium text-slate-900 dark:text-white">{item.payload.fullName}</p>
+      <p className="text-slate-600 dark:text-slate-400">{Number(item.value).toLocaleString("es-CO")} convocatorias</p>
+    </div>
+  );
+}
 
 export function SourceChart({ data }: { data: DashboardBreakdownItem[] }) {
   const chartData = useMemo(() => {
@@ -17,9 +30,14 @@ export function SourceChart({ data }: { data: DashboardBreakdownItem[] }) {
       .slice(0, 10)
       .map((d) => ({
         name: d.name.length > 30 ? d.name.slice(0, 30) + "..." : d.name,
+        fullName: d.name,
         value: d.total,
       }));
   }, [data]);
+
+  const handleClick = useCallback((entry: { fullName: string }) => {
+    console.debug("Source chart click:", entry.fullName);
+  }, []);
 
   if (!data.length) {
     return (
@@ -44,7 +62,16 @@ export function SourceChart({ data }: { data: DashboardBreakdownItem[] }) {
             tick={{ fontSize: 10, fill: "#64748b" }}
             width={170}
           />
-          <Bar dataKey="value" fill="#06b6d4" radius={[0, 4, 4, 0]} />
+          <Tooltip content={<SourceTooltip />} cursor={{ fill: "#f1f5f9" }} />
+          <Bar
+            dataKey="value"
+            fill="#06b6d4"
+            radius={[0, 4, 4, 0]}
+            isAnimationActive={true}
+            animationDuration={600}
+            cursor="pointer"
+            onClick={(entry: unknown) => handleClick(entry as { fullName: string })}
+          />
         </BarChart>
       </ResponsiveContainer>
     </div>
