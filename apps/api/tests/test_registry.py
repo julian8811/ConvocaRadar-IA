@@ -217,10 +217,10 @@ class TestFactoryFallback:
         assert isinstance(instance, GenericHtmlConnector)
 
     def test_existing_if_elif_keys_still_work(self):
-        """Keys like 'nsf-funding' that are NOT being migrated yet
+        """Keys with non-standard constructors (heading_list, BDN)
         must still resolve through the if-elif chain."""
         from app.connectors.factory import connector_for
-        from app.connectors.nsf import NSFFundingConnector
+        from app.connectors.heading_list_html import HeadingListHtmlConnector
 
-        instance = connector_for("nsf-funding", "http://nsf.gov")
-        assert isinstance(instance, NSFFundingConnector)
+        instance = connector_for("lundbeck-foundation", "http://lundbeckfonden.com")
+        assert isinstance(instance, HeadingListHtmlConnector)
