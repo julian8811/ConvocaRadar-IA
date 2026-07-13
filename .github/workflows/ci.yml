@@ -12,19 +12,24 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Install pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: 10.7.0
+
       - name: Setup Node
         uses: actions/setup-node@v4
         with:
           node-version: 22
 
       - name: Install dependencies
-        run: npm install
+        run: pnpm install --no-frozen-lockfile
 
       - name: Lint
-        run: cd apps/web && npm run lint
+        run: pnpm run lint:web
 
       - name: Build
-        run: cd apps/web && npm run build
+        run: pnpm run build:web
 
   api:
     runs-on: ubuntu-latest
