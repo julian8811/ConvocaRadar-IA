@@ -1,1 +1,0 @@
-"""ConvocaRadar Arq worker package."""
