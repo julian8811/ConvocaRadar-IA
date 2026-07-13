@@ -145,14 +145,10 @@ async def _scrape_source_candidates_with_timeout(
         ) from exc
 
 
-async def run_source_inline(
-    db, source: Source, organization_id: str | None = None
-) -> SourceRun:
-    """Async version of services.execute_source_run_locally.
-
-    Creates a SourceRun, scrapes candidates, persists opportunities,
-    and updates the run with final status and counts.
-    """
+def _setup_run(
+    db, source: Source, organization_id: str | None
+) -> tuple[SourceRun, Task, datetime]:
+    """Create SourceRun + Task records for this scrape."""
     started_at = datetime.now(UTC).replace(tzinfo=None)
     run = SourceRun(
         source_id=source.id,
@@ -183,160 +179,159 @@ async def run_source_inline(
     )
     db.add(task)
     db.flush()
+    return run, task, started_at
+
+
+def _persist_opportunities(
+    db, run: SourceRun, opportunities: list[OpportunityCreate], organization_id: str | None
+) -> tuple[int, int, int]:
+    """Persist scraped opportunities, returning (created, updated, failed)."""
+    created = 0
+    updated = 0
+    failed_items = 0
+    for opportunity_data in opportunities:
+        try:
+            opportunity = create_opportunity(
+                db, opportunity_data, organization_id=organization_id
+            )
+            if opportunity.first_seen_at == opportunity.last_seen_at:
+                created += 1
+            else:
+                updated += 1
+        except Exception as exc:
+            failed_items += 1
+            run.logs.append({
+                "level": "warning",
+                "message": "Candidate skipped during local persistence",
+                "title": getattr(opportunity_data, "title", ""),
+                "error": str(exc),
+            })
+    return created, updated, failed_items
+
+
+def _finalize_run(
+    db, run: SourceRun, task: Task, source: Source,
+    opportunities: list[OpportunityCreate],
+    created: int, updated: int, failed_items: int,
+    scrape_stats: dict[str, object],
+) -> None:
+    """Update SourceRun, Task, and Source with final status after successful scrape."""
+    finished_at = datetime.now(UTC).replace(tzinfo=None)
+    run.status = "degraded" if len(opportunities) == 0 else "success"
+    run.finished_at = finished_at
+    run.items_found = len(opportunities)
+    run.items_created = created
+    run.items_updated = updated
+    run.items_failed = failed_items
+    run.logs = [
+        *run.logs,
+        {"level": "info", "message": "Local connector executed", "task_id": task.id},
+        {"level": "info", "message": "Connector diagnostics", **scrape_stats},
+        {"level": "info", "message": "Candidates normalized",
+         "items_found": len(opportunities), "items_failed": failed_items},
+    ]
+    task.status = run.status
+    task.finished_at = finished_at
+    task.result = {
+        "items_found": len(opportunities),
+        "items_created": created,
+        "items_updated": updated,
+    }
+    if len(opportunities) > 0:
+        source.last_success_at = finished_at
+        source.last_error = None
+    if len(opportunities) == 0:
+        create_source_health_alert(
+            db, source,
+            reason="no se detectaron oportunidades nuevas en la ultima corrida",
+        )
+    # Track consecutive empty runs and auto-pause
+    source.consecutive_empty_runs = update_consecutive_empty_runs(
+        items_found=len(opportunities),
+        current_count=source.consecutive_empty_runs or 0,
+    )
+    if should_auto_pause(source.consecutive_empty_runs):
+        source.auto_paused = True
+        run.logs.append({
+            "level": "warn",
+            "message": f"Source auto-paused after {source.consecutive_empty_runs} consecutive empty runs",
+        })
+    # Track selector failures and auto-pause
+    if len(opportunities) == 0:
+        source.selector_failures = (source.selector_failures or 0) + 1
+    else:
+        source.selector_failures = 0
+    if (source.selector_failures or 0) >= 3:
+        source.auto_paused = True
+        run.logs.append({
+            "level": "warn",
+            "message": f"Source auto-paused after {source.selector_failures} consecutive selector failures",
+        })
+    db.flush()
+
+
+def _handle_run_error(
+    db, run: SourceRun, task: Task, source: Source, exc: Exception,
+) -> None:
+    """Update run/task/source on scrape error."""
+    finished_at = datetime.now(UTC).replace(tzinfo=None)
+    error_type = classify_error(exc)
+    error_type_value = error_type.value
+    run.status = "degraded" if error_type == ErrorType.PARSE else "failed"
+    run.finished_at = finished_at
+    run.items_failed = 1
+    run.error_message = str(exc)
+    run.logs = [
+        *run.logs,
+        {"level": "error", "message": str(exc), "error_type": error_type_value},
+    ]
+    task.status = run.status
+    task.finished_at = finished_at
+    task.error_message = str(exc)
+    task.result = {"items_failed": 1}
+    source.last_error = str(exc)
+    if error_type not in (ErrorType.TIMEOUT, ErrorType.NETWORK):
+        create_source_health_alert(db, source, reason=str(exc))
+
+
+async def run_source_inline(
+    db, source: Source, organization_id: str | None = None
+) -> SourceRun:
+    """Scrape a source, persist opportunities, and return the SourceRun.
+
+    Orchestrates: setup → scrape → persist → finalize (or error handling).
+    """
+    run, task, _started_at = _setup_run(db, source, organization_id)
     try:
         validate_source_url(source)
         scrape_stats: dict[str, object] = {}
-        opportunities = await _scrape_source_candidates_with_timeout(
-            source, scrape_stats
-        )
-        # Change D: update DOM hash and item count after parsing list page
+        opportunities = await _scrape_source_candidates_with_timeout(source, scrape_stats)
+
         _update_dom_hash(source, run, scrape_stats)
         items_parsed = scrape_stats.get("candidates_parsed")
         if isinstance(items_parsed, int):
             source.last_item_count = items_parsed
-        # Progress: fetch + parse complete
         _set_progress(run, {"fetch": _now(), "parse": _now()})
         db.flush()
-        created = 0
-        updated = 0
-        failed_items = 0
-        for opportunity_data in opportunities:
-            try:
-                opportunity = create_opportunity(
-                    db, opportunity_data, organization_id=organization_id
-                )
-                if opportunity.first_seen_at == opportunity.last_seen_at:
-                    created += 1
-                else:
-                    updated += 1
-            except Exception as exc:
-                failed_items += 1
-                run.logs.append(
-                    {
-                        "level": "warning",
-                        "message": "Candidate skipped during local persistence",
-                        "title": getattr(opportunity_data, "title", ""),
-                        "error": str(exc),
-                    }
-                )
-        db.flush()
-        # Progress: persist complete
+
+        created, updated, failed = _persist_opportunities(db, run, opportunities, organization_id)
         _set_progress(run, {"persist": _now()})
         db.flush()
-        finished_at = datetime.now(UTC).replace(tzinfo=None)
-        run.status = "degraded" if len(opportunities) == 0 else "success"
-        run.finished_at = finished_at
-        run.items_found = len(opportunities)
-        run.items_created = created
-        run.items_updated = updated
-        run.items_failed = failed_items
-        run.logs = [
-            *run.logs,
-            {
-                "level": "info",
-                "message": "Local connector executed",
-                "task_id": task.id,
-            },
-            {
-                "level": "info",
-                "message": "Connector diagnostics",
-                **scrape_stats,
-            },
-            {
-                "level": "info",
-                "message": "Candidates normalized",
-                "items_found": len(opportunities),
-                "items_failed": failed_items,
-            },
-        ]
-        task.status = run.status
-        task.finished_at = finished_at
-        task.result = {
-            "items_found": len(opportunities),
-            "items_created": created,
-            "items_updated": updated,
-        }
-        if len(opportunities) > 0:
-            source.last_success_at = finished_at
-            source.last_error = None
-        if len(opportunities) == 0:
-            create_source_health_alert(
-                db,
-                source,
-                reason="no se detectaron oportunidades nuevas en la ultima corrida",
-            )
-        # Change C: track consecutive empty runs and auto-pause
-        source.consecutive_empty_runs = update_consecutive_empty_runs(
-            items_found=len(opportunities),
-            current_count=source.consecutive_empty_runs or 0,
-        )
-        if should_auto_pause(source.consecutive_empty_runs):
-            source.auto_paused = True
-            run.logs.append({
-                "level": "warn",
-                "message": (
-                    f"Source auto-paused after {source.consecutive_empty_runs} "
-                    "consecutive empty runs"
-                ),
-            })
-        # Change D: track selector failures and auto-pause
-        if len(opportunities) == 0:
-            source.selector_failures = (source.selector_failures or 0) + 1
-        else:
-            source.selector_failures = 0
-        if (source.selector_failures or 0) >= 3:
-            source.auto_paused = True
-            run.logs.append({
-                "level": "warn",
-                "message": (
-                    f"Source auto-paused after {source.selector_failures} "
-                    "consecutive selector failures"
-                ),
-            })
-        db.flush()
+
+        _finalize_run(db, run, task, source, opportunities, created, updated, failed, scrape_stats)
     except asyncio.CancelledError:
         finished_at = datetime.now(UTC).replace(tzinfo=None)
         run.status = "failed"
         run.finished_at = finished_at
         run.error_message = "Scrape cancelled (shutdown or timeout)"
-        run.logs = [
-            *run.logs,
-            {
-                "level": "error",
-                "message": "Scrape cancelled",
-                "error_type": "TIMEOUT",
-            },
-        ]
+        run.logs = [*run.logs, {"level": "error", "message": "Scrape cancelled", "error_type": "TIMEOUT"}]
         task.status = "failed"
         task.finished_at = finished_at
         task.error_message = "Scrape cancelled"
         source.last_error = "Scrape cancelled"
-        raise  # Re-raise so the scheduler knows this task was cancelled
+        raise
     except Exception as exc:
-        finished_at = datetime.now(UTC).replace(tzinfo=None)
-        error_type = classify_error(exc)
-        error_type_value = error_type.value
-        run.status = "degraded" if error_type == ErrorType.PARSE else "failed"
-        run.finished_at = finished_at
-        run.items_failed = 1
-        run.error_message = str(exc)
-        run.logs = [
-            *run.logs,
-            {
-                "level": "error",
-                "message": str(exc),
-                "error_type": error_type_value,
-            },
-        ]
-        task.status = run.status
-        task.finished_at = finished_at
-        task.error_message = str(exc)
-        task.result = {"items_failed": 1}
-        source.last_error = str(exc)
-        # ERR-4: only create health alert for PARSE / UNKNOWN
-        # (TIMEOUT and NETWORK are transient — no alert needed)
-        if error_type not in (ErrorType.TIMEOUT, ErrorType.NETWORK):
-            create_source_health_alert(db, source, reason=str(exc))
+        _handle_run_error(db, run, task, source, exc)
     return run
 
 
