@@ -421,3 +421,76 @@ class TestApcColombiaParse:
         assert "APC" in candidates[0].title
 
 
+
+
+class TestMincitParse:
+    """MinCIT parsea bloques HTML (sin <a> dentro de <h2>)."""
+
+    @pytest.mark.asyncio
+    async def test_parse_yields_candidate(self):
+        from app.connectors.mincit import MincitConvocatoriasConnector
+
+        connector = MincitConvocatoriasConnector()
+        html = """<html><body>
+<div class="convocatoria">
+<h2>MinCIT Innovation Call 2027</h2>
+<p><a href="https://convocatoriasturismo.mincit.gov.co/convocatoria/2027/innovacion">Ver mas</a></p>
+<p>Abierta hasta: 31 December 2027</p>
+</div>
+</body></html>"""
+        raw = RawSourceResult("test", "https://convocatoriasturismo.mincit.gov.co/listado-convocatorias", html, "text/html")
+        candidates = await connector.parse(raw)
+        assert len(candidates) >= 1
+        assert "MinCIT" in candidates[0].title
+
+
+class TestUsaidParse:
+    """USAID extiende GrantsGovConnector — espera JSON de Grants.gov."""
+
+    @pytest.mark.asyncio
+    async def test_parse_yields_candidate(self):
+        from app.connectors.usaid_grants import UsaidGrantsConnector
+
+        connector = UsaidGrantsConnector()
+        data = {
+            "data": {
+                "oppHits": [{
+                    "id": "USAID-2027-001",
+                    "title": "USAID Development Innovation 2027",
+                    "agencyName": "USAID",
+                    "openDate": "01/15/2027",
+                    "closeDate": "07/01/2027",
+                }]
+            }
+        }
+        import json
+        raw = RawSourceResult("test", "https://api.grants.gov", json.dumps(data), "application/json")
+        candidates = await connector.parse(raw)
+        assert len(candidates) >= 1
+        assert "USAID" in candidates[0].title
+
+
+class TestBdnParse:
+    """BDN Convocatorias espera array JSON."""
+
+    @pytest.mark.asyncio
+    async def test_parse_yields_candidate(self):
+        from app.connectors.bdn_convocatorias import BdnConvocatoriasConnector
+
+        connector = BdnConvocatoriasConnector(
+            "cdti-convocatorias", "https://www.infosubvenciones.es",
+            search_query="CDTI", entity_name="CDTI", default_country="Spain",
+        )
+        import json
+        data = [{
+            "id": "CDTI-2027",
+            "descripcion": "CDTI Innovation Grant 2027",
+            "concept": "R&D funding for SMEs",
+            "conv_date": "2027-03-15",
+            "conv_end_date": "2027-09-30",
+            "budget": "2.5M EUR",
+        }]
+        raw = RawSourceResult("test", "https://www.infosubvenciones.es", json.dumps(data), "application/json")
+        candidates = await connector.parse(raw)
+        assert len(candidates) >= 1
+        assert "CDTI" in candidates[0].title
