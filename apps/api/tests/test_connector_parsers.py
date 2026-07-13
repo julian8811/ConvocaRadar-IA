@@ -179,6 +179,66 @@ class TestWellcomeParse:
 # que requiere datos reales del endpoint. Se testea via test_simpler_grants.py.
 
 
+class TestGlobalInnovationFundParse:
+    """Global Innovation Fund parsea HTML."""
+
+    @pytest.mark.asyncio
+    async def test_parse_yields_candidate(self):
+        from app.connectors.global_innovation_fund import GlobalInnovationFundConnector
+
+        connector = GlobalInnovationFundConnector()
+        html = """<html><body>
+            <article>
+                <h2><a href="/apply/gif-2027">Global Innovation Fund 2027</a></h2>
+                <p>Funding for social innovation</p>
+            </article>
+        </body></html>"""
+        raw = RawSourceResult("test", "https://globalinnovation.fund", html, "text/html")
+        candidates = await connector.parse(raw)
+        assert len(candidates) >= 1
+        assert "Global Innovation Fund" in candidates[0].title
+
+
+class TestIdrcFundingParse:
+    """IDRC parsea HTML."""
+
+    @pytest.mark.asyncio
+    async def test_parse_yields_candidate(self):
+        from app.connectors.idrc_funding import IdrcFundingConnector
+
+        connector = IdrcFundingConnector()
+        html = """<html><body>
+            <div class="funding-opportunity">
+                <h3><a href="/en/funding/idrc-research-grant-2027">IDRC Research Grant 2027 — Call for Proposals</a></h3>
+                <p>Deadline: 2027-10-30</p>
+            </div>
+        </body></html>"""
+        raw = RawSourceResult("test", "https://idrc-crdi.ca/funding", html, "text/html")
+        candidates = await connector.parse(raw)
+        assert len(candidates) >= 1
+        assert "IDRC" in candidates[0].title
+
+
+class TestUnwomenParse:
+    """UN Women parsea HTML."""
+
+    @pytest.mark.asyncio
+    async def test_parse_yields_candidate(self):
+        from app.connectors.unwomen_innovate import UnwomenInnovateConnector
+
+        connector = UnwomenInnovateConnector()
+        html = """<html><body>
+            <div class="call">
+                <h3><a href="/call/2027/gender-equality">UN Women Innovation Call 2027</a></h3>
+                <p>Deadline: 2027-09-15</p>
+            </div>
+        </body></html>"""
+        raw = RawSourceResult("test", "https://www.unwomen.org", html, "text/html")
+        candidates = await connector.parse(raw)
+        assert len(candidates) >= 1
+        assert "UN Women" in candidates[0].title
+
+
 class TestUnescoParse:
     """UNESCO parsea HTML."""
 
