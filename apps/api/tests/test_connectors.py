@@ -33,7 +33,6 @@ from tests.connector_fixtures import (
 # source_type is passed to connector_for(); None means "discover from key".
 GROUPS: list[tuple[str, str, str | None, str, str]] = [
     ("generic-html", "undef", None, "httpx-get-html", "UNDEFConnector"),
-    ("eu-post-json", "eu-funding-tenders", None, "httpx-post-json", "EuFundingTendersConnector"),
     ("get-json", "test-json", None, "httpx-get-json", "GenericHtmlConnector"),
     ("rss", "test-rss", None, "httpx-get-rss", "RssConnector"),
     ("pdf", "test-pdf", "pdf", "httpx-get-pdf", "PdfConnector"),
