@@ -1,5 +1,6 @@
-from app.connectors.registry import register
 from __future__ import annotations
+from app.connectors.registry import register
+
 
 import json
 from datetime import UTC, datetime
