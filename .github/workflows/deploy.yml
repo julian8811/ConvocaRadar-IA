@@ -113,10 +113,11 @@ jobs:
           VERCEL_ORG_ID: ${{ secrets.VERCEL_ORG_ID }}
           VERCEL_PROJECT_ID: ${{ secrets.VERCEL_PROJECT_ID }}
         run: |
+          # --cwd NO se pasa: Vercel ya tiene Root Directory: apps/web
+          # configurado en el proyecto, pasarlo duplica el path.
           vercel deploy --prod --yes --token "$VERCEL_TOKEN" \
             --scope "$VERCEL_ORG_ID" \
-            --project convocaradar-web \
-            --cwd ./apps/web
+            --project convocaradar-web
 
   healthcheck:
     name: Post-deploy healthcheck
