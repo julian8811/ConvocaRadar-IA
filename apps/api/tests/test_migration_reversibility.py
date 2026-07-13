@@ -21,7 +21,7 @@ from pathlib import Path
 
 import pytest
 from sqlalchemy import inspect
-from sqlalchemy import text as sa_text
+
 from sqlalchemy import create_engine
 
 

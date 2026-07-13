@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import os
 from datetime import UTC, datetime
-from types import SimpleNamespace
+
 
 os.environ.setdefault("DATABASE_URL", "sqlite:///./test_convocaradar.db")
 

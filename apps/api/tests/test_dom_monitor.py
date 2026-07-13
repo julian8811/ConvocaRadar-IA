@@ -4,7 +4,6 @@ Strict TDD: tests written first, implementation follows.
 """
 from __future__ import annotations
 
-import hashlib
 
 import pytest
 

@@ -341,19 +341,12 @@ export type HealthRead = {
  * (which uses short keys) for backward-compat with the legacy
  * DashboardSummary shape that the e2e + alias still emit.
  */
-export type DashboardKpiCard = {
-  total_opportunities: number;
-  open_opportunities: number;
-  closing_soon_opportunities: number;
-  high_match_opportunities: number;
-};
 
 /**
  * PR B-2: "Mi cola de revisión" — items the consultor has marked as
  * review/kept. Reuses TriageOpportunityItem (same slim shape, sourced
  * from the user's review_queue slice on /dashboard/triage).
  */
-export type ReviewQueueItem = TriageOpportunityItem;
 
 export type Organization = {
   id: string;

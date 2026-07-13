@@ -37,7 +37,7 @@ from app.db.seed import seed
 from app.db.session import SessionLocal
 from app.main import app
 from app.models import Organization, Role, User
-from app.api.v1.auth import _set_token_cookie, TOKEN_COOKIE_NAME
+from app.api.v1.auth import _set_token_cookie
 
 
 # ---------------------------------------------------------------------------
