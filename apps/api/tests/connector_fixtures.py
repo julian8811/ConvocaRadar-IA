@@ -52,10 +52,10 @@ FIXTURE_DATA: dict[str, dict[str, Any]] = {
     "httpx-post-json": {
         "sample": (
             "http://api.example.com/search",
-            '{"results": [{"id": "123", "title": "Grant X", "metadata": {"callTitle": ["Call X"], "identifier": ["ID-X"], "status": ["31094501"], "actions": [{"deadlineDates": ["2027-06-30T00:00:00Z"]}]}}]}',
+            '{"results": [{"id": "123", "metadata": {"callTitle": ["Call X"], "identifier": ["ID-X"], "callIdentifier": ["CALL-X"], "status": ["31094501"], "actions": [{"deadlineDates": ["2027-06-30T00:00:00Z"]}]}}]}',
             "application/json",
         ),
-        "empty": ("", "{}", "application/json"),
+        "empty": ("", '{"results": []}', "application/json"),
         "garbage": ("", "{{{broken}}}", "application/json"),
     },
     # 3. GET request, JSON response (Atom-feed style for GenericHtmlConnector)

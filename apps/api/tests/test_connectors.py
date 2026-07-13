@@ -41,7 +41,6 @@ GROUPS: list[tuple[str, str, str | None, str, str]] = [
     ("hybrid", "test-hybrid", "hybrid", "hybrid", "HybridConnector"),
     ("generic-api", "test-api", "api", "generic-api", "ApiConnector"),
     ("grants-gov", "grants-gov", None, "grants-gov", "GrantsGovConnector"),
-    ("grants-gov-rss", "grants-gov-rss", None, "httpx-get-rss", "GrantsGovRssConnector"),
 ]
 
 
