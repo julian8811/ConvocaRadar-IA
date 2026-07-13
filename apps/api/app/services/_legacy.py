@@ -905,6 +905,33 @@ def is_public_http_url(url: str | None) -> bool:
     return parsed.scheme in {"http", "https"} and not is_private_url(url)
 
 
+# ── Noise detection constants ──────────────────────────────────────────────
+_CSS_MARKERS = ("color:", "background-color:", "font-weight:", "display:", "justify-content:", ".box-address", ".caja", "budgetyearscolumns")
+_TEMPLATE_CODE = re.compile(r"[A-Z]{3,}\s*[-–—]\s*\d{2,}")
+_YEAR_PATTERN = re.compile(r"\b(20\d{2})\b")
+_CONVOCATORIA_TEMPLATE = re.compile(r"\b(CONVOCATORIA|AVISO|LICITACION|LICITACIÓN|CONCURSO|PROCESO)\b", re.IGNORECASE)
+_CODE_PATTERN = re.compile(r"[A-Z]{3,}\s*[-–—]\s*\d{3,}")
+_PDF_NOISE = re.compile(r"\b(cliquer ici|click here|read more|download pdf|view pdf|pdf)\b", re.IGNORECASE)
+
+_INFORMATIONAL_MARKERS = (
+    "sobre nosotros", "about us", "about the", "our team", "our mission",
+    "our work", "quienes somos", "quiénes somos", "nuestra historia",
+    "nuestro equipo", "directorio",
+    "contacto", "contact us", "términos", "terms and conditions",
+    "privacy policy", "política de privacidad", "politica de privacidad",
+    "preguntas frecuentes", "faq", "oficina", "office",
+    "what we do", "cómo trabajamos", "como trabajamos",
+    "nuestro impacto", "our impact", "our approach", "nuestro enfoque",
+    "transparencia", "transparency", "informes", "reports",
+    "publicaciones", "publications", "noticias", "news",
+    "eventos", "events", "historias", "stories",
+    "member states", "estados miembros", "governance", "gobernanza",
+    "partners", "socios", "aliados",
+    "our leadership", "nuestro liderazgo", "director ejecutivo",
+    "executive director", "deputy director", "board", "consejo",
+)
+
+
 def is_noise_title(title: str | None) -> bool:
     if not title:
         return True
@@ -918,62 +945,30 @@ def is_noise_title(title: str | None) -> bool:
         return True
     if len(cleaned) < 6 and " " not in cleaned:
         return True
-    if any(marker in lowered for marker in ("color:", "background-color:", "font-weight:", "display:", "justify-content:", ".box-address", ".caja", "budgetyearscolumns")):
+    if any(marker in lowered for marker in _CSS_MARKERS):
         return True
     if "{" in cleaned or "}" in cleaned or "<style" in lowered or "<script" in lowered:
         return True
-    # ── Low-quality / auto-generated title patterns ──
-    # All-caps titles with code-like fragments (e.g. "FNTCE - 322 - 2025")
-    # are almost always scraped noise from poorly structured sources.
-    import re
+    # All-caps titles with code-like fragments
     if cleaned == cleaned.upper() and len(cleaned) > 30:
-        # If the title is ALL CAPS and has at least one digit, it's likely
-        # a template title. Allow short acronyms (<=30 chars) through.
-        if re.search(r"[A-Z]{3,}\s*[-–—]\s*\d{2,}", cleaned):
+        if _TEMPLATE_CODE.search(cleaned):
             return True
-    # Repeated year pattern: "2025 ... 2025" or "2025-2025"
-    years = re.findall(r"\b(20\d{2})\b", cleaned)
+    # Repeated year pattern: "2025 ... 2025"
+    years = _YEAR_PATTERN.findall(cleaned)
     if len(years) >= 2 and len(set(years)) <= 2:
         return True
-    # Titles that are >80% uppercase (screaming template titles)
+    # Titles >80% uppercase (screaming template titles)
     upper_ratio = sum(1 for c in cleaned if c.isupper()) / max(len(cleaned), 1)
-    if upper_ratio > 0.8 and len(cleaned) > 60 and re.search(r"\b(20\d{2})\b", cleaned):
+    if upper_ratio > 0.8 and len(cleaned) > 60 and _YEAR_PATTERN.search(cleaned):
         return True
-    # Generic template markers: "CONVOCATORIA" + code, "AVISO", "LICITACIÓN", etc.
-    if re.search(
-        r"\b(CONVOCATORIA|AVISO|LICITACION|LICITACIÓN|CONCURSO|PROCESO)\b",
-        cleaned,
-        re.IGNORECASE,
-    ) and re.search(r"[A-Z]{3,}\s*[-–—]\s*\d{3,}", cleaned):
+    # Generic template markers + code pattern
+    if _CONVOCATORIA_TEMPLATE.search(cleaned) and _CODE_PATTERN.search(cleaned):
         return True
-    # Multi-language scraped noise: "Cliquer ici", "click here", "Read more", PDF redirects
-    if re.search(r"\b(cliquer ici|click here|read more|download pdf|view pdf|pdf)\b", lowered):
+    # Multi-language scraped noise
+    if _PDF_NOISE.search(lowered):
         return True
-    # ── Informational / non-call pages ──────────────────────────────────
-    # These are static content pages that got picked up from list views
-    # but are NOT time-bound calls, grants, or funding opportunities.
-    informational_markers = [
-        # Org/about pages
-        "sobre nosotros", "about us", "about the", "our team", "our mission",
-        "our work", "quienes somos", "quiénes somos", "nuestra historia",
-        "nuestro equipo", "directorio",
-        # Contact / legal
-        "contacto", "contact us", "términos", "terms and conditions",
-        "privacy policy", "política de privacidad", "politica de privacidad",
-        "preguntas frecuentes", "faq", "oficina", "office",
-        # General info pages (not calls)
-        "what we do", "cómo trabajamos", "como trabajamos",
-        "nuestro impacto", "our impact", "our approach", "nuestro enfoque",
-        "transparencia", "transparency", "informes", "reports",
-        "publicaciones", "publications", "noticias", "news",
-        "eventos", "events", "historias", "stories",
-        "member states", "estados miembros", "governance", "gobernanza",
-        "partners", "socios", "aliados",
-        # Leadership / people pages
-        "our leadership", "nuestro liderazgo", "director ejecutivo",
-        "executive director", "deputy director", "board", "consejo",
-    ]
-    if any(marker in lowered for marker in informational_markers):
+    # Informational / non-call pages
+    if any(marker in lowered for marker in _INFORMATIONAL_MARKERS):
         return True
     return False
 
@@ -1174,114 +1169,109 @@ def build_opportunity_query(
     return stmt.order_by(Opportunity.close_date.asc().nullslast(), Opportunity.created_at.desc())
 
 
+def _update_opportunity(
+    opportunity: Opportunity,
+    data: OpportunityCreate,
+    normalized_title: str,
+) -> None:
+    """Apply scraped data to an existing opportunity record."""
+    opportunity.last_seen_at = datetime.now(UTC).replace(tzinfo=None)
+    opportunity.title = normalized_title
+    opportunity.entity = data.entity
+    opportunity.country = data.country
+    opportunity.region = data.region
+    opportunity.language = data.language
+    opportunity.categories = list(data.categories)
+    opportunity.topics = list(data.topics)
+    opportunity.description = data.description
+    opportunity.summary = data.summary or data.description or opportunity.summary
+    opportunity.raw_text = data.raw_text or opportunity.raw_text
+    opportunity.official_url = data.official_url
+    opportunity.application_url = data.application_url
+    opportunity.open_date = data.open_date
+    opportunity.close_date = data.close_date
+    opportunity.funding_amount_value = data.funding_amount_value
+    opportunity.funding_amount_currency = data.funding_amount_currency
+    opportunity.funding_amount_raw = data.funding_amount_raw
+    opportunity.eligible_applicants = list(data.eligible_applicants)
+    opportunity.requirements = list(data.requirements)
+    opportunity.documents_required = list(data.documents_required)
+    opportunity.evaluation_criteria = list(data.evaluation_criteria)
+    opportunity.restrictions = list(data.restrictions)
+    opportunity.risk_flags = list(data.risk_flags)
+    opportunity.confidence_score = data.confidence_score
+    opportunity.status = inferred_opportunity_status(
+        data.close_date, " ".join([data.summary, data.raw_text]),
+    )
+
+
+async def _update_and_score(
+    db: Session,
+    opportunity: Opportunity,
+    data: OpportunityCreate,
+    normalized_title: str,
+    score_org_id: str | None,
+) -> Opportunity:
+    """Update opportunity, recalculate embedding + score."""
+    _update_opportunity(opportunity, data, normalized_title)
+    actual_org_id = opportunity.organization_id or score_org_id
+    await upsert_opportunity_embedding(db, opportunity)
+    if actual_org_id:
+        profile = db.scalar(select(OrganizationProfile).where(OrganizationProfile.organization_id == actual_org_id))
+        if profile:
+            calculate_score(db, opportunity, profile)
+    return opportunity
+
+
 async def create_opportunity(db: Session, data: OpportunityCreate, organization_id: str | None = None) -> Opportunity:
     data = await enrich_opportunity_payload(data)
     normalized_title = data.title.strip()
     if is_noise_payload(normalized_title, data.summary, data.raw_text):
         raise ValueError("Opportunity title looks like scraping noise")
     slug = slugify(f"{normalized_title}-{data.entity}")
-    score_organization_id = organization_id
+    score_org_id = organization_id
     if data.official_url and not url_is_reachable(data.official_url):
         data = data.model_copy(update={"official_url": None})
     if data.application_url and not url_is_reachable(data.application_url):
         data = data.model_copy(update={"application_url": None})
 
-    def apply_scraped_values(opportunity: Opportunity) -> Opportunity:
-        opportunity.last_seen_at = datetime.now(UTC).replace(tzinfo=None)
-        opportunity.title = normalized_title
-        opportunity.entity = data.entity
-        opportunity.country = data.country
-        opportunity.region = data.region
-        opportunity.language = data.language
-        opportunity.categories = list(data.categories)
-        opportunity.topics = list(data.topics)
-        opportunity.description = data.description
-        opportunity.summary = data.summary or data.description or opportunity.summary
-        opportunity.raw_text = data.raw_text or opportunity.raw_text
-        opportunity.official_url = data.official_url
-        opportunity.application_url = data.application_url
-        opportunity.open_date = data.open_date
-        opportunity.close_date = data.close_date
-        opportunity.funding_amount_value = data.funding_amount_value
-        opportunity.funding_amount_currency = data.funding_amount_currency
-        opportunity.funding_amount_raw = data.funding_amount_raw
-        opportunity.eligible_applicants = list(data.eligible_applicants)
-        opportunity.requirements = list(data.requirements)
-        opportunity.documents_required = list(data.documents_required)
-        opportunity.evaluation_criteria = list(data.evaluation_criteria)
-        opportunity.restrictions = list(data.restrictions)
-        opportunity.risk_flags = list(data.risk_flags)
-        opportunity.confidence_score = data.confidence_score
-        opportunity.status = inferred_opportunity_status(
-            data.close_date,
-            " ".join([data.summary, data.raw_text]),
-        )
-        return opportunity
-
+    # ── Dedup checks (ordered by specificity) ─────────────────────────────
     if data.external_id and data.source_id:
-        existing_by_external_id = db.scalar(
+        existing = db.scalar(
             select(Opportunity).where(
                 Opportunity.source_id == data.source_id,
                 Opportunity.external_id == data.external_id,
                 or_(Opportunity.organization_id == organization_id, Opportunity.organization_id.is_(None)),
             )
         )
-        if existing_by_external_id:
-            apply_scraped_values(existing_by_external_id)
-            score_organization_id = existing_by_external_id.organization_id or score_organization_id
-            await upsert_opportunity_embedding(db, existing_by_external_id)
-            if score_organization_id:
-                profile = db.scalar(select(OrganizationProfile).where(OrganizationProfile.organization_id == score_organization_id))
-                if profile:
-                    calculate_score(db, existing_by_external_id, profile)
-            return existing_by_external_id
+        if existing:
+            return await _update_and_score(db, existing, data, normalized_title, score_org_id)
+
     if data.external_id and data.external_id.startswith("dedup-"):
-        existing_global = db.scalar(
-            select(Opportunity)
-            .where(
+        existing = db.scalar(
+            select(Opportunity).where(
                 Opportunity.external_id == data.external_id,
                 _organization_opportunity_scope(organization_id),
-            )
-            .order_by(Opportunity.first_seen_at.asc())
+            ).order_by(Opportunity.first_seen_at.asc())
         )
-        if existing_global:
-            apply_scraped_values(existing_global)
-            score_organization_id = existing_global.organization_id or score_organization_id
-            await upsert_opportunity_embedding(db, existing_global)
-            if score_organization_id:
-                profile = db.scalar(select(OrganizationProfile).where(OrganizationProfile.organization_id == score_organization_id))
-                if profile:
-                    calculate_score(db, existing_global, profile)
-            return existing_global
+        if existing:
+            return await _update_and_score(db, existing, data, normalized_title, score_org_id)
 
     duplicate = find_duplicate_opportunity(db, data, organization_id)
     if duplicate:
-        apply_scraped_values(duplicate)
-        score_organization_id = duplicate.organization_id or score_organization_id
-        await upsert_opportunity_embedding(db, duplicate)
-        if score_organization_id:
-            profile = db.scalar(select(OrganizationProfile).where(OrganizationProfile.organization_id == score_organization_id))
-            if profile:
-                calculate_score(db, duplicate, profile)
-        return duplicate
+        return await _update_and_score(db, duplicate, data, normalized_title, score_org_id)
 
     if data.source_id and data.official_url:
-        existing_by_url = db.scalar(
+        existing = db.scalar(
             select(Opportunity).where(
                 Opportunity.source_id == data.source_id,
                 Opportunity.official_url == data.official_url,
                 or_(Opportunity.organization_id == organization_id, Opportunity.organization_id.is_(None)),
             )
         )
-        if existing_by_url:
-            apply_scraped_values(existing_by_url)
-            score_organization_id = existing_by_url.organization_id or score_organization_id
-            await upsert_opportunity_embedding(db, existing_by_url)
-            if score_organization_id:
-                profile = db.scalar(select(OrganizationProfile).where(OrganizationProfile.organization_id == score_organization_id))
-                if profile:
-                    calculate_score(db, existing_by_url, profile)
-            return existing_by_url
+        if existing:
+            return await _update_and_score(db, existing, data, normalized_title, score_org_id)
+
     existing = db.scalar(
         select(Opportunity).where(
             Opportunity.slug == slug,
@@ -1290,9 +1280,11 @@ async def create_opportunity(db: Session, data: OpportunityCreate, organization_
         )
     )
     if existing:
-        apply_scraped_values(existing)
+        _update_opportunity(existing, data, normalized_title)
         await upsert_opportunity_embedding(db, existing)
         return existing
+
+    # ── Create new opportunity ────────────────────────────────────────────
     values = data.model_dump()
     values.pop("title", None)
     if values.get("language") in {None, "", "auto"}:
@@ -1307,8 +1299,8 @@ async def create_opportunity(db: Session, data: OpportunityCreate, organization_
     db.add(opportunity)
     db.flush()
     await upsert_opportunity_embedding(db, opportunity)
-    if score_organization_id:
-        profile = db.scalar(select(OrganizationProfile).where(OrganizationProfile.organization_id == score_organization_id))
+    if score_org_id:
+        profile = db.scalar(select(OrganizationProfile).where(OrganizationProfile.organization_id == score_org_id))
         if profile:
             calculate_score(db, opportunity, profile)
     return opportunity
