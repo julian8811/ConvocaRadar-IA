@@ -354,3 +354,32 @@ export type DashboardKpiCard = {
  * from the user's review_queue slice on /dashboard/triage).
  */
 export type ReviewQueueItem = TriageOpportunityItem;
+
+export type Organization = {
+  id: string;
+  name: string;
+  slug: string;
+  type: string;
+  country: string;
+  website: string | null;
+};
+
+export type OrganizationProfile = {
+  id: string;
+  organization_id: string;
+  description: string;
+  country: string;
+  regions_of_interest: string[];
+  organization_type: string;
+  areas_of_interest: string[];
+  funding_types: string[];
+  min_funding_amount: number | null;
+  max_funding_amount: number | null;
+  preferred_currencies: string[];
+  eligible_international: boolean;
+  languages: string[];
+  has_research_groups: boolean;
+  has_company_partners: boolean;
+  has_university_partners: boolean;
+  application_capacity: "low" | "medium" | "high";
+};
