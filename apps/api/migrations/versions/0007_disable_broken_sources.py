@@ -31,7 +31,7 @@ from sqlalchemy import text
 logger = logging.getLogger(__name__)
 
 revision = "0007_disable_broken_sources"
-down_revision = "0006_connector_config"
+down_revision = "0006"
 branch_labels = None
 depends_on = None
 
