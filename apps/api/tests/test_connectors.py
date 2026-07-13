@@ -40,6 +40,8 @@ GROUPS: list[tuple[str, str, str | None, str, str]] = [
     ("hybrid", "test-hybrid", "hybrid", "hybrid", "HybridConnector"),
     ("generic-api", "test-api", "api", "generic-api", "ApiConnector"),
     ("grants-gov", "grants-gov", None, "grants-gov", "GrantsGovConnector"),
+    ("giz-funding", "giz-funding", None, "httpx-get-html", "GizFundingConnector"),
+    ("procolombia", "procolombia-convocatorias", None, "httpx-get-html", "ProcolombiaConvocatoriasConnector"),
 ]
 
 
