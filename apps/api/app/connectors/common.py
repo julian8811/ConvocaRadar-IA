@@ -387,6 +387,25 @@ def unique_links(links: list[str]) -> list[str]:
     return result
 
 
+FETCH_TIMEOUT_CAP = 120  # Hard cap per request (seconds), even if config says higher
+
+# Content-Type patterns that indicate JSON responses, even when the
+# server sends a different Content-Type header. Some API endpoints
+# send text/html or text/plain with JSON body.
+_JSON_CONTENT_PATTERNS = (
+    "application/json",
+    "application/ld+json",
+    "application/vnd.api+json",
+    "text/json",
+)
+
+
+def _looks_like_json(content: str) -> bool:
+    """Quick check if content looks like JSON without full parsing."""
+    stripped = content.lstrip()
+    return bool(stripped and stripped[0] in "[{")
+
+
 async def fetch_httpx_text(
     url: str,
     *,
@@ -407,7 +426,7 @@ async def fetch_httpx_text(
     parsed_url = urlparse(url)
     if parsed_url.scheme not in {"http", "https"} or _is_private_host(parsed_url.hostname or ""):
         raise ValueError(f"Blocked unsafe URL: {url}")
-    request_timeout = timeout_seconds or settings.scraping_timeout_seconds
+    request_timeout = min(timeout_seconds or settings.scraping_timeout_seconds, FETCH_TIMEOUT_CAP)
 
     # Per-domain budget check
     _budget = _get_budget()
@@ -422,6 +441,7 @@ async def fetch_httpx_text(
 
     try:
         last_error: Exception | None = None
+        last_status: int | None = None
         for attempt in range(max(retries, 1)):
             try:
                 client = await http_client()
@@ -435,10 +455,28 @@ async def fetch_httpx_text(
                 )
                 if _is_private_host(urlparse(str(response.url)).hostname or ""):
                     raise ValueError(f"Blocked redirect to unsafe URL: {response.url}")
+                last_status = response.status_code
                 response.raise_for_status()
-                content_type = response.headers.get("content-type", fallback_content_type)
-                return str(response.url), response.text, content_type
-            except Exception as exc:  # pragma: no cover - network fallback path
+                # Content-Type detection: use header but detect JSON body
+                raw_ct = (response.headers.get("content-type") or fallback_content_type).lower()
+                body_text = response.text
+                if not any(p in raw_ct for p in _JSON_CONTENT_PATTERNS) and _looks_like_json(body_text):
+                    raw_ct = "application/json"
+                return str(response.url), body_text, raw_ct
+            except httpx.TimeoutException as exc:
+                last_error = exc
+                if attempt + 1 >= retries:
+                    raise RuntimeError(
+                        f"Timeout fetching {url} after {request_timeout}s (attempt {attempt + 1}/{retries})"
+                    ) from exc
+            except httpx.HTTPStatusError as exc:
+                last_error = exc
+                last_status = exc.response.status_code
+                if attempt + 1 >= retries:
+                    raise RuntimeError(
+                        f"HTTP {exc.response.status_code} fetching {url}: {exc.response.text[:200]}"
+                    ) from exc
+            except Exception as exc:
                 last_error = exc
                 if attempt + 1 >= retries:
                     break
