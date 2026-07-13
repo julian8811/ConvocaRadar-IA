@@ -71,12 +71,17 @@ def load_source_definitions(seed_path: str) -> list[dict]:
         name_m = re.search(r'"name":\s*"([^"]+)"', e)
         url_m = re.search(r'"base_url":\s*"([^"]+)"', e)
         type_m = re.search(r'"source_type":\s*"([^"]+)"', e)
+        enabled_m = re.search(r'"enabled":\s*(False|True)', e)
         if key_m and url_m:
+            enabled = True
+            if enabled_m and enabled_m.group(1) == "False":
+                enabled = False
             sources.append({
                 "key": key_m.group(1),
                 "name": (name_m.group(1) if name_m else key_m.group(1)),
                 "base_url": url_m.group(1),
                 "source_type": type_m.group(1) if type_m else "html",
+                "enabled": enabled,
             })
     return sources
 
@@ -143,7 +148,14 @@ def main():
 
     results = []
     broken_count = 0
+    skipped_count = 0
     for i, src in enumerate(sources):
+        if not src.get("enabled", True):
+            skipped_count += 1
+            if not args.quiet and not args.json:
+                print(f"  [{i+1}/{total}] {src['key']:40s}... ⏭️  disabled in seed")
+            continue
+
         if not args.quiet and not args.json:
             print(f"  [{i+1}/{total}] {src['key']:40s}...", end=" ", flush=True)
 
@@ -169,10 +181,12 @@ def main():
         time.sleep(0.25)  # Be gentle to servers
 
     # Summary
-    ok_count = total - broken_count
+    checked = total - skipped_count
+    ok_count = checked - broken_count
     if not args.quiet and not args.json:
         print(f"\n{'='*60}")
-        print(f"Total: {total} | ✅ OK: {ok_count} | ❌ Broken: {broken_count}")
+        print(f"Total: {total} | Checked: {checked} | ⏭️  Skipped: {skipped_count}")
+        print(f"✅ OK: {ok_count} | ❌ Broken: {broken_count}")
         print(f"{'='*60}")
 
         if broken_count > 0:
@@ -186,12 +200,16 @@ def main():
     if args.json:
         print(json.dumps({
             "total": total,
+            "checked": checked,
+            "skipped": skipped_count,
             "ok": ok_count,
             "broken": broken_count,
             "sources": results,
         }, indent=2))
 
-    return 1 if broken_count > 0 else 0
+    # Always exit 0 — broken sources are expected (Playwright, API, WAF, etc.)
+    # The caller (GitHub Actions) handles alerting via the issue-creation step.
+    return 0
 
 
 if __name__ == "__main__":
