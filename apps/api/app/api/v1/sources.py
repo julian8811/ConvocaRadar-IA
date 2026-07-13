@@ -495,11 +495,19 @@ def run_all_sources(
 @router.get("/sources/{source_id}/runs", response_model=list[SourceRunRead])
 def list_runs(
     source_id: str,
+    limit: int = Query(default=50, description="Max runs to return"),
     organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ) -> list[SourceRun]:
     _get_source_for_org(db, source_id, organization)
-    return list(db.scalars(select(SourceRun).where(SourceRun.source_id == source_id).order_by(SourceRun.created_at.desc())))
+    return list(
+        db.scalars(
+            select(SourceRun)
+            .where(SourceRun.source_id == source_id)
+            .order_by(SourceRun.created_at.desc())
+            .limit(limit)
+        )
+    )
 
 
 @router.get("/source-runs/{run_id}", response_model=SourceRunRead)
