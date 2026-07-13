@@ -262,3 +262,162 @@ class TestUnescoParse:
         candidates = await connector.parse(raw)
         assert len(candidates) >= 1
         assert "UNESCO" in candidates[0].title
+
+
+class TestAniiUruguayParse:
+    """ANII Uruguay parsea HTML con separador <!-- page: -->."""
+
+    @pytest.mark.asyncio
+    async def test_parse_yields_candidate(self):
+        from app.connectors.anii_uruguay import AniiUruguayConnector
+
+        connector = AniiUruguayConnector()
+        html = """<html><body>
+<!-- page: https://www.anii.org.uy/apoyos/innovacion/2027/fondo-sectorial -->
+<div class="convocatoria">
+    <h3><a href="https://www.anii.org.uy/apoyos/innovacion/2027/fondo-sectorial">ANII Fondo Sectorial 2027</a></h3>
+    <p>Deadline: 2027-12-01</p>
+</div>
+</body></html>"""
+        raw = RawSourceResult("test", "https://www.anii.org.uy/convocatorias", html, "text/html")
+        candidates = await connector.parse(raw)
+        assert len(candidates) >= 1
+        assert "ANII" in candidates[0].title
+
+
+class TestApcColombiaParse:
+    """APC Colombia parsea HTML con metadata de paginas."""
+
+    @pytest.mark.asyncio
+    async def test_parse_yields_candidate(self):
+        from app.connectors.apc_colombia import ApcColombiaConnector
+
+        connector = ApcColombiaConnector()
+        html = """<html><body>
+<div class="convocatoria">
+    <h3><a href="https://www.apccolombia.gov.co/convocatoria/cooperacion-2027">Convocatoria Cooperacion APC 2027</a></h3>
+    <p>Deadline: 2027-11-15</p>
+</div>
+</body></html>"""
+        raw = RawSourceResult(
+            "test", "https://www.apccolombia.gov.co/seccion/convocatorias", html, "text/html",
+            metadata={
+                "pages": [
+                    {
+                        "url": "https://www.apccolombia.gov.co/seccion/convocatorias",
+                        "content": """<html><body>
+<div class="convocatoria">
+    <h3><a href="https://www.apccolombia.gov.co/convocatoria/cooperacion-2027">Convocatoria Cooperacion APC 2027</a></h3>
+    <p>Deadline: 2027-11-15</p>
+</div>
+</body></html>""",
+                    }
+                ]
+            },
+        )
+        candidates = await connector.parse(raw)
+        assert len(candidates) >= 1
+        assert "APC" in candidates[0].title
+
+
+class TestUnwomenParse:
+    """UN Women parsea HTML."""
+
+    @pytest.mark.asyncio
+    async def test_parse_yields_candidate(self):
+        from app.connectors.unwomen_innovate import UnwomenInnovateConnector
+
+        connector = UnwomenInnovateConnector()
+        html = """<html><body>
+            <div class="call">
+                <h3><a href="/call/2027/gender-equality">UN Women Innovation Call 2027</a></h3>
+                <p>Deadline: 2027-09-15</p>
+            </div>
+        </body></html>"""
+        raw = RawSourceResult("test", "https://www.unwomen.org", html, "text/html")
+        candidates = await connector.parse(raw)
+        assert len(candidates) >= 1
+        assert "UN Women" in candidates[0].title
+
+
+class TestUnescoParse:
+    """UNESCO parsea HTML."""
+
+    @pytest.mark.asyncio
+    async def test_parse_yields_candidate(self):
+        from app.connectors.unesco import UNESCOConnector
+
+        connector = UNESCOConnector()
+        html = """<html><body>
+            <div class="call">
+                <h3><a href="/call/2027/001">UNESCO Call for Proposals 2027</a></h3>
+                <p>Deadline: 2027-10-01</p>
+            </div>
+        </body></html>"""
+        raw = RawSourceResult(
+            source_key="unesco-call-for-proposals",
+            url="https://unesco.org/calls",
+            content=html,
+            content_type="text/html",
+        )
+        candidates = await connector.parse(raw)
+        assert len(candidates) >= 1
+        assert "UNESCO" in candidates[0].title
+
+
+class TestAniiUruguayParse:
+    """ANII Uruguay parsea HTML con separador <!-- page: -->."""
+
+    @pytest.mark.asyncio
+    async def test_parse_yields_candidate(self):
+        from app.connectors.anii_uruguay import AniiUruguayConnector
+
+        connector = AniiUruguayConnector()
+        html = """<html><body>
+<!-- page: https://www.anii.org.uy/apoyos/innovacion/2027/fondo-sectorial -->
+<div class="convocatoria">
+    <h3><a href="https://www.anii.org.uy/apoyos/innovacion/2027/fondo-sectorial">ANII Fondo Sectorial 2027</a></h3>
+    <p>Deadline: 2027-12-01</p>
+</div>
+</body></html>"""
+        raw = RawSourceResult("test", "https://www.anii.org.uy/convocatorias", html, "text/html")
+        candidates = await connector.parse(raw)
+        assert len(candidates) >= 1
+        assert "ANII" in candidates[0].title
+
+
+class TestApcColombiaParse:
+    """APC Colombia parsea HTML con metadata de paginas."""
+
+    @pytest.mark.asyncio
+    async def test_parse_yields_candidate(self):
+        from app.connectors.apc_colombia import ApcColombiaConnector
+
+        connector = ApcColombiaConnector()
+        html = """<html><body>
+<div class="convocatoria">
+    <h3><a href="https://www.apccolombia.gov.co/convocatoria/cooperacion-2027">Convocatoria Cooperacion APC 2027</a></h3>
+    <p>Deadline: 2027-11-15</p>
+</div>
+</body></html>"""
+        raw = RawSourceResult(
+            "test", "https://www.apccolombia.gov.co/seccion/convocatorias", html, "text/html",
+            metadata={
+                "pages": [
+                    {
+                        "url": "https://www.apccolombia.gov.co/seccion/convocatorias",
+                        "content": """<html><body>
+<div class="convocatoria">
+    <h3><a href="https://www.apccolombia.gov.co/convocatoria/cooperacion-2027">Convocatoria Cooperacion APC 2027</a></h3>
+    <p>Deadline: 2027-11-15</p>
+</div>
+</body></html>""",
+                    }
+                ]
+            },
+        )
+        candidates = await connector.parse(raw)
+        assert len(candidates) >= 1
+        assert "APC" in candidates[0].title
+
+
