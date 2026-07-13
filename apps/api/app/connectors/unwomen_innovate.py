@@ -1,3 +1,4 @@
+from app.connectors.registry import register
 from __future__ import annotations
 
 import re
@@ -10,6 +11,7 @@ from app.connectors.base import OpportunityCandidate, RawSourceResult, Validatio
 from app.connectors.common import clean_text, fetch_httpx_text, normalize_text
 
 
+@register("unwomen-innovate")
 class UnwomenInnovateConnector:
     source_key = "unwomen-innovate"
     CLOSED_KEYWORDS = (

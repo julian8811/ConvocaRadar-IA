@@ -1,3 +1,4 @@
+from app.connectors.registry import register
 from __future__ import annotations
 
 import re
@@ -28,6 +29,7 @@ CLOSED_KEYWORDS = (
 NOISE_TITLES = {"índice", "indice", "investigación", "investigacion", "innovación", "innovacion", "formación", "formacion", "emprendimientos", "cooperación", "cooperacion", "documentos útiles", "documentos utiles", "ver calendario", "ver todas"}
 
 
+@register("anii-uruguay")
 class AniiUruguayConnector:
     source_key = "anii-uruguay"
 

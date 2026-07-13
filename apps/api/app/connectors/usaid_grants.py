@@ -1,3 +1,4 @@
+from app.connectors.registry import register
 from __future__ import annotations
 
 import json
@@ -6,6 +7,7 @@ from app.connectors.grants_gov import GrantsGovConnector, GRANTS_GOV_SEARCH_URL
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
 
 
+@register("usaid-grants")
 class UsaidGrantsConnector(GrantsGovConnector):
     source_key = "usaid-grants"
 

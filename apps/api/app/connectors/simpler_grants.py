@@ -1,3 +1,4 @@
+from app.connectors.registry import register
 import re
 from datetime import datetime
 from html import unescape
@@ -95,6 +96,7 @@ def _amount_pair(block: str) -> tuple[str, str]:
     return minimum, maximum
 
 
+@register("simpler-grants")
 class SimplerGrantsConnector:
     source_key = "simpler-grants"
 

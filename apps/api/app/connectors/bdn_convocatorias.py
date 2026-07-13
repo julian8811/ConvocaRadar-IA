@@ -1,3 +1,4 @@
+from app.connectors.registry import register
 from __future__ import annotations
 
 import json
@@ -12,6 +13,8 @@ BDN_API_URL = "https://www.infosubvenciones.es/bdnstrans/api/convocatorias/busqu
 BDN_DETAIL_URL = "https://www.infosubvenciones.es/bdnstrans/GE/es/convocatorias/{item_id}"
 
 
+@register("cdti-convocatorias")
+@register("isciii-convocatorias")
 class BdnConvocatoriasConnector:
     def __init__(
         self,

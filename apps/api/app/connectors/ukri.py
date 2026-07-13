@@ -1,3 +1,4 @@
+from app.connectors.registry import register
 from __future__ import annotations
 
 import re
@@ -24,6 +25,7 @@ def _title_from(container) -> str:
     return ""
 
 
+@register("ukri-opportunities")
 class UKRIConnector:
     source_key = "ukri-opportunities"
 

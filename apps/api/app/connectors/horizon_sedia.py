@@ -1,3 +1,4 @@
+from app.connectors.registry import register
 import json
 from urllib.parse import quote_plus
 
@@ -18,6 +19,7 @@ HORIZON_SEARCH_URL = "https://api.tech.ec.europa.eu/search-api/prod/rest/search"
 HORIZON_TERMS = ["Horizon Europe", "open call", "research and innovation", "2026", "2027"]
 
 
+@register("horizon-europe-sedia")
 class HorizonSediaConnector:
     source_key = "horizon-europe-sedia"
 

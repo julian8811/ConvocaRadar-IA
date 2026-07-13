@@ -1,3 +1,4 @@
+from app.connectors.registry import register
 # DEPRECATED: source disabled in seed.py
 from __future__ import annotations
 
@@ -58,6 +59,8 @@ def _country(text: str) -> str:
 
 
 
+@register("icetex-vigentes")
+@register("icetex-otras-becas")
 class IcetexConnector:
     source_key = "icetex-vigentes"
 

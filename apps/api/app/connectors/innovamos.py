@@ -1,3 +1,4 @@
+from app.connectors.registry import register
 from __future__ import annotations
 
 import asyncio
@@ -102,6 +103,8 @@ def _content_needs_js_render(content: str) -> bool:
     return any(marker in content for marker in JS_RENDER_MARKERS)
 
 
+@register("innovamos-global-innovation-fund")
+@register("innovamos-fid")
 class InnovamosConnector:
     def __init__(self, source_key: str, base_url: str | None = None) -> None:
         self.source_key = source_key

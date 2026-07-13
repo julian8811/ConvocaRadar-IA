@@ -1,3 +1,4 @@
+from app.connectors.registry import register
 # DEPRECATED: source disabled in seed.py
 from __future__ import annotations
 
@@ -15,6 +16,7 @@ GIF_ALLOWED_DOMAINS = ["globalinnovation.fund", "www.globalinnovation.fund"]
 SKIP_PATHS = {"/apply-for-funding", "/apply-for-funding/", "/news", "/growth"}
 
 
+@register("global-innovation-fund")
 class GlobalInnovationFundConnector:
     source_key = "global-innovation-fund"
 

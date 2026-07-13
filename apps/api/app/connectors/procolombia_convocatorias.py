@@ -1,3 +1,4 @@
+from app.connectors.registry import register
 from __future__ import annotations
 
 import re
@@ -73,6 +74,7 @@ def _extract_gdrive_subfolder_names(html: str) -> list[str]:
     return list(dict.fromkeys(names))
 
 
+@register("procolombia-convocatorias")
 class ProcolombiaConvocatoriasConnector:
     source_key = "procolombia-convocatorias"
 
