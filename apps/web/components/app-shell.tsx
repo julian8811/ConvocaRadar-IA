@@ -35,12 +35,14 @@ function NavLink({
   icon: Icon,
   active,
   onClick,
+  badge,
 }: {
   href: string;
   label: string;
   icon: ComponentType<{ className?: string }>;
   active: boolean;
   onClick: () => void;
+  badge?: number;
 }) {
   return (
     <Link
@@ -53,6 +55,11 @@ function NavLink({
     >
       <Icon className="h-4 w-4 shrink-0" />
       <span>{label}</span>
+      {badge !== undefined && badge > 0 && (
+        <span className="ml-auto flex h-5 min-w-5 items-center justify-center rounded-full bg-[#f39a1a] px-1.5 text-[10px] font-bold text-white">
+          {badge > 99 ? "99+" : badge}
+        </span>
+      )}
     </Link>
   );
 }
@@ -90,6 +97,15 @@ export function AppShell({ children }: { children: ReactNode }) {
     retry: 1,
     retryDelay: 1000,
   });
+
+  // Notification badge: pending alerts count
+  const pendingAlerts = useQuery({
+    queryKey: ["alerts-count"],
+    queryFn: api.alertsCount,
+    refetchInterval: 60000,
+    enabled: me.isSuccess,
+  });
+  const pendingCount = pendingAlerts.data?.pending ?? 0;
 
   // SEC-1.5: track whether the user has manually clicked the "Reintentar"
   // button after the automatic retry also failed. Two consecutive AbortErrors
@@ -179,7 +195,8 @@ export function AppShell({ children }: { children: ReactNode }) {
       <div className="space-y-1">
         {mainNav.map((item) => {
           const Icon = item.icon;
-          return <NavLink key={item.href} href={item.href} label={item.label} icon={Icon} active={pathname === item.href} onClick={() => setOpen(false)} />;
+          const badge = item.href === "/alerts" ? pendingCount : undefined;
+          return <NavLink key={item.href} href={item.href} label={item.label} icon={Icon} active={pathname === item.href} onClick={() => setOpen(false)} badge={badge} />;
         })}
       </div>
 

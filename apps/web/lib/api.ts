@@ -302,6 +302,7 @@ export const api = {
   regenerateReport: (id: string) => request<Report>(`/reports/${id}/regenerate`, { method: "POST" }, 60_000),
   deleteReport: (id: string) => request(`/reports/${id}`, { method: "DELETE" }),
   alerts: () => request<Alert[]>("/alerts"),
+  alertsCount: () => request<{pending: number}>("/alerts/count"),
   createAlert: (payload: Record<string, unknown>) =>
     request<Alert>("/alerts", { method: "POST", body: JSON.stringify(payload) }),
   generateAlerts: () => request<Alert[]>("/alerts/generate", { method: "POST" }),
