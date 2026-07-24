@@ -9,7 +9,7 @@ from selectolax.parser import HTMLParser
 from app.connectors.common import clean_text, extract_close_date, extract_funding_amount, fetch_httpx_text, looks_like_noise_text, parse_date_text
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
 
-DEEP_FETCH_LIMIT = 10
+DEEP_FETCH_LIMIT = 25
 DETAIL_PAGE_TIMEOUT = 15
 
 
