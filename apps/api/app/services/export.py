@@ -131,7 +131,7 @@ def generate_report_html(title: str, organization: object, opportunities: list[O
             <span class="story-card__country">{escape(item.country)}</span>
           </div>
           <h3 class="story-card__title">{f'<a href="{escape(_link_for(item))}" target="_blank" rel="noopener noreferrer">{escape(repair_mojibake(item.title))}</a>' if _link_for(item) != '#' else escape(repair_mojibake(item.title))}</h3>
-          <p class="story-card__body">{escape(repair_mojibake(item.summary or item.description or 'Sin resumen disponible.'))}</p>
+          {f'<p class="story-card__body">{escape(repair_mojibake(item.summary or item.description))}</p>' if (item.summary or item.description) else ''}
           <div class="story-card__meta-grid">
             <div class="story-card__metaitem">
               <span class="story-card__label">Entidad</span>
@@ -314,12 +314,13 @@ h1 {{
   line-height: 1.45;
 }}
 .story-card__meta-grid {{
-  display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
-  margin: 14px 0 0; padding-top: 14px;
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 6px;
+  margin: 12px 0 0; padding-top: 10px;
   border-top: 1px solid rgba(0,86,82,0.08);
 }}
 .story-card__metaitem {{
   display: flex; flex-direction: column; gap: 2px;
+  min-width: 0;
 }}
 .story-card__label {{
   font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em;
