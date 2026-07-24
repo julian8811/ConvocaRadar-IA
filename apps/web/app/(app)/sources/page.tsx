@@ -93,6 +93,12 @@ export default function SourcesPage() {
   const [filterName, setFilterName] = useState("");
   const [filterType, setFilterType] = useState("all");
   const [filterStatus, setFilterStatus] = useState("all");
+  const [filterTier, setFilterTier] = useState("all");
+  const healthByKey = useMemo(() => {
+    const map = new Map<string, SourceHealth>();
+    for (const h of sourceHealth.data ?? []) map.set(h.key, h);
+    return map;
+  }, [sourceHealth.data]);
 
   const healthItems = useMemo(() => sourceHealth.data ?? [], [sourceHealth.data]);
 
@@ -105,9 +111,12 @@ export default function SourcesPage() {
         const healthItem = healthItems.find((h) => h.source_id === source.id);
         if (!healthItem || healthItem.status !== filterStatus) return false;
       }
+      const healthItem = healthByKey.get(source.key);
+      const tier = healthItem?.tier ?? null;
+      if (filterTier !== "all" && tier !== filterTier) return false;
       return true;
     });
-  }, [sources.data, healthItems, filterName, filterType, filterStatus]);
+  }, [sources.data, healthItems, healthByKey, filterName, filterType, filterStatus, filterTier]);
 
   const healthSummary = useMemo(() => {
     if (!healthItems.length) {
@@ -334,6 +343,16 @@ export default function SourcesPage() {
               <option value="degraded">Degradadas</option>
               <option value="failing">Fallando</option>
             </select>
+            <select
+              className="h-9 rounded-md border border-slate-300 bg-white px-3 text-sm text-slate-950 outline-none dark:border-slate-600 dark:bg-slate-900 dark:text-slate-100"
+              value={filterTier}
+              onChange={(e) => setFilterTier(e.target.value)}
+            >
+              <option value="all">Todos los niveles</option>
+              <option value="strategic">Estratégica</option>
+              <option value="complementary">Complementaria</option>
+              <option value="experimental">Experimental</option>
+            </select>
           </div>
           <CardContent className="overflow-x-auto p-0">
             <Table>
@@ -341,6 +360,7 @@ export default function SourcesPage() {
                 <TableRow>
                   <TableHead>Nombre</TableHead>
                   <TableHead>Tipo</TableHead>
+                  <TableHead>Nivel</TableHead>
                   <TableHead>País</TableHead>
                   <TableHead>Estado</TableHead>
                   <TableHead>Última ejecución</TableHead>
@@ -352,6 +372,28 @@ export default function SourcesPage() {
                   <TableRow key={source.id}>
                     <TableCell className="font-medium text-slate-950 dark:text-white">{source.name}</TableCell>
                     <TableCell>{source.source_type}</TableCell>
+                    <TableCell>
+                      {(() => {
+                        const healthItem = healthByKey.get(source.key);
+                        const tier = healthItem?.tier;
+                        if (!tier) return <span className="text-xs text-slate-400">—</span>;
+                        const colors: Record<string, string> = {
+                          strategic: "bg-emerald-100 text-emerald-800 dark:bg-emerald-900/30 dark:text-emerald-300",
+                          complementary: "bg-sky-100 text-sky-800 dark:bg-sky-900/30 dark:text-sky-300",
+                          experimental: "bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300",
+                        };
+                        const labels: Record<string, string> = {
+                          strategic: "Estratégica",
+                          complementary: "Complementaria",
+                          experimental: "Experimental",
+                        };
+                        return (
+                          <span className={`inline-block rounded-full px-2 py-0.5 text-xs font-medium ${colors[tier] ?? "bg-slate-100 text-slate-600"}`}>
+                            {labels[tier] ?? tier}
+                          </span>
+                        );
+                      })()}
+                    </TableCell>
                     <TableCell>{source.country}</TableCell>
                     <TableCell>
                       <Badge tone={source.enabled ? "open" : "closed"}>{source.enabled ? "activa" : "inactiva"}</Badge>
