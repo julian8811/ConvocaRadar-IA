@@ -395,6 +395,46 @@ def unique_links(links: list[str]) -> list[str]:
 
 FETCH_TIMEOUT_CAP = 120  # Hard cap per request (seconds), even if config says higher
 
+
+# ── User-Agent rotation pool ────────────────────────────────────────────────
+
+_UA_POOL: list[str] = [
+    # Chrome 125+ (Windows)
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/126.0.0.0 Safari/537.36",
+    # Chrome 125+ (macOS)
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+    # Firefox 127 (Windows)
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:127.0) Gecko/20100101 Firefox/127.0",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:128.0) Gecko/20100101 Firefox/128.0",
+    # Firefox 127 (macOS)
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 14.5; rv:127.0) Gecko/20100101 Firefox/127.0",
+    # Edge 125 (Windows)
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36 Edg/125.0.0.0",
+    # Safari 17.5 (macOS)
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_5) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.5 Safari/605.1.15",
+    # Chrome 125 (Linux)
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+    # Mobile Chrome (Android)
+    "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Mobile Safari/537.36",
+]
+
+
+def _random_user_agent() -> str:
+    """Return a random User-Agent from the pool."""
+    import random as _random
+    return _random.choice(_UA_POOL)
+
+
+def _resolve_proxy() -> str | None:
+    """Pick a random proxy from the configured list, or None."""
+    from app.core.config import get_settings as _settings
+    proxies = _settings().scraping_proxy_list
+    if not proxies:
+        return None
+    import random as _random
+    return _random.choice(proxies)
+
 # ── Date parsing constants ────────────────────────────────────────────────
 _SPANISH_MONTHS: dict[str, int] = {
     "enero": 1, "febrero": 2, "marzo": 3, "abril": 4,
@@ -440,7 +480,7 @@ async def fetch_httpx_text(
     from urllib.parse import urlparse
 
     settings = get_settings()
-    request_headers = {"User-Agent": settings.scraping_user_agent}
+    request_headers = {"User-Agent": _random_user_agent()}
     if headers:
         request_headers.update(headers)
     parsed_url = urlparse(url)
@@ -464,7 +504,12 @@ async def fetch_httpx_text(
         last_status: int | None = None
         for attempt in range(max(retries, 1)):
             try:
-                client = await http_client()
+                proxy = _resolve_proxy()
+                if proxy:
+                    import httpx as _httpx
+                    client = _httpx.AsyncClient(proxies=proxy, timeout=request_timeout)
+                else:
+                    client = await http_client()
                 response = await client.request(
                     method,
                     url,
