@@ -100,6 +100,44 @@ async def _run_periodic_source_sweep(interval_seconds: int | None = None) -> Non
                     except Exception as exc:
                         struct_logger.warning("send_pending_alerts_failed", error=str(exc))
 
+                    # Batch score unscored opportunities for each org
+                    from app.services.scoring import calculate_score
+                    from app.models import Opportunity, OpportunityScore, OrganizationProfile
+                    for org in orgs:
+                        try:
+                            profile = db.scalar(
+                                select(OrganizationProfile).where(OrganizationProfile.organization_id == org.id)
+                            )
+                            if not profile:
+                                continue
+                            scored_ids = db.scalars(
+                                select(OpportunityScore.opportunity_id).where(
+                                    OpportunityScore.organization_id == org.id
+                                )
+                            ).all()
+                            unscored = list(
+                                db.scalars(
+                                    select(Opportunity).where(
+                                        Opportunity.organization_id == org.id,
+                                        ~Opportunity.id.in_(scored_ids),
+                                    ).limit(100)
+                                )
+                            )
+                            if unscored:
+                                for opp in unscored:
+                                    try:
+                                        calculate_score(db, opp, profile)
+                                    except Exception:
+                                        continue
+                                db.flush()
+                                struct_logger.info(
+                                    "batch_scoring_complete",
+                                    org_id=org.id,
+                                    scored=len(unscored),
+                                )
+                        except Exception as exc:
+                            struct_logger.warning("batch_scoring_failed", org_id=org.id, error=str(exc))
+
                     sources = list(
                         db.scalars(
                             select(Source).where(Source.enabled.is_(True))
@@ -469,6 +507,32 @@ def health_v1_live() -> dict[str, str]:
 def health_v1_ready() -> JSONResponse:
     """Alias for /api/v1/health with explicit 'ready' naming for k8s."""
     return _readiness_response()
+
+
+@app.get("/api/v1/health/sources")
+def health_sources_summary() -> dict:
+    """Public summary of source health (no auth required)."""
+    from app.db.session import SessionLocal
+    from app.models import Source
+    from sqlalchemy import select, func
+
+    db = SessionLocal()
+    try:
+        total = db.scalar(select(func.count(Source.id))) or 0
+        enabled = db.scalar(select(func.count(Source.id)).where(Source.enabled.is_(True))) or 0
+        with_tier = db.scalar(select(func.count(Source.id)).where(Source.tier.isnot(None))) or 0
+        tiers = {}
+        for row in db.execute(select(Source.tier, func.count(Source.id)).where(Source.tier.isnot(None)).group_by(Source.tier)):
+            tiers[row[0]] = row[1]
+        return {
+            "total": total,
+            "enabled": enabled,
+            "tiered": with_tier,
+            "tiers": tiers,
+            "status": "ok",
+        }
+    finally:
+        db.close()
 
 
 app.include_router(api_router)
