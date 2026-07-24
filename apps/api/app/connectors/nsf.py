@@ -9,11 +9,11 @@ from urllib.parse import urljoin, urlparse
 from selectolax.parser import HTMLParser
 
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
-from app.connectors.common import clean_text, fetch_httpx_text, parse_date_text
+from app.connectors.common import BROWSER_UA, clean_text, fetch_httpx_text, parse_date_text
 from app.connectors.rss import RssConnector
 
 
-NSF_HOSTS = {"nsf.gov", "www.nsf.gov"}
+NSF_HOSTS = {"nsf.gov", "www.nsf.gov", "new.nsf.gov"}
 NSF_CLOSED_KEYWORDS = (
     "closed",
     "archived",
@@ -48,11 +48,25 @@ class NSFFundingConnector:
     source_key = "nsf-funding"
 
     def __init__(self, base_url: str | None = None) -> None:
-        self.base_url = base_url or "https://www.nsf.gov/funding"
+        # NSF redesigned their site; try new.nsf.gov first, fall back to www.nsf.gov
+        self.base_url = base_url or "https://new.nsf.gov/funding"
+        self._fallback_url = "https://www.nsf.gov/funding"
 
     async def fetch(self) -> RawSourceResult:
-        final_url, content, content_type = await fetch_httpx_text(self.base_url, fallback_content_type="text/html")
-        return RawSourceResult(source_key=self.source_key, url=final_url, content=content, content_type=content_type)
+        # Use a modern browser UA to reduce CDN/WAF blocks
+        headers = {"User-Agent": BROWSER_UA}
+        for url in (self.base_url, self._fallback_url):
+            try:
+                final_url, content, content_type = await fetch_httpx_text(
+                    url,
+                    headers=headers,
+                    fallback_content_type="text/html",
+                )
+                return RawSourceResult(source_key=self.source_key, url=final_url, content=content, content_type=content_type)
+            except Exception:
+                continue
+        # Both URLs failed; raise the last exception
+        raise RuntimeError(f"NSF funding page unreachable at both {self.base_url} and {self._fallback_url}")
 
     async def parse(self, raw: RawSourceResult) -> list[OpportunityCandidate]:
         tree = HTMLParser(raw.content)

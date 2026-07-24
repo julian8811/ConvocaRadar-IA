@@ -15,6 +15,7 @@ import type {
   SourceHealth,
   SourceRunOverview,
   SourceRun,
+  SourceSweepResponse,
   Task,
   TriageRead,
 } from "@/lib/types";
@@ -111,8 +112,10 @@ function handleUnauthorized(path: string) {
  * SEC-1.5: wrap fetch with an AbortController that fires after 12s.
  * Exposed for testing — production code uses the `api` object below.
  */
-/** Retry delay when the Render free-tier server is waking up (sleep -> wake takes ~30s). */
-const RETRY_DELAYS_MS = [3_000, 8_000, 15_000, 25_000, 40_000];
+/** Optional retry delay for hosts that deliberately suspend idle services. */
+const RETRY_DELAYS_MS = process.env.NEXT_PUBLIC_ENABLE_WAKE_RETRIES === "true"
+  ? [3_000, 8_000, 15_000, 25_000]
+  : [];
 
 export async function request<T>(path: string, init: RequestInit = {}, timeoutMs: number = REQUEST_TIMEOUT_MS): Promise<T> {
   const lastError: Error[] = [];
@@ -291,12 +294,12 @@ export const api = {
   createSource: (payload: Record<string, unknown>) =>
     request<Source>("/sources", { method: "POST", body: JSON.stringify(payload) }),
   runSource: (id: string) => request<SourceRun>(`/sources/${id}/run`, { method: "POST" }),
-  runAllSources: () => request<SourceRun[]>("/sources/run-all", { method: "POST" }),
+  runAllSources: () => request<SourceSweepResponse>("/sources/run-all?force=true", { method: "POST" }),
   sourceRuns: (id: string) => request<SourceRun[]>(`/sources/${id}/runs`),
   reports: () => request<Report[]>("/reports"),
   createReport: (payload: Record<string, unknown>) =>
-    request<Report>("/reports", { method: "POST", body: JSON.stringify(payload) }),
-  regenerateReport: (id: string) => request<Report>(`/reports/${id}/regenerate`, { method: "POST" }),
+    request<Report>("/reports", { method: "POST", body: JSON.stringify(payload) }, 60_000),
+  regenerateReport: (id: string) => request<Report>(`/reports/${id}/regenerate`, { method: "POST" }, 60_000),
   deleteReport: (id: string) => request(`/reports/${id}`, { method: "DELETE" }),
   alerts: () => request<Alert[]>("/alerts"),
   createAlert: (payload: Record<string, unknown>) =>
@@ -327,4 +330,5 @@ export const api = {
   sendWeeklyDigest: () =>
     request<{ delivered: boolean; opportunities: number }>("/admin/alerts/send-digest", { method: "POST" }),
   tasks: () => request<Task[]>("/tasks"),
+  task: (id: string) => request<Task>(`/tasks/${id}`),
 };

@@ -14,8 +14,8 @@ import {
 import type { DashboardBreakdownItem } from "@/lib/types";
 
 const COLORS = [
-  "#16a34a", "#f59e0b", "#0ea5e9", "#6366f1", "#ec4899",
-  "#f97316", "#14b8a6", "#8b5cf6",
+  "#005652", "#00a6a1", "#bed630", "#6f7f1f", "#4f8580",
+  "#ef7b45", "#30c5c0", "#92aa28",
 ];
 
 function CategoryTooltip({ active, payload }: { active?: boolean; payload?: Array<{ name: string; value: number }> }) {

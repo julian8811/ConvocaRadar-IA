@@ -37,14 +37,14 @@ class TestUniandesSeedDefinition:
         return org
 
     def test_uniandes_base_url_is_updated(self, db, org):
-        """The base_url should point to the new investigacioncreacion path."""
+        """The base_url should point to the sitemap URL."""
         seed_default_sources(db, org, bootstrap_mode=True)
 
         uniandes = self._find_uniandes_source(db)
         assert uniandes is not None, "uniandes-investigacion source was not created"
 
-        assert uniandes.base_url == "https://www.uniandes.edu.co/investigacioncreacion/", (
-            f"Expected updated base_url, got: {uniandes.base_url}"
+        assert uniandes.base_url == "https://www.uniandes.edu.co/sitemap.xml", (
+            f"Expected sitemap base_url, got: {uniandes.base_url}"
         )
 
     def test_uniandes_allowed_domains_includes_both(self, db, org):

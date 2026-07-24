@@ -1,6 +1,6 @@
-"""Export utilities: CSV, XLSX, PDF, HTML report generation.
+﻿"""Export utilities: CSV, XLSX, PDF, HTML report generation.
 
-Extracted from ``app/services.py`` (Change 3 — Architecture Refactor).
+Extracted from ``app/services.py`` (Change 3 â€” Architecture Refactor).
 """
 
 from __future__ import annotations
@@ -18,6 +18,8 @@ from reportlab.lib.styles import getSampleStyleSheet
 from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
 
 from app.models import Opportunity, OpportunityStatus
+from app.core.time import format_bogota, now_bogota
+from app.core.text import repair_mojibake
 
 
 def export_csv(opportunities: list[Opportunity]) -> str:
@@ -69,7 +71,7 @@ def generate_report_html(title: str, organization: object, opportunities: list[O
 
     The ``organization`` argument is duck-typed: it must have a ``name`` attribute.
     """
-    org_name = getattr(organization, "name", "Organización")
+    org_name = repair_mojibake(getattr(organization, "name", "Organización"))
     total = len(opportunities)
     open_count = sum(1 for item in opportunities if item.status == OpportunityStatus.open.value)
     closing_soon_count = sum(1 for item in opportunities if item.status == OpportunityStatus.closing_soon.value)
@@ -110,13 +112,13 @@ def generate_report_html(title: str, organization: object, opportunities: list[O
             <span class="story-card__eyebrow">{escape(item.status.replace('_', ' '))}</span>
             <span class="story-card__meta">{escape(item.country)}</span>
           </div>
-          <h3 class="story-card__title">{f'<a href="{escape(_link_for(item))}" target="_blank" rel="noopener noreferrer">{escape(item.title)}</a>' if _link_for(item) != '#' else escape(item.title)}</h3>
-          <p class="story-card__body">{escape(item.summary or item.description or 'Sin resumen disponible.')}</p>
+          <h3 class="story-card__title">{f'<a href="{escape(_link_for(item))}" target="_blank" rel="noopener noreferrer">{escape(repair_mojibake(item.title))}</a>' if _link_for(item) != '#' else escape(repair_mojibake(item.title))}</h3>
+          <p class="story-card__body">{escape(repair_mojibake(item.summary or item.description or 'Sin resumen disponible.'))}</p>
           <dl class="story-card__facts">
-            <div><dt>Entidad</dt><dd>{escape(item.entity)}</dd></div>
+            <div><dt>Entidad</dt><dd>{escape(repair_mojibake(item.entity))}</dd></div>
             <div><dt>Cierre</dt><dd>{escape(item.close_date.date().isoformat() if item.close_date else 'Sin fecha')}</dd></div>
             <div><dt>Monto</dt><dd>{escape(_format_amount(item))}</dd></div>
-            <div><dt>Fuente</dt><dd>{escape(item.source_id or 'Sin fuente')}</dd></div>
+            <div><dt>Fuente</dt><dd>{escape(item.source_id or item.official_url or 'Fuente no identificada')}</dd></div>
           </dl>
           <div class="story-card__actions">
             {f'<a class="link-button" href="{escape(_link_for(item))}" target="_blank" rel="noopener noreferrer">Ver convocatoria</a>' if _link_for(item) != '#' else ''}
@@ -130,10 +132,10 @@ def generate_report_html(title: str, organization: object, opportunities: list[O
         f"""
         <tr>
           <td class="col-title">
-            <a href="{escape(_link_for(o))}" target="_blank" rel="noopener noreferrer">{escape(o.title)}</a>
-            <span>{escape((o.summary or o.description or 'Sin resumen disponible.')[:140])}</span>
+            <a href="{escape(_link_for(o))}" target="_blank" rel="noopener noreferrer">{escape(repair_mojibake(o.title))}</a>
+            <span>{escape(repair_mojibake((o.summary or o.description or 'Sin resumen disponible.')[:140]))}</span>
           </td>
-          <td>{escape(o.entity)}</td>
+          <td>{escape(repair_mojibake(o.entity))}</td>
           <td>{escape(o.country)}</td>
           <td><span class="status status--{escape(o.status)}">{escape(o.status)}</span></td>
           <td>{escape(o.close_date.date().isoformat() if o.close_date else 'Sin fecha')}</td>
@@ -195,7 +197,7 @@ a {{ color: inherit; text-decoration: none; }}
   pointer-events: none;
 }}
 .hero__inner {{ position: relative; z-index: 1; display: grid; gap: 18px; }}
-.eyebrow {{
+.brand {{ display:flex; align-items:center; gap:14px; }} .brand img {{ width:56px; height:56px; object-fit:contain; background:#fff; border-radius:12px; padding:6px; }} .product {{ font-size:14px; font-weight:700; margin-top:4px; color:#cdeceb; }} .eyebrow {{
   display: inline-flex;
   align-items: center;
   gap: 8px;
@@ -374,7 +376,7 @@ tbody tr:hover {{ background: rgba(13, 78, 94, 0.03); }}
   <div class="hero__inner">
     <div class="eyebrow">ConvocaRadar IA</div>
     <h1>{escape(title)}</h1>
-    <p class="hero__lead">Organización: {escape(org_name)} · Generado: {datetime.now(UTC).date().isoformat()} · Reporte ejecutivo de oportunidades filtradas y priorizadas para revisión institucional.</p>
+    <p class="hero__lead">Organización: {escape(org_name)} · Generado: {format_bogota(now_bogota()) + " (hora de Bogotá)"} · Reporte ejecutivo de oportunidades filtradas y priorizadas para revisión institucional.</p>
     <div class="hero__toolbar">
       <a class="button button--primary" href="#oportunidades">Ver convocatorias</a>
       <a class="button" href="#resumen">Resumen ejecutivo</a>
@@ -478,7 +480,7 @@ def export_pdf(title: str, organization: object, opportunities: list[Opportunity
     Falls back to reportlab-based PDF if Playwright is unavailable.
     The ``organization`` argument is duck-typed: must have a ``name`` attribute.
     """
-    org_name = getattr(organization, "name", "Organización")
+    org_name = repair_mojibake(getattr(organization, "name", "Organización"))
     html = generate_report_html(title, organization, opportunities)
     try:
         return asyncio.run(_render_pdf_with_playwright(html))
@@ -491,7 +493,7 @@ def export_pdf(title: str, organization: object, opportunities: list[Opportunity
     story: list[object] = [
         Paragraph(title, styles["Title"]),
         Paragraph(f"Organización: {org_name}", styles["Normal"]),
-        Paragraph(f"Generado: {datetime.now(UTC).date().isoformat()}", styles["Normal"]),
+        Paragraph(f"Generado: {format_bogota(now_bogota())} (hora de Bogotá)", styles["Normal"]),
         Spacer(1, 16),
         Paragraph("Resumen ejecutivo", styles["Heading2"]),
         Paragraph(f"Se identificaron {len(opportunities)} oportunidades para revisión institucional.", styles["BodyText"]),
@@ -502,8 +504,8 @@ def export_pdf(title: str, organization: object, opportunities: list[Opportunity
     for item in opportunities[:40]:
         data.append(
             [
-                Paragraph(escape(item.title), styles["BodyText"]),
-                Paragraph(escape(item.entity), styles["BodyText"]),
+                Paragraph(escape(repair_mojibake(item.title)), styles["BodyText"]),
+                Paragraph(escape(repair_mojibake(item.entity)), styles["BodyText"]),
                 item.country,
                 item.status,
                 item.close_date.date().isoformat() if item.close_date else "Sin fecha",
@@ -538,3 +540,8 @@ def export_pdf(title: str, organization: object, opportunities: list[Opportunity
     )
     document.build(story)
     return output.getvalue()
+
+
+
+
+

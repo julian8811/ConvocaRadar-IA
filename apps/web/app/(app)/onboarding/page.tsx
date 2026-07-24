@@ -142,7 +142,7 @@ export default function OnboardingPage() {
   }
 
   return (
-    <section className="space-y-6">
+    <form onSubmit={submit} className="space-y-6">
       <div>
         <h1 className="text-3xl font-semibold tracking-tight text-slate-950 dark:text-white">Perfil institucional</h1>
         <p className="mt-2 max-w-2xl text-sm text-slate-600 dark:text-slate-400">
@@ -357,12 +357,9 @@ export default function OnboardingPage() {
       <Card>
         <CardContent className="pt-5">
           <Button
+            type="submit"
             className="w-full"
             disabled={save.isPending}
-            onClick={() => {
-              const form = document.querySelector("form");
-              if (form) form.requestSubmit();
-            }}
           >
             <Save className="h-4 w-4" />
             {save.isPending ? "Guardando..." : "Guardar perfil"}
@@ -370,8 +367,6 @@ export default function OnboardingPage() {
         </CardContent>
       </Card>
 
-      {/* Hidden form to collect all data on submit */}
-      <form onSubmit={submit} className="hidden" />
-    </section>
+    </form>
   );
 }

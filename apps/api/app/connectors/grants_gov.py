@@ -39,11 +39,14 @@ class GrantsGovConnector:
             "sortBy": "openDate|desc",
         }
         try:
+            # Use short timeout for the API POST — if it's slow, fail fast
+            # and fall back to the HTML search page.
             final_url, content, content_type = await fetch_httpx_text(
                 self.base_url,
                 method="POST",
                 payload=payload,
                 fallback_content_type="application/json",
+                timeout_seconds=30,
             )
         except Exception:
             final_url, content, content_type = await fetch_httpx_text(GRANTS_GOV_SEARCH_PAGE, fallback_content_type="text/html")

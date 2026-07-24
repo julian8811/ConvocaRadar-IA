@@ -44,3 +44,5 @@ test_convocaradar.db
 .env
 openspec/
 sdd/
+backups/*.sql
+backups/*.sql.gz

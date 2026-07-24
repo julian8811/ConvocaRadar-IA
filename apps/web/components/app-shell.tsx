@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertTriangle, Bell, Database, FileText, Gauge, LogOut, Menu, Radar, RefreshCw, Search, Settings, Shield, Target, UserRound } from "lucide-react";
+import { AlertTriangle, Bell, Database, FileText, Gauge, LogOut, Menu, RefreshCw, Search, Settings, Shield, Target, UserRound } from "lucide-react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { useCallback, useEffect, useMemo, useState, type ComponentType, type FormEvent, type ReactNode } from "react";
@@ -11,6 +11,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { LoadingState } from "@/components/ui/state";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { InstitutionalBrand } from "@/components/institutional-brand";
 import { api, clearToken } from "@/lib/api";
 import { cn } from "@/lib/utils";
 
@@ -47,7 +48,7 @@ function NavLink({
       onClick={onClick}
       className={cn(
         "flex h-11 items-center gap-3 rounded-lg px-3 text-sm text-slate-700 transition-colors hover:bg-slate-100 hover:text-slate-950 dark:text-slate-300 dark:hover:bg-white/5 dark:hover:text-white",
-        active && "bg-cyan-50 text-cyan-800 ring-1 ring-cyan-200 dark:bg-cyan-400/10 dark:text-cyan-200 dark:ring-cyan-400/20",
+        active && "bg-[#e8f6f5] text-[#005652] ring-1 ring-[#b9e3e1] dark:bg-[#00b3af]/10 dark:text-[#8ce5e2] dark:ring-[#00b3af]/20",
       )}
     >
       <Icon className="h-4 w-4 shrink-0" />
@@ -173,15 +174,7 @@ export function AppShell({ children }: { children: ReactNode }) {
 
   const sidebar = (
     <div className="flex h-full flex-col">
-      <div className="mb-8 flex items-center gap-3 px-2">
-        <div className="flex h-11 w-11 items-center justify-center rounded-xl border border-cyan-200 bg-cyan-50 text-cyan-700 shadow-[0_0_24px_rgba(13,78,94,0.08)] dark:border-cyan-400/20 dark:bg-cyan-400/10 dark:text-cyan-200">
-          <Radar className="h-5 w-5" />
-        </div>
-        <div className="min-w-0">
-          <p className="truncate text-base font-semibold text-slate-900 dark:text-white">ConvocaRadar IA</p>
-          <p className="text-[11px] uppercase tracking-[0.22em] text-slate-500 dark:text-slate-400">Inteligencia empresarial</p>
-        </div>
-      </div>
+      <InstitutionalBrand className="mb-8 px-1" />
 
       <div className="space-y-1">
         {mainNav.map((item) => {
@@ -212,8 +205,8 @@ export function AppShell({ children }: { children: ReactNode }) {
   );
 
   return (
-    <div className="min-h-screen bg-slate-50 text-slate-950 dark:bg-slate-950 dark:text-slate-100">
-      <aside className="fixed left-0 top-0 hidden h-screen w-72 border-r border-slate-200 bg-white px-4 py-5 lg:block dark:border-slate-800 dark:bg-slate-950">
+    <div className="min-h-screen bg-[#f4f7f3] text-slate-950 dark:bg-slate-950 dark:text-slate-100">
+      <aside className="institutional-sidebar fixed left-0 top-0 hidden h-screen w-72 border-r border-slate-200 bg-white px-4 py-5 lg:block dark:border-slate-800 dark:bg-slate-950">
         {sidebar}
       </aside>
 
@@ -226,8 +219,8 @@ export function AppShell({ children }: { children: ReactNode }) {
       ) : null}
 
       <main className="lg:pl-72">
-        <header className="sticky top-0 z-30 border-b border-slate-200 bg-white/90 backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/90">
-          <div className="flex h-16 items-center gap-3 px-4 lg:px-6">
+        <header className="sticky top-0 z-30 border-b border-[#005652]/10 bg-white/92 shadow-[0_8px_30px_-25px_rgba(0,86,82,.9)] backdrop-blur-xl dark:border-slate-800 dark:bg-slate-950/90">
+          <div className="flex h-[68px] items-center gap-3 px-4 lg:px-8">
             <Button variant="outline" size="icon" className="lg:hidden" onClick={() => setOpen(true)}>
               <Menu className="h-5 w-5" />
             </Button>
@@ -251,7 +244,7 @@ export function AppShell({ children }: { children: ReactNode }) {
           </div>
         </header>
 
-        <div className="mx-auto max-w-7xl px-4 py-6 lg:px-6">
+        <div className="mx-auto max-w-[1440px] px-4 py-7 lg:px-8 lg:py-8">
           {me.isLoading ? (
             <LoadingState label="Validando sesión" />
           ) : showAbortErrorUI ? (

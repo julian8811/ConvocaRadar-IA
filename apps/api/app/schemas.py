@@ -173,6 +173,7 @@ class SourceHealthRead(BaseModel):
     health_status: str = "unknown"  # healthy/stable/degraded/critical
     tier: str | None = None
     auto_paused: bool = False
+    failure_category: str | None = None
 
 
 class SourceRunRead(BaseModel):

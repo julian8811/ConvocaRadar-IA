@@ -35,6 +35,7 @@ dependencies = [
 [project.scripts]
 convocaradar-seed-admin = "app.db.seed_admin:main"
 convocaradar-backfill-close-dates = "app.db.backfill_close_dates:main"
+convocaradar-repair-data = "app.db.repair_existing_data:main"
 
 [project.optional-dependencies]
 dev = [

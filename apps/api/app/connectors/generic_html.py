@@ -101,10 +101,15 @@ class GenericHtmlConnector:
         self._default_categories = default_categories or []
         self._resolved_url: str | None = None
 
-    async def _try_url(self, url: str) -> tuple[str, str, str] | None:
-        """Try fetching a URL, return (final_url, content, content_type) or None."""
+    async def _try_url(self, url: str, *, playwright_fallback: bool = False) -> tuple[str, str, str] | None:
+        """Try fetching a URL, return (final_url, content, content_type) or None.
+        
+        ``playwright_fallback`` defaults to False during URL discovery to avoid
+        expensive Playwright launches for every fallback pattern (can exhaust
+        the per-source timeout limit of 180s).
+        """
         try:
-            return await fetch_httpx_text(url, fallback_content_type="text/html")
+            return await fetch_httpx_text(url, fallback_content_type="text/html", playwright_fallback=playwright_fallback)
         except Exception:
             return None
 

@@ -6,6 +6,15 @@ let nextConfig: NextConfig = {
   turbopack: {
     root: path.resolve(__dirname, "../.."),
   },
+  images: {
+    remotePatterns: [
+      {
+        protocol: "https",
+        hostname: "www.colmayor.edu.co",
+        pathname: "/wp-content/uploads/**",
+      },
+    ],
+  },
 };
 
 // Conditionally wrap with bundle-analyzer when ANALYZE=true

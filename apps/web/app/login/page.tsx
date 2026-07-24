@@ -1,7 +1,6 @@
 "use client";
 
 import Link from "next/link";
-import { Radar } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { FormEvent, useState } from "react";
 import { toast } from "sonner";
@@ -10,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { ThemeToggle } from "@/components/theme-toggle";
+import { InstitutionalBrand } from "@/components/institutional-brand";
 import { API_URL, api, setToken } from "@/lib/api";
 
 export default function LoginPage() {
@@ -53,18 +53,17 @@ export default function LoginPage() {
   }
 
   return (
-    <main className="relative flex min-h-screen items-center justify-center px-4">
+    <main className="auth-surface relative flex min-h-screen items-center justify-center px-4 py-12">
       <div className="absolute right-4 top-4">
         <ThemeToggle />
       </div>
-      <Card className="w-full max-w-md border-slate-200 bg-white/95 shadow-2xl shadow-slate-900/10 backdrop-blur dark:border-slate-800 dark:bg-slate-950/90">
+      <Card className="w-full max-w-md overflow-hidden border-slate-200 bg-white/95 shadow-2xl shadow-[#005652]/10 backdrop-blur dark:border-slate-800 dark:bg-slate-950/90">
+        <div className="h-1.5 bg-gradient-to-r from-[#005652] via-[#00b3af] to-[#ffcd00]" />
         <CardHeader className="space-y-4 border-b border-slate-200 pb-6 dark:border-slate-800">
-          <div className="flex h-12 w-12 items-center justify-center rounded-xl border border-cyan-200 bg-cyan-50 text-cyan-700 dark:border-cyan-400/20 dark:bg-cyan-400/10 dark:text-cyan-200">
-            <Radar className="h-6 w-6" />
-          </div>
+          <InstitutionalBrand />
           <div>
-            <CardTitle className="text-2xl text-slate-900 dark:text-white">ConvocaRadar IA</CardTitle>
-            <CardDescription>Ingresa al tablero de vigilancia de convocatorias.</CardDescription>
+            <CardTitle className="text-2xl text-slate-900 dark:text-white">Bienvenido</CardTitle>
+            <CardDescription>Ingresa al sistema institucional de vigilancia tecnológica.</CardDescription>
           </div>
         </CardHeader>
         <CardContent className="pt-6">
@@ -106,9 +105,6 @@ export default function LoginPage() {
                 </p>
               )}
           </form>
-          <p className="mt-4 text-xs text-slate-500">
-            API configurada: <span className="font-mono">{API_URL}</span>
-          </p>
           <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
             ¿Primera vez aquí?{" "}
             <Link href="/register" className="font-medium text-cyan-700 hover:underline dark:text-cyan-300">

@@ -6,6 +6,7 @@ Phase 2 (PR2): updated to track progress after each lifecycle phase.
 from __future__ import annotations
 
 import asyncio
+import inspect
 from datetime import UTC, datetime
 
 from app.core.config import get_settings
@@ -46,6 +47,7 @@ async def _scrape_candidates(
         entity_name=source.name,
         default_country=source.country,
         default_categories=source.category,
+        connector_config=source.connector_config,
     )
     raw = await connector.fetch()
     if stats is not None:
@@ -55,6 +57,11 @@ async def _scrape_candidates(
         # Change D: compute DOM hash from raw page content
         stats["dom_hash"] = compute_dom_hash(raw.content or "")
     candidates = await connector.parse(raw)
+    # Persist connector state (processed_urls, last_sitemap_fetch)
+    # for connectors that track incremental progress across runs.
+    updated_config = getattr(connector, "get_updated_config", lambda: None)()
+    if updated_config is not None:
+        source.connector_config = updated_config
     if not candidates and source.key in {
         "grants-gov",
         "grants-gov-rss",
@@ -182,7 +189,7 @@ def _setup_run(
     return run, task, started_at
 
 
-def _persist_opportunities(
+async def _persist_opportunities(
     db, run: SourceRun, opportunities: list[OpportunityCreate], organization_id: str | None
 ) -> tuple[int, int, int]:
     """Persist scraped opportunities, returning (created, updated, failed)."""
@@ -191,8 +198,13 @@ def _persist_opportunities(
     failed_items = 0
     for opportunity_data in opportunities:
         try:
-            opportunity = create_opportunity(
+            opportunity_result = create_opportunity(
                 db, opportunity_data, organization_id=organization_id
+            )
+            opportunity = (
+                await opportunity_result
+                if inspect.isawaitable(opportunity_result)
+                else opportunity_result
             )
             if opportunity.first_seen_at == opportunity.last_seen_at:
                 created += 1
@@ -276,22 +288,23 @@ def _handle_run_error(
     """Update run/task/source on scrape error."""
     finished_at = datetime.now(UTC).replace(tzinfo=None)
     error_type = classify_error(exc)
+    error_message = str(exc).strip() or f"{type(exc).__name__}: ejecución interrumpida"
     error_type_value = error_type.value
     run.status = "degraded" if error_type == ErrorType.PARSE else "failed"
     run.finished_at = finished_at
     run.items_failed = 1
-    run.error_message = str(exc)
+    run.error_message = error_message
     run.logs = [
         *run.logs,
-        {"level": "error", "message": str(exc), "error_type": error_type_value},
+        {"level": "error", "message": error_message, "error_type": error_type_value},
     ]
     task.status = run.status
     task.finished_at = finished_at
-    task.error_message = str(exc)
+    task.error_message = error_message
     task.result = {"items_failed": 1}
-    source.last_error = str(exc)
+    source.last_error = error_message
     if error_type not in (ErrorType.TIMEOUT, ErrorType.NETWORK):
-        create_source_health_alert(db, source, reason=str(exc))
+        create_source_health_alert(db, source, reason=error_message)
 
 
 async def run_source_inline(
@@ -314,7 +327,12 @@ async def run_source_inline(
         _set_progress(run, {"fetch": _now(), "parse": _now()})
         db.flush()
 
-        created, updated, failed = _persist_opportunities(db, run, opportunities, organization_id)
+        elapsed = (datetime.now(UTC).replace(tzinfo=None) - _started_at).total_seconds()
+        remaining = max(1.0, get_settings().scraping_max_source_seconds - elapsed)
+        created, updated, failed = await asyncio.wait_for(
+            _persist_opportunities(db, run, opportunities, organization_id),
+            timeout=remaining,
+        )
         _set_progress(run, {"persist": _now()})
         db.flush()
 
@@ -386,4 +404,3 @@ def _update_dom_hash(
             "old_hash_prefix": old_hash[:16],
             "new_hash_prefix": new_hash[:16],
         })
-

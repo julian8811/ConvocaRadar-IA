@@ -82,6 +82,8 @@ def list_opportunities(
     max_amount: float | None = None,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=25, ge=1, le=100),
+    include_closed: bool = Query(default=False, description="Include closed opportunities (past close_date)"),
+    include_no_url: bool = Query(default=False, description="Include opportunities without official_url"),
     organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
     ) -> OpportunityList:
@@ -97,6 +99,8 @@ def list_opportunities(
         close_date_to=close_date_to,
         min_amount=min_amount,
         max_amount=max_amount,
+        exclude_closed=not include_closed,
+        exclude_no_url=not include_no_url,
     )
     total = count_query(db, stmt)
     items = list(db.scalars(stmt.offset((page - 1) * page_size).limit(page_size)))

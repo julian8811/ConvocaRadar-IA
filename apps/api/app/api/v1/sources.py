@@ -1,7 +1,9 @@
 import concurrent.futures
+import math
 from datetime import UTC, datetime
 import logging
 import threading as _base_threading
+import time
 
 import structlog
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -16,7 +18,7 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_organization, get_current_user
 from app.db.seed import seed_default_sources
 from app.db.session import get_db, SessionLocal
-from app.models import Opportunity, Organization, Source, SourceRun, User
+from app.models import Opportunity, Organization, Source, SourceRun, Task, User
 from app.schemas import SourceCreate, SourceHealthRead, SourceRead, SourceRunRead, SourceUpdate
 from app.scraper.dispatcher import run_source as dispatcher_run_source
 from app.services import audit, execute_source_run_locally, source_due_for_scraping, validate_source_url
@@ -28,7 +30,7 @@ from app.services.scoring import (
 router = APIRouter()
 
 
-def _run_source_via_dispatcher(db, source, org_id):
+def _run_source_via_dispatcher(source_id: str, org_id: str):
     """Sync wrapper — calls dispatcher.run_source via asyncio.run().
 
     The background sweep runs in a thread (not in the asyncio event loop),
@@ -38,7 +40,21 @@ def _run_source_via_dispatcher(db, source, org_id):
     """
     import asyncio
 
-    return asyncio.run(dispatcher_run_source(db, source, org_id))
+    worker_db = SessionLocal()
+    try:
+        source = worker_db.get(Source, source_id)
+        if source is None:
+            raise LookupError(f"Source {source_id} no longer exists")
+        run = asyncio.run(dispatcher_run_source(worker_db, source, org_id))
+        worker_db.commit()
+        return run
+    except Exception:
+        transaction = worker_db.get_transaction()
+        if transaction is not None and transaction.is_active:
+            worker_db.rollback()
+        raise
+    finally:
+        worker_db.close()
 logger = logging.getLogger(__name__)
 struct_logger = structlog.get_logger(__name__)
 
@@ -234,6 +250,20 @@ def _source_health(db: Session, source: Source, raw_recent_runs: list[SourceRun]
     )
     health_status = health_status_for_score(health_score)
 
+    error_text = (source.last_error or "").lower()
+    if not error_text:
+        failure_category = None
+    elif "403" in error_text or "forbidden" in error_text or "blocked" in error_text:
+        failure_category = "blocked_external"
+    elif "timeout" in error_text or "timed out" in error_text:
+        failure_category = "timeout"
+    elif "allowed domains" in error_text or "configuration" in error_text:
+        failure_category = "configuration"
+    elif "parse" in error_text or "selector" in error_text or "structure" in error_text:
+        failure_category = "structure_changed"
+    else:
+        failure_category = "external_error"
+
     return SourceHealthRead(
         source_id=source.id,
         key=source.key,
@@ -258,6 +288,7 @@ def _source_health(db: Session, source: Source, raw_recent_runs: list[SourceRun]
         health_status=health_status,
         tier=getattr(source, "tier", None),
         auto_paused=getattr(source, "auto_paused", False),
+        failure_category=failure_category,
     )
 
 
@@ -346,7 +377,7 @@ def run_source(
 
 @router.post("/sources/run-all", response_model=dict)
 def run_all_sources(
-    force: bool = Query(default=False, description="Bypass due check and batch cap"),
+    force: bool = Query(default=False, description="Bypass the scheduling-frequency check"),
     organization: Organization = Depends(get_current_organization),
     user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -356,9 +387,8 @@ def run_all_sources(
     The sweep runs in a daemon thread so the HTTP response returns
     immediately. Use GET /api/v1/sources/health to monitor progress.
 
-    When ``force=true``, all sources are processed regardless of their
-    ``scraping_frequency`` or ``last_run_at``, and the 20-source batch
-    cap is lifted. Use this to recover sources after a code deploy.
+    When ``force=true``, all enabled sources are processed regardless of
+    their ``scraping_frequency`` or ``last_run_at``.
 
     PR4-2: structured log lines are emitted at every decision point so
     the run-all empty-return bug can be diagnosed from the log output:
@@ -427,69 +457,149 @@ def run_all_sources(
         total=len(sources),
     )
 
-    # Free tier guard: cap at 20 sources per run-all UNLESS force
-    if not force:
-        MAX_BATCH = 20
-        if len(due_sources) > MAX_BATCH:
-            due_sources = due_sources[:MAX_BATCH]
-        struct_logger.info("run_all.capped", max_batch=MAX_BATCH)
+    # Materialize primitive values before the request transaction commits.
+    # ORM instances expire on commit and cannot safely be read by the
+    # background thread afterwards.
+    due_source_items = [
+        {"id": str(source.id), "key": source.key}
+        for source in due_sources
+    ]
+
+    sweep_task = Task(
+        organization_id=org_id,
+        task_type="source_sweep",
+        provider="local",
+        status="queued",
+        payload={
+            "total_sources": len(sources),
+            "sources_due": len(due_sources),
+            "sources_skipped": len(sources) - len(due_sources),
+            "force": force,
+        },
+        result={"completed": 0, "processed": 0, "failed": 0, "total": len(due_sources)},
+    )
+    db.add(sweep_task)
+    db.flush()
+    sweep_task_id = sweep_task.id
+
+    def _update_sweep_task(*, status: str, processed: int, failed: int, finished: bool = False) -> None:
+        progress_db = SessionLocal()
+        try:
+            task = progress_db.get(Task, sweep_task_id)
+            if task is None:
+                return
+            task.status = status
+            task.started_at = task.started_at or datetime.now(UTC).replace(tzinfo=None)
+            task.result = {
+                "completed": processed + failed,
+                "processed": processed,
+                "failed": failed,
+                "total": len(due_sources),
+            }
+            if finished:
+                task.finished_at = datetime.now(UTC).replace(tzinfo=None)
+            progress_db.commit()
+        finally:
+            progress_db.close()
 
     def _background_sweep() -> None:
         from app.core.config import get_settings
 
         settings = get_settings()
-        db2 = SessionLocal()
         processed = 0
         failed = 0
         try:
+            _update_sweep_task(status="running", processed=0, failed=0)
             saved_thread = _base_threading.Thread
             _base_threading.Thread = _original_thread_cls
-            max_workers = min(len(due_sources), 2) if due_sources else 1
-            with concurrent.futures.ThreadPoolExecutor(max_workers=max_workers) as pool:
+            max_workers = min(
+                len(due_sources),
+                max(1, settings.scraping_max_concurrency),
+            ) if due_sources else 1
+            # The previous fixed global timeout (2x one connector timeout)
+            # could abort a full catalog even while its connectors were
+            # completing normally. Scale the sweep window to the number of
+            # worker batches so every enabled source gets its turn.
+            sweep_timeout = (
+                settings.per_connector_timeout_seconds
+                * max(1, math.ceil(len(due_sources) / max_workers))
+                + min(30.0, max(1.0, settings.per_connector_timeout_seconds * 0.25))
+            )
+            pool = concurrent.futures.ThreadPoolExecutor(max_workers=max_workers)
+            try:
                 futs = {}
-                for source in due_sources:
-                    fresh = db2.merge(source)
-                    fut = pool.submit(_run_source_via_dispatcher, db2, fresh, org_id)
-                    futs[fut] = fresh
+                for source_info in due_source_items:
+                    fut = pool.submit(_run_source_via_dispatcher, source_info["id"], org_id)
+                    futs[fut] = source_info
                 _base_threading.Thread = saved_thread
-                for fut in concurrent.futures.as_completed(futs, timeout=settings.per_connector_timeout_seconds * 2):
-                    fresh = futs[fut]
-                    try:
-                        fut.result(timeout=settings.per_connector_timeout_seconds)
-                        processed += 1
-                    except concurrent.futures.TimeoutError:
-                        fut.cancel()
-                        failed += 1
-                        db2.rollback()
-                        struct_logger.error(
-                            "run_all.source_timeout",
-                            source_id=str(fresh.id),
-                            source_key=fresh.key,
-                            timeout_seconds=settings.per_connector_timeout_seconds,
-                        )
-                    except Exception as exc:
-                        db2.rollback()
-                        failed += 1
-                        struct_logger.error(
-                            "run_all.source_failed",
-                            source_id=str(fresh.id),
-                            source_key=fresh.key,
-                            error_type=type(exc).__name__,
-                            error_message=str(exc)[:500],
-                        )
-            db2.commit()
+                pending = set(futs)
+                deadline = time.monotonic() + sweep_timeout
+                while pending:
+                    remaining = deadline - time.monotonic()
+                    if remaining <= 0:
+                        break
+                    completed, pending = concurrent.futures.wait(
+                        pending,
+                        timeout=remaining,
+                        return_when=concurrent.futures.FIRST_COMPLETED,
+                    )
+                    if not completed:
+                        break
+                    for fut in completed:
+                        source_info = futs[fut]
+                        try:
+                            fut.result()
+                            processed += 1
+                        except Exception as exc:
+                            failed += 1
+                            struct_logger.error(
+                                "run_all.source_failed",
+                                source_id=source_info["id"],
+                                source_key=source_info["key"],
+                                error_type=type(exc).__name__,
+                                error_message=str(exc)[:500],
+                            )
+                        _update_sweep_task(status="running", processed=processed, failed=failed)
+                for fut in pending:
+                    source_info = futs[fut]
+                    fut.cancel()
+                    failed += 1
+                    struct_logger.error(
+                        "run_all.source_timeout",
+                        source_id=source_info["id"],
+                        source_key=source_info["key"],
+                        timeout_seconds=settings.per_connector_timeout_seconds,
+                    )
+                    _update_sweep_task(status="running", processed=processed, failed=failed)
+            finally:
+                _base_threading.Thread = saved_thread
+                # A connector may block in third-party code that cannot be
+                # cancelled by Python. Do not let one such thread prevent the
+                # sweep task (or the API process) from completing.
+                pool.shutdown(wait=False, cancel_futures=True)
+            final_status = "success" if failed == 0 else ("failed" if processed == 0 else "degraded")
+            _update_sweep_task(status=final_status, processed=processed, failed=failed, finished=True)
             struct_logger.info(
                 "run_all.completed",
                 processed=processed,
                 failed=failed,
                 total=len(due_sources),
             )
-        finally:
-            db2.close()
+        except Exception as exc:
+            remaining = max(len(due_sources) - processed, failed)
+            _update_sweep_task(status="failed", processed=processed, failed=remaining, finished=True)
+            struct_logger.exception("run_all.sweep_failed", error_message=str(exc)[:500])
 
-    threading.Thread(target=_background_sweep, daemon=True).start()
     audit(db, "run_source_sweep_dispatched", "source_sweep", user, None)
-    return {"status": "started", "sources": len(sources)}
+    db.commit()
+    threading.Thread(target=_background_sweep, daemon=True).start()
+    return {
+        "status": "started",
+        "task_id": sweep_task_id,
+        "sources": len(sources),
+        "sources_due": len(due_sources),
+        "sources_skipped": len(sources) - len(due_sources),
+    }
 
 
 @router.get("/sources/{source_id}/runs", response_model=list[SourceRunRead])

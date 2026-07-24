@@ -5,23 +5,23 @@
 @theme inline {
   --font-sans: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
   --font-mono: "Geist Mono", "Geist Mono Fallback", ui-monospace, SFMono-Regular, monospace;
-  --color-background: #f3f6fb;
-  --color-foreground: #102033;
+  --color-background: #f4f7f6;
+  --color-foreground: #243336;
   --color-card: #ffffff;
   --color-card-foreground: #102033;
-  --color-primary: #1597b8;
+  --color-primary: #00807d;
   --color-primary-foreground: #ffffff;
-  --color-secondary: #edf2f7;
-  --color-secondary-foreground: #102033;
-  --color-muted: #eef3f8;
-  --color-muted-foreground: #516173;
-  --color-accent: #dde7f0;
-  --color-accent-foreground: #102033;
+  --color-secondary: #edf4f3;
+  --color-secondary-foreground: #005652;
+  --color-muted: #f0f4f3;
+  --color-muted-foreground: #5b696b;
+  --color-accent: #e0f2f1;
+  --color-accent-foreground: #005652;
   --color-destructive: #d94b4b;
-  --color-border: #d4dee8;
-  --color-input: #d4dee8;
-  --color-ring: #1597b8;
-  --radius: 0.5rem;
+  --color-border: #d8e2e0;
+  --color-input: #d8e2e0;
+  --color-ring: #00b3af;
+  --radius: 0.625rem;
   --radius-sm: calc(var(--radius) * 0.75);
   --radius-md: var(--radius);
   --radius-lg: calc(var(--radius) * 1.25);
@@ -32,8 +32,8 @@
   --color-foreground: #d7e4f3;
   --color-card: #0d1a29;
   --color-card-foreground: #d7e4f3;
-  --color-primary: #4ed2ea;
-  --color-primary-foreground: #061118;
+  --color-primary: #00b3af;
+  --color-primary-foreground: #031716;
   --color-secondary: #122131;
   --color-secondary-foreground: #d7e4f3;
   --color-muted: #122131;
@@ -52,9 +52,78 @@
 
 body {
   min-height: 100vh;
-  background: linear-gradient(180deg, #f3f6fb 0%, #e9eef5 100%);
+  background: linear-gradient(180deg, #f7f9f8 0%, #eef3f2 100%);
   color: var(--color-foreground);
   color-scheme: light;
+}
+
+::selection {
+  background: #b9e3e1;
+  color: #003432;
+}
+
+:focus-visible {
+  outline-color: #00b3af;
+}
+
+.brand-shield {
+  display: inline-flex;
+  width: 2.75rem;
+  height: 3.25rem;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+}
+
+.brand-shield img {
+  display: block;
+  width: auto;
+  height: 100%;
+  object-fit: contain;
+}
+
+.institutional-sidebar::before {
+  content: "";
+  position: absolute;
+  inset: 0 0 auto 0;
+  height: 4px;
+  background: linear-gradient(90deg, #005652 0 42%, #00b3af 42% 82%, #ffcd00 82%);
+}
+
+.institutional-hero {
+  background-image:
+    radial-gradient(circle at 88% 18%, rgba(190, 214, 48, 0.24), transparent 18rem),
+    linear-gradient(135deg, rgba(255, 255, 255, 0.07) 0%, transparent 48%);
+}
+
+.auth-surface {
+  background-color: #f4f7f6;
+  background-image:
+    radial-gradient(circle at 12% 18%, rgba(0, 179, 175, 0.13), transparent 28rem),
+    radial-gradient(circle at 88% 82%, rgba(255, 205, 0, 0.10), transparent 24rem),
+    linear-gradient(rgba(0, 86, 82, 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(0, 86, 82, 0.025) 1px, transparent 1px);
+  background-size: auto, auto, 32px 32px, 32px 32px;
+}
+
+.dark .auth-surface {
+  background-color: #07111c;
+  background-image:
+    radial-gradient(circle at 12% 18%, rgba(0, 179, 175, 0.12), transparent 28rem),
+    radial-gradient(circle at 88% 82%, rgba(255, 205, 0, 0.06), transparent 24rem);
+}
+
+h1, h2, h3 {
+  text-wrap: balance;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *, *::before, *::after {
+    scroll-behavior: auto !important;
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+  }
 }
 
 .dark body {

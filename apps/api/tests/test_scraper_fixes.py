@@ -146,8 +146,13 @@ class TestScrapeSourceTimeout:
 
             # _scrape_source_candidates_with_timeout calls asyncio.wait_for with timeout
             # We expect the timeout to be min(max(300, 30), 30) = 30
+            async def fake_wait_for(awaitable, *args, **kwargs):
+                if inspect.iscoroutine(awaitable):
+                    awaitable.close()
+                return None
+
             with patch("app.services._scrape_source_candidates", AsyncMock()):
-                with patch("asyncio.wait_for", AsyncMock()) as mock_wait:
+                with patch("asyncio.wait_for", side_effect=fake_wait_for) as mock_wait:
                     try:
                         await _scrape_source_candidates_with_timeout(mock_source)
                     except Exception:

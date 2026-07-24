@@ -136,10 +136,13 @@ export function PipelineZone() {
   if (pipelineQuery.isLoading && triageQuery.isLoading) return <PipelineSkeleton />;
   if (pipelineQuery.error) return <ErrorState message={pipelineQuery.error.message} />;
 
-  const reviewQueue = (triageQuery.data?.review_queue ?? []).map((item) => ({
-    ...item,
-    reasons: [],
-  }));
+  const reviewQueue = Array.from(
+    new Map(
+      (triageQuery.data?.review_queue ?? [])
+        .filter((item) => item.days_to_close === null || item.days_to_close >= 0)
+        .map((item) => [item.id, { ...item, reasons: [] }]),
+    ).values(),
+  );
 
   return (
     <div className="space-y-4" data-zone="pipeline">

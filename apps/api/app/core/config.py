@@ -1,4 +1,4 @@
-import logging
+﻿import logging
 
 from functools import lru_cache
 
@@ -22,14 +22,16 @@ class Settings(BaseSettings):
     llm_model: str = "gpt-4.1-mini"
     chat_model: str = "gpt-4.1-mini"
     embedding_model: str = ""
-    embedding_dimensions: int = 64
+    embedding_dimensions: int = 1024
     llm_timeout_seconds: int = 45
     bootstrap_sources_on_startup: bool = True
     bootstrap_sources_blocking: bool = False
     bootstrap_source_keys: str = "grants-gov-rss,grants-gov,innpulsa,minciencias,nsf-funding-rss"
     sentry_dsn: str | None = None
     sentry_send_default_pii: bool = False
-    scraping_user_agent: str = "ConvocaRadarBot/0.1"
+    scraping_user_agent: str = (
+        "Mozilla/5.0 (compatible; ConvocaRadarBot/1.0; +https://github.com/ConvocaRadar/ConvocaRadar-IA)"
+    )
     scraping_timeout_seconds: int = 180
     scraping_max_source_seconds: int = 180
     scraping_max_concurrency: int = 5
@@ -52,10 +54,18 @@ class Settings(BaseSettings):
     smtp_password: str | None = None
     smtp_from: str = "alerts@convocaradar.local"
     smtp_use_tls: bool = True
+    resend_api_key: str | None = None
+    resend_from: str = "Observatorio de Convocatorias <onboarding@resend.dev>"
+    alert_default_recipient: str | None = None
     frontend_url: str = "http://localhost:3000"
     backend_url: str = "http://localhost:8000"
+    app_timezone: str = "America/Bogota"
     rate_limit_requests_per_minute: int = 120
     rate_limit_window_seconds: int = 60
+    scheduler_enabled: bool = True
+    scheduler_interval_seconds: int = 1800
+    scheduler_initial_delay_seconds: int = 30
+    weekly_digest_interval_seconds: int = 604800
 
     @computed_field  # type: ignore[prop-decorator]
     @property
@@ -76,7 +86,7 @@ def get_settings() -> Settings:
 def check_production_sqlite(app_env: str | None = None, database_url: str | None = None) -> None:
     """Log a warning when DATABASE_URL uses SQLite in a production environment.
 
-    SQLite is not safe for concurrent production workloads — it can cause
+    SQLite is not safe for concurrent production workloads â€” it can cause
     data corruption under concurrent writes. This check warns operators who
     forget to configure a real database in production.
 
@@ -87,7 +97,7 @@ def check_production_sqlite(app_env: str | None = None, database_url: str | None
     if env == "production" and "sqlite" in db_url:
         logger.warning(
             "DATABASE_URL uses SQLite in APP_ENV=production. "
-            "SQLite is NOT safe for production — concurrent writes can "
+            "SQLite is NOT safe for production â€” concurrent writes can "
             "cause data corruption. Configure PostgreSQL via DATABASE_URL "
             "in your environment."
         )
@@ -95,6 +105,14 @@ def check_production_sqlite(app_env: str | None = None, database_url: str | None
 
 def effective_llm_provider(provider: str | None = None) -> str:
     value = (provider or get_settings().llm_provider).strip().lower()
-    if value in {"mock", "local", ""}:
+    if value == "mock":
+        raise ValueError("LLM_PROVIDER=mock is not supported")
+    if value in {"local", ""}:
         return "local"
     return value
+
+
+
+
+
+

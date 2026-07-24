@@ -1,3 +1,4 @@
+﻿import asyncio
 from contextlib import asynccontextmanager
 from collections.abc import AsyncIterator
 from collections import defaultdict, deque
@@ -33,7 +34,7 @@ if settings.sentry_dsn:
         import sentry_sdk
         from sentry_sdk.integrations.fastapi import FastApiIntegration
 
-        # PII off by default — ConvocaRadar is a B2B tool for funding teams;
+        # PII off by default â€” ConvocaRadar is a B2B tool for funding teams;
         # we do not want tokens, emails, or opportunity text flowing into Sentry.
         # Set SENTRY_SEND_DEFAULT_PII=true in env to opt in if needed.
         send_pii = bool(getattr(settings, "sentry_send_default_pii", False))
@@ -49,7 +50,7 @@ if settings.sentry_dsn:
 
 
 
-async def _run_periodic_source_sweep(interval_seconds: int = 1800) -> None:
+async def _run_periodic_source_sweep(interval_seconds: int | None = None) -> None:
     """Every ``interval_seconds`` (default 30 min), trigger a sweep of all
     enabled sources. Redis is not reachable on the free tier, so we use
     an asyncio loop instead of the Celery beat schedule. The sweep runs
@@ -64,10 +65,12 @@ async def _run_periodic_source_sweep(interval_seconds: int = 1800) -> None:
     """
     from datetime import UTC, datetime
 
-    WEEKLY_DIGEST_SECONDS = 604800  # 7 days
+    scheduler_settings = get_settings()
+    interval_seconds = interval_seconds or scheduler_settings.scheduler_interval_seconds
+    weekly_digest_seconds = scheduler_settings.weekly_digest_interval_seconds
     last_digest_at: datetime | None = None
 
-    await asyncio.sleep(30)  # let the API settle before the first sweep
+    await asyncio.sleep(scheduler_settings.scheduler_initial_delay_seconds)
     while True:
         try:
             from app.db.session import SessionLocal
@@ -120,10 +123,10 @@ async def _run_periodic_source_sweep(interval_seconds: int = 1800) -> None:
 
                     # Weekly digest. Fires at most once per process lifetime
                     # interval, so a long-running API instance stays under
-                    # quota. Restarting the API restarts the timer — that's
+                    # quota. Restarting the API restarts the timer â€” that's
                     # fine for a v1 cron substitute on Render's free tier.
                     now = datetime.now(UTC).replace(tzinfo=None)
-                    if last_digest_at is None or (now - last_digest_at).total_seconds() >= WEEKLY_DIGEST_SECONDS:
+                    if last_digest_at is None or (now - last_digest_at).total_seconds() >= weekly_digest_seconds:
                         delivered_count = 0
                         for org in orgs:
                             try:
@@ -153,12 +156,26 @@ async def _run_periodic_source_sweep(interval_seconds: int = 1800) -> None:
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     create_all()
-    # Run pending Alembic migrations (idempotent — stamps + upgrades).
+    # Run pending Alembic migrations (idempotent â€” stamps + upgrades).
     # This adds the new columns (tier, auto_paused, dom_hash, etc.) to the
     # production DB without requiring a manual migration step.
     from app.db.migrate import run_pending_migrations
     run_pending_migrations()
     ensure_bootstrap_data()
+
+    # Reconcile interrupted source runs/tasks immediately on boot. Waiting
+    # for the scheduler's initial delay left stale UI entries visible after
+    # a container restart.
+    from app.db.session import SessionLocal
+    from app.scraper.recovery import mark_stale_runs_failed
+    recovery_db = SessionLocal()
+    try:
+        recovered = mark_stale_runs_failed(recovery_db)
+        recovery_db.commit()
+        if recovered:
+            struct_logger.info("startup_stale_runs_recovered", count=recovered)
+    finally:
+        recovery_db.close()
 
     # Run scraper infrastructure health checks (non-blocking, warnings only).
     # Both functions handle their own errors internally and return bool.
@@ -166,17 +183,22 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     check_pypdf_import()
 
     # Pre-warm the shared HTTPX client singletons for connection pooling.
-    # The call is lazy — it creates the client if not yet initialized.
+    # The call is lazy â€” it creates the client if not yet initialized.
     await http_client()
 
     # Background scheduler: every 30 minutes, run all enabled sources
     # via an asyncio loop instead of a Celery beat schedule.
     import asyncio
-    scheduler_task = asyncio.create_task(_run_periodic_source_sweep())
+    scheduler_task = (
+        asyncio.create_task(_run_periodic_source_sweep())
+        if settings.scheduler_enabled
+        else None
+    )
     try:
         yield
     finally:
-        scheduler_task.cancel()
+        if scheduler_task is not None:
+            scheduler_task.cancel()
         # Gracefully release pooled connections on shutdown.
         # close_sync_client is sync + blocking (TCP teardown); offload to
         # a thread so it doesn't block the async lifespan handler.
@@ -297,6 +319,8 @@ app.add_exception_handler(Exception, unhandled_exception_handler)
 @app.middleware("http")
 async def rate_limit_middleware(request: Request, call_next):
     path = request.url.path
+    if request.method == "OPTIONS":
+        return await call_next(request)
     # Bypass rate limiting for liveness/readiness probes and the internal
     # scheduler endpoints. Orchestrators (k8s, Render) and the scheduler may
     # legitimately call these endpoints at high frequency.
@@ -327,7 +351,7 @@ async def rate_limit_middleware(request: Request, call_next):
     return await call_next(request)
 
 
-# SEC-4: CORS hardening — only known origins are allowed. The
+# SEC-4: CORS hardening â€” only known origins are allowed. The
 # ``allow_origin_regex`` parameter has been removed because a regex like
 # ``r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"`` can match unintended
 # origins (e.g. ``http://localhost.evil.com``). In production, validate
@@ -395,7 +419,7 @@ def _check_database() -> bool:
 
 
 def _readiness_response() -> JSONResponse:
-    """Build the readiness response — 200 when DB is reachable, 503 otherwise."""
+    """Build the readiness response â€” 200 when DB is reachable, 503 otherwise."""
     try:
         if _check_database():
             return JSONResponse(
@@ -424,7 +448,7 @@ def health_v1() -> JSONResponse:
 
 @app.get("/api/v1/health/live")
 def health_v1_live() -> dict[str, str]:
-    """Liveness probe — 200 as long as the process is up.
+    """Liveness probe â€” 200 as long as the process is up.
 
     Does NOT touch the database. Use this for k8s livenessProbe: a process
     that can answer this endpoint is alive; the orchestrator should not kill
@@ -440,3 +464,4 @@ def health_v1_ready() -> JSONResponse:
 
 
 app.include_router(api_router)
+

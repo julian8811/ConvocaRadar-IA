@@ -14,6 +14,7 @@ order-independent and avoids the rate limit polluting later tests.
 from __future__ import annotations
 
 import os
+from pathlib import Path
 from typing import Any
 from unittest.mock import AsyncMock
 
@@ -22,19 +23,32 @@ from unittest.mock import AsyncMock
 # INTERNAL_API_KEY. Per-file overrides (e.g. test_dashboard_health.py
 # setting DATABASE_URL) take precedence because conftest only sets the
 # shared, non-database settings.
-os.environ.setdefault("DATABASE_URL", "sqlite:///./test_convocaradar.db")
-os.environ.setdefault("STORAGE_BACKEND", "local")
-os.environ.setdefault("STORAGE_DIR", "./test_storage")
-os.environ.setdefault("SMTP_HOST", "")
-os.environ.setdefault("JWT_SECRET", "a" * 64)
-os.environ.setdefault("RESET_TOKEN_SECRET", "b" * 64)
-os.environ.setdefault("INTERNAL_API_KEY", "a" * 64)
-os.environ.setdefault("BOOTSTRAP_SOURCES_ON_STARTUP", "false")
+# Never inherit Docker's development/production PostgreSQL URL: destructive
+# test fixtures must always operate on a disposable database.
+os.environ["DATABASE_URL"] = "sqlite:////tmp/convocaradar_pytest.db"
+os.environ["STORAGE_BACKEND"] = "local"
+os.environ["STORAGE_DIR"] = "/tmp/convocaradar_test_storage"
+os.environ["SMTP_HOST"] = ""
+os.environ["SCRAPING_TIMEOUT_SECONDS"] = "180"
+os.environ["PER_CONNECTOR_TIMEOUT_SECONDS"] = "180"
+os.environ["JWT_SECRET"] = "a" * 64
+os.environ["RESET_TOKEN_SECRET"] = "b" * 64
+os.environ["INTERNAL_API_KEY"] = "a" * 64
+os.environ["LLM_PROVIDER"] = "local"
+os.environ["LLM_API_KEY"] = ""
+os.environ["EMBEDDING_MODEL"] = ""
+os.environ["CHAT_MODEL"] = ""
+os.environ["BOOTSTRAP_SOURCES_ON_STARTUP"] = "false"
 # In-process Celery (worker + beat) is started by the FastAPI lifespan
 # in production. The test DB has no Redis broker, so the subprocess
 # would fail and spam /tmp/celery-*.log with retry noise. Disable
 # explicitly here so tests do not fork Celery children.
-os.environ.setdefault("DISABLE_INPROCESS_CELERY", "1")
+os.environ["DISABLE_INPROCESS_CELERY"] = "1"
+
+# A previous pytest process may leave the disposable SQLite file behind.
+# Remove it before importing the app so repeated local/CI runs remain
+# deterministic and registration tests never collide with stale users.
+Path("/tmp/convocaradar_pytest.db").unlink(missing_ok=True)
 
 import pytest  # noqa: E402
 
@@ -45,11 +59,20 @@ from app.core.rate_limit import email_login_limiter  # noqa: E402
 @pytest.fixture(autouse=True)
 def _reset_rate_limit_bucket() -> None:
     """Clear the in-memory rate limit bucket before every test."""
+    from app.connectors import common as connector_common
+    from app.core.config import get_settings
+
+    get_settings.cache_clear()
+    if connector_common._DOMAIN_BUDGET is not None:
+        connector_common._DOMAIN_BUDGET.clear()
     app_main.app.state.rate_limits.clear()
     email_login_limiter.clear()
     yield
     app_main.app.state.rate_limits.clear()
     email_login_limiter.clear()
+    if connector_common._DOMAIN_BUDGET is not None:
+        connector_common._DOMAIN_BUDGET.clear()
+    get_settings.cache_clear()
 
 
 @pytest.fixture

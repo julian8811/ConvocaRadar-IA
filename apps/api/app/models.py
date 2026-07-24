@@ -293,7 +293,7 @@ class OpportunityEmbedding(Base):
     organization_id: Mapped[str | None] = mapped_column(ForeignKey("organizations.id"), nullable=True, index=True)
     model_version: Mapped[str] = mapped_column(String, default="local-hash-embeddings-v2")
     source_text: Mapped[str] = mapped_column(Text, default="")
-    embedding: Mapped[list[float]] = mapped_column(EmbeddingVector(64), default=list)
+    embedding: Mapped[list[float]] = mapped_column(EmbeddingVector(1024), default=list)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
 

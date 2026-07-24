@@ -28,8 +28,18 @@ def build_opportunity_query(
     close_date_to: str | None = None,
     min_amount: float | None = None,
     max_amount: float | None = None,
+    exclude_closed: bool = True,
+    exclude_no_url: bool = False,
 ) -> Select[tuple[Opportunity]]:
-    """Build a SELECT query for opportunities with the given filters."""
+    """Build a SELECT query for opportunities with the given filters.
+
+    By default, excludes:
+    - Opportunities with ``close_date`` in the past (closed by deadline,
+      regardless of stored status) — unless ``exclude_closed=False`` or
+      ``status`` is explicitly provided.
+    - Opportunities without an ``official_url`` (no link to view the
+      convocatoria) — unless ``exclude_no_url=False``.
+    """
     from app.models import OpportunityScore
 
     stmt = select(Opportunity).where(
@@ -41,6 +51,17 @@ def build_opportunity_query(
         stmt = stmt.where(Opportunity.categories.contains([category]))
     if status:
         stmt = stmt.where(Opportunity.status == status)
+    elif exclude_closed:
+        # Filter by close_date regardless of stored status so opportunities
+        # whose deadline passed since the last scrape are hidden immediately.
+        stmt = stmt.where(
+            or_(
+                Opportunity.close_date.is_(None),
+                Opportunity.close_date >= datetime.now(UTC).replace(tzinfo=None),
+            )
+        )
+    if exclude_no_url:
+        stmt = stmt.where(Opportunity.official_url.is_not(None), Opportunity.official_url != "")
     if source_id:
         stmt = stmt.where(Opportunity.source_id == source_id)
     if search:

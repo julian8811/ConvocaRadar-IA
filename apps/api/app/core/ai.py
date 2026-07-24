@@ -17,7 +17,7 @@ from app.core.config import effective_llm_provider, get_settings
 from app.core.http_client import http_client
 from app.schemas import AiOpportunityExtract
 
-MODEL_VERSION = "gemini-vertex" if get_settings().llm_api_key and get_settings().embedding_model else "local-heuristic-v2"
+MODEL_VERSION = "local-heuristic-v2"
 LOCAL_EMBEDDING_MODEL_VERSION = "local-hash-embeddings-v2"
 EMBEDDING_MODEL_VERSION = MODEL_VERSION
 PROMPT_VERSION = "structured-extraction-v3"
@@ -149,6 +149,13 @@ def infer_language(text: str, fallback: str = "en") -> str:
         for token in [" call ", " funding ", " deadline ", " requirements ", " eligible ", " scholarship ", " innovation ", " research ", " application "]
         if token in f" {normalized} "
     )
+    portuguese_signals = sum(
+        1
+        for token in [" inscricoes ", " inscricoes ate ", " pesquisa ", " universidade ", " bolsa ", " edital ", " financiamento ", " desenvolvimento "]
+        if token in f" {normalized} "
+    )
+    if portuguese_signals > max(spanish_signals, english_signals):
+        return "pt"
     if spanish_signals > english_signals:
         return "es"
     if english_signals > spanish_signals:
@@ -260,7 +267,7 @@ def _coerce_text_list(value: Any) -> list[str]:
     if value is None:
         return []
     if isinstance(value, str):
-        return [item for item in (part.strip() for part in re.split(r"[;,|]\s*", value)) if item]
+        return [item for item in (normalize_text(part) for part in re.split(r"[;,|]\s*", value)) if item]
     if isinstance(value, list):
         items: list[str] = []
         for item in value:
@@ -271,6 +278,17 @@ def _coerce_text_list(value: Any) -> list[str]:
                 items.append(text)
         return items
     return [normalize_text(str(value))]
+
+
+def _normalize_categories(value: Any) -> list[str]:
+    categories: list[str] = []
+    for item in _coerce_text_list(value):
+        parts = re.split(r"\s+(?:and|y|e)\s+|[/&+]", item)
+        for part in parts:
+            category = normalize_text(part).strip(" -_")
+            if category and category not in categories:
+                categories.append(category)
+    return categories
 
 
 def _normalize_remote_extraction(payload: dict[str, Any]) -> dict[str, Any]:
@@ -294,7 +312,7 @@ def _normalize_remote_extraction(payload: dict[str, Any]) -> dict[str, Any]:
     mapped["summary"] = normalize_text(str(mapped.get("summary") or ""))
     mapped["recommendation"] = normalize_text(str(mapped.get("recommendation") or ""))
     mapped["status"] = normalize_text(str(mapped.get("status") or "")) or "unknown"
-    mapped["category"] = _coerce_text_list(mapped.get("category"))
+    mapped["category"] = _normalize_categories(mapped.get("category"))
     mapped["requirements"] = _coerce_text_list(mapped.get("requirements"))
     mapped["documents_required"] = _coerce_text_list(mapped.get("documents_required"))
     mapped["risks"] = _coerce_text_list(mapped.get("risks"))
@@ -302,7 +320,8 @@ def _normalize_remote_extraction(payload: dict[str, Any]) -> dict[str, Any]:
     mapped["extraction_notes"] = _coerce_text_list(mapped.get("extraction_notes"))
     mapped["priority"] = normalize_text(str(mapped.get("priority") or "")) or "medium"
     mapped["risk_level"] = normalize_text(str(mapped.get("risk_level") or "")) or "medium"
-    mapped["model_version"] = normalize_text(str(mapped.get("model_version") or MODEL_VERSION))
+    remote_model = get_settings().chat_model or get_settings().llm_model
+    mapped["model_version"] = normalize_text(str(mapped.get("model_version") or remote_model))
     mapped["provider"] = normalize_text(str(mapped.get("provider") or get_settings().llm_provider))
     mapped["prompt_version"] = normalize_text(str(mapped.get("prompt_version") or PROMPT_VERSION))
     mapped["extraction_strategy"] = normalize_text(str(mapped.get("extraction_strategy") or "remote"))
@@ -329,6 +348,7 @@ async def _call_llm(text: str) -> dict[str, Any] | None:
             {"role": "user", "content": text[:12000]},
         ],
         "temperature": 0.1,
+        "max_tokens": 1024,
         "response_format": {"type": "json_object"},
     }
     client = await http_client()
@@ -345,11 +365,25 @@ async def _call_llm(text: str) -> dict[str, Any] | None:
     data = response.json()
     content = (((data.get("choices") or [{}])[0]).get("message") or {}).get("content")
     if not content:
-        return None
+        raise RuntimeError(f"Remote LLM provider {provider!r} returned no content")
+    if isinstance(content, dict):
+        return content
+    if not isinstance(content, str):
+        raise RuntimeError(f"Remote LLM provider {provider!r} returned unsupported content")
     try:
         return json.loads(content)
     except json.JSONDecodeError:
-        return None
+        # Some compatible providers wrap JSON in markdown or add a short preface.
+        # Decode the first complete object without accepting a local fallback.
+        object_start = content.find("{")
+        if object_start >= 0:
+            try:
+                parsed, _ = json.JSONDecoder().raw_decode(content[object_start:])
+                if isinstance(parsed, dict):
+                    return parsed
+            except json.JSONDecodeError:
+                pass
+        raise RuntimeError(f"Remote LLM provider {provider!r} returned invalid JSON")
 
 
 def build_local_extraction(text: str) -> dict[str, Any]:
@@ -452,20 +486,22 @@ def tokenize_for_embedding(text: str) -> list[str]:
 def embedding_model_version() -> str:
     settings = get_settings()
     provider = effective_llm_provider(settings.llm_provider)
-    if provider == "openai" and settings.llm_api_key and settings.embedding_model:
-        return f"openai-{settings.embedding_model}-d{settings.embedding_dimensions}"
+    if provider != "local" and settings.llm_api_key and settings.embedding_model:
+        return f"{provider}-{settings.embedding_model}-d{settings.embedding_dimensions}"
     return LOCAL_EMBEDDING_MODEL_VERSION
 
 
 async def _call_openai_embedding(text: str, *, dimensions: int) -> list[float] | None:
     settings = get_settings()
-    if effective_llm_provider(settings.llm_provider) != "openai" or not settings.llm_api_key or not settings.embedding_model:
+    provider = effective_llm_provider(settings.llm_provider)
+    if provider == "local" or not settings.llm_api_key or not settings.embedding_model:
         return None
     payload = {
         "model": settings.embedding_model,
         "input": text[:8000],
-        "dimensions": dimensions,
     }
+    if provider == "openai":
+        payload["dimensions"] = dimensions
     client = await http_client()
     response = await client.post(
         f"{settings.llm_api_base.rstrip('/')}/embeddings",
@@ -490,13 +526,19 @@ async def _call_openai_embedding(text: str, *, dimensions: int) -> list[float] |
 async def build_embedding(text: str, *, dimensions: int | None = None) -> list[float]:
     settings = get_settings()
     target_dimensions = dimensions or settings.embedding_dimensions or 64
-    if effective_llm_provider(settings.llm_provider) == "openai" and settings.llm_api_key and settings.embedding_model:
-        try:
-            result = await _call_openai_embedding(text, dimensions=target_dimensions)
-            if result:
-                return result
-        except Exception:
-            pass
+    provider = effective_llm_provider(settings.llm_provider)
+    if provider != "local":
+        if not settings.llm_api_key or not settings.embedding_model:
+            raise RuntimeError(f"Remote embedding provider {provider!r} is not fully configured")
+        result = await _call_openai_embedding(text, dimensions=target_dimensions)
+        if not result:
+            raise RuntimeError(f"Remote embedding provider {provider!r} returned no vector")
+        if len(result) != target_dimensions:
+            raise RuntimeError(
+                f"Remote embedding provider {provider!r} returned {len(result)} dimensions; "
+                f"expected {target_dimensions}"
+            )
+        return result
     vector = [0.0] * target_dimensions
     tokens = tokenize_for_embedding(text)
     if not tokens:

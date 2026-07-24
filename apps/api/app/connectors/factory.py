@@ -1,11 +1,10 @@
-from app.connectors.configurable_html import ConfigurableHtmlConnector
+﻿from app.connectors.configurable_html import ConfigurableHtmlConnector
 from app.connectors.registry import get_connector
 from app.connectors.generic_html import GenericHtmlConnector
 from app.connectors.grants_gov import GrantsGovConnector
 from app.connectors.grants_gov_rss import GrantsGovRssConnector
 from app.connectors.apc_colombia import ApcColombiaConnector
 from app.connectors.api import ApiConnector
-from app.connectors.eu_funding_tenders import EuFundingTendersConnector
 from app.connectors.icetex import IcetexConnector
 from app.connectors.innovamos import InnovamosConnector
 from app.connectors.hybrid import HybridConnector
@@ -35,6 +34,11 @@ from app.connectors.eic_accelerator import EicAcceleratorConnector
 from app.connectors.global_innovation_fund import GlobalInnovationFundConnector
 from app.connectors.procolombia_convocatorias import ProcolombiaConvocatoriasConnector
 from app.connectors.anii_uruguay import AniiUruguayConnector
+from app.connectors.development_aid import DevelopmentAidConnector
+from app.connectors.dane import DaneConnector
+from app.connectors.brazil_portals import FinepConnector
+from app.connectors.findeter import FindeterConnector  # noqa: F401 — @register side effect
+from app.connectors.uniandes import UniandesConnector  # noqa: F401 — @register side effect
 
 
 WORDPRESS_GRANT_SOURCE_KEYS = {
@@ -112,15 +116,31 @@ def _wordpress_connector(source_key: str, base_url: str) -> WordPressGrantsConne
 
 
 def connector_for(source_key: str, base_url: str | None = None, source_type: str | None = None, *, entity_name: str | None = None, default_country: str | None = None, default_categories: list[str] | None = None, connector_config: dict | None = None):
-    # ── Special construction cases (non-standard __init__) ────────────────
+    # â”€â”€ Special construction cases (non-standard __init__) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     # These connectors take ``source_key`` as a positional argument, so
     # the standard ``cls(base_url, **kwargs)`` registry pattern doesn't
     # fit.  They *are* registered for introspection but must be constructed
     # explicitly here during the gradual migration.
+    if source_key == "finep-brasil":
+        return FinepConnector(source_key, base_url or "", entity_name=entity_name or "FINEP", default_country=default_country or "Brazil", default_categories=default_categories)
+    if source_key == "dane-convocatorias":
+        return DaneConnector(source_key, base_url or "", entity_name=entity_name or "DANE", default_country=default_country or "Colombia", default_categories=default_categories)
+    if source_key == "developmentaid-tenders":
+        return DevelopmentAidConnector(source_key, base_url or "", connector_config=connector_config)
     if source_key in {"grants-gov-rss", "grants-gov-forecast"}:
         return GrantsGovRssConnector(source_key, base_url or "")
+    if source_key == "nsf-funding-rss":
+        return NSFFundingRssConnector(source_key, base_url or "")
+    if source_key in BDN_CONVOCATORIAS_SOURCE_KEYS:
+        return _bdn_connector(source_key, base_url or "")
+    if source_key in {"lundbeck-foundation", "velux-foundation"}:
+        return _heading_list_connector(source_key, base_url or "")
+    if source_key == "giz-funding":
+        return GizFundingConnector(base_url)
+    if source_key in WORDPRESS_GRANT_SOURCE_KEYS or "/wp-json/wp/v2/" in (base_url or ""):
+        return _wordpress_connector(source_key, base_url or "")
 
-    # ── Connector registry (gradual migration) ───────────────────────────
+    # â”€â”€ Connector registry (gradual migration) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     # Registered connectors with standard ``__init__(self, base_url)`` are
     # handled here.  Unregistered keys raise ``KeyError`` and fall through
     # to the traditional if-elif chain below.
@@ -129,17 +149,9 @@ def connector_for(source_key: str, base_url: str | None = None, source_type: str
     except KeyError:
         pass
 
-    # ── Traditional if-elif chain (connectors that use non-standard
+    # â”€â”€ Traditional if-elif chain (connectors that use non-standard
     #    __init__ or special construction. Standard connectors are
-    #    resolved via @register() in the registry above). ──────────────
-    if source_key in {"lundbeck-foundation", "velux-foundation"}:
-        return _heading_list_connector(source_key, base_url or "")
-    if source_key in BDN_CONVOCATORIAS_SOURCE_KEYS:
-        return _bdn_connector(source_key, base_url or "")
-    if source_key == "giz-funding":
-        return GizFundingConnector(base_url)
-    if source_key in WORDPRESS_GRANT_SOURCE_KEYS or "/wp-json/wp/v2/" in (base_url or ""):
-        return _wordpress_connector(source_key, base_url or "")
+    #    resolved via @register() in the registry above). â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     if source_type == "manual":
         return ManualConnector(source_key, base_url or "")
     if source_type == "pdf":
@@ -168,3 +180,7 @@ def connector_for(source_key: str, base_url: str | None = None, source_type: str
         default_country=default_country,
         default_categories=default_categories,
     )
+
+
+
+

@@ -5,7 +5,7 @@ if a SourceRun with status='running' already exists, the call is skipped.
 """
 from __future__ import annotations
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 
 from app.core.config import get_settings
 from app.models import Source, SourceRun
@@ -23,6 +23,16 @@ async def run_source(
     # skip auto-paused sources
     if getattr(source, "auto_paused", False):
         return None
+
+    # PostgreSQL transaction advisory locks prevent the periodic scheduler
+    # and a user-triggered sweep from scraping the same source concurrently.
+    if db.get_bind().dialect.name == "postgresql":
+        acquired = db.scalar(
+            text("SELECT pg_try_advisory_xact_lock(hashtext(:source_id))"),
+            {"source_id": str(source.id)},
+        )
+        if not acquired:
+            return None
 
     # Check for an existing running run for this source
     existing = db.scalar(

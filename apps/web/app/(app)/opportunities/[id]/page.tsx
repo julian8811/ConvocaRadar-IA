@@ -68,6 +68,18 @@ function isNoiseTitle(title: string) {
   return normalized.includes("@") || normalized.toLowerCase().startsWith("http://") || normalized.toLowerCase().startsWith("https://");
 }
 
+function formatFunding(amount: number | null, currency: string | null, raw: string | null) {
+  if (amount !== null) {
+    return new Intl.NumberFormat("es-CO", {
+      style: currency ? "currency" : "decimal",
+      currency: currency || undefined,
+      maximumFractionDigits: 0,
+    }).format(amount);
+  }
+  const cleaned = decodeVisibleText(raw ?? "", "").trim();
+  return cleaned && cleaned.length <= 80 ? cleaned : "Por validar";
+}
+
 export default function OpportunityDetailPage() {
   const params = useParams<{ id: string }>();
   const queryClient = useQueryClient();
@@ -181,7 +193,7 @@ export default function OpportunityDetailPage() {
           </div>
           <h1 className="max-w-4xl text-3xl font-semibold tracking-tight text-slate-950 dark:text-white">{decodeVisibleText(item.title, "Convocatoria sin título")}</h1>
           <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-            {item.entity} · {item.country} · Fuente: {item.source_id ? "Con fuente" : "Sin fuente"} · Cierre:{" "}
+            {item.entity} · {item.country} · {item.source_id ? "Fuente verificada" : "Sin fuente"} · Cierre:{" "}
             {item.close_date ? new Date(item.close_date).toLocaleDateString("es-CO") : "Sin fecha"}
           </p>
         </div>
@@ -277,9 +289,10 @@ export default function OpportunityDetailPage() {
               <CardTitle className="text-slate-950 dark:text-white">Datos clave</CardTitle>
             </CardHeader>
             <CardContent className="space-y-3 pt-5 text-sm">
-              <KeyValue label="Monto" value={item.funding_amount_raw ?? "Por validar"} />
+              <KeyValue label="Monto" value={formatFunding(item.funding_amount_value, item.funding_amount_currency, item.funding_amount_raw)} />
               <KeyValue label="Estado interno" value={workflowLabels[item.user_status] ?? item.user_status} />
-              <KeyValue label="Temas" value={item.topics.join(", ") || "Sin temas"} />              <KeyValue label="Regi?n" value={item.region ?? "Sin regi?n"} />
+              <KeyValue label="Temas" value={item.topics.join(", ") || "Sin temas"} />
+              <KeyValue label="Región" value={item.region ?? "Sin región"} />
               <KeyValue label="Idioma" value={item.language ?? "No indicado"} />
             </CardContent>
           </Card>

@@ -37,29 +37,6 @@ GDRIVE_CONVOCATORIA_CATEGORIES = [
     "MACRORRUEDA",
 ]
 
-# Fallback candidates generated from known active programs (updated from Notion/GDrive)
-FALLBACK_CANDIDATES: list[dict] = [
-    {
-        "title": "Ferias y Workshops internacionales ProColombia 2026",
-        "entity": "ProColombia - Exportaciones",
-        "url": PROCOLOMBIA_GDRIVE_FOLDER,
-        "summary": "ProColombia abre convocatoria para participación de empresas colombianas en ferias y workshops internacionales de comercio exterior.",
-    },
-    {
-        "title": "Misiones comerciales internacionales ProColombia 2026",
-        "entity": "ProColombia - Exportaciones",
-        "url": PROCOLOMBIA_NOTION_URL,
-        "summary": "ProColombia promueve misiones comerciales internacionales para impulsar las exportaciones colombianas.",
-    },
-    {
-        "title": "Convocatorias sectoriales de exportación ProColombia 2026",
-        "entity": "ProColombia - Exportaciones",
-        "url": PROCOLOMBIA_GDRIVE_FOLDER,
-        "summary": "Convocatorias abiertas por sector: Agroindustria, Industrias 4.0, Metalmecánica, Químicos, Sistema Moda. Dirigidas a exportadores colombianos.",
-    },
-]
-
-
 def _slug_to_title(slug: str) -> str:
     text = slug.replace("-", " ").strip()
     return re.sub(r"\s+", " ", text).title()
@@ -85,6 +62,23 @@ class ProcolombiaConvocatoriasConnector:
     async def fetch(self) -> RawSourceResult:
         pages: list[dict[str, str]] = []
 
+        # Always treat the configured source URL as the primary live source.
+        # Sitemap and Drive discovery enrich it, but never replace it with
+        # synthetic candidates when the network is unavailable.
+        try:
+            primary_url, primary_content, _ = await fetch_httpx_text(
+                self.base_url,
+                headers={"User-Agent": BROWSER_UA},
+                fallback_content_type="text/html",
+                playwright_fallback=False,
+            )
+            if primary_content:
+                pages.append({"url": primary_url, "content": primary_content})
+        except Exception as exc:
+            primary_error = exc
+        else:
+            primary_error = None
+
         # 1. Sitemap: find news/articles about convocatorias
         try:
             _, sitemap_content, _ = await fetch_httpx_text(
@@ -104,8 +98,11 @@ class ProcolombiaConvocatoriasConnector:
                     or "/convocatorias/" in loc.lower()
                 )
             ][:60]
-        except Exception:
+        except Exception as exc:
             conv_urls = []
+            sitemap_error = exc
+        else:
+            sitemap_error = None
 
         # 2. Fetch sitemap article pages individually
         for url in conv_urls:
@@ -131,8 +128,10 @@ class ProcolombiaConvocatoriasConnector:
                 timeout_seconds=20,
             )
             gdrive_subfolders = _extract_gdrive_subfolder_names(gdrive_html)
-        except Exception:
-            gdrive_subfolders = list(GDRIVE_CONVOCATORIA_CATEGORIES)
+        except Exception as exc:
+            gdrive_error = exc
+        else:
+            gdrive_error = None
 
         # Embed subfolder names as synthetic HTML so parse() can use them
         if gdrive_subfolders:
@@ -140,12 +139,11 @@ class ProcolombiaConvocatoriasConnector:
                 f'<a href="{PROCOLOMBIA_GDRIVE_FOLDER}">{name}</a>' for name in gdrive_subfolders
             )
             pages.append({"url": PROCOLOMBIA_GDRIVE_FOLDER, "content": f"<html><body>{synthetic_html}</body></html>"})
-        else:
-            # Use hardcoded categories if live fetch failed
-            synthetic_html = "\n".join(
-                f'<a href="{PROCOLOMBIA_GDRIVE_FOLDER}">{name}</a>' for name in GDRIVE_CONVOCATORIA_CATEGORIES
+        if not pages:
+            errors = "; ".join(
+                str(error) for error in (primary_error, sitemap_error, gdrive_error) if error is not None
             )
-            pages.append({"url": PROCOLOMBIA_GDRIVE_FOLDER, "content": f"<html><body>{synthetic_html}</body></html>"})
+            raise RuntimeError(f"ProColombia sources were unavailable: {errors or 'no live content'}")
 
         combined = "\n".join(
             f"<!-- page:{page['url']} -->\n{page['content']}" for page in pages
@@ -235,26 +233,6 @@ class ProcolombiaConvocatoriasConnector:
                     continue
                 seen.add(candidate.official_url)
                 candidates.append(candidate)
-
-        # Add fallback candidates if we didn't find enough
-        if len(candidates) < 3:
-            for fb in FALLBACK_CANDIDATES:
-                if fb["url"] not in seen:
-                    candidates.append(
-                        OpportunityCandidate(
-                            title=fb["title"],
-                            entity=fb["entity"],
-                            country="Colombia",
-                            official_url=fb["url"],
-                            summary=fb["summary"],
-                            categories=["convocatorias", "cooperacion", "internacionalizacion"],
-                            topics=["ProColombia", fb["entity"]],
-                            raw_text=fb["summary"],
-                            confidence_score=0.60,
-                            language="es",
-                        )
-                    )
-                    seen.add(fb["url"])
 
         return candidates[:100]
 

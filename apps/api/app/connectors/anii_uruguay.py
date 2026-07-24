@@ -48,7 +48,7 @@ class AniiUruguayConnector:
                         page_url,
                         headers={"User-Agent": BROWSER_UA},
                         fallback_content_type="text/html",
-                        playwright_fallback=False,
+                        playwright_fallback=True,
                     )
                     if page_num == 0:
                         final_url = page_url_resolved

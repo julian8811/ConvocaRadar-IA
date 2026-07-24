@@ -57,8 +57,8 @@ class TestBuildEmbeddingAsync:
         assert abs(magnitude - 1.0) < 0.001
 
     @pytest.mark.asyncio
-    async def test_build_embedding_falls_back_on_http_error(self) -> None:
-        """build_embedding should fall back to hash when _call_openai_embedding raises."""
+    async def test_build_embedding_propagates_remote_http_error(self) -> None:
+        """A configured remote provider must not silently fall back to local hashes."""
         from app.core.ai import build_embedding
 
         with patch("app.core.ai._call_openai_embedding", new_callable=AsyncMock) as mock_openai:
@@ -71,13 +71,10 @@ class TestBuildEmbeddingAsync:
                 settings.embedding_model = "text-embedding-3-small"
                 settings.embedding_dimensions = 4
 
-                result = await build_embedding("hello world", dimensions=4)
+                with pytest.raises(Exception, match="HTTP error"):
+                    await build_embedding("hello world", dimensions=4)
 
         mock_openai.assert_awaited_once()
-        assert len(result) == 4
-        # Hash embedding produces a unit vector
-        magnitude = sum(v * v for v in result) ** 0.5
-        assert abs(magnitude - 1.0) < 0.001
 
     @pytest.mark.asyncio
     async def test_build_embedding_hash_is_deterministic(self) -> None:
@@ -271,3 +268,30 @@ class TestCallOpenaiEmbeddingUsesGlobalClient:
                 result = await _call_openai_embedding("test text", dimensions=3)
 
         assert result is None
+
+    @pytest.mark.asyncio
+    async def test_cloudflare_embedding_omits_openai_dimensions_parameter(self) -> None:
+        """Cloudflare's OpenAI-compatible endpoint selects the model's native dimensions."""
+        from app.core.ai import _call_openai_embedding
+
+        with patch("app.core.ai.http_client", new_callable=AsyncMock) as mock_http_client:
+            mock_client = AsyncMock()
+            mock_response = AsyncMock()
+            mock_response.raise_for_status = MagicMock()
+            mock_response.json = MagicMock(return_value={"data": [{"embedding": [0.1, 0.2]}]})
+            mock_client.post = AsyncMock(return_value=mock_response)
+            mock_http_client.return_value = mock_client
+
+            with patch("app.core.ai.get_settings") as mock_settings:
+                settings = mock_settings.return_value
+                settings.llm_provider = "cloudflare"
+                settings.llm_api_key = "test-key"
+                settings.embedding_model = "@cf/baai/bge-m3"
+                settings.llm_api_base = "https://api.cloudflare.com/client/v4/accounts/test/ai/v1"
+                settings.llm_timeout_seconds = 30
+
+                result = await _call_openai_embedding("test text", dimensions=2)
+
+        request_payload = mock_client.post.await_args.kwargs["json"]
+        assert "dimensions" not in request_payload
+        assert result == [0.1, 0.2]
