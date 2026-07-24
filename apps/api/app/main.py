@@ -1,16 +1,16 @@
 ﻿import asyncio
-from contextlib import asynccontextmanager
-from collections.abc import AsyncIterator
-from collections import defaultdict, deque
 import logging
 import time
+from collections import defaultdict, deque
+from collections.abc import AsyncIterator
+from contextlib import asynccontextmanager
 
 import httpx
 import pydantic
 import structlog
 from fastapi import FastAPI, Request
-from fastapi.responses import JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import JSONResponse
 from sqlalchemy.exc import SQLAlchemyError
 
 from app.api.v1.router import api_router
@@ -73,6 +73,8 @@ async def _run_periodic_source_sweep(interval_seconds: int | None = None) -> Non
     await asyncio.sleep(scheduler_settings.scheduler_initial_delay_seconds)
     while True:
         try:
+            from sqlalchemy import select
+
             from app.db.session import SessionLocal
             from app.models import Organization, Source
             from app.scraper.dispatcher import run_source
@@ -80,7 +82,6 @@ async def _run_periodic_source_sweep(interval_seconds: int | None = None) -> Non
                 send_weekly_digest,
                 source_due_for_scraping,
             )
-            from sqlalchemy import select
 
             db = SessionLocal()
             try:
@@ -101,8 +102,8 @@ async def _run_periodic_source_sweep(interval_seconds: int | None = None) -> Non
                         struct_logger.warning("send_pending_alerts_failed", error=str(exc))
 
                     # Batch score unscored opportunities for each org
-                    from app.services.scoring import calculate_score
                     from app.models import Opportunity, OpportunityScore, OrganizationProfile
+                    from app.services.scoring import calculate_score
                     for org in orgs:
                         try:
                             profile = db.scalar(
@@ -512,9 +513,10 @@ def health_v1_ready() -> JSONResponse:
 @app.get("/api/v1/health/sources")
 def health_sources_summary() -> dict:
     """Public summary of source health (no auth required)."""
+    from sqlalchemy import func, select
+
     from app.db.session import SessionLocal
     from app.models import Source
-    from sqlalchemy import select, func
 
     db = SessionLocal()
     try:
