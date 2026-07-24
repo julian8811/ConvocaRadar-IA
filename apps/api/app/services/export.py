@@ -123,9 +123,8 @@ def generate_report_html(title: str, organization: object, opportunities: list[O
 
     from app.services.validation import url_is_reachable  # lazy: avoid heavy import at module level
 
-    featured = opportunities[:9]
-    featured_cards = "\n".join(
-        f"""
+    def _card_html(item: Opportunity) -> str:
+        return f"""
         <article class="story-card">
           <div class="story-card__top">
             <span class="badge badge--{escape(item.status)}">{escape(item.status.replace('_', ' '))}</span>
@@ -153,24 +152,10 @@ def generate_report_html(title: str, organization: object, opportunities: list[O
           </div>
         </article>
         """
-        for item in featured
-    )
-    rows = "\n".join(
-        f"""
-        <tr>
-          <td class="col-title">
-            <a href="{escape(_link_for(o))}" target="_blank" rel="noopener noreferrer">{escape(repair_mojibake(o.title))}</a>
-            <span>{escape(repair_mojibake((o.summary or o.description or 'Sin resumen disponible.')[:140]))}</span>
-          </td>
-          <td>{escape(repair_mojibake(o.entity))}</td>
-          <td>{escape(o.country)}</td>
-          <td><span class="badge badge--{escape(o.status)}">{escape(o.status.replace('_', ' '))}</span></td>
-          <td>{escape(o.close_date.date().isoformat() if o.close_date else 'Sin fecha')}</td>
-          <td>{escape(_format_amount(o))}</td>
-        </tr>
-        """
-        for o in opportunities
-    )
+
+    featured = opportunities[:9]
+    featured_cards = "\n".join(_card_html(item) for item in featured)
+    all_cards = "\n".join(_card_html(item) for item in opportunities)
     country_rows = "\n".join(f"<tr><td>{escape(country)}</td><td>{count}</td></tr>" for country, count in top_countries)
     category_rows = "\n".join(f"<tr><td>{escape(category)}</td><td>{count}</td></tr>" for category, count in top_categories)
     return f"""<!doctype html>
@@ -323,8 +308,7 @@ h1 {{
 .story-card__title a:hover {{ color: var(--primary); }}
 .story-card__body {{
   margin: 0; color: var(--muted); font-size: 0.88rem;
-  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
-  overflow: hidden; flex: 1;
+  line-height: 1.45;
 }}
 .story-card__meta-grid {{
   display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
@@ -383,8 +367,10 @@ tbody tr:hover {{ background: rgba(0,179,175,0.03); }}
 .note {{ font-size: 0.82rem; color: var(--muted); margin: 0; }}
 
 /* ── Responsive ───────────────────────────────────────────── */
+@media (max-width: 1400px) {{
+  .story-grid {{ grid-template-columns: repeat(2, 1fr); }}
+}}
 @media (max-width: 1100px) {{
-  .story-grid {{ grid-template-columns: 1fr 1fr; }}
   .stats-grid {{ grid-template-columns: repeat(2, 1fr); }}
 }}
 @media (max-width: 760px) {{
@@ -461,13 +447,12 @@ tbody tr:hover {{ background: rgba(0,179,175,0.03); }}
 <section class="section" id="oportunidades">
   <div class="section__head">
     <h2 class="section__title">Todas las convocatorias</h2>
-    <p class="section__subtitle">Listado completo con enlace oficial a cada convocatoria.</p>
+    <p class="section__subtitle">{total} oportunidades identificadas en tarjetas con enlace oficial a cada convocatoria.</p>
   </div>
-  <div class="section__body grid-table-wrap">
-    <table>
-      <thead><tr><th>T&iacute;tulo</th><th>Entidad</th><th>Pa&iacute;s</th><th>Estado</th><th>Cierre</th><th>Monto</th></tr></thead>
-      <tbody>{rows or '<tr><td colspan="6">Sin convocatorias disponibles</td></tr>'}</tbody>
-    </table>
+  <div class="section__body">
+    <div class="story-grid">
+      {all_cards or '<div class="story-card"><p class="story-card__body">No hay convocatorias disponibles.</p></div>'}
+    </div>
   </div>
 </section>
 
