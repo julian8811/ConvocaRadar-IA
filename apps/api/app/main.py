@@ -92,6 +92,14 @@ async def _run_periodic_source_sweep(interval_seconds: int | None = None) -> Non
                     struct_logger.info("stale_runs_recovered", count=_recovered)
                 orgs = db.scalars(select(Organization)).all()
                 if orgs:
+                    # Send pending alerts (uses Resend when configured)
+                    from app.api.v1.alerts import send_pending_alerts
+                    try:
+                        send_pending_alerts(db)
+                        db.flush()
+                    except Exception as exc:
+                        struct_logger.warning("send_pending_alerts_failed", error=str(exc))
+
                     sources = list(
                         db.scalars(
                             select(Source).where(Source.enabled.is_(True))
