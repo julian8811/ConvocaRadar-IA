@@ -207,7 +207,11 @@ def extract_close_date(text: str) -> datetime | None:
         # Spanish: "fecha de cierre: 8 de mayo de 2026"
         r"(?:fecha\s+(?:de\s+)?(?:\w+\s+)?(?:cierre|limite|limite|maxima|maxima|tope))\s*[:\-]?\s*(\d{1,2}\s+de\s+[a-z]+\s+de\s+\d{4})",
         # Spanish: "fecha de cierre de la convocatoria: 15/06/2026"
-        r"(?:fecha\s+(?:de\s+)?(?:\w+\s+)?(?:cierre|limite)\s+(?:de\s+la\s+)?(?:convocatoria|presentacion|presentación|solicitud))\s*[:\-]?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{4})",
+        r"(?:fecha\s+(?:de\s+)?(?:\w+\s+)?(?:cierre|limite|limite)\s+(?:de\s+la\s+)?(?:convocatoria|presentacion|presentación|solicitud))\s*[:\-]?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{4})",
+        # Portuguese: "data de encerramento: 30/09/2026" / "prazo: 30/09/2026"
+        r"(?:data\s+(?:de\s+)?encerramento|prazo\s+(?:maximo|máximo|final|)?|data\s+limite|data\s+final)\s*[:\-]?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{4}|\d{1,2}\s+de\s+[a-z]+\s+de\s+\d{4})",
+        # Portuguese: "inscrições até: 24/07/2026"
+        r"(?:inscrições?|inscricao|inscrição)\s+(?:ate|até|encerram|finalizam)\s*(?:\:)?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{4}|\d{1,2}\s+de\s+[a-z]+\s+de\s+\d{4})",
         # Spanish: "cierra el 08 de mayo de 2026"
         r"(?:cierra|vence|finaliza|termina)\s+(?:el\s+)?(\d{1,2}\s+de\s+[a-z]+\s+de\s+\d{4})",
         # English: "deadline: May 8, 2026"
@@ -338,6 +342,10 @@ def extract_funding_amount(text: str) -> str | None:
         r"(?:hasta|de\s+hasta|por\s+hasta)\s*([\w\s.$€£]*\d[\d.,]+\s*(?:USD|EUR|COP|usd|eur|cop)?)",
         # English: "up to USD 500,000"
         r"(?:up\s+to|of\s+up\s+to)\s*([\w\s.$€£]*\d[\d.,]+\s*(?:USD|EUR|COP|usd|eur|cop)?)",
+        # Portuguese: "investimento: R$ 500.000" / "valor: R$ 500.000"
+        r"(?:investimento|valor|recursos|aporte|orçamento|orçamento|custeio|subvenção|subvencao)\s*(?:total|estimado|disponivel|disponível|maximo|máximo|solicitado)?\s*[:\-]?\s*([\w\s.$€£,]+?\d[\d.,\s]*(?:million|milhão|milhões|mil|m|k|brl|usd|eur)?)",
+        # Portuguese: "bolsa: R$ 5.000,00" (scholarship/stipend patterns)
+        r"(?:bolsa|auxilio|auxílio|ajuda\s+de\s+custo|salário|salario|stipend)\s*(?::|de|)\s*(?:R?\$[\s\d.,]+)",
     ]
     for pattern in tier1:
         match = re.search(pattern, _text, flags=re.IGNORECASE)
@@ -356,6 +364,8 @@ def extract_funding_amount(text: str) -> str | None:
         r"(€\s*[\d.,]{3,})",
         r"(£\s*[\d.,]{3,})",
         r"(R\$\s*[\d.,]{3,})",
+        r"(BRL\s*[\d.,]{3,})",
+        r"(COP\s*[\$\s]*[\d.,]{3,})",
         r"\$(\d[\d.,]{2,}\s*(?:COP|USD|EUR)?)",
     ]
     for pattern in tier2:
@@ -572,8 +582,10 @@ DETAIL_PAGE_TIMEOUT: int = 15
 async def enrich_from_detail_page(url: str) -> dict | None:
     """Fetch a detail page and extract title, close_date, funding_amount."""
     try:
-        _, content, _ct = await fetch_httpx_text(
-            url, timeout_seconds=DETAIL_PAGE_TIMEOUT, retries=1, playwright_fallback=True,
+        import asyncio as _asyncio
+        _, content, _ct = await _asyncio.wait_for(
+            fetch_httpx_text(url, timeout_seconds=DETAIL_PAGE_TIMEOUT, retries=1, playwright_fallback=True),
+            timeout=DETAIL_PAGE_TIMEOUT + 10,
         )
     except Exception:
         return None
@@ -827,7 +839,7 @@ def infer_country_from_entity(entity_name: str | None, official_url: str | None 
 
 
 async def enrich_candidates_batch(
-    candidates: list[OpportunityCandidate], max_fetches: int = 10,
+    candidates: list[OpportunityCandidate], max_fetches: int = 25,
 ) -> list[OpportunityCandidate]:
     """Batch-enrich low-confidence candidates by fetching detail pages.
 
