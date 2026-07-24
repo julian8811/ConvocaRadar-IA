@@ -4,7 +4,7 @@ import { useMemo, useCallback } from "react";
 import { BarChart, Bar, XAxis, YAxis, ResponsiveContainer, Cell, Tooltip, CartesianGrid } from "recharts";
 import type { DashboardBreakdownItem } from "@/lib/types";
 
-const COLORS = ["#ef4444", "#f59e0b", "#06b6d4", "#16a34a"];
+const COLORS = ["#ef7b45", "#bed630", "#00b3af", "#005652"];
 
 function ScoreTooltip({ active, payload }: { active?: boolean; payload?: Array<{ name: string; value: number }> }) {
   if (!active || !payload?.length) return null;

@@ -51,7 +51,7 @@ class BdnConvocatoriasConnector:
             final_url, content, _ = await fetch_httpx_text(
                 page_url,
                 fallback_content_type="application/json",
-                playwright_fallback=False,
+                playwright_fallback=True,
             )
             payload = json.loads(content)
             items = payload.get("content") or []

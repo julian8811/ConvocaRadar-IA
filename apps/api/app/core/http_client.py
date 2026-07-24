@@ -27,6 +27,7 @@ _lock = threading.Lock()
 _client: httpx.Client | None = None
 _async_client: httpx.AsyncClient | None = None
 _async_client_loop_id: int | None = None
+_async_client_loop: asyncio.AbstractEventLoop | None = None
 _secondary_clients: dict[int, httpx.AsyncClient] = {}
 
 
@@ -36,7 +37,7 @@ def _build_async_client() -> httpx.AsyncClient:
     return httpx.AsyncClient(
         timeout=settings.scraping_timeout_seconds or 30,
         limits=httpx.Limits(max_connections=100, max_keepalive_connections=20),
-        headers={"User-Agent": getattr(settings, "scraping_user_agent", "ConvocaRadarBot/0.1")},
+        headers={"User-Agent": getattr(settings, "scraping_user_agent", "Mozilla/5.0 (compatible; ConvocaRadarBot/1.0)")},
     )
 
 
@@ -55,7 +56,7 @@ def sync_http_client() -> httpx.Client:
                 _client = httpx.Client(
                     timeout=settings.scraping_timeout_seconds or 30,
                     limits=httpx.Limits(max_connections=100, max_keepalive_connections=20),
-                    headers={"User-Agent": getattr(settings, "scraping_user_agent", "ConvocaRadarBot/0.1")},
+                    headers={"User-Agent": getattr(settings, "scraping_user_agent", "Mozilla/5.0 (compatible; ConvocaRadarBot/1.0)")},
                 )
     return _client
 
@@ -80,13 +81,23 @@ async def http_client() -> httpx.AsyncClient:
     dedicated per-loop client is created and cached.  Call
     ``close_per_loop_client()`` from the secondary loop to release it.
     """
-    global _async_client, _async_client_loop_id
-    current_loop_id = id(asyncio.get_running_loop())
+    global _async_client, _async_client_loop_id, _async_client_loop
+    current_loop = asyncio.get_running_loop()
+    current_loop_id = id(current_loop)
+
+    # A short-lived asyncio.run() may have created the first client. Once
+    # that loop closes, its transport cannot be reused or closed from a new
+    # loop, so replace the stale singleton deterministically.
+    if _async_client is not None and _async_client_loop is not None and _async_client_loop.is_closed():
+        _async_client = None
+        _async_client_loop_id = None
+        _async_client_loop = None
 
     # First call ever — initialise the singleton in whatever loop we are in.
     if _async_client is None:
         _async_client = _build_async_client()
         _async_client_loop_id = current_loop_id
+        _async_client_loop = current_loop
         return _async_client
 
     # Same loop as the singleton — share the connection pool.
@@ -124,12 +135,17 @@ async def close_async_client() -> None:
     Also closes any remaining per-loop clients.  Called during FastAPI
     lifespan shutdown.
     """
-    global _async_client, _async_client_loop_id
+    global _async_client, _async_client_loop_id, _async_client_loop
     # Close the singleton.
     if _async_client is not None:
-        await _async_client.aclose()
+        try:
+            await _async_client.aclose()
+        except RuntimeError as exc:
+            if "Event loop is closed" not in str(exc):
+                raise
         _async_client = None
         _async_client_loop_id = None
+        _async_client_loop = None
     # Close any remaining per-loop clients.
     clients = list(_secondary_clients.values())
     _secondary_clients.clear()

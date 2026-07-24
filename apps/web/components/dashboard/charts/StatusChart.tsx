@@ -11,7 +11,7 @@ import {
 } from "recharts";
 import type { DashboardBreakdownItem } from "@/lib/types";
 
-const COLORS = ["#16a34a", "#f59e0b", "#64748b", "#ef4444", "#94a3b8", "#06b6d4"];
+const COLORS = ["#005652", "#00a6a1", "#bed630", "#ef7b45", "#8ba3a1", "#4f6f6c"];
 
 function StatusTooltip({ active, payload }: { active?: boolean; payload?: Array<{ name: string; value: number }> }) {
   if (!active || !payload?.length) return null;

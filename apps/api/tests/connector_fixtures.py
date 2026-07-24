@@ -38,6 +38,15 @@ def _make_sample_pdf() -> bytes:
 #   "garbage": malformed content that should degrade gracefully
 
 FIXTURE_DATA: dict[str, dict[str, Any]] = {
+    "procolombia-html": {
+        "sample": (
+            "https://www.procolombia.co/convocatorias/innovacion-exportadora",
+            '<html><body><h1>Convocatoria de innovación exportadora</h1><a href="https://www.procolombia.co/convocatorias/innovacion-exportadora">Convocatoria de innovación exportadora</a></body></html>',
+            "text/html",
+        ),
+        "empty": ("", "", "text/html"),
+        "garbage": ("", "not useful content at all", "text/html"),
+    },
     # 1. Standard GET, HTML response
     "httpx-get-html": {
         "sample": (

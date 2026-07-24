@@ -11,7 +11,6 @@ import {
 } from "recharts";
 import type { DashboardBreakdownItem } from "@/lib/types";
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function SourceTooltip({ active, payload }: { active?: boolean; payload?: any[] }) {
   if (!active || !payload?.length) return null;
   const item = payload[0];
@@ -65,7 +64,7 @@ export function SourceChart({ data }: { data: DashboardBreakdownItem[] }) {
           <Tooltip content={<SourceTooltip />} cursor={{ fill: "#f1f5f9" }} />
           <Bar
             dataKey="value"
-            fill="#06b6d4"
+            fill="#008b86"
             radius={[0, 4, 4, 0]}
             isAnimationActive={true}
             animationDuration={600}

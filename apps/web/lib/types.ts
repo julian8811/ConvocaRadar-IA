@@ -171,6 +171,14 @@ export type Task = {
   created_at: string;
 };
 
+export type SourceSweepResponse = {
+  status: "started";
+  task_id: string;
+  sources: number;
+  sources_due: number;
+  sources_skipped: number;
+};
+
 export type SourceRunOverview = Task & {
   source_key: string;
   source_name: string;

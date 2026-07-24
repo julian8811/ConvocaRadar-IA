@@ -13,7 +13,7 @@ import {
 } from "recharts";
 import type { DashboardBreakdownItem } from "@/lib/types";
 
-const COLORS = ["#0ea5e9", "#6366f1", "#14b8a6", "#f97316", "#ec4899"];
+const COLORS = ["#005652", "#008b86", "#00b3af", "#92aa28", "#bed630"];
 
 function FundingTooltip({ active, payload }: { active?: boolean; payload?: Array<{ name: string; value: number }> }) {
   if (!active || !payload?.length) return null;

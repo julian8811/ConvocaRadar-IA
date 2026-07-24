@@ -8,6 +8,7 @@ via structlog and return booleans so callers can decide severity.
 from __future__ import annotations
 
 import os
+from pathlib import Path
 
 import structlog
 
@@ -29,18 +30,20 @@ def check_playwright_binary() -> bool:
         struct_logger.warning("health_check_playwright_no_path")
         return False
 
-    chromium_path = os.path.join(browsers_path, "chromium")
-    chromium_headless_path = os.path.join(browsers_path, "chromium-headless-shell")
+    root = Path(browsers_path)
+    candidates = [
+        root / "chromium",
+        root / "chromium-headless-shell",
+        *root.glob("chromium-*/chrome-linux/chrome"),
+        *root.glob("chromium_headless_shell-*/chrome-headless-shell-linux64/chrome-headless-shell"),
+    ]
+    found = next((path for path in candidates if os.path.exists(path)), None)
+    if found is not None:
+        struct_logger.info("health_check_playwright_binary_found", path=str(found))
+        return True
 
-    binary_found = False
-    for path, label in [(chromium_path, "chromium"), (chromium_headless_path, "chromium-headless-shell")]:
-        if os.path.exists(path):
-            struct_logger.info("health_check_playwright_binary_found", path=path, binary=label)
-            binary_found = True
-        else:
-            struct_logger.warning("health_check_playwright_binary_missing", path=path, binary=label)
-
-    return binary_found
+    struct_logger.warning("health_check_playwright_binary_missing", path=str(root))
+    return False
 
 
 def check_pypdf_import() -> bool:

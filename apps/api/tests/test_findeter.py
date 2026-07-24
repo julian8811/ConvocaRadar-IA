@@ -43,7 +43,7 @@ FINDETER_SITEMAP_XML = """<?xml version="1.0" encoding="UTF-8"?>
 
 @pytest.fixture
 def connector() -> FindeterConnector:
-    return FindeterConnector()
+    return FindeterConnector(_skip_enrichment=True)
 
 
 @pytest.fixture
@@ -100,15 +100,8 @@ class TestParse:
 
         candidates = await connector.parse(raw)
 
-        # 4 convocatorias URLs (ICBFGS x2, ANSPE x1, FNG x1) + ICBFGS/Licitacion/001-2024 filtered by year
-        # 2024 entry should be filtered out, so 3 remain (001-2025, 002-2025 from ICBFGS, 001-2025 from ANSPE, 003-2026 from FNG)
-        # Wait - 2024 is filtered, and 2025 + 2026 = 4 entries? Let's count:
-        # ICBFGS/Convocatoria/001-2025 (2025) ✓
-        # ICBFGS/Convocatoria/002-2025 (2025) ✓
-        # ANSPE/Convocatoria/001-2025 (2025) ✓
-        # FNG/Convocatoria/003-2026 (2026) ✓
-        # ICBFGS/Licitacion/001-2024 (2024) ✗
-        assert len(candidates) == 4
+        # All 5 convocatorias URLs are included (2024 is now allowed)
+        assert len(candidates) == 5
 
     @pytest.mark.asyncio
     async def test_parse_maps_entity_codes_to_names(self, connector):
@@ -121,10 +114,9 @@ class TestParse:
 
         candidates = await connector.parse(raw)
 
-        # ICBFGS → "ICBF" in title, entity should be "Findeter"
-        icbf_candidates = [c for c in candidates if "ICBF" in c.title]
-        assert len(icbf_candidates) >= 1
+        # Entity should always be "Findeter"
         assert all(c.entity == "Findeter" for c in candidates)
+        # At least one candidate should have ICBF in the title
         assert any("ICBF" in c.title for c in candidates)
 
     @pytest.mark.asyncio
@@ -144,11 +136,11 @@ class TestParse:
             assert c.entity == "Findeter"
             assert c.confidence_score == 0.45
             assert c.official_url
-            assert c.title.startswith("Convocatoria")
+            assert "Findeter" in c.title
 
     @pytest.mark.asyncio
-    async def test_parse_filters_out_2024_urls(self, connector):
-        """Only 2025 and 2026 URLs should be included."""
+    async def test_parse_includes_all_years(self, connector):
+        """2024, 2025 and 2026 URLs should all be included."""
         raw = RawSourceResult(
             source_key="findeter-convocatorias",
             url="https://www.findeter.gov.co/sitemap.xml",
@@ -158,12 +150,15 @@ class TestParse:
 
         candidates = await connector.parse(raw)
 
+        years_found = set()
         for c in candidates:
-            # All candidates should be from 2025 or 2026 (year in URL slug)
-            assert "-2025" in c.official_url or "-2026" in c.official_url
+            if "-2024" in c.official_url: years_found.add("2024")
+            if "-2025" in c.official_url: years_found.add("2025")
+            if "-2026" in c.official_url: years_found.add("2026")
 
-        # The 2024 entry should not appear
-        assert not any("-2024" in c.official_url for c in candidates)
+        assert "2024" in years_found, "2024 entries should be included"
+        assert "2025" in years_found, "2025 entries should be included"
+        assert "2026" in years_found, "2026 entries should be included"
 
     @pytest.mark.asyncio
     async def test_parse_respects_max_candidates(self, connector):

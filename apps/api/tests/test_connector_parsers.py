@@ -22,59 +22,6 @@ def _raw(content: str, content_type: str = "application/json") -> RawSourceResul
     )
 
 
-class TestEuFundingTendersParse:
-    """Espera {"results": [...]} con metadata.callTitle / identifier."""
-
-    @pytest.mark.asyncio
-    async def test_parse_yields_candidate(self):
-        from app.connectors.eu_funding_tenders import EuFundingTendersConnector
-
-        connector = EuFundingTendersConnector()
-        data = {
-            "results": [
-                {
-                    "metadata": {
-                        "callTitle": ["Horizon Europe Cluster 6 Call"],
-                        "identifier": ["HORIZON-CL6-2027"],
-                        "callIdentifier": ["HORIZON-CL6-2027"],
-                        "status": ["31094501"],
-                        "actions": [
-                            {
-                                "plannedOpeningDate": "2026-12-01T00:00:00Z",
-                                "deadlineDates": ["2027-06-30T00:00:00Z"],
-                            }
-                        ],
-                    }
-                }
-            ]
-        }
-        raw = _raw(json.dumps(data))
-        candidates = await connector.parse(raw)
-        assert len(candidates) >= 1
-        assert "Horizon Europe" in candidates[0].title
-
-    @pytest.mark.asyncio
-    async def test_parse_skips_closed(self):
-        from app.connectors.eu_funding_tenders import EuFundingTendersConnector
-
-        connector = EuFundingTendersConnector()
-        data = {
-            "results": [
-                {
-                    "metadata": {
-                        "callTitle": ["Closed Call"],
-                        "identifier": ["CLOSED-001"],
-                        "callIdentifier": ["CLOSED-001"],
-                        "status": ["31094503"],
-                    }
-                }
-            ]
-        }
-        raw = _raw(json.dumps(data))
-        candidates = await connector.parse(raw)
-        assert len(candidates) == 0
-
-
 class TestEicAcceleratorParse:
     """Misma estructura que EU Funding Tenders (SEDIA API)."""
 

@@ -15,7 +15,8 @@
 "use client";
 
 import { useQuery, keepPreviousData } from "@tanstack/react-query";
-import { Activity, AlertTriangle, Database, MapPinned, TrendingUp } from "lucide-react";
+import { useState } from "react";
+import { Activity, AlertTriangle, Database, TrendingUp } from "lucide-react";
 import Link from "next/link";
 
 import { Badge } from "@/components/ui/badge";
@@ -71,10 +72,10 @@ function SourceHealthBanner({ degraded, failing, sourceAlerts }: {
 }
 
 const KPI_ACCENTS = [
-  { border: "border-t-cyan-500", icon: "M3 3h18v18H3z" },
-  { border: "border-t-emerald-500", icon: "M5 12h14" },
-  { border: "border-t-amber-500", icon: "M12 8v8" },
-  { border: "border-t-violet-500", icon: "M12 3v18" },
+  { border: "border-t-[#005652]", icon: "M3 3h18v18H3z" },
+  { border: "border-t-[#00a6a1]", icon: "M5 12h14" },
+  { border: "border-t-[#bed630]", icon: "M12 8v8" },
+  { border: "border-t-[#6f7f1f]", icon: "M12 3v18" },
 ];
 
 function KpiCards({ kpis }: { kpis: HealthRead["kpis"] }) {
@@ -87,7 +88,7 @@ function KpiCards({ kpis }: { kpis: HealthRead["kpis"] }) {
   return (
     <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
       {items.map((item) => (
-        <Card key={item.label} className={`border-t-4 ${item.accent.border} transition-all hover:shadow-lg`}>
+        <Card key={item.label} className={`rounded-2xl border-t-4 ${item.accent.border} transition-all hover:-translate-y-0.5 hover:shadow-lg`}>
           <CardContent className="p-4">
             <p className="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">{item.label}</p>
             <p className="mt-1 text-3xl font-bold text-slate-950 dark:text-white">{formatNumber(item.value)}</p>
@@ -157,7 +158,7 @@ function healthLabel(status: string): string {
 
 function SourceHealthTable({ sources }: { sources: SourceHealth[] }) {
   if (!sources.length) return null;
-  const sorted = [...sources].sort((a, b) => (b.health_score ?? 0) - (a.health_score ?? 0));
+  const sorted = [...sources].sort((a, b) => (a.health_score ?? 0) - (b.health_score ?? 0)).slice(0, 8);
   return (
     <Card>
       <CardHeader className="border-b border-slate-200 pb-4 dark:border-slate-700">
@@ -165,7 +166,7 @@ function SourceHealthTable({ sources }: { sources: SourceHealth[] }) {
           <Activity className="h-4 w-4" />
           Salud de fuentes
         </CardTitle>
-        <CardDescription>Puntaje de salud compuesto (0-100) basado en tasa de éxito, cobertura y frescura.</CardDescription>
+        <CardDescription>Las ocho fuentes con menor puntaje para priorizar acciones de mantenimiento.</CardDescription>
       </CardHeader>
       <CardContent className="p-0">
         <div className="divide-y divide-slate-200 dark:divide-slate-800">
@@ -193,12 +194,18 @@ function SourceHealthTable({ sources }: { sources: SourceHealth[] }) {
             </div>
           ))}
         </div>
+        <div className="border-t border-slate-200 p-4 text-right dark:border-slate-800">
+          <Link href="/sources" className="text-sm font-semibold text-[#006b66] hover:text-[#004945] dark:text-[#74ddd8]">
+            Consultar todas las fuentes →
+          </Link>
+        </div>
       </CardContent>
     </Card>
   );
 }
 
 export function HealthZone() {
+  const [activeChart, setActiveChart] = useState("status");
   const query = useQuery<HealthRead>({
     queryKey: ["dashboard-health"],
     queryFn: api.dashboardHealth,
@@ -210,6 +217,15 @@ export function HealthZone() {
   if (!query.data) return null;
 
   const data = query.data;
+  const chartOptions = [
+    { id: "status", label: "Estado", title: "Estado de convocatorias", description: "Distribución general según vigencia.", content: <StatusChart data={data.status_breakdown} /> },
+    { id: "country", label: "País", title: "Cobertura geográfica", description: "Países con mayor volumen detectado.", content: <CountryChart data={data.country_breakdown} /> },
+    { id: "score", label: "Compatibilidad", title: "Distribución de compatibilidad", description: "Convocatorias agrupadas por rango de afinidad.", content: <ScoreChart data={data.score_distribution} /> },
+    { id: "funding", label: "Financiación", title: "Rangos de financiación", description: "Distribución según monto reportado.", content: <FundingChart data={data.funding_ranges} /> },
+    { id: "source", label: "Fuentes", title: "Contribución por fuente", description: "Conectores que más oportunidades aportan.", content: <SourceChart data={data.source_contribution} /> },
+    { id: "category", label: "Categorías", title: "Áreas de oportunidad", description: "Distribución temática de las convocatorias.", content: <CategoryChart data={data.category_distribution} /> },
+  ];
+  const selectedChart = chartOptions.find((item) => item.id === activeChart) ?? chartOptions[0];
 
   return (
     <div className="space-y-4" data-zone="health">
@@ -219,91 +235,40 @@ export function HealthZone() {
         sourceAlerts={data.source_alerts}
       />
       <KpiCards kpis={data.kpis} />
-      <div className="grid gap-4 xl:grid-cols-2">
-        <Card>
-          <CardHeader className="border-b border-slate-200 pb-4 dark:border-slate-700">
-            <CardTitle className="flex items-center gap-2 text-slate-950 dark:text-white">
-              <TrendingUp className="h-4 w-4" />
-              Estado de convocatorias
-            </CardTitle>
-            <CardDescription>Distribución agregada en servidor, sin muestreo parcial.</CardDescription>
-          </CardHeader>
-          <CardContent className="pt-5">
-            <StatusChart data={data.status_breakdown} />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="border-b border-slate-200 pb-4 dark:border-slate-700">
-            <CardTitle className="flex items-center gap-2 text-slate-950 dark:text-white">
-              <MapPinned className="h-4 w-4" />
-              Convocatorias por país
-            </CardTitle>
-            <CardDescription>Top países con mayor volumen detectado.</CardDescription>
-          </CardHeader>
-          <CardContent className="pt-5">
-            <CountryChart data={data.country_breakdown} />
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-4 xl:grid-cols-2">
-        <Card>
-          <CardHeader className="border-b border-slate-200 pb-4 dark:border-slate-700">
-            <CardTitle className="flex items-center gap-2 text-slate-950 dark:text-white">
-              <TrendingUp className="h-4 w-4" />
-              Distribución de scores
-            </CardTitle>
-            <CardDescription>Cuántas convocatorias en cada rango de compatibilidad.</CardDescription>
-          </CardHeader>
-          <CardContent className="pt-5">
-            <ScoreChart data={data.score_distribution} />
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardHeader className="border-b border-slate-200 pb-4 dark:border-slate-700">
-            <CardTitle className="flex items-center gap-2 text-slate-950 dark:text-white">
-              <TrendingUp className="h-4 w-4" />
-              Rangos de financiamiento
-            </CardTitle>
-            <CardDescription>Distribución por monto de financiamiento.</CardDescription>
-          </CardHeader>
-          <CardContent className="pt-5">
-            <FundingChart data={data.funding_ranges} />
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-4 xl:grid-cols-1">
-        <Card>
-          <CardHeader className="border-b border-slate-200 pb-4 dark:border-slate-700">
-            <CardTitle className="flex items-center gap-2 text-slate-950 dark:text-white">
-              <Database className="h-4 w-4" />
-              Contribución por fuente
-            </CardTitle>
-            <CardDescription>Top fuentes que más convocatorias aportan.</CardDescription>
-          </CardHeader>
-          <CardContent className="pt-5">
-            <SourceChart data={data.source_contribution} />
-          </CardContent>
-        </Card>
-      </div>
-
-      <div className="grid gap-4 xl:grid-cols-2">
-        <Card>
-          <CardHeader className="border-b border-slate-200 pb-4 dark:border-slate-700">
-            <CardTitle className="flex items-center gap-2 text-slate-950 dark:text-white">
-              <TrendingUp className="h-4 w-4" />
-              Categorías de convocatorias
-            </CardTitle>
-            <CardDescription>Distribución por tipo: innovación, investigación, emprendimiento, etc.</CardDescription>
-          </CardHeader>
-          <CardContent className="pt-5">
-            <CategoryChart data={data.category_distribution} />
-          </CardContent>
-        </Card>
-      </div>
+      <Card className="overflow-hidden border-[#005652]/15 shadow-[0_20px_50px_-35px_rgba(0,86,82,.8)]">
+        <CardHeader className="border-b border-[#005652]/10 bg-[#f4f9f8] pb-4 dark:border-white/10 dark:bg-[#005652]/10">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+            <div>
+              <CardTitle className="flex items-center gap-2 text-slate-950 dark:text-white">
+                <TrendingUp className="h-5 w-5 text-[#008b86]" />
+                Analítica del observatorio
+              </CardTitle>
+              <CardDescription>Selecciona una dimensión para explorar los datos consolidados.</CardDescription>
+            </div>
+            <div className="flex max-w-full gap-1 overflow-x-auto rounded-xl border border-[#005652]/10 bg-white p-1 dark:bg-slate-900" role="tablist" aria-label="Dimensión del gráfico">
+              {chartOptions.map((option) => (
+                <button
+                  key={option.id}
+                  type="button"
+                  role="tab"
+                  aria-selected={activeChart === option.id}
+                  onClick={() => setActiveChart(option.id)}
+                  className={cn("whitespace-nowrap rounded-lg px-3 py-2 text-xs font-semibold transition", activeChart === option.id ? "bg-[#005652] text-white shadow-sm" : "text-slate-600 hover:bg-[#e8f6f5] hover:text-[#005652] dark:text-slate-300 dark:hover:bg-white/5")}
+                >
+                  {option.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </CardHeader>
+        <CardContent className="p-5 lg:p-7">
+          <div className="mb-4">
+            <h3 className="text-lg font-semibold text-slate-950 dark:text-white">{selectedChart.title}</h3>
+            <p className="text-sm text-slate-500 dark:text-slate-400">{selectedChart.description}</p>
+          </div>
+          <div role="tabpanel" className="min-h-[280px]">{selectedChart.content}</div>
+        </CardContent>
+      </Card>
 
       <SourceHealthTable sources={data.sources_health as SourceHealth[]} />
       <DataCoverageStrip dataCoverage={data.data_coverage} />

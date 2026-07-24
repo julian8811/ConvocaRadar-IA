@@ -2,7 +2,7 @@
 
 import { AlertTriangle, Play, Plus, RefreshCw } from "lucide-react";
 import Link from "next/link";
-import { FormEvent, useMemo, useState } from "react";
+import { FormEvent, useEffect, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
@@ -62,8 +62,31 @@ function formatDays(value: number | null) {
 export default function SourcesPage() {
   const queryClient = useQueryClient();
   const [sourceType, setSourceType] = useState("html");
+  const [runningSourceId, setRunningSourceId] = useState<string | null>(null);
+  const [sweepTaskId, setSweepTaskId] = useState<string | null>(null);
   const sources = useQuery({ queryKey: ["sources"], queryFn: api.sources });
   const sourceHealth = useQuery({ queryKey: ["source-health"], queryFn: api.sourceHealth });
+  const tasks = useQuery({
+    queryKey: ["tasks"],
+    queryFn: api.tasks,
+    refetchInterval: 3000,
+  });
+  const activeSweepTaskId = useMemo(() => {
+    if (sweepTaskId || !tasks.data) return null;
+    return tasks.data
+      .filter((task) => task.task_type === "source_sweep" && ["queued", "running"].includes(task.status))
+      .sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime())[0]?.id ?? null;
+  }, [sweepTaskId, tasks.data]);
+  const trackedSweepTaskId = sweepTaskId ?? activeSweepTaskId;
+  const sweepTask = useQuery({
+    queryKey: ["task", trackedSweepTaskId],
+    queryFn: () => api.task(trackedSweepTaskId!),
+    enabled: Boolean(trackedSweepTaskId),
+    refetchInterval: (query) => {
+      const status = query.state.data?.status;
+      return status && ["success", "failed", "degraded"].includes(status) ? false : 1500;
+    },
+  });
   const actionLinkClass =
     "inline-flex h-8 items-center justify-center gap-2 rounded-md border border-slate-300 bg-white px-3 text-xs font-medium text-slate-900 shadow-sm transition-colors hover:bg-slate-50 hover:text-slate-950 dark:border-slate-700 dark:bg-slate-900 dark:text-slate-100 dark:hover:bg-slate-800";
 
@@ -127,12 +150,14 @@ export default function SourcesPage() {
       queryClient.invalidateQueries({ queryKey: ["source-runs-overview"] });
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "No se pudo ejecutar la fuente"),
+    onSettled: () => setRunningSourceId(null),
   });
 
   const runAllSources = useMutation({
     mutationFn: api.runAllSources,
-    onSuccess: () => {
-      toast.success("Se lanzaron todas las fuentes");
+    onSuccess: (response) => {
+      setSweepTaskId(response.task_id);
+      toast.success(`${response.sources_due} fuentes iniciadas; ${response.sources_skipped} omitidas por frecuencia`);
       queryClient.invalidateQueries({ queryKey: ["sources"] });
       queryClient.invalidateQueries({ queryKey: ["source-health"] });
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
@@ -142,6 +167,21 @@ export default function SourcesPage() {
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "No se pudo lanzar la corrida masiva"),
   });
+
+  useEffect(() => {
+    const status = sweepTask.data?.status;
+    if (!status || !["success", "failed", "degraded"].includes(status)) return;
+    void queryClient.invalidateQueries({ queryKey: ["sources"] });
+    void queryClient.invalidateQueries({ queryKey: ["source-health"] });
+    void queryClient.invalidateQueries({ queryKey: ["tasks"] });
+    void queryClient.invalidateQueries({ queryKey: ["opportunities"] });
+  }, [queryClient, sweepTask.data?.status]);
+
+  const sweepResult = sweepTask.data?.result ?? {};
+  const sweepCompleted = Number(sweepResult.completed ?? 0);
+  const sweepTotal = Number(sweepResult.total ?? 0);
+  const sweepFailed = Number(sweepResult.failed ?? 0);
+  const sweepPercent = sweepTotal > 0 ? Math.min(Math.round((sweepCompleted / sweepTotal) * 100), 100) : 0;
 
   function submit(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
@@ -179,11 +219,32 @@ export default function SourcesPage() {
             Configura fuentes HTML, API, PDF, RSS, manuales o híbridas.
           </p>
         </div>
-        <Button variant="outline" onClick={() => runAllSources.mutate()} disabled={runAllSources.isPending}>
-          <RefreshCw className="h-4 w-4" />
-          Ejecutar todas
+        <Button variant="outline" onClick={() => runAllSources.mutate()} disabled={runAllSources.isPending || sweepTask.data?.status === "running"}>
+          <RefreshCw className={`h-4 w-4 ${runAllSources.isPending || sweepTask.data?.status === "running" ? "animate-spin" : ""}`} />
+          {runAllSources.isPending || sweepTask.data?.status === "running" ? "Ejecutando fuentes..." : "Ejecutar todas"}
         </Button>
       </div>
+
+      {runAllSources.isPending || sweepTaskId ? (
+        <Card className="overflow-hidden border-[#00b3af]/30">
+          <CardContent className="p-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <p className="text-sm font-semibold text-slate-950 dark:text-white">Progreso de ejecución</p>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
+                  {runAllSources.isPending
+                    ? "Preparando el lote de fuentes..."
+                    : `${sweepCompleted} de ${sweepTotal} fuentes procesadas${sweepFailed ? ` · ${sweepFailed} con error` : ""}`}
+                </p>
+              </div>
+              <Badge tone={sweepTask.data?.status ?? "running"}>{translateRunStatus(sweepTask.data?.status ?? "running")}</Badge>
+            </div>
+            <div className="mt-4 h-2.5 overflow-hidden rounded-full bg-slate-100 dark:bg-slate-800" role="progressbar" aria-valuemin={0} aria-valuemax={100} aria-valuenow={sweepPercent}>
+              <div className="h-full rounded-full bg-gradient-to-r from-[#005652] to-[#00b3af] transition-[width] duration-500" style={{ width: `${runAllSources.isPending ? 4 : sweepPercent}%` }} />
+            </div>
+          </CardContent>
+        </Card>
+      ) : null}
 
       <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-6">
         <MetricCard title="Fuentes activas" value={String(sources.data?.filter((source) => source.enabled).length ?? 0)} detail="Conectadas y listas para ejecutar" />
@@ -297,9 +358,14 @@ export default function SourcesPage() {
                     </TableCell>
                     <TableCell>{source.last_run_at ? new Date(source.last_run_at).toLocaleString("es-CO") : "Sin ejecución"}</TableCell>
                     <TableCell>
-                      <Button variant="outline" size="sm" onClick={() => runSource.mutate(source.id)} disabled={runSource.isPending}>
-                        <Play className="h-4 w-4" />
-                        Ejecutar
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        onClick={() => { setRunningSourceId(source.id); runSource.mutate(source.id); }}
+                        disabled={runSource.isPending || runAllSources.isPending || sweepTask.data?.status === "running"}
+                      >
+                        {runningSourceId === source.id ? <RefreshCw className="h-4 w-4 animate-spin" /> : <Play className="h-4 w-4" />}
+                        {runningSourceId === source.id ? "Ejecutando..." : "Ejecutar"}
                       </Button>
                       <Link href={`/sources/${source.id}/runs`} className={`ml-2 ${actionLinkClass}`}>
                         Ejecuciones

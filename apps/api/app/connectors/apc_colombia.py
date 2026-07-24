@@ -72,12 +72,38 @@ class ApcColombiaConnector:
         self.base_url = base_url or APC_URLS[0]
 
     async def fetch(self) -> RawSourceResult:
-        pages: list[dict[str, str]] = []
-        for url in APC_URLS:
-            final_url, content, _ = await fetch_httpx_text(url, fallback_content_type="text/html")
-            pages.append({"url": final_url, "content": content})
+        # Fetch pages concurrently with a per-page timeout cap so a single
+        # slow or blocked page doesn't stall the entire connector.
+        import asyncio
+
+        async def _fetch_one(url: str) -> dict[str, str] | None:
+            try:
+                final_url, content, _ = await fetch_httpx_text(
+                    url,
+                    fallback_content_type="text/html",
+                    timeout_seconds=30,
+                )
+                return {"url": final_url, "content": content}
+            except Exception:
+                return None
+
+        tasks = [_fetch_one(url) for url in APC_URLS]
+        results = await asyncio.gather(*tasks, return_exceptions=True)
+        pages: list[dict[str, str]] = [
+            r for r in results if isinstance(r, dict) and r.get("content")
+        ]
+        # If no pages succeeded, try the first URL one more time as single-source
+        if not pages:
+            final_url, content, _ = await fetch_httpx_text(
+                APC_URLS[0], fallback_content_type="text/html",
+            )
+            pages = [{"url": final_url, "content": content}]
+
         combined = "\n<!-- APC_PAGE_BREAK -->\n".join(page["content"] for page in pages)
-        return RawSourceResult(source_key=self.source_key, url=self.base_url, content=combined, content_type="text/html", metadata={"pages": pages})
+        return RawSourceResult(
+            source_key=self.source_key, url=self.base_url,
+            content=combined, content_type="text/html", metadata={"pages": pages},
+        )
 
     def _candidate_from_anchor(self, anchor, page_url: str, container_text: str) -> OpportunityCandidate | None:
         title = clean_text(anchor.text())

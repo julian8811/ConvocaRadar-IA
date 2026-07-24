@@ -90,15 +90,22 @@ class WordPressGrantsConnector:
         final_url = self.base_url
         total_pages = 1
         client = await http_client()
-        for page in range(1, 51):
+        # Cap per-page timeout to 15s so a single slow page doesn't stall
+        # the entire connector. The WordPress REST API with per_page=100
+        # typically returns in under 3s.
+        _page_timeout = min(15, settings.scraping_timeout_seconds or 30)
+        for page in range(1, 11):  # max 10 pages (1000 items at per_page=100)
             page_url = _with_page(self.base_url, page)
-            response = await client.get(
-                page_url,
-                timeout=settings.scraping_timeout_seconds,
-                headers=headers,
-                follow_redirects=True,
-            )
-            response.raise_for_status()
+            try:
+                response = await client.get(
+                    page_url,
+                    timeout=_page_timeout,
+                    headers=headers,
+                    follow_redirects=True,
+                )
+                response.raise_for_status()
+            except Exception:
+                break  # a failed page means we've reached the end or hit a rate limit
             final_url = str(response.url)
             if page == 1:
                 total_pages = int(response.headers.get("X-WP-TotalPages", "1") or "1")
@@ -114,7 +121,7 @@ class WordPressGrantsConnector:
             url=final_url,
             content=content,
             content_type="application/json",
-            metadata={"pages_fetched": min(total_pages, 50), "items_fetched": len(all_items)},
+            metadata={"pages_fetched": min(total_pages, 10), "items_fetched": len(all_items)},
         )
 
     async def parse(self, raw: RawSourceResult) -> list[OpportunityCandidate]:

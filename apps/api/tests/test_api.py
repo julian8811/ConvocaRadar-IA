@@ -230,7 +230,7 @@ def test_seed_includes_real_sources() -> None:
     db = SessionLocal()
     try:
         apc = list(db.scalars(select(Source).where(Source.key == "apc-colombia")))
-        eu = list(db.scalars(select(Source).where(Source.key == "eu-funding-tenders")))
+        eu = list(db.scalars(select(Source).where(Source.key == "eic-accelerator")))
         local_user = db.scalar(select(Organization).where(Organization.slug == "convocaradar-local"))
     finally:
         db.close()
@@ -271,8 +271,8 @@ def test_seed_includes_grants_gov_source() -> None:
     assert icetex[0]["base_url"] == "https://web.icetex.gov.co/becas/becas-para-estudios-en-el-exterior/becas-vigentes"
     men = [item for item in response.json() if item["key"] == "mineducacion-becas"]
     assert men
-    innovamos = [item for item in response.json() if item["key"] == "innovamos-global-innovation-fund"]
-    assert innovamos
+    gif = [item for item in response.json() if item["key"] == "global-innovation-fund"]
+    assert gif
     undef = [item for item in response.json() if item["key"] == "undef"]
     assert undef
     innpulsa = [item for item in response.json() if item["key"] == "innpulsa"]
@@ -281,7 +281,7 @@ def test_seed_includes_grants_gov_source() -> None:
     assert innpulsa[0]["base_url"] == "https://convocatorias.innpulsacolombia.com/api/convocatorias?active_only=true&include_private=false&include_archive=false"
     apc = [item for item in response.json() if item["key"] == "apc-colombia"]
     assert apc
-    eu = [item for item in response.json() if item["key"] == "eu-funding-tenders"]
+    eu = [item for item in response.json() if item["key"] == "horizon-europe-sedia"]
     assert eu
 
 
@@ -780,7 +780,10 @@ def test_source_run_creates_real_opportunity_via_connector(monkeypatch) -> None:
 
             return ValidationResult(ok=True)
 
+    import app.connectors.factory as connector_factory
+
     monkeypatch.setattr(app_services, "connector_for", lambda *_args, **_kwargs: StubConnector())
+    monkeypatch.setattr(connector_factory, "connector_for", lambda *_args, **_kwargs: StubConnector())
     sources = c.get("/api/v1/sources", headers=auth)
     assert sources.status_code == 200
     source_id = [item for item in sources.json() if item["key"] == "grants-gov"][0]["id"]
@@ -1072,7 +1075,10 @@ def test_source_run_marks_degraded_when_no_candidates(monkeypatch) -> None:
 
             return ValidationResult(ok=True)
 
+    import app.connectors.factory as connector_factory
+
     monkeypatch.setattr(app_services, "connector_for", lambda *_args, **_kwargs: EmptyConnector())
+    monkeypatch.setattr(connector_factory, "connector_for", lambda *_args, **_kwargs: EmptyConnector())
     sources = c.get("/api/v1/sources", headers=auth)
     source_id = [item for item in sources.json() if item["key"] == "grants-gov"][0]["id"]
     run = c.post(f"/api/v1/sources/{source_id}/run", headers=auth)
@@ -1457,7 +1463,8 @@ def test_me_authenticates_via_cookie() -> None:
     assert login_resp.status_code == 200
     token_value = login_resp.cookies["convocaradar_token"]
     # Make a separate request using ONLY the cookie
-    response = c.get("/api/v1/me", cookies={"convocaradar_token": token_value})
+    c.cookies.set("convocaradar_token", token_value)
+    response = c.get("/api/v1/me")
     assert response.status_code == 200
     assert response.json()["email"] == "admin@convocaradar.io"
 
@@ -1482,5 +1489,6 @@ def test_me_with_neither_cookie_nor_header_returns_401() -> None:
 def test_me_with_invalid_cookie_returns_401() -> None:
     """GET /me with a malformed cookie value must return 401, not 500."""
     c = client()
-    response = c.get("/api/v1/me", cookies={"convocaradar_token": "garbage.token.value"})
+    c.cookies.set("convocaradar_token", "garbage.token.value")
+    response = c.get("/api/v1/me")
     assert response.status_code == 401

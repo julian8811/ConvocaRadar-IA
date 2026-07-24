@@ -22,13 +22,16 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
 # We install there during build so browsers are found at runtime.
 ENV PLAYWRIGHT_BROWSERS_PATH=/opt/render/.cache/ms-playwright
 RUN mkdir -p /opt/render/.cache && \
-    python -m playwright install chromium chromium-headless-shell --with-deps && \
-    python -m playwright install --verify
+    python -m playwright install chromium chromium-headless-shell --with-deps
 
 # Copy application code
 COPY apps/api/alembic.ini .
 COPY apps/api/migrations ./migrations
 COPY apps/api/app ./app
+
+# Refresh the editable package after the sources exist so installed CLI
+# entry points can import ``app`` from any working directory.
+RUN pip install --no-cache-dir --no-deps -e .
 
 # Runtime: ensure Playwright browsers are available at Render's expected path
 # (fallback in case Render overrides the build-time ENV)

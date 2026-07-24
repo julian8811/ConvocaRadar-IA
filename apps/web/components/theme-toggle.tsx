@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 
 type ThemeMode = "light" | "dark";
 
-const STORAGE_KEY = "convocaradar-theme";
+const STORAGE_KEY = "observatorio-theme";
 
 function resolveInitialTheme(): ThemeMode {
   if (typeof window === "undefined") return "light";
@@ -17,13 +17,25 @@ function resolveInitialTheme(): ThemeMode {
 }
 
 export function ThemeToggle() {
-  const [theme, setTheme] = useState<ThemeMode>(() => resolveInitialTheme());
+  // Keep the server and first client render identical. Reading localStorage in
+  // the state initializer caused React hydration error #418 in production.
+  const [theme, setTheme] = useState<ThemeMode>("light");
+  const [mounted, setMounted] = useState(false);
 
   useEffect(() => {
+    const frame = window.requestAnimationFrame(() => {
+      setTheme(resolveInitialTheme());
+      setMounted(true);
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, []);
+
+  useEffect(() => {
+    if (!mounted) return;
     document.documentElement.classList.toggle("dark", theme === "dark");
     window.localStorage.setItem(STORAGE_KEY, theme);
     window.dispatchEvent(new Event("convocaradar-theme-change"));
-  }, [theme]);
+  }, [mounted, theme]);
 
   const isDark = theme === "dark";
 

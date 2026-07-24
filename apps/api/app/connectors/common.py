@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import asyncio
 import html
 import re
 import socket
@@ -61,10 +62,16 @@ async def render_page_html(
     # Per-domain budget for Playwright — max 1 concurrent Playwright session
     _budget = _get_budget()
     _pw_budget_acquired = _budget.acquire("playwright")
+    budget_wait_deadline = asyncio.get_running_loop().time() + min(
+        30.0, max(5.0, float(settings.scraping_timeout_seconds))
+    )
+    while not _pw_budget_acquired and asyncio.get_running_loop().time() < budget_wait_deadline:
+        await asyncio.sleep(0.1)
+        _pw_budget_acquired = _budget.acquire("playwright")
     if not _pw_budget_acquired:
         raise RuntimeError(
-            f"Playwright budget exhausted for {url} — "
-            f"max {_budget._max_concurrent_for('playwright')} concurrent Playwright sessions"
+            f"Timed out waiting for a Playwright slot for {url} — "
+            f"max {_budget._max_concurrent_for('playwright')} concurrent sessions"
         )
 
     from playwright.async_api import async_playwright
@@ -341,16 +348,25 @@ def extract_funding_amount(text: str) -> str | None:
 
     # ── Tier 2: Any currency amount with known prefix/suffix ───────────
     tier2 = [
-        r"(\$[\d.,]+\s*(?:COP|USD|EUR)?)",
-        r"(USD\s*[\d.,]+)",
-        r"(EUR\s*[\d.,]+)",
-        r"(COP\s*[\d.,]+)",
-        r"(€\s*[\d.,]+)",
+        r"(USD\s*[\d.,]{3,})",
+        r"(EUR\s*[\d.,]{3,})",
+        r"(COP\s*[\d.,]{3,})",
+        r"(BRL\s*[\d.,]{3,})",
+        r"(GBP\s*[\d.,]{3,})",
+        r"(€\s*[\d.,]{3,})",
+        r"(£\s*[\d.,]{3,})",
+        r"(R\$\s*[\d.,]{3,})",
+        r"\$(\d[\d.,]{2,}\s*(?:COP|USD|EUR)?)",
     ]
     for pattern in tier2:
         match = re.search(pattern, _text, flags=re.IGNORECASE)
         if match:
-            return match.group(1).strip()
+            result = match.group(1).strip()
+            # Reject single/double-digit values (likely page numbers, counts)
+            digits_only = re.sub(r"[^\d]", "", result)
+            if digits_only and int(digits_only) < 500 and not re.search(r"(?:USD|EUR|COP|BRL|GBP)", result, re.IGNORECASE):
+                continue
+            return result
 
     return None
 
@@ -467,9 +483,11 @@ async def fetch_httpx_text(
                 last_error = exc
                 last_status = exc.response.status_code
                 if attempt + 1 >= retries:
-                    raise RuntimeError(
-                        f"HTTP {exc.response.status_code} fetching {url}: {exc.response.text[:200]}"
-                    ) from exc
+                    # Don't raise — fall through to Playwright fallback (if enabled).
+                    # WAF/Cloudflare blocks (403) are indistinguishable from
+                    # real 403s at the HTTP layer; Playwright with a real browser
+                    # can often bypass them.
+                    break
             except Exception as exc:
                 last_error = exc
                 if attempt + 1 >= retries:
@@ -544,3 +562,137 @@ async def fetch_httpx_bytes(
     finally:
         if _budget_acquired:
             _budget.release(url)
+
+
+# ── Detail-page enrichment for sitemap-based connectors ────────────────
+
+DETAIL_PAGE_TIMEOUT: int = 15
+
+
+async def enrich_from_detail_page(url: str) -> dict | None:
+    """Fetch a detail page and extract title, close_date, funding_amount."""
+    try:
+        _, content, _ct = await fetch_httpx_text(
+            url, timeout_seconds=DETAIL_PAGE_TIMEOUT, retries=1, playwright_fallback=False,
+        )
+    except Exception:
+        return None
+
+    from selectolax.parser import HTMLParser
+    import json as _json
+
+    result: dict = {}
+    tree = HTMLParser(content)
+
+    for script in tree.css("script[type='application/ld+json']"):
+        try:
+            payload = _json.loads(script.text() or "{}")
+        except _json.JSONDecodeError:
+            continue
+        items = payload if isinstance(payload, list) else [payload]
+        for item in items:
+            if not isinstance(item, dict):
+                continue
+            title = str(item.get("name") or item.get("title") or "").strip()
+            if title:
+                result["title"] = title
+            desc = str(item.get("description") or item.get("summary") or "").strip()
+            if desc:
+                result["summary"] = desc
+            cd = item.get("closeDate") or item.get("close_date") or item.get("deadline") or item.get("endDate")
+            if cd:
+                parsed = parse_date_text(str(cd))
+                if parsed:
+                    result["close_date"] = parsed
+            amount = str(item.get("funding", item.get("fundingAmount", ""))).strip()
+            if amount:
+                result["funding_amount_raw"] = amount
+            break
+
+    if "title" not in result:
+        og_title = tree.css_first("meta[property='og:title']")
+        if og_title:
+            value = (og_title.attributes.get("content") or "").strip()
+            if value:
+                result["title"] = value
+
+    if "summary" not in result:
+        og_desc = tree.css_first("meta[property='og:description']")
+        if og_desc:
+            value = (og_desc.attributes.get("content") or "").strip()
+            if value:
+                result["summary"] = value
+        if "summary" not in result:
+            meta_desc = tree.css_first("meta[name='description']")
+            if meta_desc:
+                value = (meta_desc.attributes.get("content") or "").strip()
+                if value:
+                    result["summary"] = value
+
+    if "title" not in result:
+        h1 = tree.css_first("h1")
+        if h1:
+            value = clean_text(h1.text())
+            if value:
+                result["title"] = value
+
+    if "close_date" not in result:
+        body = tree.css_first("body")
+        if body:
+            all_text = clean_text(body.text())
+            cd = extract_close_date(all_text)
+            if cd:
+                result["close_date"] = cd
+
+    if "funding_amount_raw" not in result:
+        body = tree.css_first("body")
+        if body:
+            all_text = clean_text(body.text())
+            amount = extract_funding_amount(all_text)
+            if amount:
+                result["funding_amount_raw"] = amount
+
+    return result if result.get("title") else None
+
+
+async def enrich_candidates_batch(
+    candidates: list[OpportunityCandidate], max_fetches: int = 10,
+) -> list[OpportunityCandidate]:
+    """Batch-enrich low-confidence candidates by fetching detail pages.
+
+    Fetches up to ``max_fetches`` detail pages concurrently, extracts
+    close_date, funding_amount, and title, then returns an enriched
+    copy of the full candidate list.
+    """
+    import asyncio
+    from copy import deepcopy
+
+    to_enrich = candidates[:max_fetches]
+    tasks = {c.official_url: enrich_from_detail_page(c.official_url) for c in to_enrich}
+    results = await asyncio.gather(*tasks.values(), return_exceptions=True)
+
+    url_to_data: dict[str, dict | None] = {}
+    for url, task in zip(tasks, results):
+        url_to_data[url] = task if isinstance(task, dict) and task.get("title") else None
+
+    enriched: list[OpportunityCandidate] = []
+    for c in candidates:
+        detail = url_to_data.get(c.official_url)
+        if detail:
+            enriched.append(
+                OpportunityCandidate(
+                    title=(detail.get("title") or c.title)[:180],
+                    entity=c.entity,
+                    country=c.country,
+                    official_url=c.official_url,
+                    summary=(detail.get("summary") or c.summary)[:700],
+                    categories=c.categories,
+                    raw_text=c.raw_text,
+                    confidence_score=0.82,
+                    close_date=detail.get("close_date") or c.close_date,
+                    funding_amount_raw=detail.get("funding_amount_raw") or c.funding_amount_raw,
+                )
+            )
+        else:
+            enriched.append(deepcopy(c))
+    return enriched

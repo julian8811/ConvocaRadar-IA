@@ -192,23 +192,23 @@ function HeroActionList({ count, hasClosingSoon7d, hasReviewQueue }: {
 }
 
 const KPI_ACCENTS = [
-  { border: "border-t-cyan-500" },
-  { border: "border-t-emerald-500" },
-  { border: "border-t-amber-500" },
-  { border: "border-t-violet-500" },
+  { border: "border-t-[#005652]" },
+  { border: "border-t-[#00a6a1]" },
+  { border: "border-t-[#bed630]" },
+  { border: "border-t-[#6f7f1f]" },
 ];
 
 function KpiFooter({ kpis }: { kpis: { total_opportunities: number; open_opportunities: number; closing_soon_opportunities: number; high_match_opportunities: number } }) {
   const items = [
-    { label: "Total convocatorias", value: kpis.total_opportunities, accent: KPI_ACCENTS[0] },
-    { label: "Con apertura próxima", value: kpis.open_opportunities, accent: KPI_ACCENTS[1] },
-    { label: "Cierran pronto", value: kpis.closing_soon_opportunities, accent: KPI_ACCENTS[2] },
-    { label: "En revisión", value: kpis.high_match_opportunities, accent: KPI_ACCENTS[3] },
+    { label: "Prioridades visibles", value: kpis.total_opportunities, accent: KPI_ACCENTS[0] },
+    { label: "Cierres en 7 días", value: kpis.open_opportunities, accent: KPI_ACCENTS[1] },
+    { label: "Atención inmediata", value: kpis.closing_soon_opportunities, accent: KPI_ACCENTS[2] },
+    { label: "En seguimiento", value: kpis.high_match_opportunities, accent: KPI_ACCENTS[3] },
   ];
   return (
     <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
       {items.map((item) => (
-        <div key={item.label} className={`rounded-lg border border-slate-200 bg-white p-4 transition-all hover:shadow-md dark:border-slate-800 dark:bg-slate-900 border-t-4 ${item.accent.border}`}>
+        <div key={item.label} className={`rounded-2xl border border-[#005652]/10 bg-white p-5 shadow-[0_12px_35px_-28px_rgba(0,86,82,.8)] transition-all hover:-translate-y-0.5 hover:shadow-lg dark:border-white/10 dark:bg-slate-900 border-t-4 ${item.accent.border}`}>
           <p className="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">{item.label}</p>
           <p className="mt-1 text-2xl font-bold text-slate-950 dark:text-white">{formatNumber(item.value)}</p>
         </div>
@@ -229,8 +229,12 @@ export function TriageZone() {
   if (!query.data) return <EmptyState title="Sin datos de triage" detail="No se recibió información del servidor." />;
 
   const data = query.data;
-  const closingSoonCount = data.closing_soon_7d?.length ?? 0;
-  const reviewCount = data.review_queue?.length ?? 0;
+  const uniqueValidItems = <T extends TriageOpportunityItem,>(items: T[]) =>
+    Array.from(new Map(items.filter((item) => item.days_to_close === null || item.days_to_close >= 0).map((item) => [item.id, item])).values());
+  const closingSoon = uniqueValidItems(data.closing_soon_7d ?? []);
+  const reviewQueue = uniqueValidItems(data.review_queue ?? []);
+  const closingSoonCount = closingSoon.length;
+  const reviewCount = reviewQueue.length;
 
   return (
     <div className="space-y-4" data-zone="triage">
@@ -243,7 +247,7 @@ export function TriageZone() {
         }}
       />
       <div id="closing-soon-7d">
-        <ClosingSoon7dWidget items={data.closing_soon_7d ?? []} />
+        <ClosingSoon7dWidget items={closingSoon} />
       </div>
       <div id="review-queue">
         <HeroActionList

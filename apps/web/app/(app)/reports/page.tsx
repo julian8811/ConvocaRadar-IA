@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { Download, FileSpreadsheet, FileText, FileType, RefreshCcw, Trash2 } from "lucide-react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -10,6 +10,10 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/state";
 import { api, downloadReport } from "@/lib/api";
 import type { Report, ReportFormat } from "@/lib/types";
+
+const BOGOTA_TIMEZONE = "America/Bogota";
+function fixEncoding(value: string) { try { return /Ã|Â/.test(value) ? decodeURIComponent(escape(value)) : value; } catch { return value; } }
+function formatBogota(value: string) { return new Intl.DateTimeFormat("es-CO", { dateStyle: "medium", timeStyle: "short", timeZone: BOGOTA_TIMEZONE }).format(new Date(value)); }
 
 const formats: Array<{ format: ReportFormat; label: string; icon: typeof FileText }> = [
   { format: "html", label: "HTML", icon: FileText },
@@ -58,17 +62,17 @@ function ReportCard({ report }: { report: Report }) {
         <CardTitle className="flex items-center justify-between gap-3 text-slate-950 dark:text-white">
           <span className="flex min-w-0 items-center gap-2">
             <FileText className="h-4 w-4 shrink-0" />
-            <span className="truncate">{report.title}</span>
+            <span className="truncate">{fixEncoding(report.title)}</span>
           </span>
           <Badge tone="medium">{formatLabel(report.format)}</Badge>
         </CardTitle>
         <CardDescription>
-          Tipo: {report.report_type} · Generado: {new Date(report.generated_at).toLocaleString("es-CO")} · Estado: {report.status}
+          Tipo: {fixEncoding(report.report_type)} · Generado: {formatBogota(report.generated_at)} · Estado: {report.status}
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-4 pt-5">
         <div className="max-h-44 overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-100/40 p-3 text-xs text-slate-700 dark:bg-slate-800/40 dark:text-slate-300">
-          {report.html_content.replace(/<[^>]+>/g, " ").slice(0, 300)}
+          {fixEncoding(report.html_content).replace(/<style[\s\S]*?<\/style>/gi, "").replace(/<[^>]+>/g, " ").replace(/\s+/g, " ").trim().slice(0, 360)}
         </div>
         <div className="rounded-xl border border-dashed border-slate-200/80 bg-slate-50/60 p-4 dark:border-slate-700/80 dark:bg-slate-950/30">
           <p className="text-xs font-semibold uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">Descarga directa</p>
@@ -145,3 +149,10 @@ export default function ReportsPage() {
     </section>
   );
 }
+
+
+
+
+
+
+

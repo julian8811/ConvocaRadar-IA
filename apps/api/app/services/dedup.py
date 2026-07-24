@@ -28,6 +28,7 @@ def opportunity_dedup_key(official_url: str | None, title: str, raw_text: str = 
             (r"/opportunity/(\d+)(?:/|$)", "simpler-grants-gov"),
             (r"/topic-details/([^/?#]+)", "eu-topic"),
             (r"/project/id/([^/?#]+)", "cordis-project"),
+            (r"/tenders/view/(\d+)", "developmentaid"),
         )
         for pattern, prefix in url_patterns:
             match = re.search(pattern, normalized_url, flags=re.IGNORECASE)

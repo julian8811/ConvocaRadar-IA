@@ -29,10 +29,6 @@ SOURCE_ENTITIES = {
     "innovamos-global-innovation-fund": "Innovamos - Global Innovation Fund",
     "innovamos-fid": "Innovamos - Fondo para la Innovacion en el Desarrollo",
 }
-SOURCE_FALLBACK_TITLES = {
-    "innovamos-global-innovation-fund": "Convocatoria Subvenciones a proyectos en alianza con Global Innovation Fund",
-    "innovamos-fid": "Convocatoria Internacional - Fondo para la Innovacion en el Desarrollo",
-}
 JS_RENDER_MARKERS = ('ng-app="nosune"', "call.model")
 RENDERED_MARKERS = ("txt-organization", "openClose-deadline", "wrap-deadline", "carousel-content", "globalinnovation.fund")
 INNOVAMOS_RENDER_SELECTOR = "h1, .txt-organization, .openClose-deadline, .wrap-deadline"
@@ -157,23 +153,6 @@ class InnovamosConnector:
             raise RuntimeError("Innovamos page unavailable")
 
         return RawSourceResult(source_key=self.source_key, url=final_url, content=content, content_type=content_type)
-
-    def _fallback_candidate(self, raw: RawSourceResult) -> OpportunityCandidate | None:
-        title = SOURCE_FALLBACK_TITLES.get(self.source_key)
-        if not title:
-            return None
-        return OpportunityCandidate(
-            title=title[:180],
-            entity=self._source_entity(),
-            country="Colombia",
-            official_url=raw.url or self.base_url,
-            summary=title,
-            categories=["innovacion", "financiacion", "cooperacion"],
-            topics=[self.source_key.replace("-", " ")],
-            raw_text=title,
-            confidence_score=0.62,
-            language="es",
-        )
 
     def _candidate_from_rendered_page(self, raw: RawSourceResult) -> OpportunityCandidate | None:
         tree = HTMLParser(raw.content)
@@ -344,8 +323,7 @@ class InnovamosConnector:
                     open_date=_extract_date(page_text),
                 )
             ]
-        fallback = self._fallback_candidate(raw)
-        return [fallback] if fallback else []
+        return []
 
     async def validate(self, candidate: OpportunityCandidate) -> ValidationResult:
         if not candidate.title or not candidate.official_url:

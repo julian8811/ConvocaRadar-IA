@@ -41,7 +41,7 @@ GROUPS: list[tuple[str, str, str | None, str, str]] = [
     ("generic-api", "test-api", "api", "generic-api", "ApiConnector"),
     ("grants-gov", "grants-gov", None, "grants-gov", "GrantsGovConnector"),
     ("giz-funding", "giz-funding", None, "httpx-get-html", "GizFundingConnector"),
-    ("procolombia", "procolombia-convocatorias", None, "httpx-get-html", "ProcolombiaConvocatoriasConnector"),
+    ("procolombia", "procolombia-convocatorias", None, "procolombia-html", "ProcolombiaConvocatoriasConnector"),
 ]
 
 

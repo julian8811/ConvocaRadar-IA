@@ -1,4 +1,4 @@
-from datetime import UTC, datetime
+﻿from datetime import UTC, datetime
 
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy import select
@@ -6,6 +6,7 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_organization, get_current_user
 from app.core.email import send_email
+from app.core.config import get_settings
 from app.db.session import get_db
 from app.models import Alert, Opportunity, OpportunityScore, OpportunityStatus, Organization, Priority, User
 from app.schemas import AlertCreate, AlertRead, AlertTestRequest, AlertUpdate
@@ -85,7 +86,7 @@ def generate_recommended_alerts(
     db: Session = Depends(get_db),
 ) -> list[Alert]:
     candidates: list[Alert] = []
-    recipient = user.email
+    recipient = get_settings().alert_default_recipient or user.email
 
     closing_opportunities = db.scalars(
         select(Opportunity).where(
@@ -111,7 +112,7 @@ def generate_recommended_alerts(
                 alert_type="closing_soon",
                 channel="email",
                 recipient=recipient,
-                subject=f"Cierre proximo: {opportunity.title}",
+                subject=f"Cierre próximo: {opportunity.title}",
                 message=(
                     f"La convocatoria '{opportunity.title}' cierra "
                     f"{opportunity.close_date.date().isoformat() if opportunity.close_date else 'pronto'}."
@@ -206,8 +207,8 @@ def test_alert(
         alert_type="test",
         channel="email",
         recipient=str(payload.recipient),
-        subject="Prueba de alerta ConvocaRadar IA",
-        message="Esta es una alerta de prueba de ConvocaRadar IA.",
+        subject="Prueba de alerta del Observatorio de Convocatorias Institucional",
+        message="Esta es una alerta de prueba del Observatorio de Convocatorias Institucional.",
         status="pending",
     )
     db.add(alert)
@@ -219,3 +220,5 @@ def test_alert(
         db.commit()
     db.refresh(alert)
     return alert
+
+

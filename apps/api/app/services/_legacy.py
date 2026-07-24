@@ -65,10 +65,10 @@ from app.schemas import (
 )
 
 
-def connector_for(source_key: str, base_url: str | None = None, source_type: str | None = None, *, entity_name: str | None = None, default_country: str | None = None, default_categories: list[str] | None = None):
+def connector_for(source_key: str, base_url: str | None = None, source_type: str | None = None, *, entity_name: str | None = None, default_country: str | None = None, default_categories: list[str] | None = None, connector_config: dict | None = None):
     from app.connectors.factory import connector_for as worker_connector_for
 
-    return worker_connector_for(source_key, base_url, source_type, entity_name=entity_name, default_country=default_country, default_categories=default_categories)
+    return worker_connector_for(source_key, base_url, source_type, entity_name=entity_name, default_country=default_country, default_categories=default_categories, connector_config=connector_config)
 
 
 SLOW_SCRAPE_SOURCE_KEYS = frozenset(
@@ -437,26 +437,33 @@ def _parse_funding_amount(funding_raw: str | None) -> tuple[float | None, str | 
       - ``$500,000`` / ``$5,000,000 COP`` / ``$1.2M``
       - ``US$ 500,000`` / ``€ 1.200.000``
       - ``5.000.000.000`` (Spanish notation, dots as thousands sep)
-    Returns ``(None, None)`` when no pattern matches.
+    Returns ``(None, None)`` when no pattern matches or when the
+    extracted value looks like a non-funding number (too small, no
+    explicit currency indicator).
     """
     if not funding_raw:
         return None, None
 
     text = funding_raw.strip()
+    upper_text = text.upper()
 
-    # Detect currency from prefix/suffix
-    currency = "USD"  # default
-    currency_map = {
-        "COP": ["COP", "COL$"],
-        "EUR": ["EUR", "€"],
-        "GBP": ["GBP", "£"],
-        "BRL": ["BRL", "R$"],
-        "MXN": ["MXN", "MX$"],
-        "USD": ["USD", "US$", "$"],
-    }
-    upper = text.upper()
-    for code, symbols in currency_map.items():
-        if any(sym in upper for sym in symbols):
+    # Guard: require at least one digit for any amount parsing
+    if not re.search(r"\d", text):
+        return None, None
+
+    # Detect currency from prefix/suffix — require explicit currency
+    # marker to avoid picking up random numbers from body text.
+    currency = None
+    currency_map: list[tuple[str | None, list[str]]] = [
+        ("COP", ["COP", "COL$"]),
+        ("EUR", ["EUR", "€"]),
+        ("GBP", ["GBP", "£"]),
+        ("BRL", ["BRL", "R$"]),
+        ("MXN", ["MXN", "MX$"]),
+        ("USD", ["USD", "US$"]),
+    ]
+    for code, symbols in currency_map:
+        if any(sym in upper_text for sym in symbols):
             currency = code
             break
 
@@ -478,11 +485,35 @@ def _parse_funding_amount(funding_raw: str | None) -> tuple[float | None, str | 
     # Take the largest number (covers "USD 500,000 - USD 1,000,000" ranges)
     value = max(float(n) for n in numbers)
 
-    # Handle million/k suffixes
-    if re.search(r"(?:million|MM)\b", text, re.IGNORECASE) or text.upper().endswith("M"):
+    # Handle million/k suffixes — but only when the suffix is attached
+    # to the number, not to arbitrary body text.
+    million_suffix = re.search(r"(?:million|MM|millón|millones)\b", text, re.IGNORECASE)
+    k_suffix = re.search(r"\b[kK]\b", text)
+    ends_with_m = bool(re.search(r"\d+M(?:$|\s)", text))
+
+    if million_suffix or ends_with_m:
         value *= 1_000_000
-    elif re.search(r"(?:\b[kK]\b|[kK]$)", text) and value < 1_000_000:
+    elif k_suffix and value < 1_000_000:
         value *= 1_000
+
+    # ── Quality gates ──────────────────────────────────────────────
+    # Reject values that look like non-funding numbers from body text.
+
+    # If no explicit currency was detected, require a larger number
+    # (>= 1000) to avoid picking up page numbers, years, or counts.
+    if currency is None:
+        return None, None
+
+    # If currency is a strong code (COP, EUR, GBP, BRL, MXN) accept it.
+    # For USD detected via bare "$" (weak signal), require >= 500.
+    if currency == "USD" and not re.search(r"(?:USD|US\$)", upper_text):
+        # USD detected only by bare "$" — require a meaningful amount
+        if value < 500:
+            return None, None
+
+    # Cap absurdly large values (> 1 trillion) — likely parsing error
+    if value > 1_000_000_000_000:
+        return None, None
 
     return value, currency
 
@@ -562,6 +593,12 @@ async def enrich_opportunity_payload(data: OpportunityCreate) -> OpportunityCrea
         parsed = extract_close_date(combined)
         if parsed:
             merged["close_date"] = parsed
+    if merged["close_date"] and merged.get("risk_flags"):
+        merged["risk_flags"] = [
+            flag
+            for flag in merged["risk_flags"]
+            if "no se detectó una fecha de cierre" not in str(flag).lower()
+        ]
     return OpportunityCreate(**merged)
 
 
@@ -1107,7 +1144,18 @@ def build_opportunity_query(
     close_date_to: str | None = None,
     min_amount: float | None = None,
     max_amount: float | None = None,
+    exclude_closed: bool = True,
+    exclude_no_url: bool = False,
 ) -> Select[tuple[Opportunity]]:
+    """Build a SELECT query for opportunities with the given filters.
+
+    By default, excludes:
+    - Opportunities with ``close_date`` in the past (closed by deadline,
+      regardless of stored status) — unless ``exclude_closed=False`` or
+      ``status`` is explicitly provided.
+    - Opportunities without an ``official_url`` (no link to view the
+      convocatoria) — unless ``exclude_no_url=False``.
+    """
     stmt = select(Opportunity).where(
         or_(Opportunity.organization_id == organization_id, Opportunity.organization_id.is_(None))
     )
@@ -1117,6 +1165,17 @@ def build_opportunity_query(
         stmt = stmt.where(Opportunity.categories.contains([category]))
     if status:
         stmt = stmt.where(Opportunity.status == status)
+    elif exclude_closed:
+        # Filter by close_date regardless of stored status so opportunities
+        # whose deadline passed since the last scrape are hidden immediately.
+        stmt = stmt.where(
+            or_(
+                Opportunity.close_date.is_(None),
+                Opportunity.close_date >= datetime.now(UTC).replace(tzinfo=None),
+            )
+        )
+    if exclude_no_url:
+        stmt = stmt.where(Opportunity.official_url.is_not(None), Opportunity.official_url != "")
     if source_id:
         stmt = stmt.where(Opportunity.source_id == source_id)
     if search:
@@ -3140,12 +3199,17 @@ def send_weekly_digest(db: Session, organization_id: str) -> bool:
     organization = db.get(Organization, organization_id)
     if organization is None:
         return False
-    recipient = db.scalar(
-        select(User.email)
-        .where(User.organization_id == organization_id, User.role == Role.admin.value)
-        .order_by(User.created_at.asc())
-        .limit(1)
-    )
+
+    # Prefer configured default recipient, fall back to first admin user
+    settings = get_settings()
+    recipient = settings.alert_default_recipient
+    if not recipient:
+        recipient = db.scalar(
+            select(User.email)
+            .where(User.organization_id == organization_id, User.role == Role.admin.value)
+            .order_by(User.created_at.asc())
+            .limit(1)
+        )
     if not recipient:
         return False
 

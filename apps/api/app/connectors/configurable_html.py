@@ -72,6 +72,13 @@ class HtmlConnectorConfig:
     detail_enrichment: bool = False
     """If True, fetch detail pages for low-confidence candidates."""
 
+    user_agent: str | None = None
+    """Optional User-Agent override for this source.
+    
+    When set, replaces the default ``scraping_user_agent`` for this
+    connector's HTTP requests. Useful for sites that block bot User-Agents
+    (e.g. CloudFront WAF)."""
+
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "HtmlConnectorConfig":
         """Parse and validate a config *dict* (e.g. from JSON API payload).
@@ -110,6 +117,7 @@ class HtmlConnectorConfig:
             date_labels=list(raw["date_labels"]),
             pagination=pagination,
             detail_enrichment=bool(raw.get("detail_enrichment", False)),
+            user_agent=raw.get("user_agent"),
         )
 
     @classmethod
@@ -184,9 +192,12 @@ class ConfigurableHtmlConnector:
 
     async def fetch(self) -> RawSourceResult:
         """Fetch the source URL and return raw content."""
+        kwargs: dict[str, object] = {"fallback_content_type": "text/html"}
+        if self.config.user_agent:
+            kwargs["headers"] = {"User-Agent": self.config.user_agent}
         final_url, content, content_type = await common.fetch_httpx_text(
             self.base_url,
-            fallback_content_type="text/html",
+            **kwargs,
         )
         return RawSourceResult(
             source_key=self.source_key,

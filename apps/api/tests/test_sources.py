@@ -53,12 +53,26 @@ def _client_with_admin() -> TestClient:
     return client
 
 
-def test_run_all_sources_emits_sources_loaded_event() -> None:
+def _defer_background_sweep(monkeypatch) -> None:
+    import threading as _threading
+
+    class DeferredThread:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def start(self):
+            pass
+
+    monkeypatch.setattr(_threading, "Thread", DeferredThread)
+
+
+def test_run_all_sources_emits_sources_loaded_event(monkeypatch) -> None:
     """POST /sources/run-all must log how many sources it loaded.
 
     The sources_loaded log line is emitted SYNCHRONOUSLY before the
     background thread starts, so it is captured by structlog.testing.capture_logs.
     """
+    _defer_background_sweep(monkeypatch)
     c = _client_with_admin()
     with structlog.testing.capture_logs() as captured:
         response = c.post("/api/v1/sources/run-all")
@@ -73,13 +87,14 @@ def test_run_all_sources_emits_sources_loaded_event() -> None:
     assert loaded["org_id"]
 
 
-def test_run_all_sources_emits_decision_summary_event() -> None:
+def test_run_all_sources_emits_decision_summary_event(monkeypatch) -> None:
     """The endpoint must emit a summary event with processed/skipped counts.
 
     The decision_summary log line is the single most useful log line for
     diagnosing the run-all empty-return bug: if sources_due == 0, the bug
     is upstream of the dispatch (e.g. a frequency mismatch or org-scope filter).
     """
+    _defer_background_sweep(monkeypatch)
     c = _client_with_admin()
     with structlog.testing.capture_logs() as captured:
         response = c.post("/api/v1/sources/run-all")
@@ -100,12 +115,13 @@ def test_run_all_sources_emits_decision_summary_event() -> None:
     assert summary["sources_due"] + summary["sources_skipped"] == summary["total"]
 
 
-def test_run_all_sources_endpoint_response_unchanged_by_instrumentation() -> None:
+def test_run_all_sources_endpoint_response_unchanged_by_instrumentation(monkeypatch) -> None:
     """The endpoint's return value must NOT change — only logs are added.
 
     The instrumentation must be observability-only: it must not affect the
     endpoint's return value or the sweep's behavior.
     """
+    _defer_background_sweep(monkeypatch)
     c = _client_with_admin()
     with structlog.testing.capture_logs():
         response = c.post("/api/v1/sources/run-all")
@@ -116,6 +132,28 @@ def test_run_all_sources_endpoint_response_unchanged_by_instrumentation() -> Non
     assert payload["status"] == "started"
     assert isinstance(payload["sources"], int)
     assert payload["sources"] >= 1
+
+
+def test_run_all_sources_does_not_cap_the_catalog_at_twenty(monkeypatch) -> None:
+    """Every due source is scheduled; catalog size must not be truncated."""
+    import threading as _threading
+
+    class DeferredThread:
+        def __init__(self, *args, **kwargs):
+            pass
+
+        def start(self):
+            pass
+
+    monkeypatch.setattr(_threading, "Thread", DeferredThread)
+    c = _client_with_admin()
+    response = c.post("/api/v1/sources/run-all?force=true")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert payload["sources_due"] == payload["sources"]
+    assert payload["sources_due"] > 20
+    assert payload["sources_skipped"] == 0
 
 
 def test_run_all_sources_logs_failure_when_execute_raises(monkeypatch) -> None:
@@ -213,6 +251,7 @@ def test_background_sweep_times_out_hanging_connector(monkeypatch) -> None:
     c = _client_with_admin()
     with structlog.testing.capture_logs() as captured:
         response = c.post("/api/v1/sources/run-all")
+    block_forever.set()
 
     # Restore cached settings so other tests are not affected.
     get_settings.cache_clear()
@@ -370,4 +409,3 @@ def test_run_source_returns_within_timeout(monkeypatch) -> None:
     elapsed = time.monotonic() - start
     assert response.status_code == 200, response.text
     assert elapsed < 5.0, f"endpoint must return in <5s, took {elapsed:.2f}s"
-

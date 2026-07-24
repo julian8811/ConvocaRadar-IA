@@ -1,11 +1,11 @@
-from fastapi import APIRouter, Depends, HTTPException, Response
+﻿from fastapi import APIRouter, Depends, HTTPException, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_organization, get_current_user
 from app.core.storage import delete_object, put_bytes
 from app.db.session import get_db
-from app.models import Opportunity, Organization, Report, User
+from app.models import Opportunity, OpportunityStatus, Organization, Report, User
 from app.schemas import ReportCreate, ReportRead
 from app.services import audit, build_opportunity_query, export_csv, export_pdf, export_xlsx, generate_report_html
 
@@ -18,7 +18,7 @@ def _report_opportunities(db: Session, report: Report) -> list[Opportunity]:
         report.organization_id,
         country=filters.get("country") or None,
         category=filters.get("category") or None,
-        status=filters.get("status") or None,
+        status=OpportunityStatus.open.value,
         source_id=filters.get("source_id") or None,
         priority=filters.get("priority") or None,
         search=filters.get("search") or None,
@@ -58,7 +58,7 @@ def create_report(
         organization.id,
         country=filters.get("country") or None,
         category=filters.get("category") or None,
-        status=filters.get("status") or None,
+        status=OpportunityStatus.open.value,
         source_id=filters.get("source_id") or None,
         priority=filters.get("priority") or None,
         search=filters.get("search") or None,
@@ -147,7 +147,7 @@ def download_report(
         opportunities = _report_opportunities(db, report)
         content = export_csv(opportunities)
         _store_report_artifact(db, report, content.encode("utf-8"), "text/csv", "csv")
-        return Response(content, media_type="text/csv", headers={"Content-Disposition": f"attachment; filename={safe_name}.csv"})
+        return Response(content, media_type="text/csv; charset=utf-8", headers={"Content-Disposition": f"attachment; filename={safe_name}.csv"})
     if report.format == "xlsx":
         opportunities = _report_opportunities(db, report)
         content = export_xlsx(opportunities)
@@ -175,6 +175,8 @@ def download_report(
     _store_report_artifact(db, report, report.html_content.encode("utf-8"), "text/html", "html")
     return Response(
         report.html_content,
-        media_type="text/html",
+        media_type="text/html; charset=utf-8",
         headers={"Content-Disposition": f"attachment; filename={safe_name}.html"},
     )
+
+

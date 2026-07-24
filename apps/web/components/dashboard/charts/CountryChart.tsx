@@ -14,9 +14,9 @@ import {
 import type { DashboardBreakdownItem } from "@/lib/types";
 
 const COLORS = [
-  "#0ea5e9", "#6366f1", "#14b8a6", "#f97316", "#ec4899",
-  "#8b5cf6", "#22c55e", "#eab308", "#ef4444", "#84cc16",
-  "#06b6d4", "#a855f7",
+  "#005652", "#008b86", "#00b3af", "#6f7f1f", "#bed630",
+  "#2f6864", "#53a6a1", "#92aa28", "#ef7b45", "#789490",
+  "#30c5c0", "#a3b85a",
 ];
 
 function CountryTooltip({ active, payload }: { active?: boolean; payload?: Array<{ name: string; value: number }> }) {

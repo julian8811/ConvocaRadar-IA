@@ -284,7 +284,7 @@ async def test_probe_dataclass_serialization(monkeypatch, db):
 # ═══════════════════════════════════════════════════════════════
 
 
-def test_bancoldex_seed_definition_has_connector_config():
+async def test_bancoldex_seed_definition_has_connector_config():
     """Verify bancoldex Source record includes connector_config after seeding."""
     from app.models import Source
     from sqlalchemy import select
@@ -305,7 +305,7 @@ def test_bancoldex_seed_definition_has_connector_config():
         session.close()
 
 
-def test_undp_seed_definition_has_connector_config():
+async def test_undp_seed_definition_has_connector_config():
     """Verify undp Source record includes connector_config after seeding."""
     from app.models import Source
     from sqlalchemy import select

@@ -273,6 +273,8 @@ describe("TriageZone", () => {
 describe("PipelineZone", () => {
   beforeEach(() => {
     mockDashboardPipeline.mockReset();
+    mockDashboardTriage.mockReset();
+    mockDashboardTriage.mockReturnValue(pendingPromise());
   });
 
   it("calls api.dashboardPipeline on mount", async () => {
