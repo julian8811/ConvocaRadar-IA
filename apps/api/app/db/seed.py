@@ -1141,6 +1141,53 @@ def seed_default_sources(
     inserted = 0
     updated = 0
     skipped = 0
+
+    # Assign tier based on source key and source_type
+    def _assign_tier(defn: dict) -> str:
+        key = defn.get("key", "")
+        source_type = defn.get("source_type", "html")
+        # Strategic: proven high-quality connectors
+        strategic = {
+            "grants-gov", "grants-gov-rss", "grants-gov-forecast", "simpler-grants",
+            "nsf-funding", "nsf-funding-rss", "minciencias", "icetex-vigentes",
+            "icetex-otras-becas", "innpulsa", "apc-colombia", "ukri-opportunities",
+            "wellcome-grants", "horizon-europe-sedia", "anii-uruguay",
+            "novo-nordisk-grants", "global-innovation-fund", "undef",
+            "unesco-call-for-proposals", "unwomen-innovate", "usaid-grants",
+            "eic-accelerator", "giz-funding", "procolombia-convocatorias",
+            "findeter-convocatorias", "fondecyt-chile", "conicet-argentina",
+            "fapesp-brasil", "cnpq-brasil", "developmentaid-tenders",
+        }
+        # Complementary: useful but lower data quality
+        complementary = {
+            "lundbeck-foundation", "velux-foundation", "idrc-funding",
+            "cdti-convocatorias", "isciii-convocatorias", "mincit-innovacion",
+            "mineducacion-becas", "uniandes-investigacion", "colfuturo-convocatorias",
+            "gates-foundation-grants", "dfg-grants", "colciencias-historico",
+            "universidad-nacional-colombia", "universidad-antioquia",
+            "camara-comercio-bogota", "camara-comercio-medellin",
+            "camara-comercio-cali", "concytec-peru", "conacyt-paraguay",
+            "bid-convocatorias", "oei-convocatorias", "cepal-convocatorias",
+            "camara-comercio-bquilla", "fapemig-brasil", "anp-brasil",
+            "undp-funding", "ford-foundation-grants", "rockefeller-foundation",
+            "mozilla-foundation", "interamerican-foundation",
+            "global-environment-facility", "green-climate-fund",
+            "sida-sweden", "norad-norway", "danida-denmark",
+            "darwin-initiative", "eureka-network-biotech",
+            "world-bank-procurement", "bancoldex-convocatorias",
+            "sena-convocatorias", "artesanias-colombia", "colombia-productiva",
+            "mintic-convocatorias", "minambiente-colombia",
+            "icbf-convocatorias", "supersolidaria-convocatorias",
+            "fondo-emprender-sena", "connect-bogota",
+            "innpulsa-colombia-startup", "procolombia-inversion",
+            "fapesp-pipe", "capes-brasil", "inct-brasil",
+        }
+        if key in strategic:
+            return "strategic"
+        if key in complementary:
+            return "complementary"
+        return "experimental"
+
     for definition in source_definitions:
         source = db.scalar(select(Source).where(Source.key == definition["key"]))
         if source:
@@ -1158,6 +1205,7 @@ def seed_default_sources(
                 source.allowed_domains = definition["allowed_domains"]
                 source.connector_config = definition.get("connector_config")
                 source.enabled = definition.get("enabled", True)
+                source.tier = _assign_tier(definition)
                 updated += 1
             else:
                 # Source is owned by another org — do not steal.
@@ -1177,6 +1225,7 @@ def seed_default_sources(
                 allowed_domains=definition["allowed_domains"],
                 connector_config=definition.get("connector_config"),
                 enabled=definition.get("enabled", True),
+                tier=_assign_tier(definition),
             )
         )
         inserted += 1
