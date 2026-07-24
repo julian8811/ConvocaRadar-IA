@@ -15,6 +15,36 @@ from app.services import audit
 router = APIRouter()
 
 
+def send_pending_alerts(db: Session) -> int:
+    """Send all pending alerts that haven't been sent yet.
+
+    Called by the periodic scheduler. Returns the number of alerts sent.
+    Uses Resend API when configured, falls back to dry-run logging.
+    """
+    import structlog
+    logger = structlog.get_logger(__name__)
+    pending = list(
+        db.scalars(
+            select(Alert).where(Alert.status == "pending").order_by(Alert.created_at.asc()).limit(50)
+        )
+    )
+    if not pending:
+        return 0
+    sent = 0
+    for alert in pending:
+        try:
+            send_email(recipient=alert.recipient, subject=alert.subject, message=alert.message)
+            alert.status = "sent"
+            alert.sent_at = datetime.now(UTC).replace(tzinfo=None)
+            sent += 1
+        except Exception as exc:
+            logger.warning("alert_send_failed", alert_id=alert.id, error=str(exc))
+            alert.status = "failed"
+    db.flush()
+    logger.info("pending_alerts_sent", sent=sent, total=len(pending))
+    return sent
+
+
 def _send_alert(alert: Alert) -> None:
     if alert.channel != "email":
         raise HTTPException(status_code=400, detail="Only email alerts can be sent in the MVP")
