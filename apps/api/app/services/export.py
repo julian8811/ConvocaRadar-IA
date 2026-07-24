@@ -286,12 +286,13 @@ h1 {{
 
 /* ── Story cards (improved) ───────────────────────────────── */
 .story-grid {{
-  display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px;
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px;
 }}
 .story-card {{
   border: 1px solid var(--border); border-radius: 18px;
   background: var(--surface);
-  padding: 20px; display: flex; flex-direction: column;
+  padding: 18px; display: flex; flex-direction: column;
+  min-width: 0; word-wrap: break-word; overflow-wrap: break-word;
   transition: all 0.15s ease;
 }}
 .story-card:hover {{
@@ -303,7 +304,9 @@ h1 {{
 }}
 .story-card__country {{ color: var(--muted); font-size: 0.82rem; }}
 .story-card__title {{
-  margin: 0 0 8px; font-size: 1.05rem; line-height: 1.3; color: var(--dark);
+  margin: 0 0 8px; font-size: 0.95rem; line-height: 1.25; color: var(--dark);
+  overflow: hidden; text-overflow: ellipsis;
+  display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical;
 }}
 .story-card__title a:hover {{ color: var(--primary); }}
 .story-card__body {{
@@ -368,9 +371,10 @@ tbody tr:hover {{ background: rgba(0,179,175,0.03); }}
 
 /* ── Responsive ───────────────────────────────────────────── */
 @media (max-width: 1400px) {{
-  .story-grid {{ grid-template-columns: repeat(2, 1fr); }}
+  .story-grid {{ grid-template-columns: repeat(3, 1fr); }}
 }}
 @media (max-width: 1100px) {{
+  .story-grid {{ grid-template-columns: repeat(2, 1fr); }}
   .stats-grid {{ grid-template-columns: repeat(2, 1fr); }}
 }}
 @media (max-width: 760px) {{
