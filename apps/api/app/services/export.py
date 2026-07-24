@@ -116,38 +116,76 @@ def generate_report_html(title: str, organization: object, opportunities: list[O
             return item.funding_amount_raw
         if item.funding_amount_value is not None:
             return f"{item.funding_amount_value:,.0f}".replace(",", ".")
-        return "No disponible"
+        return ""
 
     def _link_for(item: Opportunity) -> str:
         return item.official_url or item.application_url or "#"
 
     from app.services.validation import url_is_reachable  # lazy: avoid heavy import at module level
 
+    def _rich_summary(item: Opportunity) -> str:
+        """Return the best available summary, filtering slug-like noise."""
+        text = (item.summary or item.description or '').strip()
+        if not text:
+            return ''
+        # Detect slug-like summaries from sitemap connectors
+        slug_prefixes = ('sitemap entry:', 'convocatoria uniandes:', 'findeter ')
+        if any(text.lower().startswith(p) for p in slug_prefixes):
+            return ''
+        if text.startswith('http'):
+            return ''
+        return text
+
     def _card_html(item: Opportunity) -> str:
+        body_text = _rich_summary(item)
+        has_summary = bool(body_text)
+        has_close = bool(item.close_date)
+        has_amount = bool(item.funding_amount_raw or item.funding_amount_value)
+        has_categories = bool(item.categories)
+        entity_str = escape(repair_mojibake(item.entity or ''))
+        # Extract domain from URL as fallback context
+        domain_str = ''
+        url = _link_for(item)
+        if url and url != '#':
+            try:
+                from urllib.parse import urlparse as _up
+                domain_str = _up(url).netloc.replace('www.', '')
+            except Exception:
+                pass
+        # Build category chips
+        chips = ''
+        if has_categories:
+            chips = ' <div class="story-card__chips">' + ''.join(
+                f'<span class="chip">{escape(cat)}</span>'
+                for cat in item.categories[:4]
+            ) + '</div>'
+        # Show domain when both entity and summary are generic
+        show_domain = (not has_summary) and domain_str and (not entity_str or entity_str in ('Findeter', 'Universidad de los Andes'))
         return f"""
-        <article class="story-card">
+        <article class="story-card{' story-card--compact' if not has_summary else ''}">
           <div class="story-card__top">
             <span class="badge badge--{escape(item.status)}">{escape(item.status.replace('_', ' '))}</span>
-            <span class="story-card__country">{escape(item.country)}</span>
+            <span class="story-card__country">{escape(item.country or '')}</span>
           </div>
-          <h3 class="story-card__title">{f'<a href="{escape(_link_for(item))}" target="_blank" rel="noopener noreferrer">{escape(repair_mojibake(item.title))}</a>' if _link_for(item) != '#' else escape(repair_mojibake(item.title))}</h3>
-          {f'<p class="story-card__body">{escape(repair_mojibake(item.summary or item.description))}</p>' if (item.summary or item.description) else ''}
+          <h3 class="story-card__title">{f'<a href="{escape(url)}" target="_blank" rel="noopener noreferrer">{escape(repair_mojibake(item.title))}</a>' if url != '#' else escape(repair_mojibake(item.title))}</h3>
+          {f'<p class="story-card__body">{escape(repair_mojibake(body_text))}</p>' if has_summary else ''}
+          {chips}
           <div class="story-card__meta-grid">
-            <div class="story-card__metaitem">
-              <span class="story-card__label">Entidad</span>
-              <span class="story-card__value">{escape(repair_mojibake(item.entity))}</span>
+            <div class="story-card__metaitem" title="{entity_str}">
+              <span class="story-card__label">{'Fuente' if show_domain else 'Entidad'}</span>
+              <span class="story-card__value">{entity_str if not show_domain else domain_str}</span>
             </div>
             <div class="story-card__metaitem">
               <span class="story-card__label">Cierre</span>
-              <span class="story-card__value">{escape(item.close_date.date().isoformat() if item.close_date else 'Sin fecha')}</span>
+              <span class="story-card__value">{escape(item.close_date.date().isoformat() if has_close else '—')}</span>
             </div>
             <div class="story-card__metaitem">
               <span class="story-card__label">Monto</span>
-              <span class="story-card__value">{escape(_format_amount(item))}</span>
+              <span class="story-card__value">{escape(_format_amount(item)) if has_amount else '—'}</span>
             </div>
           </div>
           <div class="story-card__actions">
-            {f'<a class="btn" href="{escape(_link_for(item))}" target="_blank" rel="noopener noreferrer">Ver convocatoria</a>' if _link_for(item) != '#' else ''}
+            {f'<a class="btn" href="{escape(url)}" target="_blank" rel="noopener noreferrer">Ver convocatoria</a>' if url != '#' else ''}
             {f'<a class="btn btn--outline" href="{escape(item.application_url)}" target="_blank" rel="noopener noreferrer">Postular</a>' if item.application_url and url_is_reachable(item.application_url) else ''}
           </div>
         </article>
@@ -332,6 +370,22 @@ h1 {{
 }}
 .story-card__actions {{
   display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px;
+}}
+
+/* ── Chips (categories) ────────────────────────────────────── */
+.story-card__chips {{
+  display: flex; flex-wrap: wrap; gap: 4px; margin: 8px 0 0;
+}}
+.chip {{
+  display: inline-block; padding: 2px 8px;
+  border-radius: 999px; font-size: 0.7rem; font-weight: 600;
+  background: rgba(0,128,125,0.08); color: var(--primary);
+  letter-spacing: 0.02em;
+}}
+
+/* ── Compact card (no summary) ─────────────────────────────── */
+.story-card--compact .story-card__meta-grid {{
+  margin-top: 8px;
 }}
 
 /* ── Badges ───────────────────────────────────────────────── */
