@@ -599,6 +599,15 @@ async def enrich_opportunity_payload(data: OpportunityCreate) -> OpportunityCrea
             for flag in merged["risk_flags"]
             if "no se detectó una fecha de cierre" not in str(flag).lower()
         ]
+    # ── Post-processing: country inference + title cleanup ──────────────
+    from app.connectors.common import clean_opportunity_title, infer_country_from_entity
+    merged["title"] = clean_opportunity_title(merged.get("title"))
+    if not merged.get("country") or merged["country"] in ("Por validar", "Sin dato", ""):
+        inferred = infer_country_from_entity(
+            merged.get("entity"), merged.get("official_url"),
+        )
+        if inferred and inferred != "Por validar":
+            merged["country"] = inferred
     return OpportunityCreate(**merged)
 
 

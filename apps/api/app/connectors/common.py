@@ -573,7 +573,7 @@ async def enrich_from_detail_page(url: str) -> dict | None:
     """Fetch a detail page and extract title, close_date, funding_amount."""
     try:
         _, content, _ct = await fetch_httpx_text(
-            url, timeout_seconds=DETAIL_PAGE_TIMEOUT, retries=1, playwright_fallback=False,
+            url, timeout_seconds=DETAIL_PAGE_TIMEOUT, retries=1, playwright_fallback=True,
         )
     except Exception:
         return None
@@ -653,6 +653,177 @@ async def enrich_from_detail_page(url: str) -> dict | None:
                 result["funding_amount_raw"] = amount
 
     return result if result.get("title") else None
+
+
+# ── Title cleanup ───────────────────────────────────────────────────────────
+
+
+def clean_opportunity_title(title: str | None, max_len: int = 150) -> str:
+    """Clean and truncate opportunity titles.
+
+    Removes verbose suffixes common in Brazilian/LatAm portals:
+    - ``Instituição: ...``
+    - ``Cidade: ...``
+    - ``Inscrições até: ...``
+    - ``Fecha de cierre: ...``
+    """
+    if not title:
+        return title or ""
+
+    text = title.strip()
+    if len(text) <= max_len:
+        return text
+
+    # Remove verbose Portuguese/Spanish suffixes
+    for sep in ("Instituição:", "instituição:", "Cidade:", "cidade:",
+                "Inscrições até:", "inscrições até:", "Inscricoes ate:",
+                "Fecha de cierre:", "fecha de cierre:", "Deadline:",
+                "Inscrições:", "inscrições:", "Instituição:", "instituição:"):
+        idx = text.find(sep)
+        if idx > 20:  # Only if separator is past the first meaningful part
+            text = text[:idx].strip()
+            break
+
+    # If still too long, smart truncate at last period/semicolon before max_len
+    if len(text) > max_len:
+        for sep_char in (".", ";", "|", "/"):
+            truncated = text[:max_len]
+            last_sep = truncated.rfind(sep_char)
+            if last_sep > max_len // 2:
+                return truncated[:last_sep].strip() + "."
+        return text[:max_len].rsplit(" ", 1)[0] + "..."
+
+    return text
+
+
+# ── Country inference ───────────────────────────────────────────────────────
+
+
+_COUNTRY_MAP: dict[str, str] = {
+    # Domains → country
+    "findeter.gov.co": "Colombia",
+    "minciencias.gov.co": "Colombia",
+    "icetex.gov.co": "Colombia",
+    "apccolombia.gov.co": "Colombia",
+    "procolombia.co": "Colombia",
+    "colfuturo.org": "Colombia",
+    "dane.gov.co": "Colombia",
+    "sena.edu.co": "Colombia",
+    "rutanmedellin.org": "Colombia",
+    "ccb.org.co": "Colombia",
+    "bancoldex.com": "Colombia",
+    "unal.edu.co": "Colombia",
+    "udea.edu.co": "Colombia",
+    "innpulsacolombia.com": "Colombia",
+    "artesaniasdecolombia.com.co": "Colombia",
+    "fondoemprender.com": "Colombia",
+    "fapesp.br": "Brazil",
+    "finep.gov.br": "Brazil",
+    "gov.br": "Brazil",
+    "anp.gov.br": "Brazil",
+    "faperj.br": "Brazil",
+    "fapemig.br": "Brazil",
+    "conicet.gov.ar": "Argentina",
+    "anid.cl": "Chile",
+    "conahcyt.mx": "Mexico",
+    "gob.pe": "Peru",
+    "conacyt.gov.py": "Paraguay",
+    "nsf.gov": "United States",
+    "grants.gov": "United States",
+    "ukri.org": "United Kingdom",
+    "wellcome.org": "United Kingdom",
+    "ec.europa.eu": "European Union",
+    "eufundingportal.eu": "European Union",
+    "giz.de": "Germany",
+    "dfg.de": "Germany",
+    "sida.se": "Sweden",
+    "norad.no": "Norway",
+    "um.dk": "Denmark",
+    "novonordiskfonden.dk": "Denmark",
+    "lundbeckfonden.com": "Denmark",
+    "veluxfonden.dk": "Denmark",
+    "un.org": "International",
+    "unesco.org": "International",
+    "undp.org": "International",
+    "thegef.org": "International",
+    "greenclimate.fund": "International",
+    "iadb.org": "International",
+    "oei.int": "International",
+    "cepal.org": "International",
+    "segib.org": "International",
+    "globalinnovation.fund": "International",
+    "fordfoundation.org": "International",
+    "rockefellerfoundation.org": "International",
+    # Entities → country
+    "findeter": "Colombia",
+    "minciencias": "Colombia",
+    "icetex": "Colombia",
+    "apc colombia": "Colombia",
+    "procolombia": "Colombia",
+    "colfuturo": "Colombia",
+    "dane": "Colombia",
+    "sena": "Colombia",
+    "innpulsa": "Colombia",
+    "fondo emprender": "Colombia",
+    "universidad nacional": "Colombia",
+    "universidad de los andes": "Colombia",
+    "uniandes": "Colombia",
+    "fapesp": "Brazil",
+    "finep": "Brazil",
+    "cnpq": "Brazil",
+    "capes": "Brazil",
+    "conicet": "Argentina",
+    "fondecyt": "Chile",
+    "conahcyt": "Mexico",
+    "concytec": "Peru",
+    "bndes": "Brazil",
+    "developmentaid": "International",
+    "undef": "International",
+    "un women": "International",
+    "unesco": "International",
+    "undp": "International",
+    "ukri": "United Kingdom",
+    "uk research and innovation": "United Kingdom",
+    "wellcome trust": "United Kingdom",
+    "wellcome": "United Kingdom",
+    "horizon europe": "European Union",
+    "eic accelerator": "European Union",
+    "giz": "Germany",
+    "cdti": "Spain",
+    "isciii": "Spain",
+    "aecid": "Spain",
+}
+
+
+def infer_country_from_entity(entity_name: str | None, official_url: str | None = None) -> str:
+    """Infer country from entity name or domain.
+
+    Returns a country string or "Por validar" if unrecognised.
+    """
+    # 1. Try domain first (most specific)
+    if official_url:
+        domain = official_url.lower()
+        # Handle bare domains without scheme
+        if not domain.startswith("http"):
+            domain = "http://" + domain
+        from urllib.parse import urlparse
+        parsed = urlparse(domain)
+        hostname = parsed.hostname or ""
+        if hostname.startswith("www."):
+            hostname = hostname[4:]
+        # Check domain → country map
+        for key, country in _COUNTRY_MAP.items():
+            if key in hostname:
+                return country
+
+    # 2. Try entity name
+    if entity_name:
+        lower = entity_name.lower().strip()
+        for key, country in _COUNTRY_MAP.items():
+            if key in lower:
+                return country
+
+    return "Por validar"
 
 
 async def enrich_candidates_batch(
