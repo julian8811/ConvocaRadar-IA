@@ -121,12 +121,16 @@ def should_auto_pause(new_count: int) -> bool:
 
 
 def priority_for_score(score: float) -> str:
-    """Map a numeric score to a priority label."""
-    if score >= 85:
+    """Map a numeric score to a priority label.
+
+    Thresholds adjusted for real-world data where most scraped
+    opportunities lack funding amounts and detailed eligibility.
+    """
+    if score >= 75:
         return Priority.high.value
-    if score >= 65:
+    if score >= 55:
         return Priority.medium.value
-    if score >= 40:
+    if score >= 30:
         return Priority.low.value
     return Priority.not_recommended.value
 
@@ -158,9 +162,14 @@ def _compute_score(opportunity: Opportunity, profile: OrganizationProfile) -> di
     profile_areas = {item.lower() for item in profile.areas_of_interest}
     opp_topics = {item.lower() for item in [*opportunity.categories, *opportunity.topics]}
 
+    # ── Geo proximity: same country + same region bonus ──────────────────
+    SAME_REGION = {"LatAm", "Latin America"}
     if opportunity.country == profile.country:
         score += 15
         reasons.append(f"La convocatoria es del mismo país ({profile.country}).")
+    elif getattr(opportunity, "region", None) in SAME_REGION and getattr(profile, "country", "") in ("Colombia",):
+        score += 12
+        reasons.append("La convocatoria es de la misma región (LatAm).")
     elif profile.eligible_international:
         score += 10
         reasons.append("La convocatoria es internacional, permitido por el perfil.")
@@ -184,6 +193,7 @@ def _compute_score(opportunity: Opportunity, profile: OrganizationProfile) -> di
         score += 15
         reasons.append("No hay restricciones explícitas de tipo de organización.")
 
+    # ── Category / topic overlap ────────────────────────────────────────
     if profile_areas and opp_topics:
         overlap = profile_areas.intersection(opp_topics)
         if overlap:
@@ -198,8 +208,18 @@ def _compute_score(opportunity: Opportunity, profile: OrganizationProfile) -> di
                 score += 12
                 reasons.append(f"Coincidencia temática baja: {', '.join(sorted(overlap))}.")
         else:
-            score += 5
-            warnings.append("Las temáticas no coinciden con tus áreas de interés.")
+            # Fallback: try semantic similarity via embeddings
+            semantic = _semantic_score(
+                f"{opportunity.title} {opportunity.summary} {opportunity.description}",
+                " ".join(profile.areas_of_interest),
+            )
+            if semantic >= 0.3:
+                bonus = min(round(semantic * 25), 18)
+                score += bonus
+                reasons.append(f"Coincidencia semántica detectada ({bonus} pts).")
+            else:
+                score += 5
+                warnings.append("Las temáticas no coinciden con tus áreas de interés.")
     elif not profile_areas:
         score += 5
         warnings.append("Completa tus áreas de interés en el perfil.")
