@@ -124,14 +124,25 @@ def generate_report_html(title: str, organization: object, opportunities: list[O
     from app.services.validation import url_is_reachable  # lazy: avoid heavy import at module level
 
     def _rich_summary(item: Opportunity) -> str:
-        """Return the best available summary, filtering slug-like noise."""
+        """Return the best available summary, filtering noise."""
         text = (item.summary or item.description or '').strip()
         if not text:
             return ''
-        # Detect slug-like summaries from sitemap connectors
-        slug_prefixes = ('sitemap entry:', 'convocatoria uniandes:', 'findeter ')
+        # Filter sitemap noise (with or without colon)
+        if text.lower().startswith('sitemap entry'):
+            return ''
+        # Filter sitemap noise from connectors
+        slug_prefixes = ('convocatoria uniandes:', 'findeter ')
         if any(text.lower().startswith(p) for p in slug_prefixes):
             return ''
+        # Filter grant ID patterns like "DFOP0018586 | DOS-SA | Status: posted"
+        import re as _re
+        if _re.match(r'^[A-Z0-9\-]+\s*\|\s*[A-Z0-9\-]+\s*\|\s*Status:\s*', text):
+            return ''
+        # Filter lines starting with "Title " (UNDP RFP titles)
+        if text.startswith('Title '):
+            return ''
+        # Filter URLs
         if text.startswith('http'):
             return ''
         return text
