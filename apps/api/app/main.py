@@ -101,6 +101,27 @@ async def _run_periodic_source_sweep(interval_seconds: int | None = None) -> Non
                     except Exception as exc:
                         struct_logger.warning("send_pending_alerts_failed", error=str(exc))
 
+                    # Reactivate auto-paused sources that have cooled down
+                    from app.models import Source as _Source
+                    _cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(hours=24)
+                    _paused_list = list(
+                        db.scalars(
+                            select(_Source).where(
+                                _Source.auto_paused.is_(True),
+                                _Source.last_run_at.isnot(None),
+                                _Source.last_run_at < _cutoff,
+                            )
+                        )
+                    )
+                    for _src in _paused_list:
+                        _src.auto_paused = False
+                        _src.consecutive_empty_runs = 0
+                        _src.selector_failures = 0
+                        struct_logger.info("scheduler_reactivated", source_key=_src.key)
+                    if _paused_list:
+                        db.flush()
+                        struct_logger.info("auto_reactivated_sources", count=len(_paused_list))
+
                     # Batch score unscored opportunities for each org
                     from app.models import Opportunity, OpportunityScore, OrganizationProfile
                     from app.services.scoring import calculate_score
