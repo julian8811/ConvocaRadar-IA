@@ -382,7 +382,8 @@ async def test_report_creation() -> None:
     html = response.json()["html_content"]
     assert "ConvocaRadar IA" in html
     assert "Resumen ejecutivo" in html
-    assert "link-button" in html
+    assert "btn" in html
+    assert "ConvocaRadar IA" in html
     assert 'href="https://www.grants.gov/search-results-detail/fixture-grants-2026"' in html
     assert "Formato listo para lectura ejecutiva" in html
 

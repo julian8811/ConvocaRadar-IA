@@ -1,6 +1,6 @@
 ﻿"""Export utilities: CSV, XLSX, PDF, HTML report generation.
 
-Extracted from ``app/services.py`` (Change 3 â€” Architecture Refactor).
+Extracted from ``app/services.py`` (Change 3 — Architecture Refactor).
 """
 
 from __future__ import annotations
@@ -66,6 +66,29 @@ def export_xlsx(opportunities: list[Opportunity]) -> bytes:
     return output.getvalue()
 
 
+# ── Institutional brand constants ──────────────────────────────────────────
+
+_BRAND_PRIMARY = "#005652"
+_BRAND_SECONDARY = "#00b3af"
+_BRAND_ACCENT = "#00807d"
+_BRAND_DARK = "#003432"
+_BRAND_GOLD = "#ffcd00"
+_BRAND_BG = "#f4f9f8"
+
+_LOGO_SVG = (
+    '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="56" height="56">'
+    '<rect width="200" height="200" rx="36" fill="#005652"/>'
+    '<path d="M58 72 L100 48 L142 72 L142 108 C142 138 100 162 100 162 C100 162 58 138 58 108Z" '
+    'fill="none" stroke="#00b3af" stroke-width="6"/>'
+    '<path d="M82 95 C82 88 88 82 95 82 L105 82 C112 82 118 88 118 95 L118 105 '
+    'C118 112 112 118 105 118 L95 118 C88 118 82 112 82 105Z" fill="#ffcd00"/>'
+    '<circle cx="100" cy="100" r="6" fill="#003432"/>'
+    '<text x="100" y="148" text-anchor="middle" fill="#00b3af" font-family="Arial,sans-serif" '
+    'font-size="16" font-weight="bold">CR</text>'
+    '</svg>'
+)
+
+
 def generate_report_html(title: str, organization: object, opportunities: list[Opportunity]) -> str:
     """Generate a rich HTML report for an organization's opportunities.
 
@@ -108,21 +131,29 @@ def generate_report_html(title: str, organization: object, opportunities: list[O
     featured_cards = "\n".join(
         f"""
         <article class="story-card">
-          <div class="story-card__header">
-            <span class="story-card__eyebrow">{escape(item.status.replace('_', ' '))}</span>
-            <span class="story-card__meta">{escape(item.country)}</span>
+          <div class="story-card__top">
+            <span class="badge badge--{escape(item.status)}">{escape(item.status.replace('_', ' '))}</span>
+            <span class="story-card__country">{escape(item.country)}</span>
           </div>
           <h3 class="story-card__title">{f'<a href="{escape(_link_for(item))}" target="_blank" rel="noopener noreferrer">{escape(repair_mojibake(item.title))}</a>' if _link_for(item) != '#' else escape(repair_mojibake(item.title))}</h3>
           <p class="story-card__body">{escape(repair_mojibake(item.summary or item.description or 'Sin resumen disponible.'))}</p>
-          <dl class="story-card__facts">
-            <div><dt>Entidad</dt><dd>{escape(repair_mojibake(item.entity))}</dd></div>
-            <div><dt>Cierre</dt><dd>{escape(item.close_date.date().isoformat() if item.close_date else 'Sin fecha')}</dd></div>
-            <div><dt>Monto</dt><dd>{escape(_format_amount(item))}</dd></div>
-            <div><dt>Fuente</dt><dd>{escape(item.source_id or item.official_url or 'Fuente no identificada')}</dd></div>
-          </dl>
+          <div class="story-card__meta-grid">
+            <div class="story-card__metaitem">
+              <span class="story-card__label">Entidad</span>
+              <span class="story-card__value">{escape(repair_mojibake(item.entity))}</span>
+            </div>
+            <div class="story-card__metaitem">
+              <span class="story-card__label">Cierre</span>
+              <span class="story-card__value">{escape(item.close_date.date().isoformat() if item.close_date else 'Sin fecha')}</span>
+            </div>
+            <div class="story-card__metaitem">
+              <span class="story-card__label">Monto</span>
+              <span class="story-card__value">{escape(_format_amount(item))}</span>
+            </div>
+          </div>
           <div class="story-card__actions">
-            {f'<a class="link-button" href="{escape(_link_for(item))}" target="_blank" rel="noopener noreferrer">Ver convocatoria</a>' if _link_for(item) != '#' else ''}
-            {f'<a class="link-button link-button--ghost" href="{escape(item.application_url)}" target="_blank" rel="noopener noreferrer">Postular</a>' if item.application_url and url_is_reachable(item.application_url) else ''}
+            {f'<a class="btn" href="{escape(_link_for(item))}" target="_blank" rel="noopener noreferrer">Ver convocatoria</a>' if _link_for(item) != '#' else ''}
+            {f'<a class="btn btn--outline" href="{escape(item.application_url)}" target="_blank" rel="noopener noreferrer">Postular</a>' if item.application_url and url_is_reachable(item.application_url) else ''}
           </div>
         </article>
         """
@@ -137,7 +168,7 @@ def generate_report_html(title: str, organization: object, opportunities: list[O
           </td>
           <td>{escape(repair_mojibake(o.entity))}</td>
           <td>{escape(o.country)}</td>
-          <td><span class="status status--{escape(o.status)}">{escape(o.status)}</span></td>
+          <td><span class="badge badge--{escape(o.status)}">{escape(o.status.replace('_', ' '))}</span></td>
           <td>{escape(o.close_date.date().isoformat() if o.close_date else 'Sin fecha')}</td>
           <td>{escape(_format_amount(o))}</td>
         </tr>
@@ -151,245 +182,249 @@ def generate_report_html(title: str, organization: object, opportunities: list[O
 <head><meta charset="utf-8"><title>{escape(title)}</title>
 <style>
 :root {{
-  --bg: #f8fafc;
-  --surface: rgba(255,255,255,0.92);
-  --surface-strong: #ffffff;
+  --primary: {_BRAND_PRIMARY};
+  --secondary: {_BRAND_SECONDARY};
+  --accent: {_BRAND_ACCENT};
+  --dark: {_BRAND_DARK};
+  --gold: {_BRAND_GOLD};
+  --bg: {_BRAND_BG};
+  --surface: #ffffff;
   --text: #0f172a;
   --muted: #52617a;
   --border: #d8e1f3;
-  --accent: #0d4e5e;
-  --accent-soft: rgba(13, 78, 94, 0.09);
-  --accent-2: #4f46e5;
   --success: #15803d;
   --warning: #b45309;
   --danger: #b91c1c;
-  --shadow: 0 18px 42px -18px rgba(15, 23, 42, 0.24);
+  --shadow: 0 20px 48px -20px rgba(0,86,82,0.18);
 }}
 * {{ box-sizing: border-box; }}
 body {{
-  margin: 0;
-  padding: 32px 18px 48px;
-  font-family: Inter, Arial, sans-serif;
+  margin: 0; padding: 32px 18px 48px;
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
   color: var(--text);
-  background:
-    radial-gradient(circle at top, rgba(13, 78, 94, 0.1), transparent 34%),
-    linear-gradient(180deg, #faf8ff 0%, #eef2ff 100%);
+  background: linear-gradient(180deg, {_BRAND_BG} 0%, #ffffff 100%);
   line-height: 1.5;
 }}
 a {{ color: inherit; text-decoration: none; }}
 .shell {{ max-width: 1240px; margin: 0 auto; }}
+
+/* ── Header / Brand bar ────────────────────────────────── */
+.brand-bar {{
+  display: flex; align-items: center; gap: 16px;
+  margin-bottom: 24px; padding: 16px 24px;
+  background: var(--surface);
+  border-radius: 20px; border: 1px solid var(--border);
+  box-shadow: 0 4px 16px rgba(0,86,82,0.06);
+}}
+.brand-logo {{
+  width: 52px; height: 52px; flex-shrink: 0;
+}}
+.brand-logo svg {{ width: 100%; height: 100%; }}
+.brand-text {{
+  flex: 1; display: flex; flex-direction: column; gap: 2px;
+}}
+.brand-name {{
+  font-size: 1.2rem; font-weight: 700; color: var(--dark);
+  letter-spacing: -0.02em;
+}}
+.brand-tagline {{
+  font-size: 0.82rem; color: var(--muted);
+}}
+
+/* ── Hero ────────────────────────────────────────────────── */
 .hero {{
-  position: relative;
-  overflow: hidden;
-  border: 1px solid var(--border);
-  border-radius: 24px;
-  background: linear-gradient(135deg, rgba(255,255,255,0.92), rgba(242,243,255,0.92));
-  box-shadow: var(--shadow);
-  padding: 28px;
+  position: relative; overflow: hidden;
+  border: 1px solid var(--border); border-radius: 24px;
+  background: linear-gradient(135deg, var(--surface), rgba(0,179,175,0.04));
+  box-shadow: var(--shadow); padding: 32px;
 }}
 .hero::after {{
-  content: "";
-  position: absolute;
-  inset: 0;
+  content: ""; position: absolute; inset: 0;
   background:
-    radial-gradient(circle at top right, rgba(79, 70, 229, 0.12), transparent 28%),
-    radial-gradient(circle at bottom left, rgba(13, 78, 94, 0.12), transparent 24%);
+    radial-gradient(circle at top right, rgba(0,179,175,0.08), transparent 28%),
+    radial-gradient(circle at bottom left, rgba(0,86,82,0.06), transparent 24%);
   pointer-events: none;
 }}
-.hero__inner {{ position: relative; z-index: 1; display: grid; gap: 18px; }}
-.brand {{ display:flex; align-items:center; gap:14px; }} .brand img {{ width:56px; height:56px; object-fit:contain; background:#fff; border-radius:12px; padding:6px; }} .product {{ font-size:14px; font-weight:700; margin-top:4px; color:#cdeceb; }} .eyebrow {{
-  display: inline-flex;
-  align-items: center;
-  gap: 8px;
-  width: fit-content;
-  padding: 7px 12px;
-  border-radius: 999px;
-  border: 1px solid rgba(13, 78, 94, 0.16);
-  background: rgba(13, 78, 94, 0.06);
-  color: var(--accent);
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.08em;
-  text-transform: uppercase;
-}}
+.hero__inner {{ position: relative; z-index: 1; }}
 h1 {{
-  margin: 0;
-  font-size: clamp(2rem, 4vw, 3.5rem);
-  line-height: 1.03;
-  letter-spacing: -0.03em;
-  font-family: "Space Grotesk", "Inter", Arial, sans-serif;
+  margin: 0; font-size: clamp(1.8rem, 3.5vw, 3rem);
+  line-height: 1.05; letter-spacing: -0.025em;
+  color: var(--dark);
 }}
 .hero__lead {{
-  max-width: 720px;
-  font-size: 1.06rem;
-  color: var(--muted);
-  margin: 0;
+  max-width: 700px; font-size: 1rem; color: var(--muted); margin: 12px 0 0;
 }}
-.hero__toolbar {{ display: flex; flex-wrap: wrap; gap: 10px; margin-top: 4px; }}
-.button {{
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  min-height: 42px;
-  padding: 0 16px;
-  border-radius: 12px;
-  border: 1px solid var(--border);
-  background: var(--surface-strong);
-  color: var(--text);
-  font-weight: 600;
-  box-shadow: 0 4px 14px rgba(15, 23, 42, 0.04);
+.hero__toolbar {{ display: flex; flex-wrap: wrap; gap: 10px; margin-top: 20px; }}
+.btn {{
+  display: inline-flex; align-items: center; justify-content: center;
+  min-height: 40px; padding: 0 18px; border-radius: 12px;
+  border: 1px solid var(--border); background: var(--surface);
+  color: var(--text); font-weight: 600; font-size: 0.9rem;
+  transition: all 0.15s ease;
 }}
-.button--primary {{ border-color: transparent; background: linear-gradient(135deg, var(--accent), #0f766e); color: #fff; }}
-.button--ghost {{ background: rgba(255,255,255,0.8); }}
-.grid-stats {{
-  display: grid;
-  grid-template-columns: repeat(4, minmax(0, 1fr));
-  gap: 12px;
-  margin: 18px 0 32px;
+.btn:hover {{ box-shadow: 0 4px 12px rgba(0,86,82,0.12); }}
+.btn--primary {{
+  border-color: transparent; background: linear-gradient(135deg, var(--primary), var(--accent));
+  color: #fff;
+}}
+.btn--outline {{
+  border-color: var(--secondary); color: var(--primary);
+  background: transparent;
+}}
+
+/* ── Stats grid ──────────────────────────────────────────── */
+.stats-grid {{
+  display: grid; grid-template-columns: repeat(4, 1fr); gap: 12px;
+  margin: 24px 0 32px;
 }}
 .stat {{
-  border: 1px solid var(--border);
-  border-radius: 18px;
-  padding: 16px;
-  background: var(--surface);
+  border: 1px solid var(--border); border-radius: 18px; padding: 16px;
+  background: var(--surface); box-shadow: 0 2px 8px rgba(0,86,82,0.04);
 }}
+.stat:hover {{ border-color: var(--secondary); }}
 .stat span {{
-  display: block;
-  font-size: 11px;
-  font-weight: 700;
-  letter-spacing: 0.12em;
-  text-transform: uppercase;
-  color: var(--muted);
+  display: block; font-size: 11px; font-weight: 700;
+  text-transform: uppercase; letter-spacing: 0.1em; color: var(--muted);
 }}
-.stat strong {{ display: block; margin-top: 6px; font-size: 28px; line-height: 1; color: var(--text); }}
+.stat strong {{
+  display: block; margin-top: 6px; font-size: 28px; line-height: 1;
+  color: var(--dark);
+}}
+
+/* ── Sections ─────────────────────────────────────────────── */
 .section {{
-  margin-top: 26px;
-  border: 1px solid var(--border);
-  border-radius: 22px;
-  background: var(--surface);
-  box-shadow: 0 10px 28px -18px rgba(15, 23, 42, 0.22);
-  overflow: hidden;
+  margin-top: 24px;
+  border: 1px solid var(--border); border-radius: 22px;
+  background: var(--surface); box-shadow: var(--shadow); overflow: hidden;
 }}
-.section__head {{ padding: 20px 22px 0; }}
-.section__title {{ margin: 0; font-family: "Space Grotesk", "Inter", Arial, sans-serif; font-size: 1.35rem; }}
-.section__subtitle {{ margin: 6px 0 0; color: var(--muted); font-size: 0.96rem; }}
-.section__body {{ padding: 20px 22px 24px; }}
-.grid-2 {{ display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }}
-.story-grid {{ display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 16px; }}
+.section__head {{ padding: 22px 24px 0; }}
+.section__title {{ margin: 0; font-size: 1.25rem; color: var(--dark); }}
+.section__subtitle {{ margin: 6px 0 0; color: var(--muted); font-size: 0.92rem; }}
+.section__body {{ padding: 20px 24px 24px; }}
+
+/* ── Story cards (improved) ───────────────────────────────── */
+.story-grid {{
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 18px;
+}}
 .story-card {{
-  border: 1px solid var(--border);
-  border-radius: 18px;
-  background: linear-gradient(180deg, rgba(255,255,255,0.96), rgba(248,250,252,0.98));
-  padding: 18px;
-  min-height: 100%;
+  border: 1px solid var(--border); border-radius: 18px;
+  background: var(--surface);
+  padding: 20px; display: flex; flex-direction: column;
+  transition: all 0.15s ease;
 }}
-.story-card__header {{ display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 12px; flex-wrap: wrap; }}
-.story-card__eyebrow {{
-  padding: 4px 8px;
-  border-radius: 999px;
-  background: var(--accent-soft);
-  color: var(--accent);
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
+.story-card:hover {{
+  border-color: var(--secondary); box-shadow: 0 8px 24px rgba(0,179,175,0.1);
 }}
-.story-card__meta {{ color: var(--muted); font-size: 12px; }}
-.story-card__title {{ margin: 0 0 10px; font-size: 1.12rem; line-height: 1.3; }}
-.story-card__title a:hover {{ color: var(--accent); }}
-.story-card__body {{ margin: 0; color: var(--muted); font-size: 0.96rem; }}
-.story-card__facts {{
-  display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px 14px;
-  margin: 16px 0 0;
+.story-card__top {{
+  display: flex; justify-content: space-between; align-items: center;
+  gap: 10px; margin-bottom: 12px; flex-wrap: wrap;
 }}
-.story-card__facts div {{ padding-top: 10px; border-top: 1px solid rgba(82, 97, 122, 0.15); }}
-.story-card__facts dt {{ font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.08em; font-weight: 700; }}
-.story-card__facts dd {{ margin: 4px 0 0; font-size: 0.93rem; font-weight: 600; color: var(--text); }}
-.story-card__actions {{ display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }}
-.link-button {{
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  min-height: 38px;
-  padding: 0 14px;
-  border-radius: 11px;
-  background: var(--accent);
-  color: #fff;
-  font-size: 0.88rem;
-  font-weight: 700;
+.story-card__country {{ color: var(--muted); font-size: 0.82rem; }}
+.story-card__title {{
+  margin: 0 0 8px; font-size: 1.05rem; line-height: 1.3; color: var(--dark);
 }}
-.link-button--ghost {{
-  background: rgba(79, 70, 229, 0.09);
-  color: var(--accent-2);
-  border: 1px solid rgba(79, 70, 229, 0.18);
+.story-card__title a:hover {{ color: var(--primary); }}
+.story-card__body {{
+  margin: 0; color: var(--muted); font-size: 0.88rem;
+  display: -webkit-box; -webkit-line-clamp: 3; -webkit-box-orient: vertical;
+  overflow: hidden; flex: 1;
 }}
-table {{ width: 100%; border-collapse: collapse; overflow: hidden; }}
-thead th {{
-  background: #f2f5fb;
-  color: #334155;
-  font-size: 12px;
-  font-weight: 700;
-  text-transform: uppercase;
-  letter-spacing: 0.08em;
-  border-bottom: 1px solid var(--border);
-  text-align: left;
-  padding: 12px 14px;
+.story-card__meta-grid {{
+  display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px;
+  margin: 14px 0 0; padding-top: 14px;
+  border-top: 1px solid rgba(0,86,82,0.08);
 }}
-tbody td {{ border-bottom: 1px solid rgba(216, 225, 243, 0.9); padding: 13px 14px; font-size: 13px; vertical-align: top; }}
-tbody tr:hover {{ background: rgba(13, 78, 94, 0.03); }}
-.col-title a {{ display: block; font-weight: 700; color: var(--text); }}
-.col-title span {{ display: block; margin-top: 4px; color: var(--muted); font-size: 12px; line-height: 1.35; }}
-.status {{
-  display: inline-flex;
-  align-items: center;
-  padding: 4px 8px;
-  border-radius: 999px;
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: capitalize;
+.story-card__metaitem {{
+  display: flex; flex-direction: column; gap: 2px;
 }}
-.status--open {{ background: rgba(21, 128, 61, 0.1); color: var(--success); }}
-.status--closing_soon {{ background: rgba(180, 83, 9, 0.1); color: var(--warning); }}
-.status--closed {{ background: rgba(100, 116, 139, 0.12); color: #475569; }}
-.status--unknown {{ background: rgba(100, 116, 139, 0.12); color: #475569; }}
-.status--draft {{ background: rgba(79, 70, 229, 0.1); color: var(--accent-2); }}
-.status--archived {{ background: rgba(100, 116, 139, 0.12); color: #475569; }}
-.note {{ font-size: 12px; color: var(--muted); margin: 0; }}
-.stack {{ display: grid; gap: 18px; }}
+.story-card__label {{
+  font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.08em;
+  font-weight: 700; color: var(--muted);
+}}
+.story-card__value {{
+  font-size: 0.82rem; font-weight: 600; color: var(--dark);
+  overflow: hidden; text-overflow: ellipsis; white-space: nowrap;
+}}
+.story-card__actions {{
+  display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px;
+}}
+
+/* ── Badges ───────────────────────────────────────────────── */
+.badge {{
+  display: inline-flex; align-items: center; padding: 4px 10px;
+  border-radius: 999px; font-size: 0.75rem; font-weight: 700;
+  text-transform: capitalize; letter-spacing: 0.02em;
+}}
+.badge--open {{ background: rgba(21,128,61,0.1); color: var(--success); }}
+.badge--closing_soon {{ background: rgba(180,83,9,0.1); color: var(--warning); }}
+.badge--closed {{ background: rgba(100,116,139,0.12); color: #475569; }}
+.badge--unknown {{ background: rgba(100,116,139,0.12); color: #475569; }}
+.badge--draft {{ background: rgba(0,179,175,0.1); color: var(--primary); }}
+.badge--archived {{ background: rgba(100,116,139,0.12); color: #475569; }}
+
+/* ── Table ─────────────────────────────────────────────────── */
 .grid-table-wrap {{ overflow-x: auto; }}
+table {{ width: 100%; border-collapse: collapse; }}
+thead th {{
+  background: {_BRAND_BG}; color: var(--dark); font-size: 0.75rem;
+  font-weight: 700; text-transform: uppercase; letter-spacing: 0.06em;
+  border-bottom: 2px solid var(--secondary);
+  text-align: left; padding: 12px 14px;
+}}
+tbody td {{
+  border-bottom: 1px solid rgba(0,86,82,0.06); padding: 12px 14px;
+  font-size: 0.85rem; vertical-align: top;
+}}
+tbody tr:hover {{ background: rgba(0,179,175,0.03); }}
+.col-title a {{ display: block; font-weight: 700; color: var(--dark); }}
+.col-title a:hover {{ color: var(--primary); }}
+.col-title span {{ display: block; margin-top: 3px; color: var(--muted); font-size: 0.78rem; }}
+
+/* ── Methodology ─────────────────────────────────────────── */
+.stack {{ display: grid; gap: 14px; }}
+.grid-2 {{ display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }}
+.note {{ font-size: 0.82rem; color: var(--muted); margin: 0; }}
+
+/* ── Responsive ───────────────────────────────────────────── */
 @media (max-width: 1100px) {{
-  .grid-stats, .story-grid, .grid-2 {{ grid-template-columns: 1fr 1fr; }}
+  .story-grid {{ grid-template-columns: 1fr 1fr; }}
+  .stats-grid {{ grid-template-columns: repeat(2, 1fr); }}
 }}
 @media (max-width: 760px) {{
   body {{ padding: 18px 12px 28px; }}
-  .hero, .section {{ border-radius: 18px; }}
-  .grid-stats, .story-grid, .grid-2 {{ grid-template-columns: 1fr; }}
-  .story-card__facts {{ grid-template-columns: 1fr; }}
+  .brand-bar {{ flex-wrap: wrap; }}
+  .story-grid, .stats-grid, .grid-2 {{ grid-template-columns: 1fr; }}
+  .story-card__meta-grid {{ grid-template-columns: 1fr; }}
 }}
 </style></head>
 <body>
 <div class="shell">
+
+<div class="brand-bar">
+  <div class="brand-logo">{_LOGO_SVG}</div>
+  <div class="brand-text">
+    <div class="brand-name">ConvocaRadar IA</div>
+    <div class="brand-tagline">Observatorio Inteligente de Convocatorias &middot; {escape(org_name)}</div>
+  </div>
+</div>
+
 <section class="hero">
   <div class="hero__inner">
-    <div class="eyebrow">ConvocaRadar IA</div>
     <h1>{escape(title)}</h1>
-    <p class="hero__lead">Organización: {escape(org_name)} · Generado: {format_bogota(now_bogota()) + " (hora de Bogotá)"} · Reporte ejecutivo de oportunidades filtradas y priorizadas para revisión institucional.</p>
+    <p class="hero__lead">Generado: {format_bogota(now_bogota())} (hora de Bogot&aacute;) &middot; {total} oportunidades identificadas.</p>
     <div class="hero__toolbar">
-      <a class="button button--primary" href="#oportunidades">Ver convocatorias</a>
-      <a class="button" href="#resumen">Resumen ejecutivo</a>
-      <a class="button button--ghost" href="#metodologia">Metodología</a>
+      <a class="btn btn--primary" href="#oportunidades">Ver convocatorias</a>
+      <a class="btn" href="#resumen">Resumen ejecutivo</a>
+      <a class="btn" href="#metodologia">Metodolog&iacute;a</a>
     </div>
   </div>
 </section>
 
-<section class="grid-stats" aria-label="Resumen de indicadores">
-  <div class="stat"><span>Total oportunidades</span><strong>{total}</strong></div>
+<section class="stats-grid" aria-label="Indicadores">
+  <div class="stat"><span>Total</span><strong>{total}</strong></div>
   <div class="stat"><span>Abiertas</span><strong>{open_count}</strong></div>
   <div class="stat"><span>Por cerrar</span><strong>{closing_soon_count}</strong></div>
-  <div class="stat"><span>Con fecha de cierre</span><strong>{with_date}</strong></div>
+  <div class="stat"><span>Con fecha</span><strong>{with_date}</strong></div>
   <div class="stat"><span>Con fuente</span><strong>{with_source}</strong></div>
   <div class="stat"><span>Con resumen</span><strong>{with_summary}</strong></div>
   <div class="stat"><span>Con monto</span><strong>{with_amount}</strong></div>
@@ -399,16 +434,16 @@ tbody tr:hover {{ background: rgba(13, 78, 94, 0.03); }}
 <section class="section" id="resumen">
   <div class="section__head">
     <h2 class="section__title">Resumen ejecutivo</h2>
-    <p class="section__subtitle">Lectura rápida del estado de la cartera de convocatorias.</p>
+    <p class="section__subtitle">Lectura r&aacute;pida del estado de la cartera de convocatorias.</p>
   </div>
   <div class="section__body stack">
-    <p>Se identificaron {total} oportunidades relevantes para revisión institucional. {closed_count} ya están cerradas y {closing_soon_count} requieren atención cercana.</p>
+    <p>Se identificaron {total} oportunidades relevantes. {closed_count} ya est&aacute;n cerradas y {closing_soon_count} requieren atenci&oacute;n inmediata.</p>
     <div class="grid-2">
       <div>
-        <table><thead><tr><th>Principales países</th><th>Oportunidades</th></tr></thead><tbody>{country_rows or '<tr><td colspan="2">Sin datos</td></tr>'}</tbody></table>
+        <table><thead><tr><th>Pa&iacute;ses principales</th><th>Oportunidades</th></tr></thead><tbody>{country_rows or '<tr><td colspan="2">Sin datos</td></tr>'}</tbody></table>
       </div>
       <div>
-        <table><thead><tr><th>Principales categorías</th><th>Oportunidades</th></tr></thead><tbody>{category_rows or '<tr><td colspan="2">Sin datos</td></tr>'}</tbody></table>
+        <table><thead><tr><th>Categor&iacute;as principales</th><th>Oportunidades</th></tr></thead><tbody>{category_rows or '<tr><td colspan="2">Sin datos</td></tr>'}</tbody></table>
       </div>
     </div>
   </div>
@@ -416,8 +451,8 @@ tbody tr:hover {{ background: rgba(13, 78, 94, 0.03); }}
 
 <section class="section">
   <div class="section__head">
-    <h2 class="section__title">Panorama visual</h2>
-    <p class="section__subtitle">Bloques editoriales para revisar la cartera con más contexto.</p>
+    <h2 class="section__title">Convocatorias destacadas</h2>
+    <p class="section__subtitle">Tarjetas editoriales con las oportunidades m&aacute;s relevantes.</p>
   </div>
   <div class="section__body">
     <div class="story-grid">
@@ -428,12 +463,12 @@ tbody tr:hover {{ background: rgba(13, 78, 94, 0.03); }}
 
 <section class="section" id="oportunidades">
   <div class="section__head">
-    <h2 class="section__title">Convocatorias recomendadas</h2>
-    <p class="section__subtitle">Cada título enlaza la convocatoria oficial para consultar y actuar directamente.</p>
+    <h2 class="section__title">Todas las convocatorias</h2>
+    <p class="section__subtitle">Listado completo con enlace oficial a cada convocatoria.</p>
   </div>
   <div class="section__body grid-table-wrap">
     <table>
-      <thead><tr><th>Título</th><th>Entidad</th><th>País</th><th>Estado</th><th>Cierre</th><th>Monto</th></tr></thead>
+      <thead><tr><th>T&iacute;tulo</th><th>Entidad</th><th>Pa&iacute;s</th><th>Estado</th><th>Cierre</th><th>Monto</th></tr></thead>
       <tbody>{rows or '<tr><td colspan="6">Sin convocatorias disponibles</td></tr>'}</tbody>
     </table>
   </div>
@@ -441,11 +476,11 @@ tbody tr:hover {{ background: rgba(13, 78, 94, 0.03); }}
 
 <section class="section" id="metodologia">
   <div class="section__head">
-    <h2 class="section__title">Metodología</h2>
-    <p class="section__subtitle">Formato listo para lectura ejecutiva, exportación e impresión.</p>
+    <h2 class="section__title">Metodolog&iacute;a</h2>
+    <p class="section__subtitle">Formato listo para lectura ejecutiva, exportaci&oacute;n e impresi&oacute;n.</p>
   </div>
   <div class="section__body stack">
-    <p>Reporte generado desde fuentes configuradas, con normalización, deduplicación y priorización automática. El archivo PDF se renderiza con Playwright y, si el motor no está disponible, cae a una salida tipográfica de respaldo.</p>
+    <p>Reporte generado desde +90 fuentes configuradas en 14 pa&iacute;ses, con normalizaci&oacute;n, deduplicaci&oacute;n y priorizaci&oacute;n autom&aacute;tica mediante algoritmos de compatibilidad y embeddings sem&aacute;nticos.</p>
     <p class="note">Cobertura de datos: {with_source} con fuente, {with_summary} con resumen, {with_amount} con monto y {with_date} con fecha de cierre.</p>
   </div>
 </section>
@@ -540,8 +575,3 @@ def export_pdf(title: str, organization: object, opportunities: list[Opportunity
     )
     document.build(story)
     return output.getvalue()
-
-
-
-
-
