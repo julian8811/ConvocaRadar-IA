@@ -105,12 +105,14 @@ export default function LoginPage() {
                 </p>
               )}
           </form>
-          <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-            ¿Primera vez aquí?{" "}
+          <div className="mt-3 flex items-center justify-between text-sm">
+            <Link href="/forgot-password" className="font-medium text-cyan-700 hover:underline dark:text-cyan-300">
+              ¿Olvidaste tu contraseña?
+            </Link>
             <Link href="/register" className="font-medium text-cyan-700 hover:underline dark:text-cyan-300">
               Crear cuenta
             </Link>
-          </p>
+          </div>
         </CardContent>
       </Card>
     </main>
