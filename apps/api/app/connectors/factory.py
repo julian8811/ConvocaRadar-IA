@@ -39,6 +39,10 @@ from app.connectors.dane import DaneConnector
 from app.connectors.brazil_portals import FinepConnector
 from app.connectors.findeter import FindeterConnector  # noqa: F401 — @register side effect
 from app.connectors.uniandes import UniandesConnector  # noqa: F401 — @register side effect
+from app.connectors.erc_calls import ErcCallsConnector  # noqa: F401
+from app.connectors.cost_open_calls import CostOpenCallsConnector  # noqa: F401
+from app.connectors.caricom import CaricomConnector  # noqa: F401
+from app.connectors.ascun import AscunConnector  # noqa: F401
 
 
 WORDPRESS_GRANT_SOURCE_KEYS = {
