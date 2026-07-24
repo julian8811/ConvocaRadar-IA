@@ -380,10 +380,9 @@ async def test_report_creation() -> None:
     response = c.post("/api/v1/reports", headers=auth, json={"title": "Reporte institucional", "format": "html"})
     assert response.status_code == 200
     html = response.json()["html_content"]
-    assert "ConvocaRadar IA" in html
     assert "Resumen ejecutivo" in html
     assert "btn" in html
-    assert "ConvocaRadar IA" in html
+    assert "Observatorio de Convocatorias" in html
     assert 'href="https://www.grants.gov/search-results-detail/fixture-grants-2026"' in html
     assert "Formato listo para lectura ejecutiva" in html
 

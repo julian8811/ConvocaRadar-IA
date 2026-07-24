@@ -26,9 +26,11 @@ def _report_opportunities(db: Session, report: Report) -> list[Opportunity]:
     return list(db.scalars(stmt.limit(200)))
 
 
-def _safe_report_name(title: str) -> str:
-    cleaned = "".join(char.lower() if char.isalnum() else "-" for char in title).strip("-")
-    return cleaned[:48] or "report"
+def _safe_report_name(title: str, *, prefix: str = "reporte-convocatorias") -> str:
+    """Generate a safe filename. Uses a date-based format by default."""
+    from datetime import date as _date
+    today = _date.today().strftime("%Y-%m-%d")
+    return f"{prefix}-{today}"
 
 
 def _store_report_artifact(db: Session, report: Report, content: bytes, media_type: str, extension: str) -> None:
