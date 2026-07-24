@@ -58,6 +58,21 @@ def _send_alert(alert: Alert) -> None:
     alert.sent_at = datetime.now(UTC).replace(tzinfo=None)
 
 
+@router.get("/alerts/count")
+def count_pending_alerts(
+    organization: Organization = Depends(get_current_organization),
+    db: Session = Depends(get_db),
+) -> dict[str, int]:
+    """Return count of pending alerts for the current org (in-app badge)."""
+    total = db.scalar(
+        select(func.count(Alert.id)).where(
+            Alert.organization_id == organization.id,
+            Alert.status == "pending",
+        )
+    ) or 0
+    return {"pending": total}
+
+
 @router.get("/alerts", response_model=list[AlertRead])
 def list_alerts(
     organization: Organization = Depends(get_current_organization),

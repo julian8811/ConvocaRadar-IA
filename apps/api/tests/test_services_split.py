@@ -198,9 +198,9 @@ class TestScoringModule:
 
     def test_priority_for_score(self) -> None:
         from app.services.scoring import priority_for_score
-        assert priority_for_score(90) == "high"
-        assert priority_for_score(75) == "medium"
-        assert priority_for_score(50) == "low"
+        assert priority_for_score(80) == "high"
+        assert priority_for_score(65) == "medium"
+        assert priority_for_score(40) == "low"
         assert priority_for_score(20) == "not_recommended"
 
     def test_semantic_score_empty(self) -> None:
