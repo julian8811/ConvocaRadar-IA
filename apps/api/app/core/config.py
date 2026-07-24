@@ -36,6 +36,11 @@ class Settings(BaseSettings):
     scraping_max_source_seconds: int = 180
     scraping_max_concurrency: int = 5
     scraping_closing_soon_days: int = 10
+    scraping_proxy_list: list[str] = Field(
+        default_factory=list,
+        description="Comma-separated proxy URLs for rotation. "
+                    "Format: http://user:pass@host:port,http://user:pass@host2:port",
+    )
     internal_api_key: str = Field(min_length=32)
     reset_token_secret: str | None = None
     sedia_api_key: str = "SEDIA"
