@@ -16,7 +16,7 @@ from app.core.security import (
 )
 from app.core.task_queue import enqueue_seed_default_sources
 from app.db.session import get_db
-from app.models import AuditLog, Organization, OrganizationProfile, Role, User
+from app.models import Organization, OrganizationProfile, Role, User
 from app.schemas import (
     ChangePasswordRequest,
     ForgotPasswordRequest,
@@ -26,7 +26,7 @@ from app.schemas import (
     Token,
     UserRead,
 )
-from app.services import slugify
+from app.services import audit, slugify
 
 router = APIRouter()
 logger = structlog.get_logger(__name__)
@@ -223,15 +223,7 @@ def change_password(
         raise HTTPException(status_code=400, detail="Current password is incorrect")
     user.password_hash = hash_password(payload.new_password)
     user.password_changed_at = datetime.now(UTC)
-    db.add(
-        AuditLog(
-            organization_id=user.organization_id,
-            user_id=user.id,
-            action="change_password",
-            resource_type="user",
-            resource_id=user.id,
-        )
-    )
+    audit(db, "change_password", "user", user, user.id)
     db.commit()
     logger.info("auth.change_password", user_id=user.id)
     return Response(status_code=204)
@@ -319,16 +311,7 @@ def forgot_password(
             from app.core.config import get_settings
             if get_settings().app_env == "development":
                 detail = reset_url
-        db.add(
-            AuditLog(
-                organization_id=user.organization_id,
-                user_id=user.id,
-                action="forgot_password_requested",
-                resource_type="user",
-                resource_id=user.id,
-                metadata_json={"ip": _client_ip(request)},
-            )
-        )
+        audit(db, "forgot_password_requested", "user", user, user.id, metadata={"ip": _client_ip(request)})
         db.commit()
     return {"detail": detail}
 
@@ -411,15 +394,7 @@ def reset_password(
     # All checks passed — apply the reset.
     user.password_hash = hash_password(payload.new_password)
     user.password_changed_at = datetime.now(UTC)
-    db.add(
-        AuditLog(
-            organization_id=user.organization_id,
-            user_id=user.id,
-            action="password_reset",
-            resource_type="user",
-            resource_id=user.id,
-        )
-    )
+    audit(db, "password_reset", "user", user, user.id)
     db.commit()
     logger.info("auth.password_reset", user_id=user.id)
     return Response(status_code=204)
