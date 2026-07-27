@@ -501,6 +501,92 @@ class TestGenaiModule:
         assert "organization_id" in sig.parameters
 
 
+class TestConnectorsModule:
+    """Characterization for 8 connectors/scraping functions (to be extracted to connectors.py, PR C-1).
+
+    These reference app.services.connectors which does NOT exist yet.
+    They fail until connectors.py is created (GREEN step).
+    """
+
+    def test_connector_for_signature(self) -> None:
+        """connector_for is callable with source_key."""
+        from app.services.connectors import connector_for
+        from inspect import signature
+        sig = signature(connector_for)
+        assert "source_key" in sig.parameters
+
+    def test_is_slow_scrape_source_matches_key(self) -> None:
+        """is_slow_scrape_source returns True for known slow keys."""
+        from app.services.connectors import is_slow_scrape_source, SLOW_SCRAPE_SOURCE_KEYS
+        from unittest.mock import MagicMock
+        source = MagicMock()
+        source.key = next(iter(SLOW_SCRAPE_SOURCE_KEYS))
+        source.source_type = "rss"
+        assert is_slow_scrape_source(source) is True
+
+    def test_is_slow_scrape_source_not_slow(self) -> None:
+        """is_slow_scrape_source returns False for normal keys."""
+        from app.services.connectors import is_slow_scrape_source
+        from unittest.mock import MagicMock
+        source = MagicMock()
+        source.key = "fast-source"
+        source.source_type = "rss"
+        assert is_slow_scrape_source(source) is False
+
+    def test_source_due_for_scraping_no_last_run(self) -> None:
+        """source_due_for_scraping returns True when never run."""
+        from app.services.connectors import source_due_for_scraping
+        from unittest.mock import MagicMock
+        source = MagicMock()
+        source.last_run_at = None
+        source.scraping_frequency = "daily"
+        assert source_due_for_scraping(source) is True
+
+    def test_source_due_for_scraping_hourly(self) -> None:
+        """source_due_for_scraping returns True for hourly frequency."""
+        from app.services.connectors import source_due_for_scraping
+        from unittest.mock import MagicMock
+        source = MagicMock()
+        source.scraping_frequency = "hourly"
+        source.last_run_at = None
+        assert source_due_for_scraping(source) is True
+
+    def test_SLOW_SCRAPE_SOURCE_KEYS_content(self) -> None:
+        """SLOW_SCRAPE_SOURCE_KEYS is a frozenset with expected entries."""
+        from app.services.connectors import SLOW_SCRAPE_SOURCE_KEYS
+        assert isinstance(SLOW_SCRAPE_SOURCE_KEYS, frozenset)
+        assert "innovamos-global-innovation-fund" in SLOW_SCRAPE_SOURCE_KEYS
+        assert "apc-colombia" in SLOW_SCRAPE_SOURCE_KEYS
+
+    def test_SLOW_SCRAPE_SOURCE_TYPES_content(self) -> None:
+        """SLOW_SCRAPE_SOURCE_TYPES is a frozenset with 'hybrid'."""
+        from app.services.connectors import SLOW_SCRAPE_SOURCE_TYPES
+        assert isinstance(SLOW_SCRAPE_SOURCE_TYPES, frozenset)
+        assert "hybrid" in SLOW_SCRAPE_SOURCE_TYPES
+
+    def test_execute_source_run_locally_signature(self) -> None:
+        """execute_source_run_locally is callable with db + source."""
+        from app.services.connectors import execute_source_run_locally
+        from inspect import signature
+        sig = signature(execute_source_run_locally)
+        assert "db" in sig.parameters
+        assert "source" in sig.parameters
+
+    def test__scrape_source_candidates_signature(self) -> None:
+        """_scrape_source_candidates is async callable with source."""
+        from app.services.connectors import _scrape_source_candidates
+        from inspect import signature
+        sig = signature(_scrape_source_candidates)
+        assert "source" in sig.parameters
+
+    def test__scrape_source_candidates_with_timeout_signature(self) -> None:
+        """_scrape_source_candidates_with_timeout is async callable."""
+        from app.services.connectors import _scrape_source_candidates_with_timeout
+        from inspect import signature
+        sig = signature(_scrape_source_candidates_with_timeout)
+        assert "source" in sig.parameters
+
+
 class TestNoLegacyDuplicates:
     """PR A-1: Verify 36 duplicated functions are no longer defined in _legacy.py."""
 
