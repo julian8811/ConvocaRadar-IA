@@ -37,12 +37,6 @@ from app.services._legacy import (  # noqa: F401
     summarize_text,
     # Query / count
     count_query,
-    # Triage / dashboard helpers (PR B-1a)
-    _STATUS_LABELS,
-    _triage_days_to_close,
-    extract_score_reasons,
-    get_closing_soon_7d,
-    get_review_queue,
     # Pipeline helpers (PR B-1b)
     _pipeline_days_to_close,
     get_closing_soon,
@@ -114,6 +108,15 @@ from app.services.export import (  # noqa: F401
     export_pdf,
     export_xlsx,
     generate_report_html,
+)
+
+# ── dashboard.py — triage, pipeline, and health queries ──────────────────────
+from app.services.dashboard import (  # noqa: F401
+    _STATUS_LABELS,
+    _triage_days_to_close,
+    extract_score_reasons,
+    get_closing_soon_7d,
+    get_review_queue,
 )
 
 # ── search.py — semantic + lexical search ────────────────────────────────────
