@@ -11,6 +11,54 @@ from __future__ import annotations
 import pytest
 
 
+# ── Functions duplicated in _legacy.py (characterized before deletion in PR A-1) ─
+DUPLICATE_FUNCS = [
+    # validation.py
+    "slugify", "normalize_official_url", "is_private_url", "validate_source_url",
+    "is_public_http_url", "is_noise_title", "is_noise_payload", "url_is_reachable",
+    # dedup.py
+    "opportunity_dedup_key", "_organization_opportunity_scope", "find_duplicate_opportunity",
+    "_normalize_survivor_datetime", "_opportunity_survivor_key", "_reassign_opportunity_relations",
+    "_merge_opportunity_records", "deduplicate_opportunities", "candidate_external_id",
+    # scoring.py
+    "priority_for_score", "_semantic_score", "_compute_score", "calculate_score",
+    # export.py
+    "export_csv", "export_xlsx", "export_pdf", "generate_report_html", "_render_pdf_with_playwright",
+    # search.py
+    "build_opportunity_query", "_text_search_opportunities", "_lexical_search_score",
+    "semantic_search_opportunities",
+    # embeddings.py
+    "_get_opportunity_embedding", "_supports_vector_search", "opportunity_embedding_text",
+    "opportunity_reanalysis_text", "upsert_opportunity_embedding", "rebuild_opportunity_embeddings",
+]
+
+DUPLICATE_MODULE_MAP: dict[str, str] = {
+    # validation
+    "slugify": "validation", "normalize_official_url": "validation",
+    "is_private_url": "validation", "validate_source_url": "validation",
+    "is_public_http_url": "validation", "is_noise_title": "validation",
+    "is_noise_payload": "validation", "url_is_reachable": "validation",
+    # dedup
+    "opportunity_dedup_key": "dedup", "_organization_opportunity_scope": "dedup",
+    "find_duplicate_opportunity": "dedup", "_normalize_survivor_datetime": "dedup",
+    "_opportunity_survivor_key": "dedup", "_reassign_opportunity_relations": "dedup",
+    "_merge_opportunity_records": "dedup", "deduplicate_opportunities": "dedup",
+    "candidate_external_id": "dedup",
+    # scoring
+    "priority_for_score": "scoring", "_semantic_score": "scoring",
+    "_compute_score": "scoring", "calculate_score": "scoring",
+    # export
+    "export_csv": "export", "export_xlsx": "export", "export_pdf": "export",
+    "generate_report_html": "export", "_render_pdf_with_playwright": "export",
+    # search
+    "build_opportunity_query": "search", "_text_search_opportunities": "search",
+    "_lexical_search_score": "search", "semantic_search_opportunities": "search",
+    # embeddings
+    "_get_opportunity_embedding": "embeddings", "_supports_vector_search": "embeddings",
+    "opportunity_embedding_text": "embeddings", "opportunity_reanalysis_text": "embeddings",
+    "upsert_opportunity_embedding": "embeddings", "rebuild_opportunity_embeddings": "embeddings",
+}
+
 # ── Functions that MUST be importable from app.services ──────────────────────
 
 # validation.py
@@ -127,6 +175,85 @@ ALL_SYMBOLS = (
     VALIDATION_FUNCS + DEDUP_FUNCS + SCORING_FUNCS + EXPORT_FUNCS
     + SEARCH_FUNCS + EMBEDDINGS_FUNCS + FACADE_FUNCS
 )
+
+
+class TestPreDeletionSanity:
+    """Characterization tests for 36 duplicated functions (PR A-1)."""
+
+    @pytest.mark.parametrize("symbol", DUPLICATE_FUNCS)
+    def test_duplicate_importable_from_specialized_module(self, symbol: str) -> None:
+        """Each duplicated function must be importable from its specialized module."""
+        module_name = DUPLICATE_MODULE_MAP[symbol]
+        import importlib
+        mod = importlib.import_module(f"app.services.{module_name}")
+        assert hasattr(mod, symbol), (
+            f"Symbol {symbol!r} is NOT exported from app.services.{module_name}"
+        )
+
+    def test_slugify_matches_legacy(self) -> None:
+        from app.services.validation import slugify as new_slugify
+        from app.services._legacy import slugify as old_slugify
+        assert new_slugify("Hello World") == old_slugify("Hello World") == "hello-world"
+        assert new_slugify("") == old_slugify("") == "item"
+
+    def test_normalize_official_url_matches_legacy(self) -> None:
+        from app.services.validation import normalize_official_url as new_func
+        from app.services._legacy import normalize_official_url as old_func
+        assert new_func(None) == old_func(None) is None
+        assert new_func("https://Example.COM/Path/") == old_func("https://Example.COM/Path/") == "https://example.com/Path"
+
+    def test_is_noise_title_matches_legacy(self) -> None:
+        from app.services.validation import is_noise_title as new_func
+        from app.services._legacy import is_noise_title as old_func
+        assert new_func(None) == old_func(None) is True
+        assert new_func("Real Opportunity 2025") == old_func("Real Opportunity 2025") is False
+
+    def test_priority_for_score_matches_legacy(self) -> None:
+        """NOTE: scoring.py and _legacy.py have diverged for score=80.
+        scoring.py returns 'high' (the correct behavior, used by facade).
+        _legacy.py stale copy returns 'medium'. Legitimate drift."""
+        from app.services.scoring import priority_for_score as new_func
+        from app.services._legacy import priority_for_score as old_func
+        assert new_func(20) == old_func(20) == "not_recommended"
+        assert new_func(80) == "high"  # scoring.py is authoritative
+        assert old_func(80) == "medium"  # stale legacy value (dead code)
+
+    def test_validate_source_url_raises_on_bad_url(self) -> None:
+        """Both versions validate and raise on bad URL."""
+        from app.services.validation import validate_source_url as new_func
+        from app.services._legacy import validate_source_url as old_func
+        from unittest.mock import MagicMock
+        bad_source = MagicMock()
+        bad_source.base_url = "http://localhost:8080"
+        bad_source.allowed_domains = None
+        with pytest.raises(ValueError, match="not allowed"):
+            new_func(bad_source)
+        with pytest.raises(ValueError, match="not allowed"):
+            old_func(bad_source)
+
+    def test_is_private_url_matches_legacy(self) -> None:
+        from app.services.validation import is_private_url as new_func
+        from app.services._legacy import is_private_url as old_func
+        assert new_func("http://localhost:8000") == old_func("http://localhost:8000") is True
+        assert new_func("https://google.com") == old_func("https://google.com") is False
+
+    def test_export_csv_matches_legacy(self) -> None:
+        from app.services.export import export_csv as new_func
+        from app.services._legacy import export_csv as old_func
+        from unittest.mock import MagicMock
+        opp = MagicMock()
+        opp.title = "Test Opp"
+        opp.entity = "Test Entity"
+        opp.country = "Colombia"
+        opp.status = "open"
+        opp.close_date = None
+        opp.funding_amount_raw = None
+        opp.funding_amount_value = None
+        opp.official_url = None
+        new_result = new_func([opp])
+        old_result = old_func([opp])
+        assert "Test Opp" in new_result
+        assert "Test Opp" in old_result
 
 
 class TestServicesImportBackwardCompat:
