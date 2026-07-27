@@ -35,9 +35,8 @@ from app.services.opportunity import (  # noqa: F401
     count_query,
 )
 
-# ── Legacy functions (still in _legacy.py, not yet extracted) ────────────────
-from app.services._legacy import (  # noqa: F401
-    # Audit / alerts
+# ── alerts.py — audit logging and source health alerts ────────────────────────
+from app.services.alerts import (  # noqa: F401
     _source_health_status,
     audit,
     create_source_health_alert,
