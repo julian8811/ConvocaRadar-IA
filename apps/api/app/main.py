@@ -394,7 +394,11 @@ async def rate_limit_middleware(request: Request, call_next):
         "/openapi.json",
     } or path.startswith("/api/v1/internal/"):
         return await call_next(request)
-    client_host = (request.client.host if request.client else "unknown") or "unknown"
+    xff = request.headers.get("x-forwarded-for", "").strip()
+    if xff:
+        client_host = xff.split(",")[0].strip()
+    else:
+        client_host = (request.client.host if request.client else "unknown") or "unknown"
     bucket = app.state.rate_limits[client_host]
     now = time.monotonic()
     window = settings.rate_limit_window_seconds
