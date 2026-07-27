@@ -19,7 +19,6 @@ from app.services._legacy import (  # noqa: F401
     execute_source_run_locally,
     is_slow_scrape_source,
     source_due_for_scraping,
-    validate_source_url,
     # Audit / alerts
     _source_health_status,
     audit,
@@ -37,7 +36,6 @@ from app.services._legacy import (  # noqa: F401
     create_heuristic_extraction,
     summarize_text,
     # Query / count
-    build_opportunity_query,
     count_query,
     # Triage / dashboard helpers (PR B-1a)
     _STATUS_LABELS,
