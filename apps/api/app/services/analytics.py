@@ -7,7 +7,7 @@ timeline, category).
 
 Dependencies on ``inferred_opportunity_status``, ``_parse_ai_close_date``,
 ``_parse_funding_amount``, and ``create_ai_extraction`` are imported from
-``_legacy.py`` — they will be extracted to their own module in later PRs.
+``opportunity.py`` (extracted in PR C-2a).
 """
 
 from __future__ import annotations
@@ -22,8 +22,8 @@ from sqlalchemy.orm import Session
 from app.models import Opportunity, OpportunityScore, Source
 from app.schemas import DashboardBreakdownItem
 
-# ── Functions still in _legacy.py (not yet extracted) ──────────────────────
-from app.services._legacy import (
+# ── Functions extracted to opportunity.py ────────────────────────────────────
+from app.services.opportunity import (
     _parse_ai_close_date,
     _parse_funding_amount,
     create_ai_extraction,

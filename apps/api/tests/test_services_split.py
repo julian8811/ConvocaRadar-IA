@@ -110,21 +110,26 @@ CONNECTORS_FUNCS = [
     "SLOW_SCRAPE_SOURCE_TYPES",
 ]
 
+# opportunity.py
+OPPORTUNITY_FUNCS = [
+    "_combined_text",
+    "_parse_ai_close_date",
+    "_parse_funding_amount",
+    "create_opportunity",
+    "enrich_opportunity_payload",
+    "inferred_opportunity_status",
+    "opportunity_status",
+    "reanalyze_opportunity",
+    "create_ai_extraction",
+    "create_heuristic_extraction",
+    "summarize_text",
+    "count_query",
+]
+
 # Functions that stay in the __init__ facade (not moved to sub-modules)
 FACADE_FUNCS = [
     "audit",
     "create_source_health_alert",
-    "create_opportunity",
-    "enrich_opportunity_payload",
-    "reanalyze_opportunity",
-    "opportunity_status",
-    "inferred_opportunity_status",
-    "_parse_ai_close_date",
-    "_parse_funding_amount",
-    "create_heuristic_extraction",
-    "create_ai_extraction",
-    "summarize_text",
-    "count_query",
     "extract_score_reasons",
     "get_review_queue",
     "get_closing_soon_7d",
@@ -142,7 +147,7 @@ FACADE_FUNCS = [
 ALL_SYMBOLS = (
     VALIDATION_FUNCS + DEDUP_FUNCS + SCORING_FUNCS + EXPORT_FUNCS
     + SEARCH_FUNCS + EMBEDDINGS_FUNCS + ANALYTICS_FUNCS + GENAI_FUNCS
-    + CONNECTORS_FUNCS
+    + CONNECTORS_FUNCS + OPPORTUNITY_FUNCS
     + FACADE_FUNCS
 )
 
