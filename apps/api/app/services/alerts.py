@@ -18,6 +18,10 @@ def audit(
     resource_type: str,
     user: User | None,
     resource_id: str | None = None,
+    *,
+    metadata: dict[str, object] | None = None,
+    ip: str | None = None,
+    user_agent: str | None = None,
 ) -> None:
     db.add(
         AuditLog(
@@ -26,6 +30,7 @@ def audit(
             action=action,
             resource_type=resource_type,
             resource_id=resource_id,
+            **(dict(metadata_json=metadata) if metadata else {}),
         )
     )
 
