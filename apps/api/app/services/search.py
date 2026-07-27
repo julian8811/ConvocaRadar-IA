@@ -8,11 +8,27 @@ from __future__ import annotations
 import re
 from datetime import UTC, datetime
 
-from sqlalchemy import Select, and_, func as sa_func, or_, select
+from sqlalchemy import ColumnElement, Select, and_, func as sa_func, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.ai import build_embedding, cosine_similarity
 from app.models import Opportunity, OpportunityEmbedding
+
+
+def _unaccent_sql(col: ColumnElement) -> ColumnElement:
+    """Apply accent-insensitive SQL transform using nested ``sa_func.replace`` calls.
+
+    Strips acute accents and ñ/Ñ from ``col`` so subsequent ``.ilike()`` matches
+    unaccented text (e.g. ``minciencias`` matches ``Minciencias``).
+    """
+    _accents = [
+        ("á", "a"), ("é", "e"), ("í", "i"), ("ó", "o"), ("ú", "u"),
+        ("ñ", "n"), ("Á", "A"), ("É", "E"), ("Í", "I"), ("Ó", "O"), ("Ú", "U"), ("Ñ", "N"),
+    ]
+    result = col
+    for a, b in _accents:
+        result = sa_func.replace(result, a, b)
+    return result
 
 
 def build_opportunity_query(
@@ -132,20 +148,15 @@ def _text_search_opportunities(
     if not tokens:
         return []
     stmt = select(Opportunity).where(scope)
-    _unaccent = lambda col: sa_func.replace(sa_func.replace(sa_func.replace(sa_func.replace(
-        sa_func.replace(sa_func.replace(sa_func.replace(sa_func.replace(
-            sa_func.replace(sa_func.replace(sa_func.replace(sa_func.replace(
-                col, "á", "a"), "é", "e"), "í", "i"), "ó", "o"), "ú", "u"),
-            "ñ", "n"), "Á", "A"), "É", "E"), "Í", "I"), "Ó", "O"), "Ú", "U"), "Ñ", "N")
     filters = []
     for token in tokens:
         like = f"%{token}%"
         filters.append(
             or_(
-                _unaccent(Opportunity.title).ilike(like),
-                _unaccent(Opportunity.entity).ilike(like),
-                _unaccent(Opportunity.country).ilike(like),
-                _unaccent(Opportunity.summary).ilike(like),
+                _unaccent_sql(Opportunity.title).ilike(like),
+                _unaccent_sql(Opportunity.entity).ilike(like),
+                _unaccent_sql(Opportunity.country).ilike(like),
+                _unaccent_sql(Opportunity.summary).ilike(like),
             )
         )
     stmt = stmt.where(and_(*filters))
