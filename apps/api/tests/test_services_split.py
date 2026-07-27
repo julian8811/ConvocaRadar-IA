@@ -821,10 +821,10 @@ class TestAlertsModule:
         assert _source_health_status(runs) == "failing"
 
     def test__source_health_status_degraded(self) -> None:
-        """_source_health_status returns 'degraded' with 1-2 failures."""
+        """_source_health_status returns 'degraded' with 1-2 non-first failures."""
         from app.services.alerts import _source_health_status
         from unittest.mock import MagicMock
-        runs = [MagicMock(status="failed"), MagicMock(status="completed")]
+        runs = [MagicMock(status="completed"), MagicMock(status="failed")]
         assert _source_health_status(runs) == "degraded"
 
     def test_create_source_health_alert_signature(self) -> None:
