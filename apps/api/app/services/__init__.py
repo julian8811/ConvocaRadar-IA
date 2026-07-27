@@ -37,18 +37,6 @@ from app.services._legacy import (  # noqa: F401
     summarize_text,
     # Query / count
     count_query,
-    # Analytics helpers
-    _backfill_close_date_text,
-    _opportunity_combined_text,
-    backfill_close_dates,
-    backfill_close_dates_ai,
-    backfill_funding_amounts,
-    backfill_funding_amounts_ai,
-    get_category_distribution,
-    get_funding_ranges,
-    get_opportunities_timeline,
-    get_score_distribution,
-    get_source_contribution,
     # GenAI helpers
     build_weekly_digest_html,
     rescore_all_opportunities,
@@ -117,6 +105,21 @@ from app.services.dashboard import (  # noqa: F401
     get_source_health_summaries,
     get_sources_health,
     get_status_breakdown,
+)
+
+# ── analytics.py — backfill helpers and distribution queries ──────────────────
+from app.services.analytics import (  # noqa: F401
+    _backfill_close_date_text,
+    _opportunity_combined_text,
+    backfill_close_dates,
+    backfill_close_dates_ai,
+    backfill_funding_amounts,
+    backfill_funding_amounts_ai,
+    get_category_distribution,
+    get_funding_ranges,
+    get_opportunities_timeline,
+    get_score_distribution,
+    get_source_contribution,
 )
 
 # ── search.py — semantic + lexical search ────────────────────────────────────

@@ -74,6 +74,21 @@ EMBEDDINGS_FUNCS = [
     "_supports_vector_search",
 ]
 
+# analytics.py
+ANALYTICS_FUNCS = [
+    "_backfill_close_date_text",
+    "_opportunity_combined_text",
+    "backfill_close_dates",
+    "backfill_close_dates_ai",
+    "backfill_funding_amounts",
+    "backfill_funding_amounts_ai",
+    "get_category_distribution",
+    "get_funding_ranges",
+    "get_opportunities_timeline",
+    "get_score_distribution",
+    "get_source_contribution",
+]
+
 # Functions that stay in the __init__ facade (not moved to sub-modules)
 FACADE_FUNCS = [
     "connector_for",
@@ -104,15 +119,6 @@ FACADE_FUNCS = [
     "get_data_coverage",
     "get_sources_health",
     "get_source_health_summaries",
-    "get_score_distribution",
-    "backfill_close_dates",
-    "backfill_funding_amounts",
-    "backfill_close_dates_ai",
-    "backfill_funding_amounts_ai",
-    "get_funding_ranges",
-    "get_source_contribution",
-    "get_opportunities_timeline",
-    "get_category_distribution",
     "summarize_missing_opportunities",
     "rescore_all_opportunities",
     "score_unscored_opportunities",
@@ -125,7 +131,7 @@ FACADE_FUNCS = [
 # Combine ALL symbols that must be importable from app.services
 ALL_SYMBOLS = (
     VALIDATION_FUNCS + DEDUP_FUNCS + SCORING_FUNCS + EXPORT_FUNCS
-    + SEARCH_FUNCS + EMBEDDINGS_FUNCS + FACADE_FUNCS
+    + SEARCH_FUNCS + EMBEDDINGS_FUNCS + ANALYTICS_FUNCS + FACADE_FUNCS
 )
 
 
