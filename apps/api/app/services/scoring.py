@@ -167,7 +167,7 @@ def _compute_score(opportunity: Opportunity, profile: OrganizationProfile) -> di
     if opportunity.country == profile.country:
         score += 15
         reasons.append(f"La convocatoria es del mismo país ({profile.country}).")
-    elif getattr(opportunity, "region", None) in SAME_REGION and getattr(profile, "country", "") in ("Colombia",):
+    elif getattr(opportunity, "region", None) in SAME_REGION and getattr(profile, "country", "") in (profile.country,):
         score += 12
         reasons.append("La convocatoria es de la misma región (LatAm).")
     elif profile.eligible_international:
