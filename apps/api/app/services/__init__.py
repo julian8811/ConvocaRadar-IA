@@ -37,12 +37,6 @@ from app.services._legacy import (  # noqa: F401
     summarize_text,
     # Query / count
     count_query,
-    # GenAI helpers
-    build_weekly_digest_html,
-    rescore_all_opportunities,
-    score_unscored_opportunities,
-    send_weekly_digest,
-    summarize_missing_opportunities,
 )
 
 # ── validation.py — pure validation functions ────────────────────────────────
@@ -120,6 +114,15 @@ from app.services.analytics import (  # noqa: F401
     get_opportunities_timeline,
     get_score_distribution,
     get_source_contribution,
+)
+
+# ── genai.py — GenAI batch operations and weekly digest ──────────────────────
+from app.services.genai import (  # noqa: F401
+    build_weekly_digest_html,
+    rescore_all_opportunities,
+    score_unscored_opportunities,
+    send_weekly_digest,
+    summarize_missing_opportunities,
 )
 
 # ── search.py — semantic + lexical search ────────────────────────────────────
