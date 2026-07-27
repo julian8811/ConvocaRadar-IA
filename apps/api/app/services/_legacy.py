@@ -1608,6 +1608,9 @@ def generate_report_html(title: str, organization: Organization, opportunities: 
     return f"""<!doctype html>
 <html lang=\"es\">
 <head><meta charset=\"utf-8\"><title>{escape(title)}</title>
+<link rel=\"preconnect\" href=\"https://fonts.googleapis.com\">
+<link rel=\"preconnect\" href=\"https://fonts.gstatic.com\" crossorigin>
+<link href=\"https://fonts.googleapis.com/css2?family=Geist:wght@400..700&display=swap\" rel=\"stylesheet\">
 <style>
 :root {{
   --bg: #f8fafc;
@@ -1628,7 +1631,7 @@ def generate_report_html(title: str, organization: Organization, opportunities: 
 body {{
   margin: 0;
   padding: 32px 18px 48px;
-  font-family: Inter, Arial, sans-serif;
+  font-family: "Geist", system-ui, -apple-system, sans-serif;
   color: var(--text);
   background:
     radial-gradient(circle at top, rgba(13, 78, 94, 0.1), transparent 34%),
@@ -1676,7 +1679,7 @@ h1 {{
   font-size: clamp(2rem, 4vw, 3.5rem);
   line-height: 1.03;
   letter-spacing: -0.03em;
-  font-family: "Space Grotesk", "Inter", Arial, sans-serif;
+  font-family: "Geist", system-ui, -apple-system, sans-serif;
 }}
 .hero__lead {{
   max-width: 720px;
@@ -1731,7 +1734,7 @@ h1 {{
   overflow: hidden;
 }}
 .section__head {{ padding: 20px 22px 0; }}
-.section__title {{ margin: 0; font-family: "Space Grotesk", "Inter", Arial, sans-serif; font-size: 1.35rem; }}
+.section__title {{ margin: 0; font-family: "Geist", system-ui, -apple-system, sans-serif; font-size: 1.35rem; }}
 .section__subtitle {{ margin: 6px 0 0; color: var(--muted); font-size: 0.96rem; }}
 .section__body {{ padding: 20px 22px 24px; }}
 .grid-2 {{ display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; }}
