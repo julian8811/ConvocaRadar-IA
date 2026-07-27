@@ -98,16 +98,24 @@ GENAI_FUNCS = [
     "summarize_missing_opportunities",
 ]
 
-# Functions that stay in the __init__ facade (not moved to sub-modules)
-FACADE_FUNCS = [
+# connectors.py
+CONNECTORS_FUNCS = [
     "connector_for",
     "is_slow_scrape_source",
     "source_due_for_scraping",
+    "execute_source_run_locally",
+    "_scrape_source_candidates",
+    "_scrape_source_candidates_with_timeout",
+    "SLOW_SCRAPE_SOURCE_KEYS",
+    "SLOW_SCRAPE_SOURCE_TYPES",
+]
+
+# Functions that stay in the __init__ facade (not moved to sub-modules)
+FACADE_FUNCS = [
     "audit",
     "create_source_health_alert",
     "create_opportunity",
     "enrich_opportunity_payload",
-    "execute_source_run_locally",
     "reanalyze_opportunity",
     "opportunity_status",
     "inferred_opportunity_status",
@@ -128,14 +136,13 @@ FACADE_FUNCS = [
     "get_data_coverage",
     "get_sources_health",
     "get_source_health_summaries",
-    "SLOW_SCRAPE_SOURCE_KEYS",
-    "SLOW_SCRAPE_SOURCE_TYPES",
 ]
 
 # Combine ALL symbols that must be importable from app.services
 ALL_SYMBOLS = (
     VALIDATION_FUNCS + DEDUP_FUNCS + SCORING_FUNCS + EXPORT_FUNCS
     + SEARCH_FUNCS + EMBEDDINGS_FUNCS + ANALYTICS_FUNCS + GENAI_FUNCS
+    + CONNECTORS_FUNCS
     + FACADE_FUNCS
 )
 

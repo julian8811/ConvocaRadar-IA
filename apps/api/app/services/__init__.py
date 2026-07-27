@@ -7,21 +7,24 @@ respective single-responsibility modules.
 
 from __future__ import annotations
 
-# ── Legacy functions (still in _legacy.py, not yet extracted) ────────────────
-from app.services._legacy import (  # noqa: F401
-    # Scraping / sources
+# ── connectors.py — connector factory and scraping execution ──────────────────
+from app.services.connectors import (  # noqa: F401
     SLOW_SCRAPE_SOURCE_KEYS,
     SLOW_SCRAPE_SOURCE_TYPES,
     _scrape_source_candidates,
     _scrape_source_candidates_with_timeout,
     connector_for,
-    create_source_health_alert,
     execute_source_run_locally,
     is_slow_scrape_source,
     source_due_for_scraping,
+)
+
+# ── Legacy functions (still in _legacy.py, not yet extracted) ────────────────
+from app.services._legacy import (  # noqa: F401
     # Audit / alerts
     _source_health_status,
     audit,
+    create_source_health_alert,
     # Opportunity lifecycle
     _combined_text,
     _parse_ai_close_date,
