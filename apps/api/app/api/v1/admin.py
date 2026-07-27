@@ -237,7 +237,7 @@ def get_admin_metrics(
 def reseed_default_sources_admin(
     force: bool = False,
     organization: Organization = Depends(get_current_organization),
-    _: User = Depends(require_admin),
+    user: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ) -> dict[str, int]:
     """Reseed the default source catalog for the calling org.
@@ -258,20 +258,12 @@ def reseed_default_sources_admin(
             or_(Source.organization_id == organization.id, Source.organization_id.is_(None))
         )
     ) or 0
-    db.add(
-        AuditLog(
-            organization_id=organization.id,
-            action="reseed_default_sources",
-            resource_type="source",
-            resource_id=organization.id,
-            metadata_json={
-                **stats,
-                "force": force,
-                "before_total": before_total,
-                "after_total": after_total,
-            },
-        )
-    )
+    audit(db, "reseed_default_sources", "source", user, organization.id, metadata={
+        **stats,
+        "force": force,
+        "before_total": before_total,
+        "after_total": after_total,
+    })
     db.commit()
     return {**stats, "force": force, "before_total": before_total, "after_total": after_total}
 
@@ -280,7 +272,7 @@ def reseed_default_sources_admin(
 def summarize_all_opportunities_admin(
     limit: int = 10,
     organization: Organization = Depends(get_current_organization),
-    _: User = Depends(require_admin),
+    user: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ) -> dict[str, int]:
     """Generate AI summaries for opportunities that have none.
@@ -290,15 +282,7 @@ def summarize_all_opportunities_admin(
     summary are skipped.
     """
     result = summarize_missing_opportunities(db, organization.id, limit=limit)
-    db.add(
-        AuditLog(
-            organization_id=organization.id,
-            action="summarize_all_opportunities",
-            resource_type="opportunity",
-            resource_id=organization.id,
-            metadata_json={**result, "limit": limit},
-        )
-    )
+    audit(db, "summarize_all_opportunities", "opportunity", user, organization.id, metadata={**result, "limit": limit})
     db.commit()
     return result
 
@@ -307,7 +291,7 @@ def summarize_all_opportunities_admin(
 def score_all_opportunities_admin(
     limit: int = 10,
     organization: Organization = Depends(get_current_organization),
-    _: User = Depends(require_admin),
+    user: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ) -> dict[str, int]:
     """Generate OpportunityScore rows for unscored opportunities for this org.
@@ -317,15 +301,7 @@ def score_all_opportunities_admin(
     the per-opportunity ``POST /opportunities/{id}/scores`` endpoint.
     """
     result = score_unscored_opportunities(db, organization.id, limit=limit)
-    db.add(
-        AuditLog(
-            organization_id=organization.id,
-            action="score_all_opportunities",
-            resource_type="opportunity",
-            resource_id=organization.id,
-            metadata_json={**result, "limit": limit},
-        )
-    )
+    audit(db, "score_all_opportunities", "opportunity", user, organization.id, metadata={**result, "limit": limit})
     db.commit()
     return result
 
@@ -341,16 +317,7 @@ def rescore_all_opportunities_admin(
     scorer (overwrites existing scores). Runs on up to ``limit`` per call.
     """
     result = rescore_all_opportunities(db, organization.id, limit=limit)
-    db.add(
-        AuditLog(
-            organization_id=organization.id,
-            user_id=user.id,
-            action="rescore_all_opportunities",
-            resource_type="opportunity",
-            resource_id=organization.id,
-            metadata_json={**result, "limit": limit},
-        )
-    )
+    audit(db, "rescore_all_opportunities", "opportunity", user, organization.id, metadata={**result, "limit": limit})
     db.commit()
     return result
 
@@ -374,16 +341,7 @@ def send_digest_admin(
         select(func.count()).select_from(Opportunity).where(scope, Opportunity.created_at >= cutoff)
     ) or 0
     delivered = send_weekly_digest(db, organization.id)
-    db.add(
-        AuditLog(
-            organization_id=organization.id,
-            user_id=user.id,
-            action="send_weekly_digest",
-            resource_type="alert",
-            resource_id=organization.id,
-            metadata_json={"delivered": delivered, "opportunities": int(opportunity_count)},
-        )
-    )
+    audit(db, "send_weekly_digest", "alert", user, organization.id, metadata={"delivered": delivered, "opportunities": int(opportunity_count)})
     db.commit()
     return {"delivered": delivered, "opportunities": int(opportunity_count)}
 
@@ -391,19 +349,11 @@ def send_digest_admin(
 @router.post("/admin/opportunities/deduplicate")
 def deduplicate_opportunities_admin(
     organization: Organization = Depends(get_current_organization),
-    _: User = Depends(require_admin),
+    user: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ) -> dict[str, int]:
     stats = deduplicate_opportunities(db, organization.id)
-    db.add(
-        AuditLog(
-            organization_id=organization.id,
-            action="deduplicate_opportunities",
-            resource_type="opportunity",
-            resource_id=organization.id,
-            metadata_json=stats,
-        )
-    )
+    audit(db, "deduplicate_opportunities", "opportunity", user, organization.id, metadata=stats)
     db.commit()
     return stats
 
@@ -455,20 +405,12 @@ def retry_degraded_sources_admin(
 @router.post("/admin/embeddings/rebuild")
 async def rebuild_embeddings_admin(
     organization: Organization = Depends(get_current_organization),
-    _: User = Depends(require_admin),
+    user: User = Depends(require_admin),
     db: Session = Depends(get_db),
     limit: int | None = None,
 ) -> dict[str, int]:
     result = await rebuild_opportunity_embeddings(db, organization.id, limit=limit)
-    db.add(
-        AuditLog(
-            organization_id=organization.id,
-            action="rebuild_opportunity_embeddings",
-            resource_type="opportunity_embedding",
-            resource_id=organization.id,
-            metadata_json={"limit": limit, **result},
-        )
-    )
+    audit(db, "rebuild_opportunity_embeddings", "opportunity_embedding", user, organization.id, metadata={"limit": limit, **result})
     db.commit()
     return result
 
@@ -480,16 +422,7 @@ def bootstrap_data_admin(
     db: Session = Depends(get_db),
 ) -> dict[str, int | str]:
     result = bootstrap_priority_sources(blocking=True) or {"status": "skipped", "reason": "bootstrap_disabled"}
-    db.add(
-        AuditLog(
-            organization_id=organization.id,
-            user_id=user.id,
-            action="bootstrap_priority_sources",
-            resource_type="source",
-            resource_id=organization.id,
-            metadata_json=result if isinstance(result, dict) else {"status": str(result)},
-        )
-    )
+    audit(db, "bootstrap_priority_sources", "source", user, organization.id, metadata=result if isinstance(result, dict) else {"status": str(result)})
     db.commit()
     return result
 
@@ -630,21 +563,13 @@ async def probe_all_sources(
 
     report_dict = report.to_dict()
 
-    db.add(
-        AuditLog(
-            organization_id=organization.id,
-            user_id=admin.id,
-            action="source_probe",
-            resource_type="source",
-            metadata_json={
-                "total": report.total,
-                "green": report.green,
-                "yellow": report.yellow,
-                "red": report.red,
-                "source_key": source_key,
-            },
-        )
-    )
+    audit(db, "source_probe", "source", admin, metadata={
+        "total": report.total,
+        "green": report.green,
+        "yellow": report.yellow,
+        "red": report.red,
+        "source_key": source_key,
+    })
     db.commit()
 
     return report_dict
