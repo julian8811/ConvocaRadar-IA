@@ -87,7 +87,7 @@ async def _make_opportunity(
 ) -> str:
     """Create a single fixture opportunity and return its id.
 
-    Mocks url_is_reachable in _legacy.py so create_opportunity does not hit real HTTP.
+    Mocks url_is_reachable in opportunity.py so create_opportunity does not hit real HTTP.
     """
     db = SessionLocal()
     try:
@@ -96,7 +96,7 @@ async def _make_opportunity(
         source = db.scalar(select(Source).where(Source.key == "grants-gov"))
         assert source is not None
 
-        with patch("app.services._legacy.url_is_reachable", return_value=True):
+        with patch("app.services.opportunity.url_is_reachable", return_value=True):
             opportunity = await create_opportunity(
                 db,
                 OpportunityCreate(

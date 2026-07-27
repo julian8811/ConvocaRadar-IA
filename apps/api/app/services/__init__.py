@@ -19,13 +19,8 @@ from app.services.connectors import (  # noqa: F401
     source_due_for_scraping,
 )
 
-# ── Legacy functions (still in _legacy.py, not yet extracted) ────────────────
-from app.services._legacy import (  # noqa: F401
-    # Audit / alerts
-    _source_health_status,
-    audit,
-    create_source_health_alert,
-    # Opportunity lifecycle
+# ── opportunity.py — opportunity lifecycle, enrichment, AI extraction ─────────
+from app.services.opportunity import (  # noqa: F401
     _combined_text,
     _parse_ai_close_date,
     _parse_funding_amount,
@@ -34,12 +29,18 @@ from app.services._legacy import (  # noqa: F401
     inferred_opportunity_status,
     opportunity_status,
     reanalyze_opportunity,
-    # AI extraction helpers
     create_ai_extraction,
     create_heuristic_extraction,
     summarize_text,
-    # Query / count
     count_query,
+)
+
+# ── Legacy functions (still in _legacy.py, not yet extracted) ────────────────
+from app.services._legacy import (  # noqa: F401
+    # Audit / alerts
+    _source_health_status,
+    audit,
+    create_source_health_alert,
 )
 
 # ── validation.py — pure validation functions ────────────────────────────────

@@ -353,8 +353,8 @@ def get_health_kpis(db: Session, organization_id: str) -> HealthKpis:
     * high_match: distinct opportunities with an OpportunityScore row
       marked priority='high' for the current org.
     """
-    # Lazy import: avoid circular dep with _legacy.py during init
-    from app.services._legacy import count_query
+    # Lazy import: avoid circular dep during init
+    from app.services.opportunity import count_query
 
     opportunity_scope = or_(Opportunity.organization_id == organization_id, Opportunity.organization_id.is_(None))
     total = count_query(db, build_opportunity_query(organization_id))
@@ -432,8 +432,8 @@ def get_data_coverage(db: Session, organization_id: str) -> DashboardDataCoverag
     renders "Sin datos aún" for the None case. When opportunities exist
     but none have embeddings, the value is the real zero (``0.0``).
     """
-    # Lazy import: avoid circular dep with _legacy.py during init
-    from app.services._legacy import count_query
+    # Lazy import: avoid circular dep during init
+    from app.services.opportunity import count_query
 
     opportunity_scope = or_(Opportunity.organization_id == organization_id, Opportunity.organization_id.is_(None))
     with_summary = (

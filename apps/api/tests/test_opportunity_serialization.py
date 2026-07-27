@@ -90,7 +90,7 @@ class TestNoNPlusOneSerialization:
             source = db.scalar(select(Source).where(Source.key == "grants-gov"))
             assert source is not None
 
-            with patch("app.services._legacy.url_is_reachable", return_value=True):
+            with patch("app.services.opportunity.url_is_reachable", return_value=True):
                 for i in range(count):
                     await create_opportunity(
                         db,

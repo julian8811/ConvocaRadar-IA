@@ -3,7 +3,7 @@
 Extracted from ``_legacy.py`` (PR B-3). Provides batch summarize/scoring
 operations and weekly digest HTML rendering + email sending.
 
-Dependencies on ``summarize_text`` (from ``_legacy.py``) and scoring helpers
+Dependencies on ``summarize_text`` (from ``opportunity.py``) and scoring helpers
 (from ``app.services.scoring``) are imported directly.
 """
 
@@ -25,8 +25,8 @@ from app.models import (
     User,
 )
 
-# ── Functions still in _legacy.py (not yet extracted) ──────────────────────
-from app.services._legacy import summarize_text
+# ── Functions extracted to opportunity.py ────────────────────────────────────
+from app.services.opportunity import summarize_text
 
 # ── Already-extracted scoring helpers ───────────────────────────────────────
 from app.services.scoring import (
