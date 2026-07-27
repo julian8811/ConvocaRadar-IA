@@ -310,16 +310,15 @@ def forgot_password(
             # it from their inbox in a real environment, and the 200
             # response keeps the enumeration contract intact.
             logger.warning("auth.forgot_password.email_failed", error=str(exc))
-            # When SMTP is not configured in non-test environments, return the
-            # reset URL in the response so the user can still recover their
-            # password. This is safe because:
-            #   a) The email already exists (we just looked it up)
-            #   b) The URL is only returned for valid emails
-            #   c) Without this, there's no recovery path at all
-            if not get_settings_smtp_configured():
-                from app.core.config import get_settings
-                if get_settings().app_env != "test":
-                    detail = reset_url
+            # The HTTP response stays constant to prevent account enumeration.
+            # In local development only, surface the URL so the developer can
+            # complete the flow without an SMTP server. NEVER leak the URL in
+            # test, staging, or production — that would let an attacker take
+            # over any account if SMTP ever fails (the URL is a valid reset
+            # token signed with the same secret as real reset links).
+            from app.core.config import get_settings
+            if get_settings().app_env == "development":
+                detail = reset_url
         db.add(
             AuditLog(
                 organization_id=user.organization_id,
