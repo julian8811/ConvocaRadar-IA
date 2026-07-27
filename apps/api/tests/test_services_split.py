@@ -235,6 +235,62 @@ class TestDashboardPipelineModule:
         assert "days_window" in sig.parameters
 
 
+class TestDashboardHealthModule:
+    """Characterization for 6 health functions (PR B-1c).
+
+    These reference app.services.dashboard functions that are NOT yet
+    defined — they fail until the GREEN step adds them.
+    """
+
+    def test_get_health_kpis_signature(self) -> None:
+        """get_health_kpis is callable with typical args."""
+        from app.services.dashboard import get_health_kpis
+        from inspect import signature
+        sig = signature(get_health_kpis)
+        assert "db" in sig.parameters
+        assert "organization_id" in sig.parameters
+
+    def test_get_status_breakdown_signature(self) -> None:
+        """get_status_breakdown is callable with typical args."""
+        from app.services.dashboard import get_status_breakdown
+        from inspect import signature
+        sig = signature(get_status_breakdown)
+        assert "db" in sig.parameters
+        assert "organization_id" in sig.parameters
+
+    def test_get_country_breakdown_signature(self) -> None:
+        """get_country_breakdown is callable with typical args."""
+        from app.services.dashboard import get_country_breakdown
+        from inspect import signature
+        sig = signature(get_country_breakdown)
+        assert "db" in sig.parameters
+        assert "organization_id" in sig.parameters
+
+    def test_get_data_coverage_signature(self) -> None:
+        """get_data_coverage is callable with typical args."""
+        from app.services.dashboard import get_data_coverage
+        from inspect import signature
+        sig = signature(get_data_coverage)
+        assert "db" in sig.parameters
+        assert "organization_id" in sig.parameters
+
+    def test_get_sources_health_signature(self) -> None:
+        """get_sources_health is callable with typical args."""
+        from app.services.dashboard import get_sources_health
+        from inspect import signature
+        sig = signature(get_sources_health)
+        assert "db" in sig.parameters
+        assert "organization_id" in sig.parameters
+
+    def test_get_source_health_summaries_signature(self) -> None:
+        """get_source_health_summaries is callable with typical args."""
+        from app.services.dashboard import get_source_health_summaries
+        from inspect import signature
+        sig = signature(get_source_health_summaries)
+        assert "db" in sig.parameters
+        assert "organization_id" in sig.parameters
+
+
 class TestNoLegacyDuplicates:
     """PR A-1: Verify 36 duplicated functions are no longer defined in _legacy.py."""
 
