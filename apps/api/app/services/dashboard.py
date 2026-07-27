@@ -8,7 +8,7 @@ from __future__ import annotations
 import json
 from datetime import UTC, datetime, timedelta
 
-from sqlalchemy import and_, or_, select
+from sqlalchemy import Case, and_, or_, select
 from sqlalchemy.orm import Session
 
 from sqlalchemy import func
@@ -352,32 +352,49 @@ def get_health_kpis(db: Session, organization_id: str) -> HealthKpis:
     * closing_soon: opportunities with status='closing_soon'.
     * high_match: distinct opportunities with an OpportunityScore row
       marked priority='high' for the current org.
-    """
-    # Lazy import: avoid circular dep during init
-    from app.services.opportunity import count_query
 
-    opportunity_scope = or_(Opportunity.organization_id == organization_id, Opportunity.organization_id.is_(None))
-    total = count_query(db, build_opportunity_query(organization_id))
-    open_total = count_query(db, build_opportunity_query(organization_id, status="open"))
-    closing_soon_total = count_query(db, build_opportunity_query(organization_id, status="closing_soon"))
-    high_match = (
-        db.scalar(
-            select(func.count(func.distinct(OpportunityScore.opportunity_id)))
-            .select_from(OpportunityScore)
-            .join(Opportunity, Opportunity.id == OpportunityScore.opportunity_id)
-            .where(
-                OpportunityScore.organization_id == organization_id,
-                OpportunityScore.priority == "high",
-                opportunity_scope,
-            )
-        )
-        or 0
+    Uses a single combined query with CASE expressions instead of 4
+    separate ``count_query`` calls.
+    """
+    opportunity_scope = and_(
+        or_(Opportunity.organization_id == organization_id, Opportunity.organization_id.is_(None)),
+        or_(
+            Opportunity.close_date.is_(None),
+            Opportunity.close_date >= datetime.now(UTC).replace(tzinfo=None),
+        ),
+        ~Opportunity.title.ilike("%@%"),
+        ~Opportunity.title.ilike("http%"),
+        ~Opportunity.title.ilike("%color:%"),
+        ~Opportunity.title.ilike("%background-color:%"),
+        ~Opportunity.title.ilike("%font-weight:%"),
+        ~Opportunity.title.ilike("%display:%"),
+        ~Opportunity.title.ilike("%justify-content:%"),
+        ~Opportunity.title.ilike("%budgetYearsColumns%"),
+        ~Opportunity.title.ilike("%plannedOpeningDate%"),
+        ~Opportunity.title.ilike("%deadlineDate%"),
+        ~Opportunity.title.ilike("%expectedGrants%"),
     )
+    stmt = select(
+        func.count().label("total"),
+        func.count(Case((Opportunity.status == "open", 1), else_=None)).label("open"),
+        func.count(Case((Opportunity.status == "closing_soon", 1), else_=None)).label("closing_soon"),
+        func.count(
+            func.distinct(Case((OpportunityScore.priority == "high", OpportunityScore.opportunity_id), else_=None))
+        ).label("high_match"),
+    ).select_from(Opportunity).outerjoin(
+        OpportunityScore,
+        and_(
+            OpportunityScore.opportunity_id == Opportunity.id,
+            OpportunityScore.organization_id == organization_id,
+        ),
+    ).where(opportunity_scope)
+
+    row = db.execute(stmt).one()
     return HealthKpis(
-        total=total,
-        open=open_total,
-        closing_soon=closing_soon_total,
-        high_match=high_match,
+        total=row.total,
+        open=row.open,
+        closing_soon=row.closing_soon,
+        high_match=row.high_match,
     )
 
 
