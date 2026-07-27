@@ -291,6 +291,137 @@ class TestDashboardHealthModule:
         assert "organization_id" in sig.parameters
 
 
+class TestAnalyticsModule:
+    """Characterization for 11 analytics functions to be extracted to analytics.py (PR B-2).
+
+    These reference app.services.analytics which does NOT exist yet.
+    They fail until analytics.py is created (GREEN step).
+    """
+
+    def test_get_score_distribution_signature(self) -> None:
+        """get_score_distribution is callable with db + organization_id."""
+        from app.services.analytics import get_score_distribution
+        from inspect import signature
+        sig = signature(get_score_distribution)
+        assert "db" in sig.parameters
+        assert "organization_id" in sig.parameters
+
+    def test__backfill_close_date_text_pure(self) -> None:
+        """_backfill_close_date_text is a pure function."""
+        from app.services.analytics import _backfill_close_date_text
+        from unittest.mock import MagicMock
+        opp = MagicMock()
+        opp.title = "Test Grant"
+        opp.summary = "Summary text"
+        opp.description = "Description text"
+        opp.raw_text = "Raw text"
+        result = _backfill_close_date_text(opp)
+        assert "Test Grant" in result
+        assert "Summary text" in result
+        assert "Description text" in result
+        assert "Raw text" in result
+
+    def test__backfill_close_date_text_skips_none_parts(self) -> None:
+        """_backfill_close_date_text skips None parts."""
+        from app.services.analytics import _backfill_close_date_text
+        from unittest.mock import MagicMock
+        opp = MagicMock()
+        opp.title = "Title only"
+        opp.summary = None
+        opp.description = None
+        opp.raw_text = None
+        result = _backfill_close_date_text(opp)
+        assert result == "Title only"
+
+    def test_backfill_close_dates_signature(self) -> None:
+        """backfill_close_dates is callable with typical args."""
+        from app.services.analytics import backfill_close_dates
+        from inspect import signature
+        sig = signature(backfill_close_dates)
+        assert "db" in sig.parameters
+        assert "organization_id" in sig.parameters
+
+    def test_backfill_funding_amounts_signature(self) -> None:
+        """backfill_funding_amounts is callable with typical args."""
+        from app.services.analytics import backfill_funding_amounts
+        from inspect import signature
+        sig = signature(backfill_funding_amounts)
+        assert "db" in sig.parameters
+        assert "organization_id" in sig.parameters
+
+    def test__opportunity_combined_text_pure(self) -> None:
+        """_opportunity_combined_text joins all text fields."""
+        from app.services.analytics import _opportunity_combined_text
+        from unittest.mock import MagicMock
+        opp = MagicMock()
+        opp.title = "Title"
+        opp.summary = "Summary"
+        opp.description = "Description"
+        opp.raw_text = "Raw"
+        result = _opportunity_combined_text(opp)
+        assert result == "Title Summary Description Raw"
+
+    def test__opportunity_combined_text_skips_none(self) -> None:
+        """_opportunity_combined_text skips None parts."""
+        from app.services.analytics import _opportunity_combined_text
+        from unittest.mock import MagicMock
+        opp = MagicMock()
+        opp.title = "Title"
+        opp.summary = None
+        opp.description = None
+        opp.raw_text = None
+        result = _opportunity_combined_text(opp)
+        assert result == "Title"
+
+    def test_backfill_close_dates_ai_signature(self) -> None:
+        """backfill_close_dates_ai is an async callable."""
+        from app.services.analytics import backfill_close_dates_ai
+        from inspect import signature, Parameter
+        sig = signature(backfill_close_dates_ai)
+        assert "db" in sig.parameters
+        assert "organization_id" in sig.parameters
+
+    def test_backfill_funding_amounts_ai_signature(self) -> None:
+        """backfill_funding_amounts_ai is an async callable."""
+        from app.services.analytics import backfill_funding_amounts_ai
+        from inspect import signature
+        sig = signature(backfill_funding_amounts_ai)
+        assert "db" in sig.parameters
+        assert "organization_id" in sig.parameters
+
+    def test_get_funding_ranges_signature(self) -> None:
+        """get_funding_ranges is callable with db + organization_id."""
+        from app.services.analytics import get_funding_ranges
+        from inspect import signature
+        sig = signature(get_funding_ranges)
+        assert "db" in sig.parameters
+        assert "organization_id" in sig.parameters
+
+    def test_get_source_contribution_signature(self) -> None:
+        """get_source_contribution is callable with db + organization_id."""
+        from app.services.analytics import get_source_contribution
+        from inspect import signature
+        sig = signature(get_source_contribution)
+        assert "db" in sig.parameters
+        assert "organization_id" in sig.parameters
+
+    def test_get_opportunities_timeline_signature(self) -> None:
+        """get_opportunities_timeline is callable with db + organization_id."""
+        from app.services.analytics import get_opportunities_timeline
+        from inspect import signature
+        sig = signature(get_opportunities_timeline)
+        assert "db" in sig.parameters
+        assert "organization_id" in sig.parameters
+
+    def test_get_category_distribution_signature(self) -> None:
+        """get_category_distribution is callable with db + organization_id."""
+        from app.services.analytics import get_category_distribution
+        from inspect import signature
+        sig = signature(get_category_distribution)
+        assert "db" in sig.parameters
+        assert "organization_id" in sig.parameters
+
+
 class TestNoLegacyDuplicates:
     """PR A-1: Verify 36 duplicated functions are no longer defined in _legacy.py."""
 
