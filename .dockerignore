@@ -1,0 +1,76 @@
+# Python build artefacts
+__pycache__
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg
+*.egg-info
+.eggs
+build/
+dist/
+
+# Virtual envs
+.venv
+venv/
+env/
+
+# Test artefacts and tooling
+.pytest_cache
+.ruff_cache
+.mypy_cache
+.coverage
+.coverage.*
+htmlcov/
+.tox/
+.cache
+test_storage/
+*.db
+*.sqlite
+*.sqlite3
+
+# Node / build artefacts
+node_modules
+.next
+out/
+build/
+dist/
+.turbo
+.tsbuildinfo
+*.tsbuildinfo
+coverage
+test-results
+playwright-report
+playwright/.cache
+
+# Local development files
+.idea
+.vscode
+.DS_Store
+*.swp
+
+# Secrets — never bake into the image
+.env
+.env.*
+!.env.example
+!.env.production.example
+
+# Git / CI
+.git
+.gitignore
+.gitattributes
+.github
+
+# Docker self-reference
+Dockerfile
+Dockerfile.*
+.dockerignore
+docker-compose*.yml
+
+# Documentation
+*.md
+CHANGELOG*
+LICENSE*
+
+# Backups
+backups/

@@ -45,7 +45,7 @@
     ports:
       - "8000:8000"
     healthcheck:
-      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen(\"http://localhost:8000/health\", timeout=5)"]
+      test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health/live', timeout=5)"]
       interval: 30s
       timeout: 10s
       retries: 5
@@ -73,35 +73,39 @@
       SCHEDULER_ENABLED: "true"
     command: ["sh", "-c", "alembic upgrade head && python -m app.worker"]
     healthcheck:
-      test: ["CMD", "python", "-c", "import pathlib,time,sys; p=pathlib.Path(\"/tmp/convocaradar-worker.heartbeat\"); sys.exit(0 if p.exists() and time.time()-p.stat().st_mtime < 45 else 1)"]
+      test: ["CMD", "python", "-c", "import pathlib,time,sys; p=pathlib.Path('/tmp/convocaradar-worker.heartbeat'); sys.exit(0 if p.exists() and time.time()-p.stat().st_mtime < 45 else 1)"]
       interval: 30s
       timeout: 5s
       retries: 3
       start_period: 45s
     depends_on:
       api:
-        condition: service_started
+        # Wait for the API container to be healthy, not just started. The
+        # worker shares the API image but its real dependency is the database
+        # schema being migrated by the API on boot.
+        condition: service_healthy
     restart: unless-stopped
 
   web:
     build:
       context: ./apps/web
+      dockerfile: Dockerfile
     environment:
-      NEXT_PUBLIC_API_URL: http://localhost:8000/api/v1
+      # Service discovery via Docker network — not localhost (that would
+      # resolve to the web container itself, not the API).
+      NEXT_PUBLIC_API_URL: http://api:8000/api/v1
     ports:
       - "3000:3000"
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:3000/').then(r => process.exit(r.status < 500 ? 0 : 1)).catch(() => process.exit(1))"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
     depends_on:
       api:
-        condition: service_started
+        condition: service_healthy
 
 volumes:
   postgres-data:
   minio-data:
-
-
-
-
-
-
-
-
