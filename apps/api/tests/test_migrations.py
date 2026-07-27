@@ -300,3 +300,122 @@ def test_password_changed_at_migration_loads_via_alembic_script_directory() -> N
         f"but we expect '0002_role_enum'. The chain is broken — the head of "
         "0003_password_changed_at will not be applied."
     )
+
+
+# ── Migration roundtrip tests (consolidate-migrations change) ────────────
+
+
+def test_0010_roundtrip_schema_equality(monkeypatch):
+    """Upgrade → downgrade → upgrade of migration 0010 is schema-identical.
+
+    Bootstraps via create_all(), stamps alembic at head, then verifies that
+    downgrade+upgrade of migration 0010 produces an identical schema.
+    """
+    import os
+    import tempfile
+    from alembic import command
+    from alembic.config import Config
+    from sqlalchemy import create_engine, inspect
+    from app.db.session import Base as AppBase
+    import app.models  # noqa: F401
+
+    # Unique temp file per test (not the shared test DB)
+    _tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
+    db_path = _tmp.name
+    _tmp.close()
+
+    try:
+        # Point DATABASE_URL at our temp file so alembic env.py uses it
+        monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db_path}")
+        from app.core.config import get_settings
+        get_settings.cache_clear()
+
+        engine = create_engine(f"sqlite:///{db_path}")
+        AppBase.metadata.create_all(engine)
+
+        cfg = Config()
+        cfg.set_main_option("script_location", "migrations")
+        cfg.set_main_option("sqlalchemy.url", f"sqlite:///{db_path}")
+        command.stamp(cfg, "0010_source_runs_progress")
+
+        # Capture schema at head
+        schema_before = _capture_0010_schema(engine)
+        assert "progress" in dict(schema_before.get("source_runs", []))
+
+        # Downgrade to 0009 — removes progress column
+        command.downgrade(cfg, "0009_operational_indexes")
+        cols_mid = [c["name"] for c in inspect(engine).get_columns("source_runs")]
+        assert "progress" not in cols_mid
+
+        # Upgrade to 0010 — adds progress column back
+        command.upgrade(cfg, "0010_source_runs_progress")
+        cols_after = [c["name"] for c in inspect(engine).get_columns("source_runs")]
+        assert "progress" in cols_after
+
+        schema_after = _capture_0010_schema(engine)
+
+        assert schema_before == schema_after, (
+            "Schema after upgrade→downgrade→upgrade must match original"
+        )
+    finally:
+        engine.dispose()
+        if os.path.exists(db_path):
+            os.unlink(db_path)
+
+
+def test_0010_drift_detection(monkeypatch):
+    """Column set is preserved across roundtrip (triangulation)."""
+    import os
+    import tempfile
+    from alembic import command
+    from alembic.config import Config
+    from sqlalchemy import create_engine, inspect
+    from app.db.session import Base as AppBase
+    import app.models  # noqa: F401
+
+    _tmp = tempfile.NamedTemporaryFile(suffix=".db", delete=False)
+    db_path = _tmp.name
+    _tmp.close()
+
+    try:
+        monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db_path}")
+        from app.core.config import get_settings
+        get_settings.cache_clear()
+
+        engine = create_engine(f"sqlite:///{db_path}")
+        AppBase.metadata.create_all(engine)
+
+        cfg = Config()
+        cfg.set_main_option("script_location", "migrations")
+        cfg.set_main_option("sqlalchemy.url", f"sqlite:///{db_path}")
+        command.stamp(cfg, "0010_source_runs_progress")
+
+        cols_initial = sorted(c["name"] for c in inspect(engine).get_columns("source_runs"))
+        assert "progress" in cols_initial
+
+        command.downgrade(cfg, "0009_operational_indexes")
+        command.upgrade(cfg, "0010_source_runs_progress")
+
+        cols_final = sorted(c["name"] for c in inspect(engine).get_columns("source_runs"))
+        assert cols_initial == cols_final
+    finally:
+        engine.dispose()
+        if os.path.exists(db_path):
+            os.unlink(db_path)
+
+
+def _capture_0010_schema(engine) -> dict[str, list[tuple[str, str]]]:
+    """Capture schema excluding alembic_version."""
+    from sqlalchemy import inspect as _sa_inspect
+
+    inspector = _sa_inspect(engine)
+    schema: dict[str, list[tuple[str, str]]] = {}
+    for table_name in sorted(inspector.get_table_names()):
+        if table_name == "alembic_version":
+            continue
+        cols = sorted(
+            (col["name"], str(col["type"]))
+            for col in inspector.get_columns(table_name)
+        )
+        schema[table_name] = cols
+    return schema
