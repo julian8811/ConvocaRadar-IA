@@ -19,7 +19,6 @@ from app.core.config import check_production_sqlite, get_settings
 from app.core.http_client import close_async_client, close_sync_client, http_client
 from app.core.logging import configure_logging
 from app.db.bootstrap import ensure_bootstrap_data
-from app.db.session import create_all
 
 configure_logging()
 settings = get_settings()
@@ -223,12 +222,6 @@ async def _run_periodic_source_sweep(interval_seconds: int | None = None) -> Non
 
 @asynccontextmanager
 async def lifespan(_: FastAPI) -> AsyncIterator[None]:
-    create_all()
-    # Run pending Alembic migrations (idempotent â€” stamps + upgrades).
-    # This adds the new columns (tier, auto_paused, dom_hash, etc.) to the
-    # production DB without requiring a manual migration step.
-    from app.db.migrate import run_pending_migrations
-    run_pending_migrations()
     ensure_bootstrap_data()
 
     # Reconcile interrupted source runs/tasks immediately on boot. Waiting
