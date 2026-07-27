@@ -594,6 +594,178 @@ class TestConnectorsModule:
         assert "source" in sig.parameters
 
 
+class TestOpportunityModule:
+    """Characterization for 14 opportunity lifecycle functions (PR C-2a).
+
+    These reference app.services.opportunity which does NOT exist yet.
+    They fail until opportunity.py is created (GREEN step).
+    """
+
+    def test__parse_ai_close_date_none(self) -> None:
+        """_parse_ai_close_date returns None for empty input."""
+        from app.services.opportunity import _parse_ai_close_date
+        assert _parse_ai_close_date(None) is None
+        assert _parse_ai_close_date("") is None
+
+    def test__parse_ai_close_date_iso(self) -> None:
+        """_parse_ai_close_date parses ISO format."""
+        from app.services.opportunity import _parse_ai_close_date
+        from datetime import datetime
+        result = _parse_ai_close_date("2025-12-31")
+        assert result is not None
+        assert result.year == 2025
+        assert result.month == 12
+        assert result.day == 31
+
+    def test__parse_ai_close_date_datetime(self) -> None:
+        """_parse_ai_close_date passes through datetime objects."""
+        from app.services.opportunity import _parse_ai_close_date
+        from datetime import datetime
+        now = datetime.now()
+        assert _parse_ai_close_date(now) is now
+
+    def test__parse_funding_amount_none(self) -> None:
+        """_parse_funding_amount returns (None, None) for empty input."""
+        from app.services.opportunity import _parse_funding_amount
+        assert _parse_funding_amount(None) == (None, None)
+        assert _parse_funding_amount("") == (None, None)
+
+    def test__parse_funding_amount_usd(self) -> None:
+        """_parse_funding_amount parses USD 500,000."""
+        from app.services.opportunity import _parse_funding_amount
+        val, cur = _parse_funding_amount("USD 500,000")
+        assert val == 500000.0
+        assert cur == "USD"
+
+    def test__parse_funding_amount_eur_million(self) -> None:
+        """_parse_funding_amount parses EUR 1.2 million."""
+        from app.services.opportunity import _parse_funding_amount
+        val, cur = _parse_funding_amount("EUR 1.2 million")
+        assert val == 1200000.0
+        assert cur == "EUR"
+
+    def test__parse_funding_amount_cop(self) -> None:
+        """_parse_funding_amount parses COP 5,000,000."""
+        from app.services.opportunity import _parse_funding_amount
+        val, cur = _parse_funding_amount("COP 5,000,000")
+        assert val == 5000000.0
+        assert cur == "COP"
+
+    def test__parse_funding_amount_no_currency(self) -> None:
+        """_parse_funding_amount returns (None,None) when no currency marker."""
+        from app.services.opportunity import _parse_funding_amount
+        assert _parse_funding_amount("500000") == (None, None)
+
+    def test__combined_text_joins(self) -> None:
+        """_combined_text joins all OpportunityCreate text fields."""
+        from app.services.opportunity import _combined_text
+        from unittest.mock import MagicMock
+        data = MagicMock()
+        data.title = "Title"
+        data.summary = "Summary"
+        data.description = "Description"
+        data.raw_text = "Raw"
+        result = _combined_text(data)
+        assert result == "Title Summary Description Raw"
+
+    def test__combined_text_skips_none(self) -> None:
+        """_combined_text skips None/empty parts."""
+        from app.services.opportunity import _combined_text
+        from unittest.mock import MagicMock
+        data = MagicMock()
+        data.title = "Title"
+        data.summary = None
+        data.description = None
+        data.raw_text = None
+        result = _combined_text(data)
+        assert result == "Title"
+
+    def test_opportunity_status_unknown(self) -> None:
+        """opportunity_status returns unknown when close_date is None."""
+        from app.services.opportunity import opportunity_status
+        assert opportunity_status(None) == "unknown"
+
+    def test_inferred_opportunity_status_unknown_no_text(self) -> None:
+        """inferred_opportunity_status returns unknown with no text hint."""
+        from app.services.opportunity import inferred_opportunity_status
+        assert inferred_opportunity_status(None) == "unknown"
+
+    def test_inferred_opportunity_status_open_from_text(self) -> None:
+        """inferred_opportunity_status returns open when text says 'open'."""
+        from app.services.opportunity import inferred_opportunity_status
+        assert inferred_opportunity_status(None, "This opportunity is open for") == "open"
+
+    def test_create_heuristic_extraction_signature(self) -> None:
+        """create_heuristic_extraction is callable with a text arg."""
+        from app.services.opportunity import create_heuristic_extraction
+        from inspect import signature
+        sig = signature(create_heuristic_extraction)
+        assert "text" in sig.parameters
+
+    def test_create_ai_extraction_signature(self) -> None:
+        """create_ai_extraction is an async callable."""
+        from app.services.opportunity import create_ai_extraction
+        from inspect import signature
+        sig = signature(create_ai_extraction)
+        assert "text" in sig.parameters
+
+    def test_summarize_text_signature(self) -> None:
+        """summarize_text is callable with a text arg."""
+        from app.services.opportunity import summarize_text
+        from inspect import signature
+        sig = signature(summarize_text)
+        assert "text" in sig.parameters
+
+    def test_count_query_signature(self) -> None:
+        """count_query is callable with db + stmt."""
+        from app.services.opportunity import count_query
+        from inspect import signature
+        sig = signature(count_query)
+        assert "db" in sig.parameters
+        assert "stmt" in sig.parameters
+
+    def test_enrich_opportunity_payload_signature(self) -> None:
+        """enrich_opportunity_payload is async callable."""
+        from app.services.opportunity import enrich_opportunity_payload
+        from inspect import signature
+        sig = signature(enrich_opportunity_payload)
+        assert "data" in sig.parameters
+
+    def test_reanalyze_opportunity_signature(self) -> None:
+        """reanalyze_opportunity is async callable with db + opportunity."""
+        from app.services.opportunity import reanalyze_opportunity
+        from inspect import signature
+        sig = signature(reanalyze_opportunity)
+        assert "db" in sig.parameters
+        assert "opportunity" in sig.parameters
+
+    def test_create_opportunity_signature(self) -> None:
+        """create_opportunity is async callable with db + data."""
+        from app.services.opportunity import create_opportunity
+        from inspect import signature
+        sig = signature(create_opportunity)
+        assert "db" in sig.parameters
+        assert "data" in sig.parameters
+
+    def test__update_opportunity_signature(self) -> None:
+        """_update_opportunity is callable with opportunity + data + title."""
+        from app.services.opportunity import _update_opportunity
+        from inspect import signature
+        sig = signature(_update_opportunity)
+        assert "opportunity" in sig.parameters
+        assert "data" in sig.parameters
+        assert "normalized_title" in sig.parameters
+
+    def test__update_and_score_signature(self) -> None:
+        """_update_and_score is async callable with db + opportunity + data."""
+        from app.services.opportunity import _update_and_score
+        from inspect import signature
+        sig = signature(_update_and_score)
+        assert "db" in sig.parameters
+        assert "opportunity" in sig.parameters
+        assert "data" in sig.parameters
+
+
 class TestNoLegacyDuplicates:
     """PR A-1: Verify 36 duplicated functions are no longer defined in _legacy.py."""
 
