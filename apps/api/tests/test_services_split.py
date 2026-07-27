@@ -213,7 +213,8 @@ class TestDashboardPipelineModule:
         """_pipeline_days_to_close clamps negative to 0."""
         from datetime import timedelta
         from app.services.dashboard import _pipeline_days_to_close
-        yesterday = datetime.now(UTC) - timedelta(days=1)
+        # Must use naive UTC to match the function's internal behavior
+        yesterday = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=1)
         assert _pipeline_days_to_close(yesterday) == 0
 
     def test_get_top_scored_signature(self) -> None:
