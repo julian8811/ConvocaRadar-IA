@@ -132,6 +132,7 @@ from app.services.genai import (  # noqa: F401
 from app.services.search import (  # noqa: F401
     _lexical_search_score,
     _text_search_opportunities,
+    _unaccent_sql,
     semantic_search_opportunities,
     build_opportunity_query,
 )
