@@ -55,7 +55,7 @@ def summarize_missing_opportunities(
     scope = or_(
         Opportunity.organization_id == organization_id,
         Opportunity.organization_id.is_(None),
-    ) if organization_id else True
+    ) if organization_id else Opportunity.organization_id.is_(None)
     stmt = (
         select(Opportunity)
         .where(
