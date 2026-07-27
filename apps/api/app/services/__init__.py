@@ -37,10 +37,6 @@ from app.services._legacy import (  # noqa: F401
     summarize_text,
     # Query / count
     count_query,
-    # Pipeline helpers (PR B-1b)
-    _pipeline_days_to_close,
-    get_closing_soon,
-    get_top_scored,
     # Health helpers (PR B-1c)
     get_data_coverage,
     get_health_kpis,
@@ -117,6 +113,10 @@ from app.services.dashboard import (  # noqa: F401
     extract_score_reasons,
     get_closing_soon_7d,
     get_review_queue,
+    # Pipeline helpers (PR B-1b)
+    _pipeline_days_to_close,
+    get_closing_soon,
+    get_top_scored,
 )
 
 # ── search.py — semantic + lexical search ────────────────────────────────────
