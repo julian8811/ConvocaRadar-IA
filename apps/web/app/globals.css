@@ -3,8 +3,7 @@
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme inline {
-  --font-sans: "Geist", "Geist Fallback", ui-sans-serif, system-ui, sans-serif;
-  --font-mono: "Geist Mono", "Geist Mono Fallback", ui-monospace, SFMono-Regular, monospace;
+  --font-sans: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif;
   --color-background: #f4f7f6;
   --color-foreground: #243336;
   --color-card: #ffffff;
@@ -180,5 +179,5 @@ select option {
 .plot-container .ytick text,
 .plot-container .gtitle,
 .plot-container .legend text {
-  font-family: "Geist", ui-sans-serif, system-ui, sans-serif !important;
+  font-family: var(--font-geist-sans), ui-sans-serif, system-ui, sans-serif !important;
 }
