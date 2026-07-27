@@ -771,6 +771,72 @@ class TestOpportunityModule:
         assert "data" in sig.parameters
 
 
+class TestAlertsModule:
+    """Characterization for 3 audit/alert functions (PR C-2b).
+
+    These reference app.services.alerts which does NOT exist yet.
+    They fail until alerts.py is created (GREEN step).
+    """
+
+    def test_audit_signature(self) -> None:
+        """audit is callable with db + action + resource_type + user."""
+        from app.services.alerts import audit
+        from inspect import signature
+        sig = signature(audit)
+        assert "db" in sig.parameters
+        assert "action" in sig.parameters
+        assert "resource_type" in sig.parameters
+        assert "user" in sig.parameters
+
+    def test__source_health_status_idle(self) -> None:
+        """_source_health_status returns 'idle' for empty runs."""
+        from app.services.alerts import _source_health_status
+        assert _source_health_status([]) == "idle"
+
+    def test__source_health_status_healthy(self) -> None:
+        """_source_health_status returns 'healthy' when first run succeeded."""
+        from app.services.alerts import _source_health_status
+        from unittest.mock import MagicMock
+        run = MagicMock()
+        run.status = "completed"
+        assert _source_health_status([run]) == "healthy"
+
+    def test__source_health_status_failing_first_run(self) -> None:
+        """_source_health_status returns 'failing' when first run failed."""
+        from app.services.alerts import _source_health_status
+        from unittest.mock import MagicMock
+        run = MagicMock()
+        run.status = "failed"
+        assert _source_health_status([run]) == "failing"
+
+    def test__source_health_status_failing_three_failures(self) -> None:
+        """_source_health_status returns 'failing' with 3+ failures."""
+        from app.services.alerts import _source_health_status
+        from unittest.mock import MagicMock
+        runs = [MagicMock(status="completed") for _ in range(2)]
+        # Add 3 failed runs (after the initial successful ones)
+        runs.insert(0, MagicMock(status="failed"))
+        runs.insert(0, MagicMock(status="failed"))
+        runs.insert(0, MagicMock(status="failed"))
+        assert _source_health_status(runs) == "failing"
+
+    def test__source_health_status_degraded(self) -> None:
+        """_source_health_status returns 'degraded' with 1-2 failures."""
+        from app.services.alerts import _source_health_status
+        from unittest.mock import MagicMock
+        runs = [MagicMock(status="failed"), MagicMock(status="completed")]
+        assert _source_health_status(runs) == "degraded"
+
+    def test_create_source_health_alert_signature(self) -> None:
+        """create_source_health_alert is callable with db + source + reason."""
+        from app.services.alerts import create_source_health_alert
+        from inspect import signature
+        sig = signature(create_source_health_alert)
+        assert "db" in sig.parameters
+        assert "source" in sig.parameters
+        assert "reason" in sig.parameters
+
+
 class TestNoLegacyDuplicates:
     """PR A-1: Verify 36 duplicated functions are no longer defined in _legacy.py."""
 
