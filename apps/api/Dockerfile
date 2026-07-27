@@ -1,46 +1,65 @@
-FROM python:3.12-slim
+# syntax=docker/dockerfile:1.7
+# ── Stage 1: install Python deps into /install prefix ────────────────────────
+FROM python:3.12-slim AS builder
+
+WORKDIR /build
+
+# pip + setuptools upgrade only (no build-essential needed: psycopg[binary] ships
+# pre-built wheels and the rest of the stack is pure-Python with wheels too).
+RUN pip install --no-cache-dir --upgrade pip
+
+COPY apps/api/pyproject.toml ./
+RUN pip install --no-cache-dir --prefix=/install .
+
+# ── Stage 2: runtime image ───────────────────────────────────────────────────
+FROM python:3.12-slim AS runtime
+
+ENV PYTHONDONTWRITEBYTECODE=1 \
+    PYTHONUNBUFFERED=1 \
+    PIP_NO_CACHE_DIR=1 \
+    PIP_DISABLE_PIP_VERSION_CHECK=1 \
+    PLAYWRIGHT_BROWSERS_PATH=/ms-playwright
 
 WORKDIR /app
 
-# Install system deps for Playwright and psycopg
+# Runtime system deps: libpq client + Playwright/Chromium headless libs.
+# (Build tools, headers, and dev libs were only needed in the builder stage.)
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    libpq-dev \
-    libglib2.0-0 libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 \
-    libcups2 libdrm2 libdbus-1-3 libxcb1 libxkbcommon0 libx11-6 \
-    libxcomposite1 libxdamage1 libxext6 libxfixes3 libxrandr2 \
-    libgbm1 libpango-1.0-0 libcairo2 libasound2 libatspi2.0-0 \
+        libpq5 \
+        libglib2.0-0 libnss3 libnspr4 libatk1.0-0 libatk-bridge2.0-0 \
+        libcups2 libdrm2 libdbus-1-3 libxcb1 libxkbcommon0 libx11-6 \
+        libxcomposite1 libxdamage1 libxext6 libxfixes3 libxrandr2 \
+        libgbm1 libpango-1.0-0 libcairo2 libasound2 libatspi2.0-0 \
+        fonts-liberation \
     && rm -rf /var/lib/apt/lists/*
 
-# Install Python deps from pyproject.toml
-COPY apps/api/pyproject.toml .
-RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
-    pip install --no-cache-dir -e ".[dev]"
+# Copy installed Python packages from builder
+COPY --from=builder /install /usr/local
 
-# Install Playwright browsers to Render-compatible path.
-# Render runtime sets PLAYWRIGHT_BROWSERS_PATH or HOME to /opt/render/,
-# so Playwright looks for browsers under /opt/render/.cache/ms-playwright/.
-# We install there during build so browsers are found at runtime.
-ENV PLAYWRIGHT_BROWSERS_PATH=/opt/render/.cache/ms-playwright
-RUN mkdir -p /opt/render/.cache && \
-    python -m playwright install chromium chromium-headless-shell --with-deps
+# Install Playwright Chromium into the runtime layer (browsers land in /ms-playwright,
+# which is the value of $PLAYWRIGHT_BROWSERS_PATH set above).
+RUN playwright install chromium chromium-headless-shell
 
-# Copy application code
-COPY apps/api/alembic.ini .
+# Application code
+COPY apps/api/alembic.ini ./
 COPY apps/api/migrations ./migrations
 COPY apps/api/app ./app
 
-# Refresh the editable package after the sources exist so installed CLI
-# entry points can import ``app`` from any working directory.
-RUN pip install --no-cache-dir --no-deps -e .
+# Non-root runtime user. Playwright cache is owned by app so the user can read
+# browsers without needing root at runtime.
+RUN groupadd --system --gid 1001 app \
+    && useradd --system --uid 1001 --gid app --create-home --home-dir /home/app app \
+    && mkdir -p /ms-playwright \
+    && chown -R app:app /app /home/app /ms-playwright
 
-# Runtime: ensure Playwright browsers are available at Render's expected path
-# (fallback in case Render overrides the build-time ENV)
-CMD ["sh", "-c", "\
-  if [ -n \"$PLAYWRIGHT_BROWSERS_PATH\" ] && [ \"$PLAYWRIGHT_BROWSERS_PATH\" != '/opt/render/.cache/ms-playwright' ] && [ -d /opt/render/.cache/ms-playwright ]; then \
-    mkdir -p \"$(dirname \"$PLAYWRIGHT_BROWSERS_PATH\")\" && \
-    ln -sf /opt/render/.cache/ms-playwright \"$PLAYWRIGHT_BROWSERS_PATH\" 2>/dev/null || true; \
-  fi; \
-  alembic upgrade head 2>/dev/null; \
-  python -c 'from app.db.session import create_all; create_all()'; \
-  uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000} \
-"]
+USER app
+
+EXPOSE 8000
+
+HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health/live', timeout=5)" || exit 1
+
+# Single source of truth for schema: Alembic. We do NOT call create_all() here —
+# the previous double-migration (alembic + create_all) could drift between
+# environments. See audit note 2026-07.
+CMD ["sh", "-c", "alembic upgrade head && uvicorn app.main:app --host 0.0.0.0 --port ${PORT:-8000}"]
