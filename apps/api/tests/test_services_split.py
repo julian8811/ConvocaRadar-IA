@@ -8,6 +8,8 @@ Tests:
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
+
 import pytest
 
 
@@ -193,6 +195,43 @@ class TestDashboardTriageModule:
         assert callable(get_review_queue)
         assert callable(get_closing_soon_7d)
         assert isinstance(_STATUS_LABELS, dict)
+
+
+class TestDashboardPipelineModule:
+    """Characterization for 3 pipeline functions (PR B-1b).
+
+    These reference app.services.dashboard functions that are NOT yet
+    defined — they fail until the GREEN step adds them.
+    """
+
+    def test__pipeline_days_to_close_none(self) -> None:
+        """_pipeline_days_to_close returns None when close_date is None."""
+        from app.services.dashboard import _pipeline_days_to_close
+        assert _pipeline_days_to_close(None) is None
+
+    def test__pipeline_days_to_close_clamps_negative(self) -> None:
+        """_pipeline_days_to_close clamps negative to 0."""
+        from datetime import timedelta
+        from app.services.dashboard import _pipeline_days_to_close
+        yesterday = datetime.now(UTC) - timedelta(days=1)
+        assert _pipeline_days_to_close(yesterday) == 0
+
+    def test_get_top_scored_signature(self) -> None:
+        """get_top_scored is callable with typical args."""
+        from app.services.dashboard import get_top_scored
+        from inspect import signature
+        sig = signature(get_top_scored)
+        assert "db" in sig.parameters
+        assert "organization_id" in sig.parameters
+
+    def test_get_closing_soon_signature(self) -> None:
+        """get_closing_soon is callable with typical args."""
+        from app.services.dashboard import get_closing_soon
+        from inspect import signature
+        sig = signature(get_closing_soon)
+        assert "db" in sig.parameters
+        assert "organization_id" in sig.parameters
+        assert "days_window" in sig.parameters
 
 
 class TestNoLegacyDuplicates:
