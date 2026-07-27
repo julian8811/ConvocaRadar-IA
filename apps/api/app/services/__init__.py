@@ -37,13 +37,6 @@ from app.services._legacy import (  # noqa: F401
     summarize_text,
     # Query / count
     count_query,
-    # Health helpers (PR B-1c)
-    get_data_coverage,
-    get_health_kpis,
-    get_sources_health,
-    get_source_health_summaries,
-    get_status_breakdown,
-    get_country_breakdown,
     # Analytics helpers
     _backfill_close_date_text,
     _opportunity_combined_text,
@@ -117,6 +110,13 @@ from app.services.dashboard import (  # noqa: F401
     _pipeline_days_to_close,
     get_closing_soon,
     get_top_scored,
+    # Health helpers (PR B-1c)
+    get_country_breakdown,
+    get_data_coverage,
+    get_health_kpis,
+    get_source_health_summaries,
+    get_sources_health,
+    get_status_breakdown,
 )
 
 # ── search.py — semantic + lexical search ────────────────────────────────────

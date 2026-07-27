@@ -324,7 +324,7 @@ class TestNoLegacyDuplicates:
         from app.services._legacy import (
             connector_for, is_slow_scrape_source, source_due_for_scraping,
             audit, create_opportunity, reanalyze_opportunity,
-            opportunity_status, get_health_kpis,
+            opportunity_status,
         )
         assert callable(connector_for)
 
