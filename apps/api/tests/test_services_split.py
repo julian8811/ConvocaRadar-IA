@@ -130,6 +130,45 @@ ALL_SYMBOLS = (
 
 
 
+class TestNoLegacyDuplicates:
+    """PR A-1: Verify 36 duplicated functions are no longer defined in _legacy.py."""
+
+    DELETED_SYMBOLS = [
+        "slugify", "normalize_official_url", "is_private_url", "validate_source_url",
+        "is_public_http_url", "is_noise_title", "is_noise_payload", "url_is_reachable",
+        "opportunity_dedup_key", "_organization_opportunity_scope", "find_duplicate_opportunity",
+        "_normalize_survivor_datetime", "_opportunity_survivor_key", "_reassign_opportunity_relations",
+        "_merge_opportunity_records", "deduplicate_opportunities", "candidate_external_id",
+        "priority_for_score", "_semantic_score", "_compute_score", "calculate_score",
+        "export_csv", "export_xlsx", "export_pdf", "generate_report_html", "_render_pdf_with_playwright",
+        "build_opportunity_query", "_text_search_opportunities", "_lexical_search_score",
+        "semantic_search_opportunities",
+        "_get_opportunity_embedding", "_supports_vector_search", "opportunity_embedding_text",
+        "opportunity_reanalysis_text", "upsert_opportunity_embedding", "rebuild_opportunity_embeddings",
+    ]
+
+    @pytest.mark.parametrize("symbol", DELETED_SYMBOLS)
+    def test_no_def_in_legacy_source(self, symbol: str) -> None:
+        """Verify the function is no longer *defined* in the _legacy.py source."""
+        import re
+        with open("app/services/_legacy.py") as f:
+            source = f.read()
+        pattern = rf"^(?:async\s+)?def\s+{re.escape(symbol)}\s*\("
+        assert not re.search(pattern, source, re.MULTILINE), (
+            f"Function {symbol!r} is still *defined* in _legacy.py source"
+        )
+
+    def test_legacy_compiles_and_key_functions_callable(self) -> None:
+        """_legacy.py still compiles and key functions work after deletion."""
+        from app.services._legacy import (
+            connector_for, is_slow_scrape_source, source_due_for_scraping,
+            audit, create_opportunity, reanalyze_opportunity,
+            opportunity_status, get_review_queue, get_health_kpis,
+        )
+        assert callable(connector_for)
+        assert callable(get_review_queue)
+
+
 class TestServicesImportBackwardCompat:
     """Every symbol from the old services.py MUST be importable via the new package."""
 
