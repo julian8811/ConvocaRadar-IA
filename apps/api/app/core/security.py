@@ -12,24 +12,6 @@ from app.core.config import get_settings
 PBKDF2_ITERATIONS = 390_000
 
 
-CSRF_SAFE_METHODS = frozenset({"GET", "HEAD", "OPTIONS"})
-
-
-def verify_csrf(request: object) -> None:
-    """Verify CSRF token header for state-changing requests.
-
-    The frontend includes ``X-CSRF-Protection: 1`` on every request.
-    For unsafe methods (POST, PUT, PATCH, DELETE) the middleware checks
-    that this header is present and set to ``"1"``.
-    """
-    if request.method in CSRF_SAFE_METHODS:
-        return
-    csrf_header = request.headers.get("x-csrf-protection")
-    if csrf_header != "1":
-        from fastapi import HTTPException
-        raise HTTPException(status_code=403, detail="CSRF validation failed")
-
-
 def hash_password(password: str) -> str:
     salt = os.urandom(16)
     digest = hashlib.pbkdf2_hmac("sha256", password.encode("utf-8"), salt, PBKDF2_ITERATIONS)
