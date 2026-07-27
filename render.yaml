@@ -43,12 +43,12 @@ services:
       - key: EMBEDDING_MODEL
         value: ""
       - key: SMTP_HOST
-        value: smtp.resend.com
+        value: smtp-mail.outlook.com
       - key: SMTP_PORT
         value: "587"
       - key: SMTP_USER
-        value: resend
+        value: julianmontoya8811@hotmail.com
       - key: SMTP_FROM
-        value: ConvocaRadar IA <onboarding@resend.dev>
+        value: julianmontoya8811@hotmail.com
       - key: SMTP_USE_TLS
         value: "true"

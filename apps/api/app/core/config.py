@@ -57,7 +57,7 @@ class Settings(BaseSettings):
     smtp_port: int = 587
     smtp_user: str | None = None
     smtp_password: str | None = None
-    smtp_from: str = "alerts@convocaradar.local"
+    smtp_from: str = "julianmontoya8811@hotmail.com"
     smtp_use_tls: bool = True
     resend_api_key: str | None = None
     resend_from: str = "Observatorio de Convocatorias <onboarding@resend.dev>"
