@@ -89,6 +89,15 @@ ANALYTICS_FUNCS = [
     "get_source_contribution",
 ]
 
+# genai.py
+GENAI_FUNCS = [
+    "build_weekly_digest_html",
+    "rescore_all_opportunities",
+    "score_unscored_opportunities",
+    "send_weekly_digest",
+    "summarize_missing_opportunities",
+]
+
 # Functions that stay in the __init__ facade (not moved to sub-modules)
 FACADE_FUNCS = [
     "connector_for",
@@ -119,11 +128,6 @@ FACADE_FUNCS = [
     "get_data_coverage",
     "get_sources_health",
     "get_source_health_summaries",
-    "summarize_missing_opportunities",
-    "rescore_all_opportunities",
-    "score_unscored_opportunities",
-    "build_weekly_digest_html",
-    "send_weekly_digest",
     "SLOW_SCRAPE_SOURCE_KEYS",
     "SLOW_SCRAPE_SOURCE_TYPES",
 ]
@@ -131,7 +135,8 @@ FACADE_FUNCS = [
 # Combine ALL symbols that must be importable from app.services
 ALL_SYMBOLS = (
     VALIDATION_FUNCS + DEDUP_FUNCS + SCORING_FUNCS + EXPORT_FUNCS
-    + SEARCH_FUNCS + EMBEDDINGS_FUNCS + ANALYTICS_FUNCS + FACADE_FUNCS
+    + SEARCH_FUNCS + EMBEDDINGS_FUNCS + ANALYTICS_FUNCS + GENAI_FUNCS
+    + FACADE_FUNCS
 )
 
 
