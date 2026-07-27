@@ -428,6 +428,74 @@ class TestAnalyticsModule:
         assert "organization_id" in sig.parameters
 
 
+class TestGenaiModule:
+    """Characterization for 5 genai/digest functions to be extracted to genai.py (PR B-3).
+
+    These reference app.services.genai which does NOT exist yet.
+    They fail until genai.py is created (GREEN step).
+    """
+
+    def test_summarize_missing_opportunities_signature(self) -> None:
+        """summarize_missing_opportunities is callable with db + organization_id."""
+        from app.services.genai import summarize_missing_opportunities
+        from inspect import signature
+        sig = signature(summarize_missing_opportunities)
+        assert "db" in sig.parameters
+        assert "organization_id" in sig.parameters
+
+    def test_rescore_all_opportunities_signature(self) -> None:
+        """rescore_all_opportunities is callable with db + organization_id."""
+        from app.services.genai import rescore_all_opportunities
+        from inspect import signature
+        sig = signature(rescore_all_opportunities)
+        assert "db" in sig.parameters
+        assert "organization_id" in sig.parameters
+
+    def test_score_unscored_opportunities_signature(self) -> None:
+        """score_unscored_opportunities is callable with db + organization_id."""
+        from app.services.genai import score_unscored_opportunities
+        from inspect import signature
+        sig = signature(score_unscored_opportunities)
+        assert "db" in sig.parameters
+        assert "organization_id" in sig.parameters
+
+    def test_build_weekly_digest_html_pure(self) -> None:
+        """build_weekly_digest_html is callable with kwargs."""
+        from app.services.genai import build_weekly_digest_html
+        from inspect import signature
+        sig = signature(build_weekly_digest_html)
+        assert "organization" in sig.parameters
+        assert "opportunities" in sig.parameters
+
+    def test_build_weekly_digest_html_structure(self) -> None:
+        """build_weekly_digest_html produces expected HTML structure."""
+        from app.services.genai import build_weekly_digest_html
+        from unittest.mock import MagicMock
+        org = MagicMock()
+        org.name = "Test Org"
+        opp = MagicMock()
+        opp.title = "Test Grant"
+        opp.entity = "MinCiencia"
+        opp.country = "Colombia"
+        opp.summary = "A research opportunity"
+        opp.description = None
+        opp.official_url = "https://example.com/grant"
+        opp.application_url = None
+        html = build_weekly_digest_html(organization=org, opportunities=[opp])
+        assert "<html>" in html
+        assert "Test Grant" in html
+        assert "Test Org" in html
+        assert "Resumen semanal" in html
+
+    def test_send_weekly_digest_signature(self) -> None:
+        """send_weekly_digest is callable with db + organization_id."""
+        from app.services.genai import send_weekly_digest
+        from inspect import signature
+        sig = signature(send_weekly_digest)
+        assert "db" in sig.parameters
+        assert "organization_id" in sig.parameters
+
+
 class TestNoLegacyDuplicates:
     """PR A-1: Verify 36 duplicated functions are no longer defined in _legacy.py."""
 
