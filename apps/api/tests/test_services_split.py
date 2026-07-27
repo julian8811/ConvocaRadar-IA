@@ -130,6 +130,71 @@ ALL_SYMBOLS = (
 
 
 
+class TestDashboardTriageModule:
+    """Characterization for 5 triage functions extracted to dashboard.py (PR B-1a).
+    
+    NOTE: These reference app.services.dashboard which does NOT exist yet.
+    They fail until dashboard.py is created (GREEN step).
+    """
+
+    def test_extract_score_reasons_pure(self) -> None:
+        """extract_score_reasons is a pure function — characterize known inputs."""
+        from app.services.dashboard import extract_score_reasons
+
+        assert extract_score_reasons(None) == []
+        assert extract_score_reasons([]) == []
+        assert extract_score_reasons(["a", "b"]) == ["a", "b"]
+        assert extract_score_reasons('["a", "b"]') == ["a", "b"]
+        assert extract_score_reasons("a, b") == ["a", "b"]
+        assert extract_score_reasons(42) == []
+        assert extract_score_reasons("") == []
+
+    def test__triage_days_to_close_none(self) -> None:
+        """_triage_days_to_close returns None when close_date is None."""
+        from app.services.dashboard import _triage_days_to_close
+        assert _triage_days_to_close(None) is None
+
+    def test_get_review_queue_signature(self) -> None:
+        """get_review_queue is callable with typical args."""
+        from app.services.dashboard import get_review_queue
+        from inspect import signature
+        sig = signature(get_review_queue)
+        assert "db" in sig.parameters
+        assert "organization_id" in sig.parameters
+
+    def test_get_closing_soon_7d_signature(self) -> None:
+        """get_closing_soon_7d is callable with typical args."""
+        from app.services.dashboard import get_closing_soon_7d
+        from inspect import signature
+        sig = signature(get_closing_soon_7d)
+        assert "db" in sig.parameters
+        assert "organization_id" in sig.parameters
+
+    def test__STATUS_LABELS_content(self) -> None:
+        """_STATUS_LABELS is a dict with expected keys and Spanish labels."""
+        from app.services.dashboard import _STATUS_LABELS
+        assert isinstance(_STATUS_LABELS, dict)
+        assert _STATUS_LABELS["open"] == "Abiertas"
+        assert _STATUS_LABELS["closing_soon"] == "Cierran pronto"
+        assert _STATUS_LABELS["closed"] == "Cerradas"
+        assert _STATUS_LABELS["unknown"] == "Sin fecha"
+
+    def test_dashboard_facade_re_exports(self) -> None:
+        """The facade re-exports triage symbols from app.services."""
+        from app.services import (
+            extract_score_reasons,
+            _triage_days_to_close,
+            get_review_queue,
+            get_closing_soon_7d,
+            _STATUS_LABELS,
+        )
+        assert callable(extract_score_reasons)
+        assert callable(_triage_days_to_close)
+        assert callable(get_review_queue)
+        assert callable(get_closing_soon_7d)
+        assert isinstance(_STATUS_LABELS, dict)
+
+
 class TestNoLegacyDuplicates:
     """PR A-1: Verify 36 duplicated functions are no longer defined in _legacy.py."""
 
