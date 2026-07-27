@@ -1,8 +1,56 @@
+# Dependencies (re-installed inside the image)
 node_modules
-.next
-coverage
-test-results
-playwright-report
+.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# Build artefacts
+.next/
+out/
+build/
+dist/
+
+# Testing
+coverage/
+test-results/
+playwright-report/
+playwright/.cache/
+.nyc_output
+
+# Cache
 .turbo
+.eslintcache
+.tsbuildinfo
+*.tsbuildinfo
+
+# Environment files — never bake secrets into the image
 .env
 .env.*
+!.env.example
+!.env.production.example
+
+# Git / CI / IDE
+.git
+.gitignore
+.gitattributes
+.github
+.idea
+.vscode
+.DS_Store
+*.swp
+
+# Docker / Compose
+Dockerfile
+Dockerfile.*
+.dockerignore
+docker-compose*.yml
+
+# Documentation
+*.md
+!app/**/*.md
+LICENSE*
+CHANGELOG*
