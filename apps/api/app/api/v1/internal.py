@@ -4,7 +4,7 @@ from fastapi import APIRouter, Depends, Header, HTTPException, status
 
 from app.core.config import get_settings
 from app.schemas import ConnectorProbeRequest
-from app.services import connector_for
+from app.services import connector_for, is_private_url
 
 router = APIRouter(prefix="/internal", tags=["internal"])
 
@@ -16,6 +16,19 @@ def verify_internal_key(x_internal_api_key: str | None = Header(default=None)) -
 
 @router.post("/connectors/probe", dependencies=[Depends(verify_internal_key)])
 async def probe_connector(payload: ConnectorProbeRequest) -> dict[str, object]:
+    # Reject non-public URLs up-front when the caller supplies one. The
+    # endpoint is auth'd by a single API key (not a per-user session), so
+    # an attacker who obtains the key, or an operator who fat-fingers a
+    # URL, could otherwise pivot the API into probing internal services
+    # (cloud metadata endpoints like 169.254.169.254, internal HTTP
+    # services, link-local addresses, etc.). When no base_url is sent,
+    # the connector uses its configured default — and the same private-IP
+    # guard inside the connector itself remains the second line of defense.
+    if payload.base_url is not None and is_private_url(payload.base_url):
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="base_url must be a public HTTP/HTTPS URL",
+        )
     connector = connector_for(payload.source_key, payload.base_url, payload.source_type)
     stats: dict[str, object] = {
         "source_key": payload.source_key,
