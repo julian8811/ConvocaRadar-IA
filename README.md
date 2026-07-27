@@ -1,6 +1,6 @@
 # ConvocaRadar-IA
 
-Intelligent grants and opportunities monitoring platform. Scrapes, deduplicates, scores, and alerts on funding opportunities from 93+ sources across Latin America, the United States, Europe, and global organizations.
+Intelligent grants and opportunities monitoring platform. Scrapes, deduplicates, scores, and alerts on funding opportunities from ~50 source connectors across Latin America, the United States, Europe, and global organizations.
 
 ## Architecture
 
@@ -11,7 +11,7 @@ Intelligent grants and opportunities monitoring platform. Scrapes, deduplicates,
 ├─────────────────────────────────────────────────────────┤
 │  Backend (FastAPI, SQLAlchemy 2.0, structlog)            │
 │  apps/api/        → port 8000                            │
-│    ├── connectors/  46 source connector modules          │
+│    ├── connectors/  ~50 source connector modules          │
 │    ├── scraper/     Runner, dispatcher, recovery, DOM    │
 │    ├── services/    Scoring, dedup, export, enrichment   │
 │    ├── core/        Config, security, email, AI, HTTP    │
@@ -129,7 +129,7 @@ docker compose exec api convocaradar-seed-admin \
 apps/
 ├── api/                              # FastAPI backend
 │   ├── app/
-│   │   ├── connectors/               # 46 source connector modules
+│   │   ├── connectors/               # ~50 source connector modules
 │   │   │   ├── base.py               # SourceConnector protocol + dataclasses
 │   │   │   ├── registry.py           # @register decorator + get_connector()
 │   │   │   ├── factory.py            # connector_for() dispatcher
@@ -205,7 +205,7 @@ apps/
 │   │   ├── main.py                   # FastAPI app factory, lifespan, middleware
 │   │   └── worker.py                 # Dedicated scheduler process
 │   │
-│   └── tests/                        # 793 tests (60 test files)
+│   └── tests/                        # 942+ tests (65+ test files)
 │       ├── test_auth.py
 │       ├── test_scoring.py
 │       ├── test_connectors.py
@@ -264,7 +264,7 @@ Key environment variables (see `.env.example` for defaults):
 ## Testing
 
 ```sh
-# Backend tests (793 tests, 60 files)
+# Backend tests (942+ tests, 65+ files)
 cd apps/api
 pip install -e ".[dev]"
 pytest tests/                  # all tests
@@ -340,7 +340,7 @@ conn = get_connector("grants-gov", "https://api.example.com")
 ### Source ecosystem
 
 - **93 source keys** defined in `seed.py` across LatAm, US, Europe, and global orgs
-- **46 connector modules** in `connectors/`
+- **~50 connector modules** in `connectors/`
 - **36 registered connectors** via `@register`
 - Sources are tiered and auto-paused when consecutive empty runs exceed a threshold
 
