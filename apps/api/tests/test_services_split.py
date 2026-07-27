@@ -126,10 +126,15 @@ OPPORTUNITY_FUNCS = [
     "count_query",
 ]
 
-# Functions that stay in the __init__ facade (not moved to sub-modules)
-FACADE_FUNCS = [
+# alerts.py
+ALERTS_FUNCS = [
+    "_source_health_status",
     "audit",
     "create_source_health_alert",
+]
+
+# Functions that stay in the __init__ facade (not moved to sub-modules)
+FACADE_FUNCS = [
     "extract_score_reasons",
     "get_review_queue",
     "get_closing_soon_7d",
@@ -147,7 +152,7 @@ FACADE_FUNCS = [
 ALL_SYMBOLS = (
     VALIDATION_FUNCS + DEDUP_FUNCS + SCORING_FUNCS + EXPORT_FUNCS
     + SEARCH_FUNCS + EMBEDDINGS_FUNCS + ANALYTICS_FUNCS + GENAI_FUNCS
-    + CONNECTORS_FUNCS + OPPORTUNITY_FUNCS
+    + CONNECTORS_FUNCS + OPPORTUNITY_FUNCS + ALERTS_FUNCS
     + FACADE_FUNCS
 )
 
@@ -838,7 +843,7 @@ class TestAlertsModule:
 
 
 class TestNoLegacyDuplicates:
-    """PR A-1: Verify 36 duplicated functions are no longer defined in _legacy.py."""
+    """PR C-2b: Verify _legacy.py has been deleted and all functions migrated."""
 
     DELETED_SYMBOLS = [
         "slugify", "normalize_official_url", "is_private_url", "validate_source_url",
@@ -854,25 +859,32 @@ class TestNoLegacyDuplicates:
         "opportunity_reanalysis_text", "upsert_opportunity_embedding", "rebuild_opportunity_embeddings",
     ]
 
-    @pytest.mark.parametrize("symbol", DELETED_SYMBOLS)
-    def test_no_def_in_legacy_source(self, symbol: str) -> None:
-        """Verify the function is no longer *defined* in the _legacy.py source."""
-        import re
-        with open("app/services/_legacy.py") as f:
-            source = f.read()
-        pattern = rf"^(?:async\s+)?def\s+{re.escape(symbol)}\s*\("
-        assert not re.search(pattern, source, re.MULTILINE), (
-            f"Function {symbol!r} is still *defined* in _legacy.py source"
+    def test_legacy_file_deleted(self) -> None:
+        """_legacy.py no longer exists in the services directory."""
+        import os
+        assert not os.path.exists("app/services/_legacy.py"), (
+            "_legacy.py should have been deleted"
         )
 
-    def test_legacy_compiles_and_key_functions_callable(self) -> None:
-        """_legacy.py still compiles and key functions work after deletion."""
-        from app.services._legacy import (
+    @pytest.mark.parametrize("symbol", DELETED_SYMBOLS)
+    def test_all_deleted_symbols_still_importable(self, symbol: str) -> None:
+        """All previously-deleted symbols are still importable from app.services."""
+        import importlib
+        mod = importlib.import_module("app.services")
+        assert hasattr(mod, symbol), (
+            f"Symbol {symbol!r} is NOT exported from app.services"
+        )
+
+    def test_all_extracted_functions_callable_via_facade(self) -> None:
+        """Key extracted functions are still callable through app.services."""
+        from app.services import (
             connector_for, is_slow_scrape_source, source_due_for_scraping,
             audit, create_opportunity, reanalyze_opportunity,
-            opportunity_status,
+            opportunity_status, create_source_health_alert,
         )
         assert callable(connector_for)
+        assert callable(audit)
+        assert callable(create_source_health_alert)
 
 
 class TestServicesImportBackwardCompat:
