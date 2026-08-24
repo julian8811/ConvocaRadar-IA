@@ -10,8 +10,6 @@ active markup (``<script>``) stays neutralized.
 
 from __future__ import annotations
 
-import pytest
-
 from app.core.text import safe_escape
 
 
