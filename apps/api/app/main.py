@@ -269,7 +269,21 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
         await asyncio.to_thread(close_sync_client)
 
 
-app = FastAPI(title=settings.app_name, version="0.1.0", lifespan=lifespan)
+# Docs gating: Swagger UI, ReDoc and the OpenAPI schema expose endpoint
+# structure to anyone who can reach them, so they are only served in
+# development. Outside development every docs URL is None (FastAPI then
+# answers 404), and the rate-limit bypass set below intentionally does
+# NOT include these paths — wherever they are served they count toward
+# the caller's bucket like any other endpoint.
+_docs_enabled = settings.app_env.strip().lower() == "development"
+app = FastAPI(
+    title=settings.app_name,
+    version="0.1.0",
+    lifespan=lifespan,
+    docs_url="/docs" if _docs_enabled else None,
+    redoc_url="/redoc" if _docs_enabled else None,
+    openapi_url="/openapi.json" if _docs_enabled else None,
+)
 app.state.rate_limits = defaultdict(deque)
 
 
@@ -384,14 +398,14 @@ async def rate_limit_middleware(request: Request, call_next):
         return await call_next(request)
     # Bypass rate limiting for liveness/readiness probes and the internal
     # scheduler endpoints. Orchestrators (k8s, Render) and the scheduler may
-    # legitimately call these endpoints at high frequency.
+    # legitimately call these endpoints at high frequency. Docs paths are
+    # deliberately absent: they are only served in development, and where
+    # served they are counted like any other request.
     if path in {
         "/health",
         "/api/v1/health",
         "/api/v1/health/live",
         "/api/v1/health/ready",
-        "/docs",
-        "/openapi.json",
     } or path.startswith("/api/v1/internal/"):
         return await call_next(request)
     xff = request.headers.get("x-forwarded-for", "").strip()
