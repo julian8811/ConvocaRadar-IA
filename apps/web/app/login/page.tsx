@@ -91,7 +91,7 @@ export default function LoginPage() {
                 {error}
               </div>
             ) : null}
-              <Button className="w-full" disabled={loading} type="button" onClick={() => signIn(email, password)}>
+              <Button className="w-full" disabled={loading} type="submit">
                 {loading ? "Ingresando..." : "Ingresar"}
               </Button>
               {isDev && (
