@@ -9,7 +9,8 @@ import asyncio
 import csv
 import io
 from datetime import UTC, datetime
-from html import escape
+
+from app.core.text import safe_escape
 
 from openpyxl import Workbook
 from reportlab.lib import colors
@@ -153,7 +154,7 @@ def generate_report_html(title: str, organization: object, opportunities: list[O
         has_close = bool(item.close_date)
         has_amount = bool(item.funding_amount_raw or item.funding_amount_value)
         has_categories = bool(item.categories)
-        entity_str = escape(repair_mojibake(item.entity or ''))
+        entity_str = safe_escape(repair_mojibake(item.entity or ''))
         # Extract domain from URL as fallback context
         domain_str = ''
         url = _link_for(item)
@@ -167,7 +168,7 @@ def generate_report_html(title: str, organization: object, opportunities: list[O
         chips = ''
         if has_categories:
             chips = ' <div class="story-card__chips">' + ''.join(
-                f'<span class="chip">{escape(cat)}</span>'
+                f'<span class="chip">{safe_escape(cat)}</span>'
                 for cat in item.categories[:4]
             ) + '</div>'
         # Show domain when both entity and summary are generic
@@ -175,11 +176,11 @@ def generate_report_html(title: str, organization: object, opportunities: list[O
         return f"""
         <article class="story-card{' story-card--compact' if not has_summary else ''}">
           <div class="story-card__top">
-            <span class="badge badge--{escape(item.status)}">{escape(item.status.replace('_', ' '))}</span>
-            <span class="story-card__country">{escape(item.country or '')}</span>
+            <span class="badge badge--{safe_escape(item.status)}">{safe_escape(item.status.replace('_', ' '))}</span>
+            <span class="story-card__country">{safe_escape(item.country or '')}</span>
           </div>
-          <h3 class="story-card__title">{f'<a href="{escape(url)}" target="_blank" rel="noopener noreferrer">{escape(repair_mojibake(item.title))}</a>' if url != '#' else escape(repair_mojibake(item.title))}</h3>
-          {f'<p class="story-card__body">{escape(repair_mojibake(body_text))}</p>' if has_summary else ''}
+          <h3 class="story-card__title">{f'<a href="{safe_escape(url)}" target="_blank" rel="noopener noreferrer">{safe_escape(repair_mojibake(item.title))}</a>' if url != '#' else safe_escape(repair_mojibake(item.title))}</h3>
+          {f'<p class="story-card__body">{safe_escape(repair_mojibake(body_text))}</p>' if has_summary else ''}
           {chips}
           <div class="story-card__meta-grid">
             <div class="story-card__metaitem" title="{entity_str}">
@@ -188,16 +189,16 @@ def generate_report_html(title: str, organization: object, opportunities: list[O
             </div>
             <div class="story-card__metaitem">
               <span class="story-card__label">Cierre</span>
-              <span class="story-card__value">{escape(item.close_date.date().isoformat() if has_close else '—')}</span>
+              <span class="story-card__value">{safe_escape(item.close_date.date().isoformat() if has_close else '—')}</span>
             </div>
             <div class="story-card__metaitem">
               <span class="story-card__label">Monto</span>
-              <span class="story-card__value">{escape(_format_amount(item)) if has_amount else '—'}</span>
+              <span class="story-card__value">{safe_escape(_format_amount(item)) if has_amount else '—'}</span>
             </div>
           </div>
           <div class="story-card__actions">
-            {f'<a class="btn" href="{escape(url)}" target="_blank" rel="noopener noreferrer">Ver convocatoria</a>' if url != '#' else ''}
-            {f'<a class="btn btn--outline" href="{escape(item.application_url)}" target="_blank" rel="noopener noreferrer">Postular</a>' if item.application_url and url_is_reachable(item.application_url) else ''}
+            {f'<a class="btn" href="{safe_escape(url)}" target="_blank" rel="noopener noreferrer">Ver convocatoria</a>' if url != '#' else ''}
+            {f'<a class="btn btn--outline" href="{safe_escape(item.application_url)}" target="_blank" rel="noopener noreferrer">Postular</a>' if item.application_url and url_is_reachable(item.application_url) else ''}
           </div>
         </article>
         """
@@ -205,11 +206,11 @@ def generate_report_html(title: str, organization: object, opportunities: list[O
     featured = opportunities[:9]
     featured_cards = "\n".join(_card_html(item) for item in featured)
     all_cards = "\n".join(_card_html(item) for item in opportunities)
-    country_rows = "\n".join(f"<tr><td>{escape(country)}</td><td>{count}</td></tr>" for country, count in top_countries)
-    category_rows = "\n".join(f"<tr><td>{escape(category)}</td><td>{count}</td></tr>" for category, count in top_categories)
+    country_rows = "\n".join(f"<tr><td>{safe_escape(country)}</td><td>{count}</td></tr>" for country, count in top_countries)
+    category_rows = "\n".join(f"<tr><td>{safe_escape(category)}</td><td>{count}</td></tr>" for category, count in top_categories)
     return f"""<!doctype html>
 <html lang="es">
-<head><meta charset="utf-8"><title>{escape(title)}</title>
+<head><meta charset="utf-8"><title>{safe_escape(title)}</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Geist:wght@400..700&display=swap" rel="stylesheet">
@@ -460,13 +461,13 @@ tbody tr:hover {{ background: rgba(0,179,175,0.03); }}
   <div class="brand-logo">{_LOGO_IMG}</div>
   <div class="brand-text">
     <div class="brand-name">Observatorio de Convocatorias</div>
-    <div class="brand-tagline">{escape(org_name)} &middot; Institución Universitaria Colmayor</div>
+    <div class="brand-tagline">{safe_escape(org_name)} &middot; Institución Universitaria Colmayor</div>
   </div>
 </div>
 
 <section class="hero">
   <div class="hero__inner">
-    <h1>{escape(title)}</h1>
+    <h1>{safe_escape(title)}</h1>
     <p class="hero__lead">Generado: {format_bogota(now_bogota())} (hora de Bogot&aacute;) &middot; {total} oportunidades identificadas.</p>
     <div class="hero__toolbar">
       <a class="btn btn--primary" href="#oportunidades">Ver convocatorias</a>
@@ -594,8 +595,8 @@ def export_pdf(title: str, organization: object, opportunities: list[Opportunity
     for item in opportunities[:40]:
         data.append(
             [
-                Paragraph(escape(repair_mojibake(item.title)), styles["BodyText"]),
-                Paragraph(escape(repair_mojibake(item.entity)), styles["BodyText"]),
+                Paragraph(safe_escape(repair_mojibake(item.title)), styles["BodyText"]),
+                Paragraph(safe_escape(repair_mojibake(item.entity)), styles["BodyText"]),
                 item.country,
                 item.status,
                 item.close_date.date().isoformat() if item.close_date else "Sin fecha",
