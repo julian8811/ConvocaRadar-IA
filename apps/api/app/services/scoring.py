@@ -9,7 +9,7 @@ from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
-from app.core.ai import build_embedding, cosine_similarity
+from app.core.ai import build_embedding_sync, cosine_similarity
 from app.models import Opportunity, OpportunityScore, OrganizationProfile, Priority
 
 # ── Source health score (Change C) ───────────────────────────────────────────
@@ -138,14 +138,13 @@ def priority_for_score(score: float) -> str:
 def _semantic_score(text: str, profile_text: str) -> float:
     """Compare opportunity text with profile text using embedding similarity.
 
-    Uses local hash-based embeddings (no API key required).
-    Returns a float in [0, 1] or 0 if empty input.
+    Returns a float in [0, 1] or 0 if empty input or embedding unavailable.
     """
     if not text.strip() or not profile_text.strip():
         return 0.0
     try:
-        opp_vec = build_embedding(text[:2000])
-        prof_vec = build_embedding(profile_text[:2000])
+        opp_vec = build_embedding_sync(text[:2000])
+        prof_vec = build_embedding_sync(profile_text[:2000])
         return cosine_similarity(opp_vec, prof_vec)
     except Exception:
         return 0.0
