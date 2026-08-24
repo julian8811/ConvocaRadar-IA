@@ -10,7 +10,6 @@ from __future__ import annotations
 import hashlib
 import re
 import structlog
-from datetime import UTC, datetime
 from xml.etree import ElementTree
 
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult

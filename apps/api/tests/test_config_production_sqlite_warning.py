@@ -9,7 +9,6 @@ in app.core.config at startup.
 
 from __future__ import annotations
 
-import logging
 from unittest.mock import patch
 
 from app.core.config import check_production_sqlite

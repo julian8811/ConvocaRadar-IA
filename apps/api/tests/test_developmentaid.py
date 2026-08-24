@@ -10,11 +10,6 @@ Covers the full two-phase sitemap-driven extraction:
 
 from __future__ import annotations
 
-import asyncio
-import json
-import re
-from datetime import datetime, UTC
-from unittest.mock import AsyncMock, patch
 
 import pytest
 

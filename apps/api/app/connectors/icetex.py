@@ -3,7 +3,6 @@ from app.connectors.registry import register
 # DEPRECATED: source disabled in seed.py
 
 import re
-from datetime import datetime
 from urllib.parse import urljoin, urlparse
 
 from selectolax.parser import HTMLParser, Node

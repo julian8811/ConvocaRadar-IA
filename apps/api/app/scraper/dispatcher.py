@@ -10,7 +10,6 @@ from datetime import UTC, datetime
 
 from sqlalchemy import select, text
 
-from app.core.config import get_settings
 from app.models import Source, SourceRun
 from app.scraper.runner import run_source_inline
 

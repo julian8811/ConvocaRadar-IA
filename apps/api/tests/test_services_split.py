@@ -404,7 +404,7 @@ class TestAnalyticsModule:
     def test_backfill_close_dates_ai_signature(self) -> None:
         """backfill_close_dates_ai is an async callable."""
         from app.services.analytics import backfill_close_dates_ai
-        from inspect import signature, Parameter
+        from inspect import signature
         sig = signature(backfill_close_dates_ai)
         assert "db" in sig.parameters
         assert "organization_id" in sig.parameters
@@ -620,7 +620,6 @@ class TestOpportunityModule:
     def test__parse_ai_close_date_iso(self) -> None:
         """_parse_ai_close_date parses ISO format."""
         from app.services.opportunity import _parse_ai_close_date
-        from datetime import datetime
         result = _parse_ai_close_date("2025-12-31")
         assert result is not None
         assert result.year == 2025
@@ -878,9 +877,7 @@ class TestNoLegacyDuplicates:
     def test_all_extracted_functions_callable_via_facade(self) -> None:
         """Key extracted functions are still callable through app.services."""
         from app.services import (
-            connector_for, is_slow_scrape_source, source_due_for_scraping,
-            audit, create_opportunity, reanalyze_opportunity,
-            opportunity_status, create_source_health_alert,
+            connector_for, audit, create_source_health_alert,
         )
         assert callable(connector_for)
         assert callable(audit)

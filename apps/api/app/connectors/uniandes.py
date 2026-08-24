@@ -8,11 +8,10 @@ their URL slugs and context.
 
 from __future__ import annotations
 
-import re
 from xml.etree import ElementTree
 
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
-from app.connectors.common import clean_text, enrich_candidates_batch, fetch_httpx_text
+from app.connectors.common import enrich_candidates_batch, fetch_httpx_text
 from app.connectors.registry import register
 
 UNIANDES_SITEMAP_URL = "https://www.uniandes.edu.co/sitemap.xml"

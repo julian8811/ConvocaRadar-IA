@@ -2,7 +2,6 @@
 from __future__ import annotations
 
 import json
-from urllib.parse import urljoin
 
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
 from app.connectors.common import clean_text, fetch_httpx_text, parse_date_text

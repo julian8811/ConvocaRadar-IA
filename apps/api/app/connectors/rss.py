@@ -1,6 +1,5 @@
 from datetime import datetime
 from email.utils import parsedate_to_datetime
-import re
 import xml.etree.ElementTree as ET
 
 from app.connectors.common import clean_text, fetch_httpx_text, safe_urljoin

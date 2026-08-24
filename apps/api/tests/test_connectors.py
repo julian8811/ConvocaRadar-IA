@@ -16,11 +16,10 @@ Four scenarios are tested per group:
 from __future__ import annotations
 
 from inspect import signature
-from unittest.mock import AsyncMock
 
 import pytest
 
-from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
+from app.connectors.base import OpportunityCandidate, RawSourceResult
 from tests.connector_fixtures import (
     FIXTURE_DATA,
     NETWORK_ERROR_MSG,

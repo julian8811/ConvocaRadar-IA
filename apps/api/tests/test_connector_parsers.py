@@ -10,7 +10,7 @@ import json
 
 import pytest
 
-from app.connectors.base import OpportunityCandidate, RawSourceResult
+from app.connectors.base import RawSourceResult
 
 
 def _raw(content: str, content_type: str = "application/json") -> RawSourceResult:

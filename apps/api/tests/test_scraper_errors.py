@@ -7,7 +7,6 @@ from __future__ import annotations
 import asyncio
 
 import httpx
-import pytest
 
 from app.scraper.errors import ErrorType, classify_error
 

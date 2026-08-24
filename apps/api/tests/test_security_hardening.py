@@ -31,7 +31,6 @@ from app.core.security import (
     decode_reset_token,
     hash_password,
 )
-from app.core.config import get_settings
 from app.core.rate_limit import email_login_limiter
 from app.db.seed import seed
 from app.db.session import SessionLocal

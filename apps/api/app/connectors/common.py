@@ -7,10 +7,11 @@ import socket
 from datetime import datetime
 import unicodedata
 import ipaddress
-from urllib.parse import urljoin, urlparse
+from urllib.parse import urljoin, urlparse  # noqa: F401 — kept at module level by test_scraper_fixes guard
 
 import httpx
 
+from app.connectors.base import OpportunityCandidate
 from app.core.config import get_settings
 from app.core.http_client import http_client
 

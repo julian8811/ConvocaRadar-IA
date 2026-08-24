@@ -1,39 +1,39 @@
 ﻿from app.connectors.configurable_html import ConfigurableHtmlConnector
 from app.connectors.registry import get_connector
 from app.connectors.generic_html import GenericHtmlConnector
-from app.connectors.grants_gov import GrantsGovConnector
+from app.connectors.grants_gov import GrantsGovConnector  # noqa: F401 — @register side effect
 from app.connectors.grants_gov_rss import GrantsGovRssConnector
-from app.connectors.apc_colombia import ApcColombiaConnector
+from app.connectors.apc_colombia import ApcColombiaConnector  # noqa: F401 — @register side effect
 from app.connectors.api import ApiConnector
-from app.connectors.icetex import IcetexConnector
-from app.connectors.innovamos import InnovamosConnector
+from app.connectors.icetex import IcetexConnector  # noqa: F401 — @register side effect
+from app.connectors.innovamos import InnovamosConnector  # noqa: F401 — @register side effect
 from app.connectors.hybrid import HybridConnector
-from app.connectors.nsf import NSFFundingConnector, NSFFundingRssConnector
+from app.connectors.nsf import NSFFundingConnector, NSFFundingRssConnector  # noqa: F401 — @register side effect
 from app.connectors.manual import ManualConnector
-from app.connectors.innpulsa import InnpulsaConnector
-from app.connectors.minciencias import MincienciasConnector
-from app.connectors.mineducacion import MineducacionConnector
-from app.connectors.unesco import UNESCOConnector
+from app.connectors.innpulsa import InnpulsaConnector  # noqa: F401 — @register side effect
+from app.connectors.minciencias import MincienciasConnector  # noqa: F401 — @register side effect
+from app.connectors.mineducacion import MineducacionConnector  # noqa: F401 — @register side effect
+from app.connectors.unesco import UNESCOConnector  # noqa: F401 — @register side effect
 from app.connectors.pdf import PdfConnector
 from app.connectors.rss import RssConnector
-from app.connectors.simpler_grants import SimplerGrantsConnector
-from app.connectors.undef import UNDEFConnector
-from app.connectors.ukri import UKRIConnector
-from app.connectors.unwomen_innovate import UnwomenInnovateConnector
+from app.connectors.simpler_grants import SimplerGrantsConnector  # noqa: F401 — @register side effect
+from app.connectors.undef import UNDEFConnector  # noqa: F401 — @register side effect
+from app.connectors.ukri import UKRIConnector  # noqa: F401 — @register side effect
+from app.connectors.unwomen_innovate import UnwomenInnovateConnector  # noqa: F401 — @register side effect
 from app.connectors.wordpress_grants import WordPressGrantsConnector
-from app.connectors.horizon_sedia import HorizonSediaConnector
-from app.connectors.mincit import MincitConvocatoriasConnector
-from app.connectors.wellcome import WellcomeConnector
+from app.connectors.horizon_sedia import HorizonSediaConnector  # noqa: F401 — @register side effect
+from app.connectors.mincit import MincitConvocatoriasConnector  # noqa: F401 — @register side effect
+from app.connectors.wellcome import WellcomeConnector  # noqa: F401 — @register side effect
 from app.connectors.bdn_convocatorias import BdnConvocatoriasConnector
 from app.connectors.heading_list_html import HeadingListHtmlConnector
-from app.connectors.idrc_funding import IdrcFundingConnector
-from app.connectors.usaid_grants import UsaidGrantsConnector
+from app.connectors.idrc_funding import IdrcFundingConnector  # noqa: F401 — @register side effect
+from app.connectors.usaid_grants import UsaidGrantsConnector  # noqa: F401 — @register side effect
 from app.connectors.giz_funding import GizFundingConnector
 # from app.connectors.cordis_h2020 import CordisH2020Connector  # Removed: Horizon 2020 ended in 2020
-from app.connectors.eic_accelerator import EicAcceleratorConnector
-from app.connectors.global_innovation_fund import GlobalInnovationFundConnector
-from app.connectors.procolombia_convocatorias import ProcolombiaConvocatoriasConnector
-from app.connectors.anii_uruguay import AniiUruguayConnector
+from app.connectors.eic_accelerator import EicAcceleratorConnector  # noqa: F401 — @register side effect
+from app.connectors.global_innovation_fund import GlobalInnovationFundConnector  # noqa: F401 — @register side effect
+from app.connectors.procolombia_convocatorias import ProcolombiaConvocatoriasConnector  # noqa: F401 — @register side effect
+from app.connectors.anii_uruguay import AniiUruguayConnector  # noqa: F401 — @register side effect
 from app.connectors.development_aid import DevelopmentAidConnector
 from app.connectors.dane import DaneConnector
 from app.connectors.brazil_portals import FinepConnector

@@ -10,7 +10,6 @@ from __future__ import annotations
 import pytest
 
 from app.connectors.base import OpportunityCandidate, RawSourceResult
-from app.connectors.factory import connector_for
 from tests.connector_fixtures import apply_fixture_data
 
 _SAMPLE_HTML = """<html><body>

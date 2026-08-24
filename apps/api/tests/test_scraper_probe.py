@@ -19,7 +19,6 @@ os.environ.setdefault("DATABASE_URL", "sqlite:///./test_convocaradar.db")
 import asyncio
 from datetime import UTC, datetime
 from unittest.mock import AsyncMock, MagicMock
-from uuid import uuid4
 
 import pytest
 

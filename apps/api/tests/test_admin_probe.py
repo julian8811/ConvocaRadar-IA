@@ -15,16 +15,14 @@ import os
 os.environ.setdefault("DATABASE_URL", "sqlite:///./test_convocaradar.db")
 
 from datetime import UTC, datetime
-from unittest.mock import AsyncMock
 
-import pytest
 from fastapi.testclient import TestClient
 from sqlalchemy import select
 
 from app.db.session import SessionLocal
 from app.db.seed import seed
 from app.main import app
-from app.models import Organization, Role, Source, User
+from app.models import Organization, Role, User
 from app.core.security import hash_password, create_access_token
 from app.scraper.probe import ProbeReport, ProbeResult
 

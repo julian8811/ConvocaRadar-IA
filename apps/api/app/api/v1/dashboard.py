@@ -2,28 +2,22 @@ from datetime import UTC, datetime, timedelta
 import time
 
 from fastapi import APIRouter, Depends, Response
-from sqlalchemy import func, or_, select
+from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_organization, get_current_user
-from app.api.v1.admin import _source_health_status
 from app.db.session import get_db
-from app.models import Opportunity, OpportunityEmbedding, OpportunityScore, Organization, OrganizationProfile, Source, User
+from app.models import Opportunity, OpportunityScore, Organization, OrganizationProfile, Source, User
 from app.schemas import (
-    DashboardBreakdownItem,
-    DashboardDataCoverage,
     DashboardOpportunityItem,
     DashboardProfileSummary,
-    DashboardSourceAlert,
     DashboardSummaryRead,
-    HealthKpis,
     HealthRead,
     PipelineRead,
     TriageRead,
 )
 from app.services import (
     build_opportunity_query,
-    count_query,
     get_category_distribution,
     get_closing_soon,
     get_closing_soon_7d,

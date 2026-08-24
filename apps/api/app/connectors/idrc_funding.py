@@ -2,13 +2,12 @@ from __future__ import annotations
 from app.connectors.registry import register
 # DEPRECATED: source disabled in seed.py
 
-from datetime import UTC, datetime
 from urllib.parse import urljoin, urlparse
 
 from selectolax.parser import HTMLParser
 
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
-from app.connectors.common import BROWSER_UA, clean_text, fetch_httpx_text, parse_date_text
+from app.connectors.common import BROWSER_UA, clean_text, fetch_httpx_text
 
 
 IDRC_FUNDING_URL = "https://idrc-crdi.ca/en/funding"

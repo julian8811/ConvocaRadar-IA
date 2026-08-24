@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, patch, PropertyMock
 
-import pytest
 
 from app.connectors.common import (
     _UA_POOL,

@@ -21,7 +21,7 @@ from app.db.session import get_db, SessionLocal
 from app.models import Opportunity, Organization, Source, SourceRun, Task, User
 from app.schemas import SourceCreate, SourceHealthRead, SourceRead, SourceRunRead, SourceUpdate
 from app.scraper.dispatcher import run_source as dispatcher_run_source
-from app.services import audit, execute_source_run_locally, source_due_for_scraping, validate_source_url
+from app.services import audit, source_due_for_scraping, validate_source_url
 from app.services.scoring import (
     calculate_source_health_score,
     health_status_for_score,

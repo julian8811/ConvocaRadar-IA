@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock, MagicMock
 
-import pytest
 
 
 def test_country_inference_fixes_sin_dato():
