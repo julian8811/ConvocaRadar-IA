@@ -10,7 +10,8 @@ Dependencies on ``summarize_text`` (from ``opportunity.py``) and scoring helpers
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
-from html import escape
+
+from app.core.text import safe_escape
 
 from sqlalchemy import and_, func, or_, select
 from sqlalchemy.orm import Session
@@ -214,14 +215,14 @@ def build_weekly_digest_html(
     """
     rows: list[str] = []
     for item in opportunities[:5]:
-        title = escape(item.title or "Convocatoria sin título")
-        entity = escape(item.entity or "Sin entidad")
-        country = escape(item.country or "")
-        summary = escape((item.summary or item.description or "")[:280])
+        title = safe_escape(item.title or "Convocatoria sin título")
+        entity = safe_escape(item.entity or "Sin entidad")
+        country = safe_escape(item.country or "")
+        summary = safe_escape((item.summary or item.description or "")[:280])
         url = item.official_url or item.application_url or "#"
         rows.append(
             f"<tr><td style='padding:12px 0;border-bottom:1px solid #e2e8f0;'>"
-            f"<a href='{escape(url)}' style='font-size:15px;font-weight:600;color:#0f172a;text-decoration:none;'>{title}</a>"
+            f"<a href='{safe_escape(url)}' style='font-size:15px;font-weight:600;color:#0f172a;text-decoration:none;'>{title}</a>"
             f"<p style='margin:4px 0 0;font-size:12px;color:#64748b;'>{entity} · {country}</p>"
             f"<p style='margin:6px 0 0;font-size:13px;color:#334155;line-height:1.5;'>{summary}</p>"
             f"</td></tr>"
@@ -232,7 +233,7 @@ def build_weekly_digest_html(
     return (
         "<html><body style='font-family:-apple-system,Segoe UI,Roboto,sans-serif;background:#f8fafc;padding:24px;'>"
         f"<div style='max-width:640px;margin:0 auto;background:#ffffff;padding:24px;border-radius:12px;border:1px solid #e2e8f0;'>"
-        f"<h1 style='margin:0 0 4px;font-size:20px;color:#0f172a;'>Resumen semanal · {escape(organization.name)}</h1>"
+        f"<h1 style='margin:0 0 4px;font-size:20px;color:#0f172a;'>Resumen semanal · {safe_escape(organization.name)}</h1>"
         f"<p style='margin:0 0 16px;font-size:13px;color:#64748b;'>"
         f"Top {min(len(opportunities), 5)} convocatorias detectadas en los últimos 7 días."
         f"</p>"
