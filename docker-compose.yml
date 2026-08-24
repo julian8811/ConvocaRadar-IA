@@ -4,9 +4,9 @@
     environment:
       POSTGRES_DB: convocaradar
       POSTGRES_USER: convocaradar
-      POSTGRES_PASSWORD: convocaradar
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?must be set}
     ports:
-      - "5432:5432"
+      - "5434:5432"
     volumes:
       - postgres-data:/var/lib/postgresql/data
     healthcheck:
@@ -20,10 +20,10 @@
     command: server /data --console-address ":9001"
     environment:
       MINIO_ROOT_USER: minio
-      MINIO_ROOT_PASSWORD: minio123
+      MINIO_ROOT_PASSWORD: ${MINIO_ROOT_PASSWORD:?must be set}
     ports:
-      - "9000:9000"
-      - "9001:9001"
+      - "9004:9000"
+      - "9005:9001"
     volumes:
       - minio-data:/data
 
@@ -33,17 +33,17 @@
       dockerfile: apps/api/Dockerfile
     env_file: .env
     environment:
-      DATABASE_URL: postgresql+psycopg://convocaradar:convocaradar@postgres:5432/convocaradar
+      DATABASE_URL: postgresql+psycopg://convocaradar:${POSTGRES_PASSWORD:?must be set}@postgres:5432/convocaradar
       STORAGE_BACKEND: s3
       S3_ENDPOINT_URL: http://minio:9000
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:?must be set}
       BOOTSTRAP_SOURCES_ON_STARTUP: "true"
-      SCRAPING_MAX_CONCURRENCY: "2"
+      SCRAPING_MAX_CONCURRENCY: "6"
       SCRAPING_TIMEOUT_SECONDS: "120"
       SCRAPING_MAX_SOURCE_SECONDS: "180"
       SCHEDULER_ENABLED: "false"
     ports:
-      - "8000:8000"
+      - "8002:8000"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health/live', timeout=5)"]
       interval: 30s
@@ -62,12 +62,12 @@
       dockerfile: apps/api/Dockerfile
     env_file: .env
     environment:
-      DATABASE_URL: postgresql+psycopg://convocaradar:${POSTGRES_PASSWORD:-convocaradar}@postgres:5432/convocaradar
+      DATABASE_URL: postgresql+psycopg://convocaradar:${POSTGRES_PASSWORD:?must be set}@postgres:5432/convocaradar
       STORAGE_BACKEND: s3
       S3_ENDPOINT_URL: http://minio:9000
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:?must be set}
       BOOTSTRAP_SOURCES_ON_STARTUP: "false"
-      SCRAPING_MAX_CONCURRENCY: "2"
+      SCRAPING_MAX_CONCURRENCY: "6"
       SCRAPING_TIMEOUT_SECONDS: "120"
       SCRAPING_MAX_SOURCE_SECONDS: "180"
       SCHEDULER_ENABLED: "true"
@@ -86,16 +86,45 @@
         condition: service_healthy
     restart: unless-stopped
 
+  backup:
+    # Nightly pg_dump sidecar (03:30 UTC, see scripts/crontab-backup).
+    # Client major version MUST match the server (pg_dump 16 <-> pg16).
+    image: postgres:16-alpine
+    restart: unless-stopped
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      PGHOST: postgres
+      PGPORT: "5432"
+      POSTGRES_USER: convocaradar
+      POSTGRES_DB: convocaradar
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?must be set}
+      BACKUP_RETENTION_DAYS: ${BACKUP_RETENTION_DAYS:-14}
+    volumes:
+      - backups-data:/backups
+      - ./scripts:/scripts:ro
+    command:
+      - sh
+      - -ec
+      - |
+        wget -qO /usr/local/bin/supercronic \
+          https://github.com/aptible/supercronic/releases/download/v0.2.33/supercronic-linux-amd64
+        echo '71b0d58cc53f6bd72cf2f293e09e294b79c666d8  /usr/local/bin/supercronic' | sha1sum -c -
+        chmod +x /usr/local/bin/supercronic
+        exec /usr/local/bin/supercronic -passthrough-logs /scripts/crontab-backup
+
   web:
     build:
-      context: ./apps/web
-      dockerfile: Dockerfile
-    environment:
-      # Service discovery via Docker network — not localhost (that would
-      # resolve to the web container itself, not the API).
-      NEXT_PUBLIC_API_URL: http://api:8000/api/v1
+      context: .
+      dockerfile: apps/web/Dockerfile
+      args:
+        # Embedded by Next.js at build time for client-side fetch().
+        # localhost:8002 = the host-mapped API port (browser-accessible).
+        # Server-side (SSR) calls go through the Next.js rewrite → http://api:8000.
+        NEXT_PUBLIC_API_URL: http://localhost:8002/api/v1
     ports:
-      - "3000:3000"
+      - "3002:3000"
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://localhost:3000/').then(r => process.exit(r.status < 500 ? 0 : 1)).catch(() => process.exit(1))"]
       interval: 30s
@@ -109,3 +138,4 @@
 volumes:
   postgres-data:
   minio-data:
+  backups-data:

@@ -62,7 +62,7 @@ async def _run_periodic_source_sweep(interval_seconds: int | None = None) -> Non
     organization. The digest is best-effort: a hard SMTP failure logs a
     warning and the loop keeps running.
     """
-    from datetime import UTC, datetime
+    from datetime import UTC, datetime, timedelta
 
     scheduler_settings = get_settings()
     interval_seconds = interval_seconds or scheduler_settings.scheduler_interval_seconds
@@ -432,6 +432,8 @@ app.add_middleware(
         "http://127.0.0.1:3000",
         "http://localhost:3001",
         "http://127.0.0.1:3001",
+        "http://localhost:3002",
+        "http://127.0.0.1:3002",
         "http://localhost:3004",
         "http://127.0.0.1:3004",
         "http://localhost:3006",

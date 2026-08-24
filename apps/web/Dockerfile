@@ -15,6 +15,12 @@ WORKDIR /app
 
 ENV NEXT_TELEMETRY_DISABLED=1
 
+# NEXT_PUBLIC_* vars are embedded at build time by Next.js, not at runtime.
+# Default to the Docker-network URL (used by SSR rewrites); override via
+# docker-compose build args for local dev where the browser needs localhost.
+ARG NEXT_PUBLIC_API_URL=http://api:8000/api/v1
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+
 COPY --from=deps /app/node_modules ./node_modules
 COPY apps/web/ ./
 RUN npm run build
@@ -33,13 +39,11 @@ ENV NODE_ENV=production \
 RUN groupadd --system --gid 1001 nodejs \
     && useradd --system --uid 1001 --gid nodejs --create-home --home-dir /home/nextjs nextjs
 
-# Standalone output already includes a minimal node_modules with only what the
-# app imports. We still need to ship the static assets that live outside the
-# standalone bundle (.next/static).
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
+# Standalone output nests at standalone/app/ because of the monorepo workspace
+# layout (WORKDIR=/app, app source at ./apps/web copied to /app).
+COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone/app ./
 COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
-# public/ is optional in this repo; copy only if it exists at build time.
-COPY --from=builder /app/public ./public 2>/dev/null || true
+# public/ is optional in this repo — skipped (not present).
 
 USER nextjs
 
