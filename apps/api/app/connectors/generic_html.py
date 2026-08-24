@@ -1,6 +1,7 @@
 import asyncio
 import json
 import re
+import time
 from datetime import UTC, datetime
 from urllib.parse import urljoin, urlparse
 
@@ -9,8 +10,9 @@ from selectolax.parser import HTMLParser
 from app.connectors.common import clean_text, extract_close_date, extract_funding_amount, fetch_httpx_text, looks_like_noise_text, parse_date_text
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
 
-DEEP_FETCH_LIMIT = 25
+DEEP_FETCH_LIMIT = 10
 DETAIL_PAGE_TIMEOUT = 15
+RESOLVE_URL_TIMEOUT = 20  # Max seconds to spend resolving base URL
 
 
 CLOSED_KEYWORDS = (
@@ -127,7 +129,13 @@ class GenericHtmlConnector:
         return parents
 
     async def _resolve_base_url(self) -> str:
-        """Try original URL, then parent paths, fallback patterns, then homepage."""
+        """Try original URL, then parent paths, fallback patterns, then homepage.
+        
+        Gives up after RESOLVE_URL_TIMEOUT seconds to avoid blocking the
+        entire source run on a broken base URL.
+        """
+        deadline = time.monotonic() + RESOLVE_URL_TIMEOUT
+
         # 1. Try original URL first
         result = await self._try_url(self.base_url)
         if result is not None:
@@ -139,6 +147,8 @@ class GenericHtmlConnector:
         domain = f"{parsed.scheme}://{parsed.hostname}"
 
         for parent in self._parent_paths(self.base_url):
+            if time.monotonic() > deadline:
+                break
             if parent == domain:
                 continue  # Will try as last resort
             result = await self._try_url(parent)
@@ -148,6 +158,8 @@ class GenericHtmlConnector:
 
         # 3. Try common fallback patterns on domain root
         for path in self.FALLBACK_PATTERNS:
+            if time.monotonic() > deadline:
+                break
             test_url = urljoin(domain, path)
             if test_url == self.base_url:
                 continue
@@ -157,10 +169,11 @@ class GenericHtmlConnector:
                 return self._resolved_url
 
         # 4. Last resort: try domain homepage and let parse() find convocatorias links
-        result = await self._try_url(domain)
-        if result is not None:
-            self._resolved_url = result[0]
-            return self._resolved_url
+        if time.monotonic() <= deadline:
+            result = await self._try_url(domain)
+            if result is not None:
+                self._resolved_url = result[0]
+                return self._resolved_url
 
         return self.base_url
 
