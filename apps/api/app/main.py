@@ -33,7 +33,7 @@ if settings.sentry_dsn:
         import sentry_sdk
         from sentry_sdk.integrations.fastapi import FastApiIntegration
 
-        # PII off by default â€” ConvocaRadar is a B2B tool for funding teams;
+        # PII off by default — ConvocaRadar is a B2B tool for funding teams;
         # we do not want tokens, emails, or opportunity text flowing into Sentry.
         # Set SENTRY_SEND_DEFAULT_PII=true in env to opt in if needed.
         send_pii = bool(getattr(settings, "sentry_send_default_pii", False))
@@ -190,7 +190,7 @@ async def _run_periodic_source_sweep(interval_seconds: int | None = None) -> Non
 
                     # Weekly digest. Fires at most once per process lifetime
                     # interval, so a long-running API instance stays under
-                    # quota. Restarting the API restarts the timer â€” that's
+                    # quota. Restarting the API restarts the timer — that's
                     # fine for a v1 cron substitute on Render's free tier.
                     now = datetime.now(UTC).replace(tzinfo=None)
                     if last_digest_at is None or (now - last_digest_at).total_seconds() >= weekly_digest_seconds:
@@ -244,7 +244,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     check_pypdf_import()
 
     # Pre-warm the shared HTTPX client singletons for connection pooling.
-    # The call is lazy â€” it creates the client if not yet initialized.
+    # The call is lazy — it creates the client if not yet initialized.
     await http_client()
 
     # Background scheduler: every 30 minutes, run all enabled sources
@@ -430,7 +430,7 @@ async def rate_limit_middleware(request: Request, call_next):
     return await call_next(request)
 
 
-# SEC-4: CORS hardening â€” only known origins are allowed. The
+# SEC-4: CORS hardening — only known origins are allowed. The
 # ``allow_origin_regex`` parameter has been removed because a regex like
 # ``r"^https?://(localhost|127\.0\.0\.1)(:\d+)?$"`` can match unintended
 # origins (e.g. ``http://localhost.evil.com``). In production, validate
@@ -500,7 +500,7 @@ def _check_database() -> bool:
 
 
 def _readiness_response() -> JSONResponse:
-    """Build the readiness response â€” 200 when DB is reachable, 503 otherwise."""
+    """Build the readiness response — 200 when DB is reachable, 503 otherwise."""
     try:
         if _check_database():
             return JSONResponse(
@@ -529,7 +529,7 @@ def health_v1() -> JSONResponse:
 
 @app.get("/api/v1/health/live")
 def health_v1_live() -> dict[str, str]:
-    """Liveness probe â€” 200 as long as the process is up.
+    """Liveness probe — 200 as long as the process is up.
 
     Does NOT touch the database. Use this for k8s livenessProbe: a process
     that can answer this endpoint is alive; the orchestrator should not kill
