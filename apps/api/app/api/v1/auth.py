@@ -274,7 +274,6 @@ def forgot_password(
         logger.info(
             "auth.forgot_password",
             user_id=user.id,
-            reset_url=reset_url,
             smtp_configured=bool(get_settings_smtp_configured()),
         )
         # When SMTP is wired (future change), call ``send_email`` here
