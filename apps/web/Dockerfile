@@ -1,19 +1,22 @@
 ﻿# syntax=docker/dockerfile:1.7
-# ── Stage 1: install deps ────────────────────────────────────────────────────
-FROM node:22-slim AS deps
-
-WORKDIR /app
-
-# Install only the production deps first for better layer caching.
-COPY apps/web/package.json apps/web/package-lock.json ./
-RUN npm ci --ignore-scripts
-
-# ── Stage 2: build the Next.js app ───────────────────────────────────────────
+# ── Stage 1: install deps + build the Next.js app ────────────────────────────
+# The repo is a pnpm workspace (root package.json pins pnpm@10.7.0 via
+# packageManager; the single shared lockfile lives at the repo root, matching
+# CI). Build context is the repository root.
 FROM node:22-slim AS builder
 
 WORKDIR /app
 
-ENV NEXT_TELEMETRY_DISABLED=1
+ENV NEXT_TELEMETRY_DISABLED=1 \
+    COREPACK_ENABLE_DOWNLOAD_PROMPT=0
+
+RUN corepack enable && corepack prepare pnpm@10.7.0 --activate
+
+# Workspace manifests first for better layer caching (frozen lockfile
+# validates against the root + apps/web importers only).
+COPY pnpm-workspace.yaml pnpm-lock.yaml ./
+COPY apps/web/package.json ./apps/web/package.json
+RUN pnpm install --frozen-lockfile --ignore-scripts
 
 # NEXT_PUBLIC_* vars are embedded at build time by Next.js, not at runtime.
 # Default to the Docker-network URL (used by SSR rewrites); override via
@@ -21,13 +24,17 @@ ENV NEXT_TELEMETRY_DISABLED=1
 ARG NEXT_PUBLIC_API_URL=http://api:8000/api/v1
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 
-COPY --from=deps /app/node_modules ./node_modules
-COPY apps/web/ ./
-RUN npm run build
+COPY apps/web/ ./apps/web/
+RUN pnpm --filter @convocaradar/web run build
 
-# ── Stage 3: minimal runtime image ───────────────────────────────────────────
+# ── Stage 2: minimal runtime image ───────────────────────────────────────────
 FROM node:22-slim AS runner
 
+# Keep the standalone tree's relative depth (/srv/app two levels below the
+# workspace root): pnpm's traced node_modules use symlinks like
+# node_modules/next -> ../../../node_modules/.pnpm/<hash>/node_modules/next,
+# which only resolve if the app sits exactly two directories below the
+# directory holding the traced node_modules.
 WORKDIR /app
 
 ENV NODE_ENV=production \
@@ -39,11 +46,12 @@ ENV NODE_ENV=production \
 RUN groupadd --system --gid 1001 nodejs \
     && useradd --system --uid 1001 --gid nodejs --create-home --home-dir /home/nextjs nextjs
 
-# Standalone output nests at standalone/app/ because of the monorepo workspace
-# layout (WORKDIR=/app, app source at ./apps/web copied to /app).
-COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone/app ./
-COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/standalone/node_modules ./node_modules
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/standalone/apps/web ./srv/app
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static ./srv/app/.next/static
 # public/ is optional in this repo — skipped (not present).
+
+WORKDIR /app/srv/app
 
 USER nextjs
 
