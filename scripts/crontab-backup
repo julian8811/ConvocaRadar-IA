@@ -1,0 +1,5 @@
+# ConvocaRadar scheduled backups — supercronic crontab (5-field cron format).
+# 03:30 UTC daily: off-peak window (REQ-BACKUP-SCHEDULE-1). supercronic runs
+# as PID 1 of the backup sidecar, so output is appended to /proc/1/fd/1 to
+# surface every cycle (and every failure) in `docker compose logs backup`.
+30 3 * * * /scripts/backup-cycle.sh >> /proc/1/fd/1 2>&1
