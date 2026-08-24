@@ -8,14 +8,36 @@ from playwright.async_api import async_playwright
 from selectolax.parser import HTMLParser, Node
 
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
-from app.connectors.common import clean_text, extract_close_date, fetch_httpx_text, launch_chromium, normalize_text
+from app.connectors.common import (
+    clean_text,
+    extract_close_date,
+    fetch_httpx_text,
+    launch_chromium,
+    normalize_text,
+)
 from app.connectors.registry import register
 
 
 MINCIENCIAS_URL = "https://minciencias.gov.co/convocatorias/todas"
-TITLE_KEYWORDS = ("convocatoria", "convocatorias", "ciencia", "innovacion", "investigacion", "fondo", "programa")
+TITLE_KEYWORDS = (
+    "convocatoria",
+    "convocatorias",
+    "ciencia",
+    "innovacion",
+    "investigacion",
+    "fondo",
+    "programa",
+)
 STOP_TITLES = {"inicio", "convocatorias", "convocatorias todas", "todas las convocatorias"}
-CLOSED_KEYWORDS = ("cerrada", "cerrado", "closed", "archivada", "archived", "finalizada", "finalizado")
+CLOSED_KEYWORDS = (
+    "cerrada",
+    "cerrado",
+    "closed",
+    "archivada",
+    "archived",
+    "finalizada",
+    "finalizado",
+)
 MONTHS_ES = {
     "enero": 1,
     "febrero": 2,
@@ -39,7 +61,10 @@ def _clean(value: str | None) -> str:
 
 def _parse_spanish_date(text: str) -> datetime | None:
     normalized = normalize_text(text)
-    match = re.search(r"(?:lunes|martes|miercoles|jueves|viernes|sabado|domingo)?,?\s*([a-z]+)\s+(\d{1,2}),?\s*(?:de\s+)?(\d{4})", normalized)
+    match = re.search(
+        r"(?:lunes|martes|miercoles|jueves|viernes|sabado|domingo)?,?\s*([a-z]+)\s+(\d{1,2}),?\s*(?:de\s+)?(\d{4})",
+        normalized,
+    )
     if not match:
         return None
     month = MONTHS_ES.get(match.group(1))
@@ -85,7 +110,9 @@ class MincienciasConnector:
         for page_num in range(5):
             page_url = f"{self.base_url}?page={page_num}"
             try:
-                url, content, content_type = await fetch_httpx_text(page_url, fallback_content_type="text/html")
+                url, content, content_type = await fetch_httpx_text(
+                    page_url, fallback_content_type="text/html"
+                )
                 pages.append({"url": url, "content": content, "content_type": content_type})
                 if page_num == 0:
                     final_url = url
@@ -97,18 +124,32 @@ class MincienciasConnector:
                     browser = await launch_chromium(playwright)
                     try:
                         page = await browser.new_page(user_agent=settings.scraping_user_agent)
-                        await page.goto(page_url, wait_until="domcontentloaded", timeout=settings.scraping_timeout_seconds * 1000)
+                        await page.goto(
+                            page_url,
+                            wait_until="domcontentloaded",
+                            timeout=settings.scraping_timeout_seconds * 1000,
+                        )
                         await page.wait_for_timeout(4000)
                         content = await page.content()
-                        pages.append({"url": page.url, "content": content, "content_type": "text/html"})
+                        pages.append(
+                            {"url": page.url, "content": content, "content_type": "text/html"}
+                        )
                         if page_num == 0:
                             final_url = page.url
                     finally:
                         await browser.close()
         combined = "\n<!-- MINCIENCIAS_PAGE_BREAK -->\n".join(page["content"] for page in pages)
-        return RawSourceResult(source_key=self.source_key, url=final_url, content=combined, content_type="text/html", metadata={"pages": pages})
+        return RawSourceResult(
+            source_key=self.source_key,
+            url=final_url,
+            content=combined,
+            content_type="text/html",
+            metadata={"pages": pages},
+        )
 
-    def _candidate_from_container(self, container: Node, raw_url: str) -> OpportunityCandidate | None:
+    def _candidate_from_container(
+        self, container: Node, raw_url: str
+    ) -> OpportunityCandidate | None:
         anchor = None
         for link in container.css("a[href]"):
             href = link.attributes.get("href") or ""
@@ -138,9 +179,9 @@ class MincienciasConnector:
             topics=["minciencias"],
             raw_text=text[:5000],
             confidence_score=0.82,
-                    open_date=_parse_spanish_date(text),
-                    close_date=_extract_close_date(text),
-                    funding_amount_raw=_extract_money(text),
+            open_date=_parse_spanish_date(text),
+            close_date=_extract_close_date(text),
+            funding_amount_raw=_extract_money(text),
             language="es",
         )
 
@@ -170,7 +211,12 @@ class MincienciasConnector:
             for link in tree.css("a[href]"):
                 title = _clean(link.text())
                 href = link.attributes.get("href") or ""
-                if not title or not href or not _is_candidate_text(title) or "/convocatorias/" not in href:
+                if (
+                    not title
+                    or not href
+                    or not _is_candidate_text(title)
+                    or "/convocatorias/" not in href
+                ):
                     continue
                 official_url = urljoin(page_url, href)
                 if official_url in seen:
@@ -201,7 +247,10 @@ class MincienciasConnector:
     async def validate(self, candidate: OpportunityCandidate) -> ValidationResult:
         if not candidate.title or not candidate.official_url:
             return ValidationResult(ok=False, reason="Missing title or URL")
-        if urlparse(candidate.official_url).netloc not in {"minciencias.gov.co", "www.minciencias.gov.co"}:
+        if urlparse(candidate.official_url).netloc not in {
+            "minciencias.gov.co",
+            "www.minciencias.gov.co",
+        }:
             return ValidationResult(ok=False, reason="URL is outside Minciencias")
         if _is_closed_text(f"{candidate.title} {candidate.summary}"):
             return ValidationResult(ok=False, reason="Opportunity appears closed")

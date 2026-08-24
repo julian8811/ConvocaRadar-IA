@@ -1,4 +1,5 @@
 """Tests for the connector registry pattern."""
+
 from __future__ import annotations
 
 import pytest
@@ -199,14 +200,18 @@ class TestFactoryFallback:
         from app.connectors.factory import connector_for
         from app.connectors.manual import ManualConnector
 
-        instance = connector_for("nobody-registered-this", "http://example.com", source_type="manual")
+        instance = connector_for(
+            "nobody-registered-this", "http://example.com", source_type="manual"
+        )
         assert isinstance(instance, ManualConnector)
 
     def test_unregistered_key_falls_back_to_rss(self):
         from app.connectors.factory import connector_for
         from app.connectors.rss import RssConnector
 
-        instance = connector_for("some-custom-rss", "http://example.com/feed.xml", source_type="rss")
+        instance = connector_for(
+            "some-custom-rss", "http://example.com/feed.xml", source_type="rss"
+        )
         assert isinstance(instance, RssConnector)
 
     def test_unregistered_key_defaults_to_generic_html(self):

@@ -11,7 +11,9 @@ router = APIRouter(prefix="/internal", tags=["internal"])
 
 def verify_internal_key(x_internal_api_key: str | None = Header(default=None)) -> None:
     if not hmac.compare_digest(x_internal_api_key or "", get_settings().internal_api_key):
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid internal API key")
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid internal API key"
+        )
 
 
 @router.post("/connectors/probe", dependencies=[Depends(verify_internal_key)])

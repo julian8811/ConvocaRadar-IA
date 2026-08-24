@@ -27,7 +27,23 @@ CLOSED_KEYWORDS = (
     "finaliz",
     "conclu",
 )
-NOISE_TITLES = {"índice", "indice", "investigación", "investigacion", "innovación", "innovacion", "formación", "formacion", "emprendimientos", "cooperación", "cooperacion", "documentos útiles", "documentos utiles", "ver calendario", "ver todas"}
+NOISE_TITLES = {
+    "índice",
+    "indice",
+    "investigación",
+    "investigacion",
+    "innovación",
+    "innovacion",
+    "formación",
+    "formacion",
+    "emprendimientos",
+    "cooperación",
+    "cooperacion",
+    "documentos útiles",
+    "documentos utiles",
+    "ver calendario",
+    "ver todas",
+}
 
 
 @register("anii-uruguay")
@@ -55,9 +71,7 @@ class AniiUruguayConnector:
                     pages.append({"url": page_url_resolved, "content": content})
                 except Exception:
                     break
-        combined = "\n".join(
-            f"<!-- page:{page['url']} -->\n{page['content']}" for page in pages
-        )
+        combined = "\n".join(f"<!-- page:{page['url']} -->\n{page['content']}" for page in pages)
         return RawSourceResult(
             source_key=self.source_key,
             url=final_url,
@@ -94,7 +108,10 @@ class AniiUruguayConnector:
                 lowered_title = title.lower()
                 if any(keyword in lowered_title for keyword in NOISE_TITLES):
                     continue
-                if any(keyword in lowered_title for keyword in ("informe", "resolución", "resolucion", "pdf")):
+                if any(
+                    keyword in lowered_title
+                    for keyword in ("informe", "resolución", "resolucion", "pdf")
+                ):
                     continue
                 official_url = self._normalize_url(href, page_url)
                 if official_url in seen:

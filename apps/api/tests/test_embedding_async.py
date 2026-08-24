@@ -2,6 +2,7 @@
 
 Strict TDD: tests written FIRST, implementation follows.
 """
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -150,6 +151,7 @@ class TestBuildEmbeddingSyncBridge:
             sync_result = build_embedding_sync("same text", dimensions=4)
 
             import asyncio
+
             async_result = asyncio.run(build_embedding("same text", dimensions=4))
 
         assert sync_result == async_result
@@ -186,11 +188,7 @@ class TestCallOpenaiEmbeddingUsesGlobalClient:
             mock_client = AsyncMock()
             mock_response = AsyncMock()
             mock_response.raise_for_status = MagicMock()
-            mock_response.json = MagicMock(
-                return_value={
-                    "data": [{"embedding": [0.1, 0.2, 0.3]}]
-                }
-            )
+            mock_response.json = MagicMock(return_value={"data": [{"embedding": [0.1, 0.2, 0.3]}]})
             mock_client.post = AsyncMock(return_value=mock_response)
             mock_http_client.return_value = mock_client
 
@@ -221,11 +219,7 @@ class TestCallOpenaiEmbeddingUsesGlobalClient:
             mock_client = AsyncMock()
             mock_response = AsyncMock()
             mock_response.raise_for_status = MagicMock()
-            mock_response.json = MagicMock(
-                return_value={
-                    "data": [{"embedding": [0.1, 0.2, 0.3]}]
-                }
-            )
+            mock_response.json = MagicMock(return_value={"data": [{"embedding": [0.1, 0.2, 0.3]}]})
             mock_client.post = AsyncMock(return_value=mock_response)
             mock_http_client.return_value = mock_client
 

@@ -146,8 +146,8 @@ FIXTURE_DATA: dict[str, dict[str, Any]] = {
             '{"data": {"oppHits": [{"id": "GRA-123", "title": "Federal Research Grant", "agencyName": "NSF", "openDate": "01/01/2027", "closeDate": "07/01/2027"}]}}',
             "application/json",
         ),
-        "empty": ('', '{}', "application/json"),
-        "garbage": ('', '{{{not json}}}', "application/json"),
+        "empty": ("", "{}", "application/json"),
+        "garbage": ("", "{{{not json}}}", "application/json"),
     },
 }
 

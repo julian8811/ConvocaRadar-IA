@@ -87,7 +87,13 @@ class HtmlConnectorConfig:
         """
         errors: list[str] = []
 
-        for field_name in ("list_selectors", "title_selectors", "link_selectors", "content_selectors", "date_labels"):
+        for field_name in (
+            "list_selectors",
+            "title_selectors",
+            "link_selectors",
+            "content_selectors",
+            "date_labels",
+        ):
             if field_name not in data:
                 errors.append(f"Missing required field: {field_name!r}")
 
@@ -98,7 +104,13 @@ class HtmlConnectorConfig:
         raw = dict(data)
 
         # Validate each selector list is a non-empty list of strings
-        for field_name in ("list_selectors", "title_selectors", "link_selectors", "content_selectors", "date_labels"):
+        for field_name in (
+            "list_selectors",
+            "title_selectors",
+            "link_selectors",
+            "content_selectors",
+            "date_labels",
+        ):
             val = raw[field_name]
             if not isinstance(val, list):
                 raise ValueError(f"Field {field_name!r} must be a list, got {type(val).__name__}")
@@ -107,7 +119,9 @@ class HtmlConnectorConfig:
 
         pagination = raw.get("pagination")
         if pagination is not None and not isinstance(pagination, dict):
-            raise ValueError(f"Field 'pagination' must be a dict or None, got {type(pagination).__name__}")
+            raise ValueError(
+                f"Field 'pagination' must be a dict or None, got {type(pagination).__name__}"
+            )
 
         return cls(
             list_selectors=list(raw["list_selectors"]),
@@ -168,7 +182,9 @@ class ConfigurableHtmlConnector:
         elif isinstance(config, dict):
             self.config = HtmlConnectorConfig.from_dict(config)
         else:
-            raise TypeError(f"config must be a dict or HtmlConnectorConfig, got {type(config).__name__}")
+            raise TypeError(
+                f"config must be a dict or HtmlConnectorConfig, got {type(config).__name__}"
+            )
 
         # Diagnostics: tracks which selectors succeeded / failed per run
         self._selector_diagnostics: dict[str, str | None] = {
@@ -223,7 +239,9 @@ class ConfigurableHtmlConnector:
         embedded = self._collect_embedded_json(tree, raw.url)
         for item in embedded:
             title = str(item.get("name") or item.get("title") or item.get("headline") or "").strip()
-            link = str(item.get("url") or item.get("link") or item.get("official_url") or "").strip()
+            link = str(
+                item.get("url") or item.get("link") or item.get("official_url") or ""
+            ).strip()
             if link and not link.startswith(("http://", "https://")):
                 link = urljoin(raw.url, link)
             if not title or not link or link in seen_urls:
@@ -234,17 +252,21 @@ class ConfigurableHtmlConnector:
             raw_text = summary[:2500]
             if self._is_closed(title, summary, raw_text, close_date):
                 continue
-            candidates.append(OpportunityCandidate(
-                title=title[:180],
-                entity=str(item.get("entity") or self._entity_name),
-                country=str(item.get("country") or self._default_country),
-                official_url=link,
-                summary=summary[:700] or title,
-                categories=[str(v) for v in (item.get("categories") or [])[:4] if isinstance(v, str)],
-                raw_text=raw_text,
-                confidence_score=0.72,
-                close_date=close_date,
-            ))
+            candidates.append(
+                OpportunityCandidate(
+                    title=title[:180],
+                    entity=str(item.get("entity") or self._entity_name),
+                    country=str(item.get("country") or self._default_country),
+                    official_url=link,
+                    summary=summary[:700] or title,
+                    categories=[
+                        str(v) for v in (item.get("categories") or [])[:4] if isinstance(v, str)
+                    ],
+                    raw_text=raw_text,
+                    confidence_score=0.72,
+                    close_date=close_date,
+                )
+            )
 
         # ── Step 2: CSS selector extraction ───────────────────────────
         html_candidates = self._extract_from_css(tree, raw.url, seen_urls)
@@ -265,7 +287,9 @@ class ConfigurableHtmlConnector:
         """Validate a candidate — basic required-field and closed check."""
         if not candidate.title or not candidate.official_url:
             return ValidationResult(ok=False, reason="Missing title or URL")
-        if self._is_closed(candidate.title, candidate.summary, candidate.raw_text, candidate.close_date):
+        if self._is_closed(
+            candidate.title, candidate.summary, candidate.raw_text, candidate.close_date
+        ):
             return ValidationResult(ok=False, reason="Opportunity appears closed")
         return ValidationResult(ok=True)
 
@@ -295,8 +319,12 @@ class ConfigurableHtmlConnector:
                 except json.JSONDecodeError:
                     continue
                 for item in self._iter_items(payload):
-                    title = str(item.get("name") or item.get("title") or item.get("headline") or "").strip()
-                    link = str(item.get("url") or item.get("link") or item.get("official_url") or "").strip()
+                    title = str(
+                        item.get("name") or item.get("title") or item.get("headline") or ""
+                    ).strip()
+                    link = str(
+                        item.get("url") or item.get("link") or item.get("official_url") or ""
+                    ).strip()
                     if title and link and title not in seen_titles:
                         seen_titles.add(title)
                         candidates.append(item)
@@ -322,7 +350,18 @@ class ConfigurableHtmlConnector:
         if any(payload.get(field) for field in ("title", "name", "url", "link", "official_url")):
             return [payload]
         items: list[dict] = []
-        for key in ("items", "results", "data", "opportunities", "records", "content", "itemListElement", "@graph", "graph", "grants"):
+        for key in (
+            "items",
+            "results",
+            "data",
+            "opportunities",
+            "records",
+            "content",
+            "itemListElement",
+            "@graph",
+            "graph",
+            "grants",
+        ):
             value = payload.get(key)
             parsed = self._maybe_load_json(value)
             if parsed is not None:
@@ -486,7 +525,9 @@ class ConfigurableHtmlConnector:
                     return parsed
         return common.parse_date_text(text)
 
-    def _is_closed(self, title: str, summary: str, raw_text: str, close_date: datetime | None) -> bool:
+    def _is_closed(
+        self, title: str, summary: str, raw_text: str, close_date: datetime | None
+    ) -> bool:
         """Check if an opportunity appears closed."""
         if close_date and close_date.date() < datetime.now(UTC).date():
             return True
@@ -578,18 +619,22 @@ class ConfigurableHtmlConnector:
         for c in candidates:
             detail = url_to_data.get(c.official_url)
             if detail:
-                enriched.append(OpportunityCandidate(
-                    title=(detail.get("title") or c.title)[:180],
-                    entity=c.entity,
-                    country=c.country,
-                    official_url=c.official_url,
-                    summary=(detail.get("summary") or c.summary)[:700],
-                    categories=detail.get("categories", c.categories or self._default_categories),
-                    raw_text=c.raw_text,
-                    confidence_score=0.82,
-                    close_date=detail.get("close_date") or c.close_date,
-                    funding_amount_raw=detail.get("funding_amount_raw") or c.funding_amount_raw,
-                ))
+                enriched.append(
+                    OpportunityCandidate(
+                        title=(detail.get("title") or c.title)[:180],
+                        entity=c.entity,
+                        country=c.country,
+                        official_url=c.official_url,
+                        summary=(detail.get("summary") or c.summary)[:700],
+                        categories=detail.get(
+                            "categories", c.categories or self._default_categories
+                        ),
+                        raw_text=c.raw_text,
+                        confidence_score=0.82,
+                        close_date=detail.get("close_date") or c.close_date,
+                        funding_amount_raw=detail.get("funding_amount_raw") or c.funding_amount_raw,
+                    )
+                )
             else:
                 enriched.append(c)
         return enriched

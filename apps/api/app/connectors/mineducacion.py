@@ -12,7 +12,16 @@ from app.connectors.common import clean_text, fetch_httpx_text, normalize_text, 
 
 
 MINEDUCACION_URL = "https://www.mineducacion.gov.co/portal/micrositios-institucionales/Cooperacion-Internacional/Becas-convocatorias-y-premios-de-cooperacion-internacional/420940:Becas-y-convocatorias"
-TITLE_KEYWORDS = ("convocatoria", "beca", "becas", "cooperacion", "premio", "programa", "fellowship", "grant")
+TITLE_KEYWORDS = (
+    "convocatoria",
+    "beca",
+    "becas",
+    "cooperacion",
+    "premio",
+    "programa",
+    "fellowship",
+    "grant",
+)
 STOP_TITLES = {
     "becas y convocatorias",
     "inicio",
@@ -54,7 +63,6 @@ def _country(text: str) -> str:
     return "International"
 
 
-
 @register("mineducacion-becas")
 class MineducacionConnector:
     source_key = "mineducacion-becas"
@@ -63,10 +71,16 @@ class MineducacionConnector:
         self.base_url = base_url or MINEDUCACION_URL
 
     async def fetch(self) -> RawSourceResult:
-        final_url, content, content_type = await fetch_httpx_text(self.base_url, fallback_content_type="text/html")
-        return RawSourceResult(source_key=self.source_key, url=final_url, content=content, content_type=content_type)
+        final_url, content, content_type = await fetch_httpx_text(
+            self.base_url, fallback_content_type="text/html"
+        )
+        return RawSourceResult(
+            source_key=self.source_key, url=final_url, content=content, content_type=content_type
+        )
 
-    def _candidate_from_container(self, container: Node, raw_url: str) -> OpportunityCandidate | None:
+    def _candidate_from_container(
+        self, container: Node, raw_url: str
+    ) -> OpportunityCandidate | None:
         title = ""
         href = ""
         for anchor in container.css("a[href]"):
@@ -110,7 +124,10 @@ class MineducacionConnector:
                 candidate = self._candidate_from_container(container, raw.url)
                 if not candidate or candidate.official_url in seen:
                     continue
-                if urlparse(candidate.official_url).netloc not in {"www.mineducacion.gov.co", "mineducacion.gov.co"}:
+                if urlparse(candidate.official_url).netloc not in {
+                    "www.mineducacion.gov.co",
+                    "mineducacion.gov.co",
+                }:
                     continue
                 seen.add(candidate.official_url)
                 candidates.append(candidate)
@@ -119,6 +136,9 @@ class MineducacionConnector:
     async def validate(self, candidate: OpportunityCandidate) -> ValidationResult:
         if not candidate.title or not candidate.official_url:
             return ValidationResult(ok=False, reason="Missing title or URL")
-        if urlparse(candidate.official_url).netloc not in {"www.mineducacion.gov.co", "mineducacion.gov.co"}:
+        if urlparse(candidate.official_url).netloc not in {
+            "www.mineducacion.gov.co",
+            "mineducacion.gov.co",
+        }:
             return ValidationResult(ok=False, reason="URL is outside MINEDUCACION")
         return ValidationResult(ok=True)

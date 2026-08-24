@@ -2,6 +2,7 @@
 
 Strict TDD: tests written FIRST, before the module exists.
 """
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch

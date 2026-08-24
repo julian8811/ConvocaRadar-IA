@@ -6,7 +6,19 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_organization, get_current_user
 from app.db.session import get_db
-from app.models import Alert, AuditLog, Opportunity, OpportunityEmbedding, Organization, Report, Role, Source, SourceRun, Task, User
+from app.models import (
+    Alert,
+    AuditLog,
+    Opportunity,
+    OpportunityEmbedding,
+    Organization,
+    Report,
+    Role,
+    Source,
+    SourceRun,
+    Task,
+    User,
+)
 from app.schemas import AdminMetricsRead, AuditLogRead, SourceRunRead, SourceRunOverviewRead
 from app.db.bootstrap import bootstrap_priority_sources
 from app.db.seed import seed_default_sources
@@ -42,7 +54,9 @@ def _health_window_days(source: Source) -> int:
 
 
 def _days_since_last_success(recent_runs: list[SourceRun], source: Source) -> int | None:
-    last_success = next((run for run in recent_runs if run.status == "success" and run.finished_at), None)
+    last_success = next(
+        (run for run in recent_runs if run.status == "success" and run.finished_at), None
+    )
     success_at = last_success.finished_at if last_success else source.last_success_at
     if not success_at:
         return None
@@ -55,7 +69,9 @@ def require_admin(user: User = Depends(get_current_user)) -> User:
     return user
 
 
-def _source_health_status(db: Session, source: Source, raw_recent_runs: list[SourceRun] | None = None) -> str:
+def _source_health_status(
+    db: Session, source: Source, raw_recent_runs: list[SourceRun] | None = None
+) -> str:
     if raw_recent_runs is None:
         raw_recent_runs = list(
             db.scalars(
@@ -65,7 +81,9 @@ def _source_health_status(db: Session, source: Source, raw_recent_runs: list[Sou
                 .limit(10)
             )
         )
-    recent_runs = [run for run in raw_recent_runs if run.status in {"success", "failed", "degraded"}]
+    recent_runs = [
+        run for run in raw_recent_runs if run.status in {"success", "failed", "degraded"}
+    ]
     failures = sum(1 for run in recent_runs if run.status == "failed")
     days_since_last_success = _days_since_last_success(recent_runs, source)
     stale_days = _health_window_days(source)
@@ -77,12 +95,13 @@ def _source_health_status(db: Session, source: Source, raw_recent_runs: list[Sou
         return "failing"
     if recent_runs[0].status == "degraded":
         return "degraded"
-    success_rate = round((sum(1 for run in recent_runs if run.status == "success") / len(recent_runs)) * 100, 2)
+    success_rate = round(
+        (sum(1 for run in recent_runs if run.status == "success") / len(recent_runs)) * 100, 2
+    )
     average_items_found = round(sum(run.items_found for run in recent_runs) / len(recent_runs), 2)
     failure_rate = round((failures / len(recent_runs)) * 100, 2)
-    if (
-        (failure_rate >= 60 and average_items_found <= 1)
-        or (days_since_last_success is not None and days_since_last_success >= stale_days * 2)
+    if (failure_rate >= 60 and average_items_found <= 1) or (
+        days_since_last_success is not None and days_since_last_success >= stale_days * 2
     ):
         return "failing"
     if (
@@ -154,7 +173,9 @@ def get_admin_metrics(
     db: Session = Depends(get_db),
 ) -> AdminMetricsRead:
     source_scope = or_(Source.organization_id == organization.id, Source.organization_id.is_(None))
-    opportunity_scope = or_(Opportunity.organization_id == organization.id, Opportunity.organization_id.is_(None))
+    opportunity_scope = or_(
+        Opportunity.organization_id == organization.id, Opportunity.organization_id.is_(None)
+    )
     sources = list(db.scalars(select(Source).where(source_scope)))
 
     # Batch-load the latest 10 SourceRun per source (single query instead of N+1)
@@ -178,33 +199,61 @@ def get_admin_metrics(
         runs_by_source = {}
 
     source_health_counts = {
-        "degraded": sum(1 for source in sources if _source_health_status(db, source, runs_by_source.get(source.id, [])) == "degraded"),
-        "failing": sum(1 for source in sources if _source_health_status(db, source, runs_by_source.get(source.id, [])) == "failing"),
+        "degraded": sum(
+            1
+            for source in sources
+            if _source_health_status(db, source, runs_by_source.get(source.id, [])) == "degraded"
+        ),
+        "failing": sum(
+            1
+            for source in sources
+            if _source_health_status(db, source, runs_by_source.get(source.id, [])) == "failing"
+        ),
     }
     stale_sources = sum(
         1
         for source in sources
-        if source.last_success_at is not None and (datetime.now(UTC).replace(tzinfo=None) - source.last_success_at).days >= _health_window_days(source)
+        if source.last_success_at is not None
+        and (datetime.now(UTC).replace(tzinfo=None) - source.last_success_at).days
+        >= _health_window_days(source)
     )
-    opportunity_total = db.scalar(select(func.count()).select_from(Opportunity).where(opportunity_scope)) or 0
-    embeddings_total = db.scalar(
-        select(func.count()).select_from(OpportunityEmbedding).join(
-            Opportunity, Opportunity.id == OpportunityEmbedding.opportunity_id
-        ).where(opportunity_scope)
-    ) or 0
+    opportunity_total = (
+        db.scalar(select(func.count()).select_from(Opportunity).where(opportunity_scope)) or 0
+    )
+    embeddings_total = (
+        db.scalar(
+            select(func.count())
+            .select_from(OpportunityEmbedding)
+            .join(Opportunity, Opportunity.id == OpportunityEmbedding.opportunity_id)
+            .where(opportunity_scope)
+        )
+        or 0
+    )
     embeddings_missing = max(opportunity_total - embeddings_total, 0)
-    embeddings_coverage = round((embeddings_total / opportunity_total) * 100, 1) if opportunity_total else 0.0
+    embeddings_coverage = (
+        round((embeddings_total / opportunity_total) * 100, 1) if opportunity_total else 0.0
+    )
 
     return AdminMetricsRead(
-        active_sources=db.scalar(select(func.count()).select_from(Source).where(source_scope, Source.enabled.is_(True))) or 0,
+        active_sources=db.scalar(
+            select(func.count()).select_from(Source).where(source_scope, Source.enabled.is_(True))
+        )
+        or 0,
         total_sources=db.scalar(select(func.count()).select_from(Source).where(source_scope)) or 0,
         degraded_sources=source_health_counts["degraded"],
         failing_sources=source_health_counts["failing"],
         stale_sources=stale_sources,
         opportunities=opportunity_total,
-        open_opportunities=db.scalar(select(func.count()).select_from(Opportunity).where(opportunity_scope, Opportunity.status == "open")) or 0,
+        open_opportunities=db.scalar(
+            select(func.count())
+            .select_from(Opportunity)
+            .where(opportunity_scope, Opportunity.status == "open")
+        )
+        or 0,
         closing_soon_opportunities=db.scalar(
-            select(func.count()).select_from(Opportunity).where(opportunity_scope, Opportunity.status == "closing_soon")
+            select(func.count())
+            .select_from(Opportunity)
+            .where(opportunity_scope, Opportunity.status == "closing_soon")
         )
         or 0,
         embeddings_total=embeddings_total,
@@ -217,19 +266,46 @@ def get_admin_metrics(
             .where(source_scope, SourceRun.status == "failed")
         )
         or 0,
-        failed_tasks=db.scalar(select(func.count()).select_from(Task).where(Task.organization_id == organization.id, Task.status == "failed")) or 0,
-        reports=db.scalar(select(func.count()).select_from(Report).where(Report.organization_id == organization.id)) or 0,
-        pending_alerts=db.scalar(select(func.count()).select_from(Alert).where(Alert.organization_id == organization.id, Alert.status == "pending")) or 0,
+        failed_tasks=db.scalar(
+            select(func.count())
+            .select_from(Task)
+            .where(Task.organization_id == organization.id, Task.status == "failed")
+        )
+        or 0,
+        reports=db.scalar(
+            select(func.count())
+            .select_from(Report)
+            .where(Report.organization_id == organization.id)
+        )
+        or 0,
+        pending_alerts=db.scalar(
+            select(func.count())
+            .select_from(Alert)
+            .where(Alert.organization_id == organization.id, Alert.status == "pending")
+        )
+        or 0,
         source_health_alerts=db.scalar(
-            select(func.count()).select_from(Alert).where(
+            select(func.count())
+            .select_from(Alert)
+            .where(
                 Alert.organization_id == organization.id,
                 Alert.alert_type == "source_health",
                 Alert.status == "pending",
             )
         )
         or 0,
-        sent_alerts=db.scalar(select(func.count()).select_from(Alert).where(Alert.organization_id == organization.id, Alert.status == "sent")) or 0,
-        audit_events=db.scalar(select(func.count()).select_from(AuditLog).where(AuditLog.organization_id == organization.id)) or 0,
+        sent_alerts=db.scalar(
+            select(func.count())
+            .select_from(Alert)
+            .where(Alert.organization_id == organization.id, Alert.status == "sent")
+        )
+        or 0,
+        audit_events=db.scalar(
+            select(func.count())
+            .select_from(AuditLog)
+            .where(AuditLog.organization_id == organization.id)
+        )
+        or 0,
     )
 
 
@@ -247,23 +323,36 @@ def reseed_default_sources_admin(
     explicit admin opt-in to bypass the org-ownership safety check and
     reassign/update every source.
     """
-    before_total = db.scalar(
-        select(func.count()).select_from(Source).where(
-            or_(Source.organization_id == organization.id, Source.organization_id.is_(None))
+    before_total = (
+        db.scalar(
+            select(func.count())
+            .select_from(Source)
+            .where(or_(Source.organization_id == organization.id, Source.organization_id.is_(None)))
         )
-    ) or 0
+        or 0
+    )
     stats = seed_default_sources(db, organization, force=force)
-    after_total = db.scalar(
-        select(func.count()).select_from(Source).where(
-            or_(Source.organization_id == organization.id, Source.organization_id.is_(None))
+    after_total = (
+        db.scalar(
+            select(func.count())
+            .select_from(Source)
+            .where(or_(Source.organization_id == organization.id, Source.organization_id.is_(None)))
         )
-    ) or 0
-    audit(db, "reseed_default_sources", "source", user, organization.id, metadata={
-        **stats,
-        "force": force,
-        "before_total": before_total,
-        "after_total": after_total,
-    })
+        or 0
+    )
+    audit(
+        db,
+        "reseed_default_sources",
+        "source",
+        user,
+        organization.id,
+        metadata={
+            **stats,
+            "force": force,
+            "before_total": before_total,
+            "after_total": after_total,
+        },
+    )
     db.commit()
     return {**stats, "force": force, "before_total": before_total, "after_total": after_total}
 
@@ -282,7 +371,14 @@ def summarize_all_opportunities_admin(
     summary are skipped.
     """
     result = summarize_missing_opportunities(db, organization.id, limit=limit)
-    audit(db, "summarize_all_opportunities", "opportunity", user, organization.id, metadata={**result, "limit": limit})
+    audit(
+        db,
+        "summarize_all_opportunities",
+        "opportunity",
+        user,
+        organization.id,
+        metadata={**result, "limit": limit},
+    )
     db.commit()
     return result
 
@@ -301,7 +397,14 @@ def score_all_opportunities_admin(
     the per-opportunity ``POST /opportunities/{id}/scores`` endpoint.
     """
     result = score_unscored_opportunities(db, organization.id, limit=limit)
-    audit(db, "score_all_opportunities", "opportunity", user, organization.id, metadata={**result, "limit": limit})
+    audit(
+        db,
+        "score_all_opportunities",
+        "opportunity",
+        user,
+        organization.id,
+        metadata={**result, "limit": limit},
+    )
     db.commit()
     return result
 
@@ -317,7 +420,14 @@ def rescore_all_opportunities_admin(
     scorer (overwrites existing scores). Runs on up to ``limit`` per call.
     """
     result = rescore_all_opportunities(db, organization.id, limit=limit)
-    audit(db, "rescore_all_opportunities", "opportunity", user, organization.id, metadata={**result, "limit": limit})
+    audit(
+        db,
+        "rescore_all_opportunities",
+        "opportunity",
+        user,
+        organization.id,
+        metadata={**result, "limit": limit},
+    )
     db.commit()
     return result
 
@@ -336,12 +446,26 @@ def send_digest_admin(
     case), or that the org has no admin recipient.
     """
     cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=7)
-    scope = or_(Opportunity.organization_id == organization.id, Opportunity.organization_id.is_(None))
-    opportunity_count = db.scalar(
-        select(func.count()).select_from(Opportunity).where(scope, Opportunity.created_at >= cutoff)
-    ) or 0
+    scope = or_(
+        Opportunity.organization_id == organization.id, Opportunity.organization_id.is_(None)
+    )
+    opportunity_count = (
+        db.scalar(
+            select(func.count())
+            .select_from(Opportunity)
+            .where(scope, Opportunity.created_at >= cutoff)
+        )
+        or 0
+    )
     delivered = send_weekly_digest(db, organization.id)
-    audit(db, "send_weekly_digest", "alert", user, organization.id, metadata={"delivered": delivered, "opportunities": int(opportunity_count)})
+    audit(
+        db,
+        "send_weekly_digest",
+        "alert",
+        user,
+        organization.id,
+        metadata={"delivered": delivered, "opportunities": int(opportunity_count)},
+    )
     db.commit()
     return {"delivered": delivered, "opportunities": int(opportunity_count)}
 
@@ -380,7 +504,13 @@ def retry_degraded_sources_admin(
         if not recent_runs:
             continue
         failures = sum(1 for run in recent_runs if run.status == "failed")
-        health = "failing" if recent_runs[0].status == "failed" or failures >= 3 else "degraded" if failures > 0 else "healthy"
+        health = (
+            "failing"
+            if recent_runs[0].status == "failed" or failures >= 3
+            else "degraded"
+            if failures > 0
+            else "healthy"
+        )
         if health == "healthy":
             continue
         pending_task = db.scalar(
@@ -410,7 +540,14 @@ async def rebuild_embeddings_admin(
     limit: int | None = None,
 ) -> dict[str, int]:
     result = await rebuild_opportunity_embeddings(db, organization.id, limit=limit)
-    audit(db, "rebuild_opportunity_embeddings", "opportunity_embedding", user, organization.id, metadata={"limit": limit, **result})
+    audit(
+        db,
+        "rebuild_opportunity_embeddings",
+        "opportunity_embedding",
+        user,
+        organization.id,
+        metadata={"limit": limit, **result},
+    )
     db.commit()
     return result
 
@@ -421,8 +558,18 @@ def bootstrap_data_admin(
     user: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ) -> dict[str, int | str]:
-    result = bootstrap_priority_sources(blocking=True) or {"status": "skipped", "reason": "bootstrap_disabled"}
-    audit(db, "bootstrap_priority_sources", "source", user, organization.id, metadata=result if isinstance(result, dict) else {"status": str(result)})
+    result = bootstrap_priority_sources(blocking=True) or {
+        "status": "skipped",
+        "reason": "bootstrap_disabled",
+    }
+    audit(
+        db,
+        "bootstrap_priority_sources",
+        "source",
+        user,
+        organization.id,
+        metadata=result if isinstance(result, dict) else {"status": str(result)},
+    )
     db.commit()
     return result
 
@@ -507,7 +654,10 @@ def backfill_funding_amounts_ai_admin(
 
 @router.post("/admin/sources/clear-errors")
 def clear_source_errors(
-    error_pattern: str = Query(default="", description="Clear only sources whose last_error contains this text (case-insensitive). Empty = all."),
+    error_pattern: str = Query(
+        default="",
+        description="Clear only sources whose last_error contains this text (case-insensitive). Empty = all.",
+    ),
     user: User = Depends(require_admin),
     db: Session = Depends(get_db),
 ) -> dict:
@@ -541,7 +691,10 @@ def clear_source_errors(
 
 @router.post("/admin/sources/probe-all")
 async def probe_all_sources(
-    source_key: list[str] | None = Query(default=None, description="Optional source key(s) to probe (repeatable: ?source_key=a&source_key=b)"),
+    source_key: list[str] | None = Query(
+        default=None,
+        description="Optional source key(s) to probe (repeatable: ?source_key=a&source_key=b)",
+    ),
     organization: Organization = Depends(get_current_organization),
     admin: User = Depends(require_admin),
     db: Session = Depends(get_db),
@@ -563,13 +716,19 @@ async def probe_all_sources(
 
     report_dict = report.to_dict()
 
-    audit(db, "source_probe", "source", admin, metadata={
-        "total": report.total,
-        "green": report.green,
-        "yellow": report.yellow,
-        "red": report.red,
-        "source_key": source_key,
-    })
+    audit(
+        db,
+        "source_probe",
+        "source",
+        admin,
+        metadata={
+            "total": report.total,
+            "green": report.green,
+            "yellow": report.yellow,
+            "red": report.red,
+            "source_key": source_key,
+        },
+    )
     db.commit()
 
     return report_dict

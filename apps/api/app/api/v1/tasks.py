@@ -65,11 +65,15 @@ def archive_old_tasks(
     if user.role != Role.admin.value:
         raise HTTPException(status_code=403, detail="Admin role required")
     cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=older_than_days)
-    archived = db.query(Task).filter(
-        Task.organization_id == organization.id,
-        Task.status.in_(("success", "failed", "degraded")),
-        Task.created_at < cutoff,
-    ).update({Task.status: "archived"}, synchronize_session=False)
+    archived = (
+        db.query(Task)
+        .filter(
+            Task.organization_id == organization.id,
+            Task.status.in_(("success", "failed", "degraded")),
+            Task.created_at < cutoff,
+        )
+        .update({Task.status: "archived"}, synchronize_session=False)
+    )
     db.commit()
     return {"archived": int(archived), "older_than_days": older_than_days}
 
@@ -81,7 +85,9 @@ def get_task(
     db: Session = Depends(get_db),
 ) -> Task:
     _mark_stale_source_sweeps(db, organization.id)
-    task = db.scalar(select(Task).where(Task.id == task_id, Task.organization_id == organization.id))
+    task = db.scalar(
+        select(Task).where(Task.id == task_id, Task.organization_id == organization.id)
+    )
     if not task:
         raise HTTPException(status_code=404, detail="Task not found")
     return task

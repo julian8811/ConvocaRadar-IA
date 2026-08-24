@@ -63,11 +63,7 @@ def get_score_distribution(db: Session, organization_id: str) -> list[DashboardB
             buckets["50-75"] += 1
         else:
             buckets["75-100"] += 1
-    return [
-        DashboardBreakdownItem(name=k, total=v)
-        for k, v in buckets.items()
-        if v > 0
-    ]
+    return [DashboardBreakdownItem(name=k, total=v) for k, v in buckets.items() if v > 0]
 
 
 # ── Regex backfill — close date ────────────────────────────────────────────
@@ -75,7 +71,9 @@ def get_score_distribution(db: Session, organization_id: str) -> list[DashboardB
 
 def _backfill_close_date_text(opp: Opportunity) -> str:
     """Combine all text fields for close_date regex extraction."""
-    return " ".join(part for part in [opp.title, opp.summary, opp.description, opp.raw_text] if part)
+    return " ".join(
+        part for part in [opp.title, opp.summary, opp.description, opp.raw_text] if part
+    )
 
 
 def backfill_close_dates(db: Session, organization_id: str, *, limit: int = 500) -> dict[str, int]:
@@ -89,11 +87,7 @@ def backfill_close_dates(db: Session, organization_id: str, *, limit: int = 500)
         Opportunity.organization_id == organization_id,
         Opportunity.organization_id.is_(None),
     )
-    stmt = (
-        select(Opportunity)
-        .where(scope, Opportunity.close_date.is_(None))
-        .limit(limit)
-    )
+    stmt = select(Opportunity).where(scope, Opportunity.close_date.is_(None)).limit(limit)
     opportunities = list(db.scalars(stmt))
     updated = 0
     for opp in opportunities:
@@ -114,7 +108,9 @@ def backfill_close_dates(db: Session, organization_id: str, *, limit: int = 500)
 # ── Regex backfill — funding amount ────────────────────────────────────────
 
 
-def backfill_funding_amounts(db: Session, organization_id: str, *, limit: int = 500) -> dict[str, int]:
+def backfill_funding_amounts(
+    db: Session, organization_id: str, *, limit: int = 500
+) -> dict[str, int]:
     """Parse ``funding_amount_raw`` into ``funding_amount_value`` + ``funding_amount_currency``
     for existing opportunities that have raw text but no parsed value yet.
     Uses the local regex parser only — no AI calls.
@@ -150,12 +146,13 @@ def backfill_funding_amounts(db: Session, organization_id: str, *, limit: int = 
 def _opportunity_combined_text(opp: Opportunity) -> str:
     """Combine all text fields of an opportunity for AI extraction."""
     return " ".join(
-        part for part in [opp.title, opp.summary, opp.description, opp.raw_text]
-        if part
+        part for part in [opp.title, opp.summary, opp.description, opp.raw_text] if part
     )
 
 
-async def backfill_close_dates_ai(db: Session, organization_id: str, *, limit: int = 100) -> dict[str, int]:
+async def backfill_close_dates_ai(
+    db: Session, organization_id: str, *, limit: int = 100
+) -> dict[str, int]:
     """Use AI (LLM) to extract close_date for opportunities that are missing it.
 
     Calls ``create_ai_extraction`` on each opportunity's combined text and
@@ -205,7 +202,9 @@ async def backfill_close_dates_ai(db: Session, organization_id: str, *, limit: i
 # ── AI backfill — funding amount ───────────────────────────────────────────
 
 
-async def backfill_funding_amounts_ai(db: Session, organization_id: str, *, limit: int = 100) -> dict[str, int]:
+async def backfill_funding_amounts_ai(
+    db: Session, organization_id: str, *, limit: int = 100
+) -> dict[str, int]:
     """Use AI (LLM) to extract ``funding_amount_raw`` for opportunities missing it.
 
     Calls ``create_ai_extraction`` on each opportunity's combined text and
@@ -267,8 +266,9 @@ def get_funding_ranges(db: Session, organization_id: str) -> list[DashboardBreak
     }
     rows = (
         db.execute(
-            select(Opportunity.funding_amount_value)
-            .where(scope, Opportunity.funding_amount_value.isnot(None))
+            select(Opportunity.funding_amount_value).where(
+                scope, Opportunity.funding_amount_value.isnot(None)
+            )
         )
         .scalars()
         .all()
@@ -286,11 +286,7 @@ def get_funding_ranges(db: Session, organization_id: str) -> list[DashboardBreak
             buckets["$1M-$5M"] += 1
         else:
             buckets[">$5M"] += 1
-    return [
-        DashboardBreakdownItem(name=k, total=v)
-        for k, v in buckets.items()
-        if v > 0
-    ]
+    return [DashboardBreakdownItem(name=k, total=v) for k, v in buckets.items() if v > 0]
 
 
 # ── Source contribution ─────────────────────────────────────────────────────
@@ -302,17 +298,14 @@ def get_source_contribution(db: Session, organization_id: str) -> list[Dashboard
         Opportunity.organization_id == organization_id,
         Opportunity.organization_id.is_(None),
     )
-    rows = (
-        db.execute(
-            select(Source.name, func.count())
-            .join(Opportunity, Opportunity.source_id == Source.id)
-            .where(scope)
-            .group_by(Source.name)
-            .order_by(func.count().desc())
-            .limit(10)
-        )
-        .all()
-    )
+    rows = db.execute(
+        select(Source.name, func.count())
+        .join(Opportunity, Opportunity.source_id == Source.id)
+        .where(scope)
+        .group_by(Source.name)
+        .order_by(func.count().desc())
+        .limit(10)
+    ).all()
     return [DashboardBreakdownItem(name=name or "Unknown", total=count) for name, count in rows]
 
 
@@ -328,18 +321,15 @@ def get_opportunities_timeline(db: Session, organization_id: str) -> list[Dashbo
         Opportunity.organization_id.is_(None),
     )
     cutoff = dt.now(UTC).replace(tzinfo=None) - timedelta(days=365)
-    rows = (
-        db.execute(
-            select(
-                func.date_trunc("month", Opportunity.created_at).label("month"),
-                func.count(),
-            )
-            .where(scope, Opportunity.created_at >= cutoff)
-            .group_by("month")
-            .order_by("month")
+    rows = db.execute(
+        select(
+            func.date_trunc("month", Opportunity.created_at).label("month"),
+            func.count(),
         )
-        .all()
-    )
+        .where(scope, Opportunity.created_at >= cutoff)
+        .group_by("month")
+        .order_by("month")
+    ).all()
     return [
         DashboardBreakdownItem(
             name=str(month.strftime("%Y-%m")) if month else "Unknown",

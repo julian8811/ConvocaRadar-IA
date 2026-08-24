@@ -49,7 +49,12 @@ class TestErcConnector:
     @pytest.mark.asyncio
     async def test_parse_sample(self):
         conn = ErcCallsConnector()
-        raw = RawSourceResult(source_key="erc-calls", url="http://example.com", content=ERC_SAMPLE, content_type="application/json")
+        raw = RawSourceResult(
+            source_key="erc-calls",
+            url="http://example.com",
+            content=ERC_SAMPLE,
+            content_type="application/json",
+        )
         candidates = await conn.parse(raw)
         assert len(candidates) >= 1
         assert "Starting Grant" in candidates[0].title
@@ -57,7 +62,12 @@ class TestErcConnector:
     @pytest.mark.asyncio
     async def test_parse_sample(self):
         conn = ErcCallsConnector()
-        raw = RawSourceResult(source_key="erc-calls", url="http://example.com", content=ERC_SAMPLE, content_type="application/json")
+        raw = RawSourceResult(
+            source_key="erc-calls",
+            url="http://example.com",
+            content=ERC_SAMPLE,
+            content_type="application/json",
+        )
         candidates = await conn.parse(raw)
         assert len(candidates) >= 1
         assert "Starting Grant" in candidates[0].title
@@ -65,14 +75,24 @@ class TestErcConnector:
     @pytest.mark.asyncio
     async def test_parse_empty(self):
         conn = ErcCallsConnector()
-        raw = RawSourceResult(source_key="erc-calls", url="http://example.com", content=ERC_EMPTY, content_type="application/json")
+        raw = RawSourceResult(
+            source_key="erc-calls",
+            url="http://example.com",
+            content=ERC_EMPTY,
+            content_type="application/json",
+        )
         candidates = await conn.parse(raw)
         assert candidates == []
 
     @pytest.mark.asyncio
     async def test_parse_garbage(self):
         conn = ErcCallsConnector()
-        raw = RawSourceResult(source_key="erc-calls", url="http://example.com", content=ERC_GARBAGE, content_type="application/json")
+        raw = RawSourceResult(
+            source_key="erc-calls",
+            url="http://example.com",
+            content=ERC_GARBAGE,
+            content_type="application/json",
+        )
         candidates = await conn.parse(raw)
         assert isinstance(candidates, list)
 
@@ -87,7 +107,12 @@ class TestCostConnector:
     @pytest.mark.asyncio
     async def test_parse_sample(self):
         conn = CostOpenCallsConnector()
-        raw = RawSourceResult(source_key="cost-open-calls", url="http://example.com", content=COST_SAMPLE, content_type="application/json")
+        raw = RawSourceResult(
+            source_key="cost-open-calls",
+            url="http://example.com",
+            content=COST_SAMPLE,
+            content_type="application/json",
+        )
         candidates = await conn.parse(raw)
         assert len(candidates) >= 1
         assert "Open Call" in candidates[0].title
@@ -95,21 +120,35 @@ class TestCostConnector:
     @pytest.mark.asyncio
     async def test_parse_empty(self):
         conn = CostOpenCallsConnector()
-        raw = RawSourceResult(source_key="cost-open-calls", url="http://example.com", content=COST_EMPTY, content_type="application/json")
+        raw = RawSourceResult(
+            source_key="cost-open-calls",
+            url="http://example.com",
+            content=COST_EMPTY,
+            content_type="application/json",
+        )
         candidates = await conn.parse(raw)
         assert candidates == []
 
     @pytest.mark.asyncio
     async def test_parse_garbage(self):
         conn = CostOpenCallsConnector()
-        raw = RawSourceResult(source_key="cost-open-calls", url="http://example.com", content=COST_GARBAGE, content_type="application/json")
+        raw = RawSourceResult(
+            source_key="cost-open-calls",
+            url="http://example.com",
+            content=COST_GARBAGE,
+            content_type="application/json",
+        )
         candidates = await conn.parse(raw)
         assert isinstance(candidates, list)
 
     @pytest.mark.asyncio
     async def test_validate(self):
         conn = CostOpenCallsConnector()
-        result = await conn.validate(OpportunityCandidate(title="Test", entity="COST", country="EU", official_url="https://www.cost.eu/test"))
+        result = await conn.validate(
+            OpportunityCandidate(
+                title="Test", entity="COST", country="EU", official_url="https://www.cost.eu/test"
+            )
+        )
         assert result.ok is True
 
     def test_registered(self):
@@ -123,7 +162,12 @@ class TestCaricomConnector:
     @pytest.mark.asyncio
     async def test_parse_sample(self):
         conn = CaricomConnector()
-        raw = RawSourceResult(source_key="caricom-procurement", url="https://caricom.org/tenders", content=CARICOM_SAMPLE, content_type="text/html")
+        raw = RawSourceResult(
+            source_key="caricom-procurement",
+            url="https://caricom.org/tenders",
+            content=CARICOM_SAMPLE,
+            content_type="text/html",
+        )
         candidates = await conn.parse(raw)
         assert len(candidates) >= 1
         assert any("Climate" in c.title for c in candidates)
@@ -131,21 +175,38 @@ class TestCaricomConnector:
     @pytest.mark.asyncio
     async def test_parse_empty(self):
         conn = CaricomConnector()
-        raw = RawSourceResult(source_key="caricom-procurement", url="https://caricom.org/tenders", content=CARICOM_EMPTY, content_type="text/html")
+        raw = RawSourceResult(
+            source_key="caricom-procurement",
+            url="https://caricom.org/tenders",
+            content=CARICOM_EMPTY,
+            content_type="text/html",
+        )
         candidates = await conn.parse(raw)
         assert candidates == []
 
     @pytest.mark.asyncio
     async def test_parse_garbage(self):
         conn = CaricomConnector()
-        raw = RawSourceResult(source_key="caricom-procurement", url="https://caricom.org/tenders", content=CARICOM_GARBAGE, content_type="text/html")
+        raw = RawSourceResult(
+            source_key="caricom-procurement",
+            url="https://caricom.org/tenders",
+            content=CARICOM_GARBAGE,
+            content_type="text/html",
+        )
         candidates = await conn.parse(raw)
         assert isinstance(candidates, list)
 
     @pytest.mark.asyncio
     async def test_validate(self):
         conn = CaricomConnector()
-        result = await conn.validate(OpportunityCandidate(title="Test", entity="CARICOM", country="International", official_url="https://caricom.org/tenders/tender-1"))
+        result = await conn.validate(
+            OpportunityCandidate(
+                title="Test",
+                entity="CARICOM",
+                country="International",
+                official_url="https://caricom.org/tenders/tender-1",
+            )
+        )
         assert result.ok is True
 
     def test_registered(self):
@@ -159,7 +220,12 @@ class TestAscunConnector:
     @pytest.mark.asyncio
     async def test_parse_sample(self):
         conn = AscunConnector()
-        raw = RawSourceResult(source_key="ascun-convocatorias", url="http://example.com", content=ASCUN_SAMPLE, content_type="application/json")
+        raw = RawSourceResult(
+            source_key="ascun-convocatorias",
+            url="http://example.com",
+            content=ASCUN_SAMPLE,
+            content_type="application/json",
+        )
         candidates = await conn.parse(raw)
         assert len(candidates) >= 1
         assert "Investigación" in candidates[0].title
@@ -167,7 +233,12 @@ class TestAscunConnector:
     @pytest.mark.asyncio
     async def test_parse_empty(self):
         conn = AscunConnector()
-        raw = RawSourceResult(source_key="ascun-convocatorias", url="http://example.com", content=ASCUN_EMPTY, content_type="application/json")
+        raw = RawSourceResult(
+            source_key="ascun-convocatorias",
+            url="http://example.com",
+            content=ASCUN_EMPTY,
+            content_type="application/json",
+        )
         candidates = await conn.parse(raw)
         assert candidates == []
 
@@ -182,7 +253,14 @@ class TestAscunConnector:
     @pytest.mark.asyncio
     async def test_validate(self):
         conn = AscunConnector()
-        result = await conn.validate(OpportunityCandidate(title="Test", entity="ASCUN", country="Colombia", official_url="https://ascun.org.co/convocatoria-2026"))
+        result = await conn.validate(
+            OpportunityCandidate(
+                title="Test",
+                entity="ASCUN",
+                country="Colombia",
+                official_url="https://ascun.org.co/convocatoria-2026",
+            )
+        )
         assert result.ok is True
 
     def test_registered(self):

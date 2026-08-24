@@ -14,7 +14,15 @@ from app.connectors.registry import register
 INNPULSA_API_URL = "https://convocatorias.innpulsacolombia.com/api/convocatorias?active_only=false&include_private=false&include_archive=false"
 INNPULSA_SITE_URL = "https://www.innpulsacolombia.com/convocatorias.html"
 INNPULSA_DETAIL_BASE = "https://convocatorias.innpulsacolombia.com/convocatoria/"
-INNPULSA_CLOSED_KEYWORDS = ("cerrada", "cerrado", "closed", "archivada", "archived", "finalizada", "finalized")
+INNPULSA_CLOSED_KEYWORDS = (
+    "cerrada",
+    "cerrado",
+    "closed",
+    "archivada",
+    "archived",
+    "finalizada",
+    "finalized",
+)
 
 
 def _clean(value: str | None) -> str:
@@ -80,7 +88,9 @@ class InnpulsaConnector:
         target_audience = _clean(str(item.get("target_audience") or ""))
         purpose = _clean(str(item.get("purpose") or ""))
         benefits = _clean(str(item.get("benefits") or ""))
-        terms = self._unique([str(value) for value in item.get("terms") or [] if isinstance(value, str)])
+        terms = self._unique(
+            [str(value) for value in item.get("terms") or [] if isinstance(value, str)]
+        )
         terms_files = self._unique(
             [
                 str(file.get("url") or file.get("name") or "")
@@ -114,12 +124,18 @@ class InnpulsaConnector:
             ]
         )
         topics = self._unique(["iNNpulsa", category, status])
-        requirements = self._unique([target_audience, purpose]) or ["Revisar la convocatoria oficial"]
+        requirements = self._unique([target_audience, purpose]) or [
+            "Revisar la convocatoria oficial"
+        ]
         status_lower = status.lower()
-        if (
-            status_lower in {"closed", "cerrada", "cerrado", "archived", "finalizada", "finished"}
-            or _is_past(parse_date_text(str(item.get("end_date") or "")))
-        ):
+        if status_lower in {
+            "closed",
+            "cerrada",
+            "cerrado",
+            "archived",
+            "finalizada",
+            "finished",
+        } or _is_past(parse_date_text(str(item.get("end_date") or ""))):
             return None
         return OpportunityCandidate(
             title=title[:180],
@@ -157,7 +173,9 @@ class InnpulsaConnector:
                 metadata=metadata,
             )
         except Exception:
-            final_url, content, content_type = await fetch_httpx_text(self.base_url, fallback_content_type="text/html")
+            final_url, content, content_type = await fetch_httpx_text(
+                self.base_url, fallback_content_type="text/html"
+            )
             cards: list[dict[str, str]] = []
             async with async_playwright() as playwright:
                 browser = await launch_chromium(playwright)
@@ -166,9 +184,15 @@ class InnpulsaConnector:
 
                     settings = get_settings()
                     page = await browser.new_page(user_agent=settings.scraping_user_agent)
-                    await page.goto(self.base_url, wait_until="domcontentloaded", timeout=settings.scraping_timeout_seconds * 1000)
+                    await page.goto(
+                        self.base_url,
+                        wait_until="domcontentloaded",
+                        timeout=settings.scraping_timeout_seconds * 1000,
+                    )
                     await page.wait_for_timeout(4000)
-                    cards_locator = page.locator("main article, main section, article, section, .card, [data-testid]")
+                    cards_locator = page.locator(
+                        "main article, main section, article, section, .card, [data-testid]"
+                    )
                     card_count = await cards_locator.count()
                     for index in range(min(card_count, 30)):
                         card = cards_locator.nth(index)
@@ -176,7 +200,9 @@ class InnpulsaConnector:
                         summary = ""
                         detail_url = ""
                         try:
-                            title = _clean(await card.locator("h1, h2, h3, h4, a").first.inner_text())
+                            title = _clean(
+                                await card.locator("h1, h2, h3, h4, a").first.inner_text()
+                            )
                         except Exception:
                             title = ""
                         try:
@@ -209,7 +235,9 @@ class InnpulsaConnector:
                 metadata={"fetch_mode": "html", "cards": cards},
             )
 
-    def _candidate_from_container(self, container: Node, raw_url: str) -> OpportunityCandidate | None:
+    def _candidate_from_container(
+        self, container: Node, raw_url: str
+    ) -> OpportunityCandidate | None:
         link_node = None
         for link in container.css("a"):
             href = link.attributes.get("href") or ""
@@ -218,7 +246,15 @@ class InnpulsaConnector:
             if text and (
                 "innpulsacolombia.com" in href
                 or href.startswith("/")
-                or lowered in {"conoce mas", "conoce mas >", "conoce mas>>", "ver detalles", "postulate", "postulate ahora"}
+                or lowered
+                in {
+                    "conoce mas",
+                    "conoce mas >",
+                    "conoce mas>>",
+                    "ver detalles",
+                    "postulate",
+                    "postulate ahora",
+                }
                 or "conoce mas" in lowered
                 or "postulate" in lowered
             ):
@@ -258,7 +294,10 @@ class InnpulsaConnector:
         )
 
     async def parse(self, raw: RawSourceResult) -> list[OpportunityCandidate]:
-        if raw.content_type.startswith("application/json") or raw.metadata.get("fetch_mode") == "api":
+        if (
+            raw.content_type.startswith("application/json")
+            or raw.metadata.get("fetch_mode") == "api"
+        ):
             try:
                 payload = json.loads(raw.content)
             except json.JSONDecodeError:
@@ -325,7 +364,10 @@ class InnpulsaConnector:
             candidate = self._candidate_from_container(container, raw.url)
             if not candidate or candidate.official_url in seen:
                 continue
-            if "innpulsacolombia.com" not in candidate.official_url and "convocatorias.innpulsacolombia.com" not in candidate.official_url:
+            if (
+                "innpulsacolombia.com" not in candidate.official_url
+                and "convocatorias.innpulsacolombia.com" not in candidate.official_url
+            ):
                 continue
             seen.add(candidate.official_url)
             candidates.append(candidate)
@@ -334,8 +376,13 @@ class InnpulsaConnector:
     async def validate(self, candidate: OpportunityCandidate) -> ValidationResult:
         if not candidate.title or not candidate.official_url:
             return ValidationResult(ok=False, reason="Missing title or URL")
-        if "innpulsacolombia.com" not in candidate.official_url and "convocatorias.innpulsacolombia.com" not in candidate.official_url:
+        if (
+            "innpulsacolombia.com" not in candidate.official_url
+            and "convocatorias.innpulsacolombia.com" not in candidate.official_url
+        ):
             return ValidationResult(ok=False, reason="URL is outside iNNpulsa")
-        if _is_closed_text(f"{candidate.title} {candidate.summary} {candidate.raw_text}") or _is_past(candidate.close_date):
+        if _is_closed_text(
+            f"{candidate.title} {candidate.summary} {candidate.raw_text}"
+        ) or _is_past(candidate.close_date):
             return ValidationResult(ok=False, reason="Opportunity appears closed")
         return ValidationResult(ok=True)

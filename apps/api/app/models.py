@@ -117,7 +117,9 @@ class Organization(Base):
     country: Mapped[str] = mapped_column(String, default="Colombia")
     website: Mapped[str | None] = mapped_column(String, nullable=True)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now()
+    )
 
     users: Mapped[list[User]] = relationship(back_populates="organization")
     profile: Mapped["OrganizationProfile | None"] = relationship(back_populates="organization")
@@ -151,7 +153,9 @@ class Source(Base):
     __tablename__ = "sources"
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=uuid)
-    organization_id: Mapped[str | None] = mapped_column(ForeignKey("organizations.id"), nullable=True)
+    organization_id: Mapped[str | None] = mapped_column(
+        ForeignKey("organizations.id"), nullable=True
+    )
     name: Mapped[str] = mapped_column(String, index=True)
     key: Mapped[str] = mapped_column(String, index=True)
     base_url: Mapped[str] = mapped_column(String)
@@ -166,7 +170,9 @@ class Source(Base):
     last_success_at: Mapped[datetime | None] = mapped_column(DateTime, nullable=True)
     last_error: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Change C: health score & quality gate fields
-    tier: Mapped[str | None] = mapped_column(String, nullable=True)  # "strategic", "complementary", "experimental"
+    tier: Mapped[str | None] = mapped_column(
+        String, nullable=True
+    )  # "strategic", "complementary", "experimental"
     auto_paused: Mapped[bool] = mapped_column(Boolean, default=False)
     consecutive_empty_runs: Mapped[int] = mapped_column(Integer, default=0)
     # connector_config: declarative scraping config (JSON)
@@ -177,7 +183,9 @@ class Source(Base):
     last_item_count: Mapped[int | None] = mapped_column(Integer, nullable=True)
     selector_failures: Mapped[int] = mapped_column(Integer, default=0)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now()
+    )
 
 
 class SourceRun(Base):
@@ -203,8 +211,12 @@ class Task(Base):
     __tablename__ = "tasks"
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=uuid)
-    organization_id: Mapped[str | None] = mapped_column(ForeignKey("organizations.id"), nullable=True, index=True)
-    source_run_id: Mapped[str | None] = mapped_column(ForeignKey("source_runs.id"), nullable=True, index=True)
+    organization_id: Mapped[str | None] = mapped_column(
+        ForeignKey("organizations.id"), nullable=True, index=True
+    )
+    source_run_id: Mapped[str | None] = mapped_column(
+        ForeignKey("source_runs.id"), nullable=True, index=True
+    )
     task_type: Mapped[str] = mapped_column(String, index=True)
     provider: Mapped[str] = mapped_column(String, default="local")
     status: Mapped[str] = mapped_column(String, default="pending", index=True)
@@ -221,7 +233,9 @@ class Opportunity(Base):
     __tablename__ = "opportunities"
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=uuid)
-    organization_id: Mapped[str | None] = mapped_column(ForeignKey("organizations.id"), nullable=True)
+    organization_id: Mapped[str | None] = mapped_column(
+        ForeignKey("organizations.id"), nullable=True
+    )
     source_id: Mapped[str | None] = mapped_column(ForeignKey("sources.id"), nullable=True)
     external_id: Mapped[str | None] = mapped_column(String, nullable=True)
     title: Mapped[str] = mapped_column(String, index=True)
@@ -255,7 +269,9 @@ class Opportunity(Base):
     first_seen_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     last_seen_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now()
+    )
 
 
 class OpportunityDocument(Base):
@@ -289,13 +305,19 @@ class OpportunityEmbedding(Base):
     __tablename__ = "opportunity_embeddings"
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=uuid)
-    opportunity_id: Mapped[str] = mapped_column(ForeignKey("opportunities.id"), unique=True, index=True)
-    organization_id: Mapped[str | None] = mapped_column(ForeignKey("organizations.id"), nullable=True, index=True)
+    opportunity_id: Mapped[str] = mapped_column(
+        ForeignKey("opportunities.id"), unique=True, index=True
+    )
+    organization_id: Mapped[str | None] = mapped_column(
+        ForeignKey("organizations.id"), nullable=True, index=True
+    )
     model_version: Mapped[str] = mapped_column(String, default="local-hash-embeddings-v2")
     source_text: Mapped[str] = mapped_column(Text, default="")
     embedding: Mapped[list[float]] = mapped_column(EmbeddingVector(1024), default=list)
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
-    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime, server_default=func.now(), onupdate=func.now()
+    )
 
 
 class Report(Base):
@@ -320,7 +342,9 @@ class Alert(Base):
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=uuid)
     organization_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), index=True)
-    opportunity_id: Mapped[str | None] = mapped_column(ForeignKey("opportunities.id"), nullable=True)
+    opportunity_id: Mapped[str | None] = mapped_column(
+        ForeignKey("opportunities.id"), nullable=True
+    )
     alert_type: Mapped[str] = mapped_column(String)
     channel: Mapped[str] = mapped_column(String, default="email")
     recipient: Mapped[str] = mapped_column(String)
@@ -336,7 +360,9 @@ class AuditLog(Base):
     __tablename__ = "audit_logs"
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=uuid)
-    organization_id: Mapped[str | None] = mapped_column(ForeignKey("organizations.id"), nullable=True)
+    organization_id: Mapped[str | None] = mapped_column(
+        ForeignKey("organizations.id"), nullable=True
+    )
     user_id: Mapped[str | None] = mapped_column(ForeignKey("users.id"), nullable=True)
     action: Mapped[str] = mapped_column(String)
     resource_type: Mapped[str] = mapped_column(String)

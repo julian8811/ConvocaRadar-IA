@@ -12,7 +12,17 @@ from app.connectors.common import clean_text, fetch_httpx_text, normalize_text, 
 
 
 ICETEX_URL = "https://web.icetex.gov.co/becas/becas-para-estudios-en-el-exterior/becas-vigentes"
-TITLE_KEYWORDS = ("beca", "becas", "convocatoria", "maestr", "doctor", "curso", "posgrado", "investig", "programa")
+TITLE_KEYWORDS = (
+    "beca",
+    "becas",
+    "convocatoria",
+    "maestr",
+    "doctor",
+    "curso",
+    "posgrado",
+    "investig",
+    "programa",
+)
 STOP_TITLES = {
     "becas para estudios en el exterior",
     "becas vigentes",
@@ -57,7 +67,6 @@ def _country(text: str) -> str:
     return "Colombia"
 
 
-
 @register("icetex-vigentes")
 @register("icetex-otras-becas")
 class IcetexConnector:
@@ -67,10 +76,16 @@ class IcetexConnector:
         self.base_url = base_url or ICETEX_URL
 
     async def fetch(self) -> RawSourceResult:
-        final_url, content, content_type = await fetch_httpx_text(self.base_url, fallback_content_type="text/html")
-        return RawSourceResult(source_key=self.source_key, url=final_url, content=content, content_type=content_type)
+        final_url, content, content_type = await fetch_httpx_text(
+            self.base_url, fallback_content_type="text/html"
+        )
+        return RawSourceResult(
+            source_key=self.source_key, url=final_url, content=content, content_type=content_type
+        )
 
-    def _candidate_from_container(self, container: Node, raw_url: str) -> OpportunityCandidate | None:
+    def _candidate_from_container(
+        self, container: Node, raw_url: str
+    ) -> OpportunityCandidate | None:
         title = ""
         href = ""
         for anchor in container.css("a[href]"):
@@ -114,7 +129,10 @@ class IcetexConnector:
                 candidate = self._candidate_from_container(container, raw.url)
                 if not candidate or candidate.official_url in seen:
                     continue
-                if urlparse(candidate.official_url).netloc not in {"web.icetex.gov.co", "icetex.gov.co"}:
+                if urlparse(candidate.official_url).netloc not in {
+                    "web.icetex.gov.co",
+                    "icetex.gov.co",
+                }:
                     continue
                 seen.add(candidate.official_url)
                 candidates.append(candidate)

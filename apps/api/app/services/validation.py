@@ -154,7 +154,12 @@ def is_private_url(url: str) -> bool:
     host = host.lower()
     if host in {"localhost", "127.0.0.1", "0.0.0.0", "::1"}:
         return True
-    if host.endswith(".local") or host.endswith(".internal") or host.endswith(".lan") or host.endswith(".corp"):
+    if (
+        host.endswith(".local")
+        or host.endswith(".internal")
+        or host.endswith(".lan")
+        or host.endswith(".corp")
+    ):
         return True
     try:
         ip = ipaddress.ip_address(host)
@@ -187,7 +192,9 @@ def validate_source_url(source: object) -> None:
     if is_private_url(base_url):
         raise ValueError("Source URL is not allowed")
     host = urlparse(base_url).hostname or ""
-    if allowed_domains and not any(host == allowed or host.endswith(f".{allowed}") for allowed in allowed_domains):
+    if allowed_domains and not any(
+        host == allowed or host.endswith(f".{allowed}") for allowed in allowed_domains
+    ):
         raise ValueError("Source URL host is outside the allowed domains")
 
 

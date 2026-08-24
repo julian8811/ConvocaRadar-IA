@@ -17,9 +17,7 @@ from app.connectors.configurable_html import ConfigurableHtmlConnector
 # ── Fondo Emprender SENA ─────────────────────────────────────────────────
 
 FONDO_KEY = "fondo-emprender-sena"
-FONDO_URL = (
-    "https://www.fondoemprender.com/SitePages/FondoEmprenderConvocatoriasVigentes.aspx"
-)
+FONDO_URL = "https://www.fondoemprender.com/SitePages/FondoEmprenderConvocatoriasVigentes.aspx"
 
 FONDO_CONFIG: dict = {
     "list_selectors": ["div.row"],

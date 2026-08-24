@@ -2,6 +2,7 @@
 
 TDD Cycle: tests written FIRST, then implementation.
 """
+
 from __future__ import annotations
 
 import threading
@@ -132,8 +133,7 @@ def test_delay_after_elapsed() -> None:
     tm.sleep(2.1)
     remaining = manager.delay_for("https://minciencias.gov.co/b")
     assert remaining == 0.0, (
-        f"Expected delay to be 0 after sleeping 2.1s (delay_seconds=2), "
-        f"got {remaining}"
+        f"Expected delay to be 0 after sleeping 2.1s (delay_seconds=2), got {remaining}"
     )
 
 
@@ -217,9 +217,7 @@ def test_thread_safety() -> None:
         f"Thread-safety violation: {allowed} of {n_threads} concurrent "
         f"requests acquired slots (max default=2). Expected exactly 2."
     )
-    assert blocked == n_threads - 2, (
-        f"Expected {n_threads - 2} blocked, got {blocked}."
-    )
+    assert blocked == n_threads - 2, f"Expected {n_threads - 2} blocked, got {blocked}."
 
 
 # ---------------------------------------------------------------------------

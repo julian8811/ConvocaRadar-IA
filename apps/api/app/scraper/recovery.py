@@ -1,5 +1,5 @@
-"""Scraper recovery — stale run detection and cleanup.
-"""
+"""Scraper recovery — stale run detection and cleanup."""
+
 from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta

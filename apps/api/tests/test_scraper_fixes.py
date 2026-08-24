@@ -89,9 +89,9 @@ class TestCommonAutoInstall:
 
         source = inspect.getsource(common_mod.render_page_html)
         # The install command should mention both browsers
-        assert (
-            "chromium" in source and "chromium-headless-shell" in source
-        ), "auto-install should install both chromium and chromium-headless-shell"
+        assert "chromium" in source and "chromium-headless-shell" in source, (
+            "auto-install should install both chromium and chromium-headless-shell"
+        )
 
 
 # ── Task 2.3: per_connector_timeout_seconds wiring ────────────────────────
@@ -163,9 +163,7 @@ class TestScrapeSourceTimeout:
                         # The second positional arg or keyword arg 'timeout' should be 30
                         args, kwargs = call_args
                         if len(args) > 1:
-                            assert args[1] == 30, (
-                                f"Expected timeout=30, got {args[1]}"
-                            )
+                            assert args[1] == 30, f"Expected timeout=30, got {args[1]}"
                         elif "timeout" in kwargs:
                             assert kwargs["timeout"] == 30, (
                                 f"Expected timeout=30, got {kwargs['timeout']}"
@@ -188,12 +186,16 @@ class TestHealthCheckPlaywright:
 
         with patch("app.connectors.health_check.struct_logger.info") as mock_info:
             with patch("app.connectors.health_check.os.path.exists", return_value=True):
-                with patch("app.connectors.health_check.os.environ.get", return_value="/app/.playwright"):
+                with patch(
+                    "app.connectors.health_check.os.environ.get", return_value="/app/.playwright"
+                ):
                     result = check_playwright_binary()
                     assert result is not None
                     # Should have logged the path
                     info_calls = [c for c in mock_info.call_args_list if "playwright" in str(c)]
-                    assert info_calls, "check_playwright_binary should log something about playwright"
+                    assert info_calls, (
+                        "check_playwright_binary should log something about playwright"
+                    )
 
     def test_check_playwright_binary_warns_on_missing(self) -> None:
         """When PLAYWRIGHT_BROWSERS_PATH is not set, warn."""
@@ -203,7 +205,11 @@ class TestHealthCheckPlaywright:
             with patch("app.connectors.health_check.os.environ.get", return_value=None):
                 result = check_playwright_binary()
                 assert result is False
-                warning_calls = [c for c in mock_warn.call_args_list if "pat" in str(c).lower() or "playwright" in str(c).lower()]
+                warning_calls = [
+                    c
+                    for c in mock_warn.call_args_list
+                    if "pat" in str(c).lower() or "playwright" in str(c).lower()
+                ]
                 assert warning_calls, "Should warn when PLAYWRIGHT_BROWSERS_PATH is not set"
 
 
@@ -245,9 +251,7 @@ class TestMainHealthCheckWiring:
         import inspect
 
         source = inspect.getsource(main_mod)
-        assert "health_check" in source, (
-            "main.py should reference health_check module"
-        )
+        assert "health_check" in source, "main.py should reference health_check module"
 
     def test_lifespan_calls_health_check(self) -> None:
         """The lifespan function should call health check functions."""
@@ -256,9 +260,5 @@ class TestMainHealthCheckWiring:
         import inspect
 
         source = inspect.getsource(main_mod)
-        assert "check_playwright_binary" in source, (
-            "lifespan should call check_playwright_binary"
-        )
-        assert "check_pypdf_import" in source, (
-            "lifespan should call check_pypdf_import"
-        )
+        assert "check_playwright_binary" in source, "lifespan should call check_playwright_binary"
+        assert "check_pypdf_import" in source, "lifespan should call check_pypdf_import"

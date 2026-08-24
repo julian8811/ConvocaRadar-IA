@@ -185,6 +185,7 @@ _SITEMAP_SUB_XML_LARGE += "</urlset>"
 
 # ── Helpers ───────────────────────────────────────────────────────────
 
+
 def _make_connector(connector_config=None):
     """Create a DevelopmentAidConnector instance with defaults."""
     return DevelopmentAidConnector(
@@ -196,10 +197,12 @@ def _make_connector(connector_config=None):
 
 def _mock_fetch_side_effect(urls_map: dict[str, tuple[str, str, str]]):
     """Build an async side_effect that returns content based on URL."""
+
     async def _side_effect(url, **kwargs):
         if url in urls_map:
             return urls_map[url]
         raise RuntimeError(f"Unexpected URL: {url}")
+
     return _side_effect
 
 
@@ -215,6 +218,7 @@ class TestSitemapParsing:
         """Parse a sitemap index with 3 sub-sitemap entries."""
         connector = _make_connector()
         from app.connectors.development_aid import _parse_sitemap_index
+
         urls = _parse_sitemap_index(_SITEMAP_INDEX_XML)
         assert len(urls) == 3
         assert urls[0] == "https://www.developmentaid.org/tenders_sitemap_1.xml"
@@ -225,6 +229,7 @@ class TestSitemapParsing:
         """Empty sitemap index returns empty list."""
         connector = _make_connector()
         from app.connectors.development_aid import _parse_sitemap_index
+
         urls = _parse_sitemap_index(_SITEMAP_EMPTY_INDEX_XML)
         assert urls == []
 
@@ -232,6 +237,7 @@ class TestSitemapParsing:
         """Extract loc + lastmod from a sub-sitemap."""
         connector = _make_connector()
         from app.connectors.development_aid import _parse_sitemap_entries
+
         entries = _parse_sitemap_entries(_SITEMAP_SUB_XML)
         assert len(entries) == 3
         assert entries[0]["loc"] == "https://www.developmentaid.org/tenders/view/123"
@@ -244,6 +250,7 @@ class TestSitemapParsing:
         empty_xml = '<?xml version="1.0"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"></urlset>'
         connector = _make_connector()
         from app.connectors.development_aid import _parse_sitemap_entries
+
         entries = _parse_sitemap_entries(empty_xml)
         assert entries == []
 
@@ -251,6 +258,7 @@ class TestSitemapParsing:
         """Malformed XML returns empty list (S1.4 — graceful degradation)."""
         connector = _make_connector()
         from app.connectors.development_aid import _parse_sitemap_entries
+
         entries = _parse_sitemap_entries("not valid xml at all <<<>>>")
         assert entries == []
 
@@ -261,9 +269,9 @@ class TestFieldExtraction:
     def test_extract_full_fields(self):
         """Extract all fields from a rich HTML fixture."""
         from app.connectors.development_aid import _extract_fields_from_html
+
         fields = _extract_fields_from_html(
-            _TENDER_HTML_OPEN,
-            "https://www.developmentaid.org/tenders/view/123"
+            _TENDER_HTML_OPEN, "https://www.developmentaid.org/tenders/view/123"
         )
         assert fields is not None
         assert fields["title"] == "Solar Energy Tender"
@@ -277,9 +285,9 @@ class TestFieldExtraction:
     def test_extract_minimal_fields(self):
         """Extract from HTML with only title and status."""
         from app.connectors.development_aid import _extract_fields_from_html
+
         fields = _extract_fields_from_html(
-            _TENDER_HTML_MINIMAL,
-            "https://www.developmentaid.org/tenders/view/999"
+            _TENDER_HTML_MINIMAL, "https://www.developmentaid.org/tenders/view/999"
         )
         assert fields is not None
         assert fields["title"] == "Minimal Tender"
@@ -291,18 +299,18 @@ class TestFieldExtraction:
     def test_extract_missing_title_returns_none(self):
         """HTML without <h1 class="name"> returns None."""
         from app.connectors.development_aid import _extract_fields_from_html
+
         fields = _extract_fields_from_html(
-            _TENDER_HTML_NO_TITLE,
-            "https://www.developmentaid.org/tenders/view/555"
+            _TENDER_HTML_NO_TITLE, "https://www.developmentaid.org/tenders/view/555"
         )
         assert fields is None
 
     def test_extract_open_restricted_status(self):
         """Prefix match: "Open (Restricted)" is captured as "Open (Restricted)"."""
         from app.connectors.development_aid import _extract_fields_from_html
+
         fields = _extract_fields_from_html(
-            _TENDER_HTML_OPEN_RESTRICTED,
-            "https://www.developmentaid.org/tenders/view/777"
+            _TENDER_HTML_OPEN_RESTRICTED, "https://www.developmentaid.org/tenders/view/777"
         )
         assert fields is not None
         assert fields["title"] == "Restricted Tender"
@@ -315,6 +323,7 @@ class TestStatusFilter:
     def test_accepts_open(self):
         """Status "Open" is accepted (case-insensitive)."""
         from app.connectors.development_aid import _status_is_accepted
+
         assert _status_is_accepted("Open") is True
         assert _status_is_accepted("open") is True
         assert _status_is_accepted("OPEN") is True
@@ -322,18 +331,21 @@ class TestStatusFilter:
     def test_accepts_forecast(self):
         """Status "Forecast" is accepted."""
         from app.connectors.development_aid import _status_is_accepted
+
         assert _status_is_accepted("Forecast") is True
         assert _status_is_accepted("forecast") is True
 
     def test_accepts_open_prefix(self):
         """Status strings starting with "Open" are accepted."""
         from app.connectors.development_aid import _status_is_accepted
+
         assert _status_is_accepted("Open (Restricted)") is True
         assert _status_is_accepted("Open - Limited") is True
 
     def test_rejects_closed(self):
-        """"Closed" status is rejected."""
+        """ "Closed" status is rejected."""
         from app.connectors.development_aid import _status_is_accepted
+
         assert _status_is_accepted("Closed") is False
         assert _status_is_accepted("Awarded") is False
         assert _status_is_accepted("Evaluation") is False
@@ -343,6 +355,7 @@ class TestStatusFilter:
     def test_rejects_empty(self):
         """Empty status is rejected."""
         from app.connectors.development_aid import _status_is_accepted
+
         assert _status_is_accepted("") is False
         assert _status_is_accepted("   ") is False
 
@@ -431,6 +444,7 @@ class TestFetchIntegration:
     @pytest.mark.asyncio
     async def test_fetch_sitemaps(self, monkeypatch):
         """Fetch sitemap index + sub-sitemaps → metadata with urls."""
+
         async def mock_fetch(url, **kwargs):
             if url == SITEMAP_INDEX_URL:
                 return (url, _SITEMAP_INDEX_XML, "text/xml")
@@ -455,6 +469,7 @@ class TestFetchIntegration:
     @pytest.mark.asyncio
     async def test_fetch_empty_sitemap(self, monkeypatch):
         """Empty sitemap → empty urls list."""
+
         async def mock_fetch(url, **kwargs):
             if url == SITEMAP_INDEX_URL:
                 return (url, _SITEMAP_EMPTY_INDEX_XML, "text/xml")
@@ -471,6 +486,7 @@ class TestFetchIntegration:
     @pytest.mark.asyncio
     async def test_fetch_sub_sitemap_failure_continues(self, monkeypatch):
         """A failed sub-sitemap doesn't abort the whole fetch."""
+
         async def mock_fetch(url, **kwargs):
             if url == SITEMAP_INDEX_URL:
                 return (url, _SITEMAP_INDEX_XML, "text/xml")
@@ -503,9 +519,18 @@ class TestParseIntegration:
             metadata={
                 "sitemap_fetch_time": "2025-07-01T00:00:00Z",
                 "urls": [
-                    {"loc": "https://www.developmentaid.org/tenders/view/123/caribbean-efficient-and-green-energy-buildings-project", "lastmod": "2025-06-15T00:00:00Z"},
-                    {"loc": "https://www.developmentaid.org/tenders/view/456/solar-energy-infrastructure-tender", "lastmod": "2025-07-01T00:00:00Z"},
-                    {"loc": "https://www.developmentaid.org/tenders/view/789/water-management-project", "lastmod": "2025-06-20T00:00:00Z"},
+                    {
+                        "loc": "https://www.developmentaid.org/tenders/view/123/caribbean-efficient-and-green-energy-buildings-project",
+                        "lastmod": "2025-06-15T00:00:00Z",
+                    },
+                    {
+                        "loc": "https://www.developmentaid.org/tenders/view/456/solar-energy-infrastructure-tender",
+                        "lastmod": "2025-07-01T00:00:00Z",
+                    },
+                    {
+                        "loc": "https://www.developmentaid.org/tenders/view/789/water-management-project",
+                        "lastmod": "2025-06-20T00:00:00Z",
+                    },
                 ],
             },
         )
@@ -535,8 +560,14 @@ class TestParseIntegration:
             metadata={
                 "sitemap_fetch_time": "2025-07-01T00:00:00Z",
                 "urls": [
-                    {"loc": "https://www.developmentaid.org/other-page", "lastmod": "2025-07-01T00:00:00Z"},
-                    {"loc": "https://www.developmentaid.org/tenders/view/123/solar-tender", "lastmod": "2025-06-15T00:00:00Z"},
+                    {
+                        "loc": "https://www.developmentaid.org/other-page",
+                        "lastmod": "2025-07-01T00:00:00Z",
+                    },
+                    {
+                        "loc": "https://www.developmentaid.org/tenders/view/123/solar-tender",
+                        "lastmod": "2025-06-15T00:00:00Z",
+                    },
                 ],
             },
         )
@@ -548,7 +579,10 @@ class TestParseIntegration:
     async def test_parse_respects_max_cap(self):
         """parse() caps at MAX_DETAIL_PAGES."""
         urls = [
-            {"loc": f"https://www.developmentaid.org/tenders/view/{i}/project-{i}", "lastmod": "2025-07-01T00:00:00Z"}
+            {
+                "loc": f"https://www.developmentaid.org/tenders/view/{i}/project-{i}",
+                "lastmod": "2025-07-01T00:00:00Z",
+            }
             for i in range(100)
         ]
 
@@ -568,12 +602,19 @@ class TestParseIntegration:
     async def test_parse_incremental_state(self):
         """Incremental state: processed_urls skip already-seen URLs."""
         import hashlib
-        hash_123 = hashlib.sha256("https://www.developmentaid.org/tenders/view/123/solar-project".encode()).hexdigest()[:16]
 
-        connector = _make_connector(connector_config={
-            "last_sitemap_fetch": "2025-06-01T00:00:00Z",
-            "processed_urls": {hash_123: "https://www.developmentaid.org/tenders/view/123/solar-project"},
-        })
+        hash_123 = hashlib.sha256(
+            "https://www.developmentaid.org/tenders/view/123/solar-project".encode()
+        ).hexdigest()[:16]
+
+        connector = _make_connector(
+            connector_config={
+                "last_sitemap_fetch": "2025-06-01T00:00:00Z",
+                "processed_urls": {
+                    hash_123: "https://www.developmentaid.org/tenders/view/123/solar-project"
+                },
+            }
+        )
 
         raw = RawSourceResult(
             source_key="developmentaid-tenders",
@@ -583,8 +624,14 @@ class TestParseIntegration:
             metadata={
                 "sitemap_fetch_time": "2025-07-01T00:00:00Z",
                 "urls": [
-                    {"loc": "https://www.developmentaid.org/tenders/view/123/solar-project", "lastmod": "2025-06-15T00:00:00Z"},
-                    {"loc": "https://www.developmentaid.org/tenders/view/456/water-project", "lastmod": "2025-07-01T00:00:00Z"},
+                    {
+                        "loc": "https://www.developmentaid.org/tenders/view/123/solar-project",
+                        "lastmod": "2025-06-15T00:00:00Z",
+                    },
+                    {
+                        "loc": "https://www.developmentaid.org/tenders/view/456/water-project",
+                        "lastmod": "2025-07-01T00:00:00Z",
+                    },
                 ],
             },
         )
@@ -618,7 +665,10 @@ class TestGetUpdatedConfig:
             metadata={
                 "sitemap_fetch_time": "2025-07-01T00:00:00Z",
                 "urls": [
-                    {"loc": "https://www.developmentaid.org/tenders/view/123/solar-tender", "lastmod": "2025-07-01T00:00:00Z"},
+                    {
+                        "loc": "https://www.developmentaid.org/tenders/view/123/solar-tender",
+                        "lastmod": "2025-07-01T00:00:00Z",
+                    },
                 ],
             },
         )
@@ -634,6 +684,7 @@ class TestDedupKey:
     def test_dedup_key_extracts_id(self):
         """URL /tenders/view/123 → dedup key developmentaid:123."""
         from app.services.dedup import opportunity_dedup_key
+
         key = opportunity_dedup_key(
             "https://www.developmentaid.org/tenders/view/123",
             "Some Title",
@@ -643,6 +694,7 @@ class TestDedupKey:
     def test_dedup_key_with_query_params(self):
         """URL with query params still extracts the numeric ID."""
         from app.services.dedup import opportunity_dedup_key
+
         key = opportunity_dedup_key(
             "https://www.developmentaid.org/tenders/view/456?source=search",
             "Some Title",
@@ -661,6 +713,7 @@ class TestProtocolContract:
     def test_fetch_method_signature(self):
         """fetch() is an async method returning RawSourceResult."""
         import inspect
+
         connector = _make_connector()
         assert hasattr(connector, "fetch")
         assert inspect.iscoroutinefunction(connector.fetch)
@@ -668,6 +721,7 @@ class TestProtocolContract:
     def test_parse_method_signature(self):
         """parse() is an async method accepting RawSourceResult."""
         import inspect
+
         connector = _make_connector()
         assert hasattr(connector, "parse")
         assert inspect.iscoroutinefunction(connector.parse)
@@ -675,6 +729,7 @@ class TestProtocolContract:
     def test_validate_method_signature(self):
         """validate() is an async method accepting OpportunityCandidate."""
         import inspect
+
         connector = _make_connector()
         assert hasattr(connector, "validate")
         assert inspect.iscoroutinefunction(connector.validate)
@@ -686,6 +741,7 @@ class TestSitemapIndexFetchError:
     @pytest.mark.asyncio
     async def test_fetch_returns_empty_on_index_failure(self, monkeypatch):
         """fetch() returns empty result gracefully when sitemap index fails."""
+
         async def mock_fetch(url, **kwargs):
             if url == SITEMAP_INDEX_URL:
                 raise RuntimeError("HTTP 500 from sitemap index")
@@ -710,7 +766,10 @@ class TestSitemapIndexFetchError:
             metadata={
                 "sitemap_fetch_time": "2025-07-01T00:00:00Z",
                 "urls": [
-                    {"loc": "https://www.developmentaid.org/tenders/view/123/solar-tender", "lastmod": "2025-07-01T00:00:00Z"},
+                    {
+                        "loc": "https://www.developmentaid.org/tenders/view/123/solar-tender",
+                        "lastmod": "2025-07-01T00:00:00Z",
+                    },
                 ],
             },
         )

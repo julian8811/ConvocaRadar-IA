@@ -96,7 +96,9 @@ async def _seed_opportunity(title: str = "Convocatoria abierta para consultoria"
     """Seed an opportunity so the summary has a non-empty payload."""
     db = SessionLocal()
     try:
-        organization = db.scalar(select(Organization).where(Organization.slug == "convocaradar-local"))
+        organization = db.scalar(
+            select(Organization).where(Organization.slug == "convocaradar-local")
+        )
         assert organization is not None
         from app.models import Source
 

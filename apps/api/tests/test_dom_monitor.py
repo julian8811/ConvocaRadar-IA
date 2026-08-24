@@ -2,6 +2,7 @@
 
 Strict TDD: tests written first, implementation follows.
 """
+
 from __future__ import annotations
 
 
@@ -52,8 +53,8 @@ class TestNormalizeHtml:
 
     def test_different_dynamic_content_still_normalizes_to_same(self):
         """HTML that differs only in script content normalizes identically."""
-        html_a = '<html><body><p>Static</p><script>var x = 1;</script></body></html>'
-        html_b = '<html><body><p>Static</p><script>var x = 999;</script></body></html>'
+        html_a = "<html><body><p>Static</p><script>var x = 1;</script></body></html>"
+        html_b = "<html><body><p>Static</p><script>var x = 999;</script></body></html>"
         assert normalize_html(html_a) == normalize_html(html_b)
 
     def test_removes_timestamp_patterns(self):
@@ -104,8 +105,10 @@ class TestComputeDomHash:
 
     def test_dynamic_content_stripped_for_stable_hash(self):
         """HTML that differs only in scripts/styles produces the same hash."""
-        html_with_script = '<html><body><p>Stable</p><script>var x = Math.random();</script></body></html>'
-        html_without_script = '<html><body><p>Stable</p></body></html>'
+        html_with_script = (
+            "<html><body><p>Stable</p><script>var x = Math.random();</script></body></html>"
+        )
+        html_without_script = "<html><body><p>Stable</p></body></html>"
         assert compute_dom_hash(html_with_script) == compute_dom_hash(html_without_script)
 
     def test_analytics_params_stripped(self):
@@ -257,13 +260,12 @@ class TestSelectorDiagnostics:
 
         from app.connectors.configurable_html import ConfigurableHtmlConnector
 
-        mock = AsyncMock(
-            return_value=("http://example.com", SAMPLE_LIST_HTML, "text/html")
-        )
+        mock = AsyncMock(return_value=("http://example.com", SAMPLE_LIST_HTML, "text/html"))
         monkeypatch.setattr("app.connectors.common.fetch_httpx_text", mock)
 
         connector = ConfigurableHtmlConnector("test-key", "http://example.com", VALID_CONFIG)
         import asyncio
+
         raw = asyncio.run(connector.fetch())
         asyncio.run(connector.parse(raw))
 
@@ -280,13 +282,12 @@ class TestSelectorDiagnostics:
 
         from app.connectors.configurable_html import ConfigurableHtmlConnector
 
-        mock = AsyncMock(
-            return_value=("http://example.com", SAMPLE_LIST_HTML, "text/html")
-        )
+        mock = AsyncMock(return_value=("http://example.com", SAMPLE_LIST_HTML, "text/html"))
         monkeypatch.setattr("app.connectors.common.fetch_httpx_text", mock)
 
         connector = ConfigurableHtmlConnector("test-key", "http://example.com", VALID_CONFIG)
         import asyncio
+
         raw = asyncio.run(connector.fetch())
         asyncio.run(connector.parse(raw))
 
@@ -305,13 +306,18 @@ class TestSelectorDiagnostics:
         from app.connectors.configurable_html import ConfigurableHtmlConnector
 
         mock = AsyncMock(
-            return_value=("http://example.com", "<html><body><p>No items</p></body></html>", "text/html")
+            return_value=(
+                "http://example.com",
+                "<html><body><p>No items</p></body></html>",
+                "text/html",
+            )
         )
         monkeypatch.setattr("app.connectors.common.fetch_httpx_text", mock)
 
         config = {**VALID_CONFIG, "list_selectors": [".does-not-exist", ".also-missing"]}
         connector = ConfigurableHtmlConnector("test-key", "http://example.com", config)
         import asyncio
+
         raw = asyncio.run(connector.fetch())
         asyncio.run(connector.parse(raw))
 

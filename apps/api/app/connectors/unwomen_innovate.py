@@ -26,11 +26,17 @@ class UnwomenInnovateConnector:
     )
 
     def __init__(self, base_url: str | None = None) -> None:
-        self.base_url = base_url or "https://www.unwomen.org/en/how-we-work/innovation-and-technology"
+        self.base_url = (
+            base_url or "https://www.unwomen.org/en/how-we-work/innovation-and-technology"
+        )
 
     async def fetch(self) -> RawSourceResult:
-        final_url, content, content_type = await fetch_httpx_text(self.base_url, fallback_content_type="text/html")
-        return RawSourceResult(source_key=self.source_key, url=final_url, content=content, content_type=content_type)
+        final_url, content, content_type = await fetch_httpx_text(
+            self.base_url, fallback_content_type="text/html"
+        )
+        return RawSourceResult(
+            source_key=self.source_key, url=final_url, content=content, content_type=content_type
+        )
 
     def _title_from_container(self, container) -> tuple[str, str]:
         anchor = container.css_first("a[href]")
@@ -84,9 +90,23 @@ class UnwomenInnovateConnector:
         normalized = normalize_text(f"{candidate.title} {candidate.summary} {candidate.raw_text}")
         return any(keyword in normalized for keyword in self.CLOSED_KEYWORDS)
 
-    def _candidate(self, title: str, href: str, text: str, raw_url: str) -> OpportunityCandidate | None:
+    def _candidate(
+        self, title: str, href: str, text: str, raw_url: str
+    ) -> OpportunityCandidate | None:
         lowered = normalize_text(f"{title} {text}")
-        keywords = ("innovation", "technology", "digital", "women", "gender", "ai", "research", "call", "grant", "fund", "fellowship")
+        keywords = (
+            "innovation",
+            "technology",
+            "digital",
+            "women",
+            "gender",
+            "ai",
+            "research",
+            "call",
+            "grant",
+            "fund",
+            "fellowship",
+        )
         if not title or not any(keyword in lowered for keyword in keywords):
             return None
         official_url = urljoin(raw_url, href) if href else raw_url

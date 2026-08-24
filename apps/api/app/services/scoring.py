@@ -50,13 +50,13 @@ def _normalize_freshness(freshness_days: int | None) -> float:
 
 def calculate_source_health_score(
     *,
-    success_rate: float,         # 0-100, weight 30%
-    avg_items_found: float,      # 0+, weight 20%
+    success_rate: float,  # 0-100, weight 30%
+    avg_items_found: float,  # 0+, weight 20%
     close_date_coverage: float,  # 0-100, weight 15%
-    amount_coverage: float,      # 0-100, weight 10%
-    url_coverage: float,         # 0-100, weight 10%
+    amount_coverage: float,  # 0-100, weight 10%
+    url_coverage: float,  # 0-100, weight 10%
     freshness_days: int | None,  # days since last success, weight 10%
-    selector_stability: float,   # 0-100, weight 5%
+    selector_stability: float,  # 0-100, weight 5%
 ) -> int:
     """Calculate a 0-100 health score for a source.
 
@@ -166,7 +166,9 @@ def _compute_score(opportunity: Opportunity, profile: OrganizationProfile) -> di
     if opportunity.country == profile.country:
         score += 15
         reasons.append(f"La convocatoria es del mismo país ({profile.country}).")
-    elif getattr(opportunity, "region", None) in SAME_REGION and getattr(profile, "country", "") in (profile.country,):
+    elif getattr(opportunity, "region", None) in SAME_REGION and getattr(
+        profile, "country", ""
+    ) in (profile.country,):
         score += 12
         reasons.append("La convocatoria es de la misma región (LatAm).")
     elif profile.eligible_international:
@@ -262,7 +264,9 @@ def _compute_score(opportunity: Opportunity, profile: OrganizationProfile) -> di
     return {"raw": score, "reasons": reasons, "warnings": warnings}
 
 
-def calculate_score(db: Session, opportunity: Opportunity, profile: OrganizationProfile) -> OpportunityScore:
+def calculate_score(
+    db: Session, opportunity: Opportunity, profile: OrganizationProfile
+) -> OpportunityScore:
     """Calculate and persist an OpportunityScore for the given opportunity and profile."""
     score = _compute_score(opportunity, profile)
     result = OpportunityScore(

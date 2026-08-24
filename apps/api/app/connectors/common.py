@@ -29,6 +29,7 @@ def _get_budget():
         _DOMAIN_BUDGET = DomainBudgetManager()
     return _DOMAIN_BUDGET
 
+
 CHROMIUM_CONTAINER_ARGS = ["--no-sandbox", "--disable-dev-shm-usage"]
 PLAYWRIGHT_BLOCKED_RESOURCE_TYPES = {"image", "media", "font"}
 BROWSER_UA = (
@@ -95,7 +96,9 @@ async def render_page_html(
                         await page.goto(url, wait_until=wait_until, timeout=navigation_timeout_ms)
                         if wait_selector:
                             try:
-                                await page.wait_for_selector(wait_selector, timeout=wait_selector_timeout_ms)
+                                await page.wait_for_selector(
+                                    wait_selector, timeout=wait_selector_timeout_ms
+                                )
                             except Exception:
                                 pass
                         if post_wait_ms > 0:
@@ -109,10 +112,19 @@ async def render_page_html(
             except Exception as exc:
                 if attempt == 0 and "Executable doesn't exist" in str(exc):
                     import subprocess, sys as _sys
+
                     _sys.stdout.flush()
                     subprocess.run(
-                        [_sys.executable, "-m", "playwright", "install", "chromium", "chromium-headless-shell"],
-                        capture_output=True, timeout=180,
+                        [
+                            _sys.executable,
+                            "-m",
+                            "playwright",
+                            "install",
+                            "chromium",
+                            "chromium-headless-shell",
+                        ],
+                        capture_output=True,
+                        timeout=180,
                     )
                     continue
                 raise RuntimeError(
@@ -155,14 +167,21 @@ def _is_private_host(hostname: str) -> bool:
     host = hostname.lower()
     if host in {"localhost", "127.0.0.1", "0.0.0.0", "::1"}:
         return True
-    if host.endswith(".local") or host.endswith(".internal") or host.endswith(".lan") or host.endswith(".corp"):
+    if (
+        host.endswith(".local")
+        or host.endswith(".internal")
+        or host.endswith(".lan")
+        or host.endswith(".corp")
+    ):
         return True
     try:
         ip = ipaddress.ip_address(host)
     except ValueError:
         pass
     else:
-        return ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast
+        return (
+            ip.is_private or ip.is_loopback or ip.is_link_local or ip.is_reserved or ip.is_multicast
+        )
     try:
         addrs = socket.getaddrinfo(host, 80)
         for family, _type, _proto, _cname, sockaddr in addrs:
@@ -171,7 +190,13 @@ def _is_private_host(hostname: str) -> bool:
                 addr = ipaddress.ip_address(raw)
             except ValueError:
                 continue
-            if addr.is_private or addr.is_loopback or addr.is_link_local or addr.is_reserved or addr.is_multicast:
+            if (
+                addr.is_private
+                or addr.is_loopback
+                or addr.is_link_local
+                or addr.is_reserved
+                or addr.is_multicast
+            ):
                 return True
     except OSError:
         pass
@@ -180,6 +205,7 @@ def _is_private_host(hostname: str) -> bool:
 
 def is_allowed_host(url: str, allowed_domains: list[str] | tuple[str, ...] | None = None) -> bool:
     from urllib.parse import urlparse
+
     host = (urlparse(url).hostname or "").lower()
     if not host:
         return False
@@ -269,7 +295,9 @@ def extract_close_date(text: str) -> datetime | None:
     return None
 
 
-def _parse_spanish_month(text: str, month_group: int, day_group: int, year_group: int, match) -> datetime | None:
+def _parse_spanish_month(
+    text: str, month_group: int, day_group: int, year_group: int, match
+) -> datetime | None:
     """Try to parse a Spanish date using the module-level month map."""
     month = _SPANISH_MONTHS.get(match.group(month_group).lower())
     if month is None:
@@ -375,7 +403,11 @@ def extract_funding_amount(text: str) -> str | None:
             result = match.group(1).strip()
             # Reject single/double-digit values (likely page numbers, counts)
             digits_only = re.sub(r"[^\d]", "", result)
-            if digits_only and int(digits_only) < 500 and not re.search(r"(?:USD|EUR|COP|BRL|GBP)", result, re.IGNORECASE):
+            if (
+                digits_only
+                and int(digits_only) < 500
+                and not re.search(r"(?:USD|EUR|COP|BRL|GBP)", result, re.IGNORECASE)
+            ):
                 continue
             return result
 
@@ -424,31 +456,48 @@ _UA_POOL: list[str] = [
 def _random_user_agent() -> str:
     """Return a random User-Agent from the pool."""
     import random as _random
+
     return _random.choice(_UA_POOL)
 
 
 def _resolve_proxy() -> str | None:
     """Pick a random proxy from the configured list, or None."""
     from app.core.config import get_settings as _settings
+
     proxies = _settings().scraping_proxy_list
     if not proxies:
         return None
     import random as _random
+
     return _random.choice(proxies)
+
 
 # ── Date parsing constants ────────────────────────────────────────────────
 _SPANISH_MONTHS: dict[str, int] = {
-    "enero": 1, "febrero": 2, "marzo": 3, "abril": 4,
-    "mayo": 5, "junio": 6, "julio": 7, "agosto": 8,
-    "septiembre": 9, "setiembre": 9, "octubre": 10,
-    "noviembre": 11, "diciembre": 12,
+    "enero": 1,
+    "febrero": 2,
+    "marzo": 3,
+    "abril": 4,
+    "mayo": 5,
+    "junio": 6,
+    "julio": 7,
+    "agosto": 8,
+    "septiembre": 9,
+    "setiembre": 9,
+    "octubre": 10,
+    "noviembre": 11,
+    "diciembre": 12,
 }
 
 _ISO_DATE = re.compile(r"\b(\d{4}-\d{2}-\d{2})\b")
 _SLASH_DATE = re.compile(r"\b(\d{1,2}/\d{1,2}/\d{4})\b")
 _ENGLISH_DATE = re.compile(r"\b([A-Za-z]{3,9})\s+(\d{1,2}),\s+(\d{4})\b")
-_SPANISH_DATE_COMMA = re.compile(r"\b([A-Za-záéíóúñ]+)\s+(\d{1,2}),\s+(\d{4})\b", flags=re.IGNORECASE)
-_SPANISH_DATE_DE = re.compile(r"\b(\d{1,2})\s+de\s+([A-Za-záéíóúñ]+)\s+de\s+(\d{4})\b", flags=re.IGNORECASE)
+_SPANISH_DATE_COMMA = re.compile(
+    r"\b([A-Za-záéíóúñ]+)\s+(\d{1,2}),\s+(\d{4})\b", flags=re.IGNORECASE
+)
+_SPANISH_DATE_DE = re.compile(
+    r"\b(\d{1,2})\s+de\s+([A-Za-záéíóúñ]+)\s+de\s+(\d{4})\b", flags=re.IGNORECASE
+)
 
 # Content-Type patterns that indicate JSON responses, even when the
 # server sends a different Content-Type header. Some API endpoints
@@ -508,6 +557,7 @@ async def fetch_httpx_text(
                 proxy = _resolve_proxy()
                 if proxy:
                     import httpx as _httpx
+
                     client = _httpx.AsyncClient(proxies=proxy, timeout=request_timeout)
                 else:
                     client = await http_client()
@@ -526,7 +576,9 @@ async def fetch_httpx_text(
                 # Content-Type detection: use header but detect JSON body
                 raw_ct = (response.headers.get("content-type") or fallback_content_type).lower()
                 body_text = response.text
-                if not any(p in raw_ct for p in _JSON_CONTENT_PATTERNS) and _looks_like_json(body_text):
+                if not any(p in raw_ct for p in _JSON_CONTENT_PATTERNS) and _looks_like_json(
+                    body_text
+                ):
                     raw_ct = "application/json"
                 return str(response.url), body_text, raw_ct
             except httpx.TimeoutException as exc:
@@ -629,8 +681,11 @@ async def enrich_from_detail_page(url: str) -> dict | None:
     """Fetch a detail page and extract title, close_date, funding_amount."""
     try:
         import asyncio as _asyncio
+
         _, content, _ct = await _asyncio.wait_for(
-            fetch_httpx_text(url, timeout_seconds=DETAIL_PAGE_TIMEOUT, retries=1, playwright_fallback=True),
+            fetch_httpx_text(
+                url, timeout_seconds=DETAIL_PAGE_TIMEOUT, retries=1, playwright_fallback=True
+            ),
             timeout=DETAIL_PAGE_TIMEOUT + 10,
         )
     except Exception:
@@ -657,7 +712,12 @@ async def enrich_from_detail_page(url: str) -> dict | None:
             desc = str(item.get("description") or item.get("summary") or "").strip()
             if desc:
                 result["summary"] = desc
-            cd = item.get("closeDate") or item.get("close_date") or item.get("deadline") or item.get("endDate")
+            cd = (
+                item.get("closeDate")
+                or item.get("close_date")
+                or item.get("deadline")
+                or item.get("endDate")
+            )
             if cd:
                 parsed = parse_date_text(str(cd))
                 if parsed:
@@ -733,10 +793,22 @@ def clean_opportunity_title(title: str | None, max_len: int = 150) -> str:
         return text
 
     # Remove verbose Portuguese/Spanish suffixes
-    for sep in ("Instituição:", "instituição:", "Cidade:", "cidade:",
-                "Inscrições até:", "inscrições até:", "Inscricoes ate:",
-                "Fecha de cierre:", "fecha de cierre:", "Deadline:",
-                "Inscrições:", "inscrições:", "Instituição:", "instituição:"):
+    for sep in (
+        "Instituição:",
+        "instituição:",
+        "Cidade:",
+        "cidade:",
+        "Inscrições até:",
+        "inscrições até:",
+        "Inscricoes ate:",
+        "Fecha de cierre:",
+        "fecha de cierre:",
+        "Deadline:",
+        "Inscrições:",
+        "inscrições:",
+        "Instituição:",
+        "instituição:",
+    ):
         idx = text.find(sep)
         if idx > 20:  # Only if separator is past the first meaningful part
             text = text[:idx].strip()
@@ -865,6 +937,7 @@ def infer_country_from_entity(entity_name: str | None, official_url: str | None 
         if not domain.startswith("http"):
             domain = "http://" + domain
         from urllib.parse import urlparse
+
         parsed = urlparse(domain)
         hostname = parsed.hostname or ""
         if hostname.startswith("www."):
@@ -885,7 +958,8 @@ def infer_country_from_entity(entity_name: str | None, official_url: str | None 
 
 
 async def enrich_candidates_batch(
-    candidates: list[OpportunityCandidate], max_fetches: int = 25,
+    candidates: list[OpportunityCandidate],
+    max_fetches: int = 25,
 ) -> list[OpportunityCandidate]:
     """Batch-enrich low-confidence candidates by fetching detail pages.
 

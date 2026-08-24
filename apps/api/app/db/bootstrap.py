@@ -31,7 +31,11 @@ def bootstrap_priority_sources(*, blocking: bool = False) -> dict[str, int | str
     try:
         opportunity_total = db.scalar(select(func.count()).select_from(Opportunity)) or 0
         if opportunity_total > 0:
-            return {"status": "skipped", "reason": "opportunities_already_present", "opportunities": opportunity_total}
+            return {
+                "status": "skipped",
+                "reason": "opportunities_already_present",
+                "opportunities": opportunity_total,
+            }
 
         keys = settings.bootstrap_source_key_list or list(DEFAULT_BOOTSTRAP_SOURCE_KEYS)
         sources = list(

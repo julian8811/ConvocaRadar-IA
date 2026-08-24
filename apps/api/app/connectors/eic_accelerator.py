@@ -80,9 +80,7 @@ class EicAcceleratorConnector:
         seen: set[str] = set()
         final_url = self.base_url
         for term in EIC_TERMS:
-            search_url = (
-                f"{EIC_SEARCH_URL}?apiKey={get_settings().sedia_api_key}&text={quote_plus(term)}&pageSize=50&pageNumber=1"
-            )
+            search_url = f"{EIC_SEARCH_URL}?apiKey={get_settings().sedia_api_key}&text={quote_plus(term)}&pageSize=50&pageNumber=1"
             final_url, content, _ = await fetch_httpx_text(
                 search_url,
                 method="POST",
@@ -98,7 +96,10 @@ class EicAcceleratorConnector:
                 )
                 if not identifier or identifier in seen:
                     continue
-                if "EIC" not in identifier.upper() and "EIC" not in _clean(_first_text(metadata.get("callTitle"))).upper():
+                if (
+                    "EIC" not in identifier.upper()
+                    and "EIC" not in _clean(_first_text(metadata.get("callTitle"))).upper()
+                ):
                     continue
                 seen.add(identifier)
                 results.append(item)
@@ -122,10 +123,14 @@ class EicAcceleratorConnector:
             title = _clean(_first_text(call_titles) or item.get("summary") or item.get("content"))
             identifiers = metadata.get("identifier") or []
             call_identifiers = metadata.get("callIdentifier") or []
-            identifier = _clean(_first_text(identifiers) or _first_text(call_identifiers) or item.get("reference"))
+            identifier = _clean(
+                _first_text(identifiers) or _first_text(call_identifiers) or item.get("reference")
+            )
             if not title or not identifier or identifier in seen:
                 continue
-            status_values = [str(value) for value in (metadata.get("status") or []) if value is not None]
+            status_values = [
+                str(value) for value in (metadata.get("status") or []) if value is not None
+            ]
             open_date, close_date = _parse_action_dates(metadata.get("actions") or [])
             if not open_date:
                 open_date = _parse_date(_first_text(metadata.get("startDate")))
@@ -134,7 +139,9 @@ class EicAcceleratorConnector:
             if not _is_openish(status_values, close_date):
                 continue
             seen.add(identifier)
-            keywords = [str(value) for value in (metadata.get("keywords") or []) if isinstance(value, str)]
+            keywords = [
+                str(value) for value in (metadata.get("keywords") or []) if isinstance(value, str)
+            ]
             candidates.append(
                 OpportunityCandidate(
                     title=title[:180],

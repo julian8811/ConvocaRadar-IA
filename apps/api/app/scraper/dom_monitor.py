@@ -6,6 +6,7 @@ Provides pure functions for:
 - Detecting structural changes between two hashes
 - Extracting item counts from list selectors
 """
+
 from __future__ import annotations
 
 import hashlib
@@ -19,8 +20,13 @@ if TYPE_CHECKING:
 _SCRIPT_RE = re.compile(r"<script[^>]*>.*?</script>", re.DOTALL | re.IGNORECASE)
 _STYLE_RE = re.compile(r"<style[^>]*>.*?</style>", re.DOTALL | re.IGNORECASE)
 _COMMENT_RE = re.compile(r"<!--.*?-->", re.DOTALL)
-_TIMESTAMP_ATTR_RE = re.compile(r'\s+(data-(?:timestamp|date|time|added|updated|modified|created|expires|published|generated))="[^"]*"', re.IGNORECASE)
-_ANALYTICS_PARAM_RE = re.compile(r"(\?|&)(utm_[^&=]+|gclid|fbclid|ref|source|mc_cid|mc_eid)=[^&\s\"'>]+", re.IGNORECASE)
+_TIMESTAMP_ATTR_RE = re.compile(
+    r'\s+(data-(?:timestamp|date|time|added|updated|modified|created|expires|published|generated))="[^"]*"',
+    re.IGNORECASE,
+)
+_ANALYTICS_PARAM_RE = re.compile(
+    r"(\?|&)(utm_[^&=]+|gclid|fbclid|ref|source|mc_cid|mc_eid)=[^&\s\"'>]+", re.IGNORECASE
+)
 _WHITESPACE_RE = re.compile(r"\s+")
 
 
@@ -97,9 +103,7 @@ def detect_structural_change(
         ValueError: If threshold is outside [0.0, 1.0].
     """
     if not (0.0 <= threshold <= 1.0):
-        raise ValueError(
-            f"Threshold must be between 0.0 and 1.0, got {threshold}"
-        )
+        raise ValueError(f"Threshold must be between 0.0 and 1.0, got {threshold}")
 
     if old_hash is None:
         return True

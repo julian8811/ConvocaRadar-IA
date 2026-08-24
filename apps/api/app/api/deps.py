@@ -47,6 +47,7 @@ def verify_csrf(request: Request) -> None:
             detail="CSRF protection: missing X-CSRF-Protection header",
         )
 
+
 # auto_error=False: don't raise when no header is present, so the cookie
 # fallback can take over (SEC-1.5 dual-support).
 bearer = HTTPBearer(auto_error=False)
@@ -82,7 +83,9 @@ def get_current_user(
     try:
         payload = decode_access_token(token)
     except ValueError as exc:
-        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token") from exc
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED, detail="Invalid token"
+        ) from exc
     # PR1-4: scope check. Tokens minted for password_reset (or any other
     # non-access purpose) must not authenticate protected routes. Tokens
     # without a scope claim are accepted as scope="access" for backward

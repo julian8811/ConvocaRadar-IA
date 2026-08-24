@@ -62,7 +62,18 @@ class IdrcFundingConnector:
             lowered = title.lower()
             if any(keyword in lowered for keyword in CLOSED_KEYWORDS):
                 continue
-            if not any(token in lowered for token in ("call", "funding", "grant", "initiative", "award", "partnership", "research")):
+            if not any(
+                token in lowered
+                for token in (
+                    "call",
+                    "funding",
+                    "grant",
+                    "initiative",
+                    "award",
+                    "partnership",
+                    "research",
+                )
+            ):
                 continue
             seen.add(official_url)
             candidates.append(

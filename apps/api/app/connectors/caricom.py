@@ -1,4 +1,5 @@
 """CARICOM procurement tenders connector via HTML scraping."""
+
 from __future__ import annotations
 
 from urllib.parse import urljoin
@@ -21,7 +22,9 @@ class CaricomConnector:
         self.base_url = base_url or CARICOM_TENDERS_URL
 
     async def fetch(self) -> RawSourceResult:
-        final_url, content, content_type = await fetch_httpx_text(self.base_url, fallback_content_type="text/html")
+        final_url, content, content_type = await fetch_httpx_text(
+            self.base_url, fallback_content_type="text/html"
+        )
         return RawSourceResult(
             source_key=self.source_key,
             url=final_url,

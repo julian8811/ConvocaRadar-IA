@@ -4,6 +4,7 @@ Cada conector se testea inyectando RawSourceResult directamente,
 sin mockear fetch_httpx_text. Esto permite probar la logica de
 parseo aisladamente.
 """
+
 from __future__ import annotations
 
 import json
@@ -106,10 +107,24 @@ class TestWellcomeParse:
         connector = WellcomeConnector()
         html = f"""<html><body>
         <script id="__NEXT_DATA__" type="application/json">
-        {json.dumps({"props": {"pageProps": {"initialListings": [
-            {"title": "Early-Career Awards 2027", "url": "/funding/eca-2027",
-             "scheme_status": "open", "scheme_closes_for_applications": "1 June 2027"}
-        ]}}})}
+        {
+            json.dumps(
+                {
+                    "props": {
+                        "pageProps": {
+                            "initialListings": [
+                                {
+                                    "title": "Early-Career Awards 2027",
+                                    "url": "/funding/eca-2027",
+                                    "scheme_status": "open",
+                                    "scheme_closes_for_applications": "1 June 2027",
+                                }
+                            ]
+                        }
+                    }
+                }
+            )
+        }
         </script></body></html>"""
         raw = RawSourceResult(
             source_key="wellcome-grants",
@@ -247,7 +262,10 @@ class TestApcColombiaParse:
 </div>
 </body></html>"""
         raw = RawSourceResult(
-            "test", "https://www.apccolombia.gov.co/seccion/convocatorias", html, "text/html",
+            "test",
+            "https://www.apccolombia.gov.co/seccion/convocatorias",
+            html,
+            "text/html",
             metadata={
                 "pages": [
                     {
@@ -348,7 +366,10 @@ class TestApcColombiaParse:
 </div>
 </body></html>"""
         raw = RawSourceResult(
-            "test", "https://www.apccolombia.gov.co/seccion/convocatorias", html, "text/html",
+            "test",
+            "https://www.apccolombia.gov.co/seccion/convocatorias",
+            html,
+            "text/html",
             metadata={
                 "pages": [
                     {
@@ -368,8 +389,6 @@ class TestApcColombiaParse:
         assert "APC" in candidates[0].title
 
 
-
-
 class TestMincitParse:
     """MinCIT parsea bloques HTML (sin <a> dentro de <h2>)."""
 
@@ -385,7 +404,12 @@ class TestMincitParse:
 <p>Abierta hasta: 31 December 2027</p>
 </div>
 </body></html>"""
-        raw = RawSourceResult("test", "https://convocatoriasturismo.mincit.gov.co/listado-convocatorias", html, "text/html")
+        raw = RawSourceResult(
+            "test",
+            "https://convocatoriasturismo.mincit.gov.co/listado-convocatorias",
+            html,
+            "text/html",
+        )
         candidates = await connector.parse(raw)
         assert len(candidates) >= 1
         assert "MinCIT" in candidates[0].title
@@ -401,17 +425,22 @@ class TestUsaidParse:
         connector = UsaidGrantsConnector()
         data = {
             "data": {
-                "oppHits": [{
-                    "id": "USAID-2027-001",
-                    "title": "USAID Development Innovation 2027",
-                    "agencyName": "USAID",
-                    "openDate": "01/15/2027",
-                    "closeDate": "07/01/2027",
-                }]
+                "oppHits": [
+                    {
+                        "id": "USAID-2027-001",
+                        "title": "USAID Development Innovation 2027",
+                        "agencyName": "USAID",
+                        "openDate": "01/15/2027",
+                        "closeDate": "07/01/2027",
+                    }
+                ]
             }
         }
         import json
-        raw = RawSourceResult("test", "https://api.grants.gov", json.dumps(data), "application/json")
+
+        raw = RawSourceResult(
+            "test", "https://api.grants.gov", json.dumps(data), "application/json"
+        )
         candidates = await connector.parse(raw)
         assert len(candidates) >= 1
         assert "USAID" in candidates[0].title
@@ -425,19 +454,27 @@ class TestBdnParse:
         from app.connectors.bdn_convocatorias import BdnConvocatoriasConnector
 
         connector = BdnConvocatoriasConnector(
-            "cdti-convocatorias", "https://www.infosubvenciones.es",
-            search_query="CDTI", entity_name="CDTI", default_country="Spain",
+            "cdti-convocatorias",
+            "https://www.infosubvenciones.es",
+            search_query="CDTI",
+            entity_name="CDTI",
+            default_country="Spain",
         )
         import json
-        data = [{
-            "id": "CDTI-2027",
-            "descripcion": "CDTI Innovation Grant 2027",
-            "concept": "R&D funding for SMEs",
-            "conv_date": "2027-03-15",
-            "conv_end_date": "2027-09-30",
-            "budget": "2.5M EUR",
-        }]
-        raw = RawSourceResult("test", "https://www.infosubvenciones.es", json.dumps(data), "application/json")
+
+        data = [
+            {
+                "id": "CDTI-2027",
+                "descripcion": "CDTI Innovation Grant 2027",
+                "concept": "R&D funding for SMEs",
+                "conv_date": "2027-03-15",
+                "conv_end_date": "2027-09-30",
+                "budget": "2.5M EUR",
+            }
+        ]
+        raw = RawSourceResult(
+            "test", "https://www.infosubvenciones.es", json.dumps(data), "application/json"
+        )
         candidates = await connector.parse(raw)
         assert len(candidates) >= 1
         assert "CDTI" in candidates[0].title

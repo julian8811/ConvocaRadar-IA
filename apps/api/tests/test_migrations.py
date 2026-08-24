@@ -95,8 +95,8 @@ def test_password_changed_at_upgrade_adds_column() -> None:
     add_column_match = re.search(
         r'op\.add_column\(\s*["\']users["\']\s*,\s*'
         r'sa\.Column\(\s*["\']password_changed_at["\']\s*,\s*'
-        r'sa\.DateTime\(\)\s*,\s*'
-        r'nullable\s*=\s*True\s*\)',
+        r"sa\.DateTime\(\)\s*,\s*"
+        r"nullable\s*=\s*True\s*\)",
         source,
         re.DOTALL,
     )
@@ -125,8 +125,8 @@ def test_password_changed_at_upgrade_backfills_existing_rows() -> None:
     # for the SQL pattern in isolation.
     upgrade_body = _extract_function_body(source, "upgrade")
     backfill_match = re.search(
-        r'UPDATE\s+users\s+SET\s+password_changed_at\s*=\s*'
-        r'(?:COALESCE\s*\([^)]+\)|NOW\s*\(\s*\)|CURRENT_TIMESTAMP)',
+        r"UPDATE\s+users\s+SET\s+password_changed_at\s*=\s*"
+        r"(?:COALESCE\s*\([^)]+\)|NOW\s*\(\s*\)|CURRENT_TIMESTAMP)",
         upgrade_body,
         re.IGNORECASE,
     )
@@ -134,15 +134,15 @@ def test_password_changed_at_upgrade_backfills_existing_rows() -> None:
         "Expected upgrade() to backfill existing users' password_changed_at with a non-NULL value. "
         "Without this, every existing user has NULL password_changed_at and the JWT-invalidation "
         "claim cannot be used to invalidate their sessions. Use either "
-        "`op.execute(\"UPDATE users SET password_changed_at = NOW()\")` or "
-        "`op.execute(\"UPDATE users SET password_changed_at = COALESCE(updated_at, NOW())\")`."
+        '`op.execute("UPDATE users SET password_changed_at = NOW()")` or '
+        '`op.execute("UPDATE users SET password_changed_at = COALESCE(updated_at, NOW())")`.'
     )
     assert backfill_match, (
         "Expected upgrade() to backfill existing users' password_changed_at with a non-NULL value. "
         "Without this, every existing user has NULL password_changed_at and the JWT-invalidation "
         "claim cannot be used to invalidate their sessions. Use either "
-        "`op.execute(\"UPDATE users SET password_changed_at = NOW()\")` or "
-        "`op.execute(\"UPDATE users SET password_changed_at = COALESCE(updated_at, NOW())\")`."
+        '`op.execute("UPDATE users SET password_changed_at = NOW()")` or '
+        '`op.execute("UPDATE users SET password_changed_at = COALESCE(updated_at, NOW())")`.'
     )
 
 
@@ -190,7 +190,7 @@ def test_password_changed_at_migration_is_idempotent_against_repeated_upgrade() 
 
     # If the migration DOES use a guard, verify it is correctly formed
     guard_pattern = re.search(
-        r'(op\.get_bind\(\)\.dialect\.has_table|inspect\([^)]+\)\.has_column)',
+        r"(op\.get_bind\(\)\.dialect\.has_table|inspect\([^)]+\)\.has_column)",
         source,
     )
     assert guard_pattern, (
@@ -222,9 +222,13 @@ def test_password_changed_at_migration_has_typed_columns() -> None:
 
     # The module must define upgrade() and downgrade()
     function_names = {
-        node.name for node in ast.walk(tree) if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
+        node.name
+        for node in ast.walk(tree)
+        if isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef))
     }
-    assert "upgrade" in function_names, f"Migration {candidates[0].name} must define an upgrade() function"
+    assert "upgrade" in function_names, (
+        f"Migration {candidates[0].name} must define an upgrade() function"
+    )
     assert "downgrade" in function_names, (
         f"Migration {candidates[0].name} must define a downgrade() function"
     )
@@ -244,7 +248,9 @@ def test_password_changed_at_backfill_targets_created_at_or_now() -> None:
 
     # The backfill line must reference created_at or NOW() (or CURRENT_TIMESTAMP)
     uses_created_at = re.search(r"COALESCE\s*\(\s*created_at", upgrade_body, re.IGNORECASE)
-    uses_now = re.search(r"COALESCE\s*\([^)]*(?:NOW\(\)|CURRENT_TIMESTAMP)", upgrade_body, re.IGNORECASE)
+    uses_now = re.search(
+        r"COALESCE\s*\([^)]*(?:NOW\(\)|CURRENT_TIMESTAMP)", upgrade_body, re.IGNORECASE
+    )
     uses_bare_now = re.search(
         r"password_changed_at\s*=\s*NOW\s*\(\s*\)", upgrade_body, re.IGNORECASE
     ) and not re.search(r"COALESCE", upgrade_body, re.IGNORECASE)
@@ -328,6 +334,7 @@ def test_0010_roundtrip_schema_equality(monkeypatch):
         # Point DATABASE_URL at our temp file so alembic env.py uses it
         monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db_path}")
         from app.core.config import get_settings
+
         get_settings.cache_clear()
 
         engine = create_engine(f"sqlite:///{db_path}")
@@ -380,6 +387,7 @@ def test_0010_drift_detection(monkeypatch):
     try:
         monkeypatch.setenv("DATABASE_URL", f"sqlite:///{db_path}")
         from app.core.config import get_settings
+
         get_settings.cache_clear()
 
         engine = create_engine(f"sqlite:///{db_path}")
@@ -413,9 +421,6 @@ def _capture_0010_schema(engine) -> dict[str, list[tuple[str, str]]]:
     for table_name in sorted(inspector.get_table_names()):
         if table_name == "alembic_version":
             continue
-        cols = sorted(
-            (col["name"], str(col["type"]))
-            for col in inspector.get_columns(table_name)
-        )
+        cols = sorted((col["name"], str(col["type"])) for col in inspector.get_columns(table_name))
         schema[table_name] = cols
     return schema

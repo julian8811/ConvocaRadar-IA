@@ -72,7 +72,10 @@ class GizFundingConnector:
             if not href or len(title) < 10:
                 continue
             lowered = f"{title} {href}".lower()
-            if not any(token in lowered for token in ("fund", "partner", "tender", "procure", "project", "download")):
+            if not any(
+                token in lowered
+                for token in ("fund", "partner", "tender", "procure", "project", "download")
+            ):
                 continue
             if href.endswith(".pdf"):
                 continue

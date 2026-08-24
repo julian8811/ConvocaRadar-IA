@@ -2,6 +2,7 @@
 
 TDD Cycle: tests written FIRST, then implementation.
 """
+
 from __future__ import annotations
 
 import os
@@ -58,9 +59,7 @@ def source(db) -> Source:
 @pytest.fixture
 def org_id(db) -> str:
     """Return the seeded org ID."""
-    org = db.scalar(
-        select(Organization).where(Organization.slug == "convocaradar-local")
-    )
+    org = db.scalar(select(Organization).where(Organization.slug == "convocaradar-local"))
     assert org is not None, "seeded org not found"
     return str(org.id)
 
@@ -125,12 +124,8 @@ async def test_run_source_inline_returns_success_run(monkeypatch, db, source, or
         opportunities_created.append(opp)
         return opp
 
-    monkeypatch.setattr(
-        "app.scraper.runner._scrape_candidates", mock_scrape_candidates
-    )
-    monkeypatch.setattr(
-        "app.scraper.runner.create_opportunity", mock_create_opportunity
-    )
+    monkeypatch.setattr("app.scraper.runner._scrape_candidates", mock_scrape_candidates)
+    monkeypatch.setattr("app.scraper.runner.create_opportunity", mock_create_opportunity)
 
     run = await run_source_inline(db, source, org_id)
 
@@ -149,9 +144,7 @@ async def test_run_source_inline_returns_success_run(monkeypatch, db, source, or
 # ---------------------------------------------------------------------------
 
 
-async def test_run_source_inline_returns_failed_run_on_timeout(
-    monkeypatch, db, source, org_id
-):
+async def test_run_source_inline_returns_failed_run_on_timeout(monkeypatch, db, source, org_id):
     """When _scrape_source_candidates_with_timeout raises TimeoutError,
     run_source_inline must return a SourceRun with status='failed'."""
     from app.scraper.runner import run_source_inline
@@ -177,9 +170,7 @@ async def test_run_source_inline_returns_failed_run_on_timeout(
 # ---------------------------------------------------------------------------
 
 
-async def test_run_source_skips_when_source_already_running(
-    monkeypatch, db, source, org_id
-):
+async def test_run_source_skips_when_source_already_running(monkeypatch, db, source, org_id):
     """run_source should return None (skip) when the source already has
     a SourceRun with status='running'."""
     from app.scraper.dispatcher import run_source
@@ -237,9 +228,7 @@ async def test_run_source_inline_returns_degraded_when_no_opportunities(
     def mock_create_opportunity_never_called(_db, data, organization_id=None):
         raise AssertionError("create_opportunity should NOT be called with 0 candidates")
 
-    monkeypatch.setattr(
-        "app.scraper.runner._scrape_candidates", mock_scrape_empty
-    )
+    monkeypatch.setattr("app.scraper.runner._scrape_candidates", mock_scrape_empty)
     monkeypatch.setattr(
         "app.scraper.runner.create_opportunity", mock_create_opportunity_never_called
     )
@@ -258,9 +247,7 @@ async def test_run_source_inline_returns_degraded_when_no_opportunities(
 # ---------------------------------------------------------------------------
 
 
-async def test_run_source_inline_returns_failed_on_generic_error(
-    monkeypatch, db, source, org_id
-):
+async def test_run_source_inline_returns_failed_on_generic_error(monkeypatch, db, source, org_id):
     """Any Exception (not just TimeoutError) should result in a failed run."""
     from app.scraper.runner import run_source_inline
 
@@ -285,9 +272,7 @@ async def test_run_source_inline_returns_failed_on_generic_error(
 # ---------------------------------------------------------------------------
 
 
-async def test_run_source_delegates_when_no_existing_run(
-    monkeypatch, db, source, org_id
-):
+async def test_run_source_delegates_when_no_existing_run(monkeypatch, db, source, org_id):
     """When no existing running SourceRun exists, run_source should
     delegate to run_source_inline and return the resulting run."""
     from app.scraper.dispatcher import run_source
@@ -305,9 +290,7 @@ async def test_run_source_delegates_when_no_existing_run(
         )
         return run
 
-    monkeypatch.setattr(
-        "app.scraper.dispatcher.run_source_inline", tracking_inline
-    )
+    monkeypatch.setattr("app.scraper.dispatcher.run_source_inline", tracking_inline)
 
     result = await run_source(db, source, org_id)
 
@@ -444,9 +427,7 @@ async def test_mark_stale_runs_failed_boundary(db):
 # ---------------------------------------------------------------------------
 
 
-async def test_run_source_inline_stores_dom_hash(
-    monkeypatch, db, source, org_id
-):
+async def test_run_source_inline_stores_dom_hash(monkeypatch, db, source, org_id):
     """After a successful scrape, source.dom_hash is updated."""
     from app.scraper.runner import run_source_inline
 
@@ -509,9 +490,7 @@ async def test_run_source_inline_stores_dom_hash(
     assert len(source.dom_hash) == 64  # SHA256 hex
 
 
-async def test_run_source_tracks_selector_failures(
-    monkeypatch, db, source, org_id
-):
+async def test_run_source_tracks_selector_failures(monkeypatch, db, source, org_id):
     """When selectors fail, selector_failures increments on the source."""
     from app.scraper.runner import run_source_inline
 
@@ -521,12 +500,8 @@ async def test_run_source_tracks_selector_failures(
     def mock_create_never(_db, data, organization_id=None):
         raise AssertionError("Should not be called")
 
-    monkeypatch.setattr(
-        "app.scraper.runner._scrape_candidates", mock_empty_scrape
-    )
-    monkeypatch.setattr(
-        "app.scraper.runner.create_opportunity", mock_create_never
-    )
+    monkeypatch.setattr("app.scraper.runner._scrape_candidates", mock_empty_scrape)
+    monkeypatch.setattr("app.scraper.runner.create_opportunity", mock_create_never)
 
     assert source.selector_failures == 0
 
@@ -538,9 +513,7 @@ async def test_run_source_tracks_selector_failures(
     assert run.status == "degraded"
 
 
-async def test_selector_failures_auto_pause_after_three(
-    monkeypatch, db, source, org_id
-):
+async def test_selector_failures_auto_pause_after_three(monkeypatch, db, source, org_id):
     """After 3 consecutive selector failures, source auto-pauses."""
     from app.scraper.runner import run_source_inline
 
@@ -550,12 +523,8 @@ async def test_selector_failures_auto_pause_after_three(
     def mock_create_never(_db, data, organization_id=None):
         raise AssertionError("Should not be called")
 
-    monkeypatch.setattr(
-        "app.scraper.runner._scrape_candidates", mock_empty_scrape
-    )
-    monkeypatch.setattr(
-        "app.scraper.runner.create_opportunity", mock_create_never
-    )
+    monkeypatch.setattr("app.scraper.runner._scrape_candidates", mock_empty_scrape)
+    monkeypatch.setattr("app.scraper.runner.create_opportunity", mock_create_never)
 
     # Set up 2 prior failures
     source.selector_failures = 2
@@ -569,9 +538,7 @@ async def test_selector_failures_auto_pause_after_three(
     assert any("auto-paused" in str(log).lower() for log in run.logs)
 
 
-async def test_dom_hash_detect_structural_change_logged(
-    monkeypatch, db, source, org_id
-):
+async def test_dom_hash_detect_structural_change_logged(monkeypatch, db, source, org_id):
     """When DOM hash changes, a log entry is added."""
     from app.scraper.runner import run_source_inline
 

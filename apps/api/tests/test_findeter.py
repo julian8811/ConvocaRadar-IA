@@ -152,9 +152,12 @@ class TestParse:
 
         years_found = set()
         for c in candidates:
-            if "-2024" in c.official_url: years_found.add("2024")
-            if "-2025" in c.official_url: years_found.add("2025")
-            if "-2026" in c.official_url: years_found.add("2026")
+            if "-2024" in c.official_url:
+                years_found.add("2024")
+            if "-2025" in c.official_url:
+                years_found.add("2025")
+            if "-2026" in c.official_url:
+                years_found.add("2026")
 
         assert "2024" in years_found, "2024 entries should be included"
         assert "2025" in years_found, "2025 entries should be included"
@@ -193,7 +196,7 @@ class TestParse:
         raw = RawSourceResult(
             source_key="findeter-convocatorias",
             url="https://www.findeter.gov.co/sitemap.xml",
-            content="<?xml version=\"1.0\" encoding=\"UTF-8\"?><urlset xmlns=\"http://www.sitemaps.org/schemas/sitemap/0.9\"></urlset>",
+            content='<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"></urlset>',
             content_type="application/xml",
         )
 

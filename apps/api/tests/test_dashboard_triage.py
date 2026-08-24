@@ -126,7 +126,9 @@ async def _make_opportunity(
     db = SessionLocal()
     try:
         if organization_id is None:
-            organization = db.scalar(select(Organization).where(Organization.slug == "convocaradar-local"))
+            organization = db.scalar(
+                select(Organization).where(Organization.slug == "convocaradar-local")
+            )
             assert organization is not None
             organization_id = organization.id
         source = db.scalar(select(Source).where(Source.key == "grants-gov"))
@@ -376,7 +378,9 @@ async def test_review_queue_item_includes_score_from_opportunity_score() -> None
 
     db = SessionLocal()
     try:
-        organization = db.scalar(select(Organization).where(Organization.slug == "convocaradar-local"))
+        organization = db.scalar(
+            select(Organization).where(Organization.slug == "convocaradar-local")
+        )
         assert organization is not None
         org_id = organization.id
     finally:

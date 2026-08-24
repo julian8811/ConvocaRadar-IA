@@ -9,6 +9,7 @@ was first written but are now live — the new interactive dashboard
 charts import them. The DEAD_DEPS list below reflects only the
 remaining packages that still have no consumer.)
 """
+
 from __future__ import annotations
 
 import json
@@ -91,21 +92,16 @@ def test_dead_deps_absent_from_package_json() -> None:
 
 def test_react_table_not_imported_in_web_source() -> None:
     hits = _grep_imports_for("@tanstack/react-table")
-    assert not hits, (
-        "@tanstack/react-table is still imported from apps/web source:\n"
-        + "\n".join(hits)
+    assert not hits, "@tanstack/react-table is still imported from apps/web source:\n" + "\n".join(
+        hits
     )
 
 
 def test_react_hook_form_not_imported_in_web_source() -> None:
     hits = _grep_imports_for("react-hook-form")
-    assert not hits, (
-        "react-hook-form is still imported from apps/web source:\n" + "\n".join(hits)
-    )
+    assert not hits, "react-hook-form is still imported from apps/web source:\n" + "\n".join(hits)
 
 
 def test_zod_not_imported_in_web_source() -> None:
     hits = _grep_imports_for("zod")
-    assert not hits, (
-        "zod is still imported from apps/web source:\n" + "\n".join(hits)
-    )
+    assert not hits, "zod is still imported from apps/web source:\n" + "\n".join(hits)

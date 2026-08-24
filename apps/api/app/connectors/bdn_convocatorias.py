@@ -86,7 +86,17 @@ class BdnConvocatoriasConnector:
             if not title or not item_id or item_id in seen:
                 continue
             lowered = title.lower()
-            if any(token in lowered for token in ("anulación", "anulacion", "rectificación", "rectificacion", "modificación", "modificacion")):
+            if any(
+                token in lowered
+                for token in (
+                    "anulación",
+                    "anulacion",
+                    "rectificación",
+                    "rectificacion",
+                    "modificación",
+                    "modificacion",
+                )
+            ):
                 continue
             seen.add(item_id)
             open_date = parse_date_text(str(item.get("fechaRecepcion") or ""))
@@ -111,4 +121,6 @@ class BdnConvocatoriasConnector:
         return candidates[:150]
 
     async def validate(self, candidate: OpportunityCandidate) -> ValidationResult:
-        return ValidationResult(ok=bool(candidate.title and "infosubvenciones.es" in candidate.official_url))
+        return ValidationResult(
+            ok=bool(candidate.title and "infosubvenciones.es" in candidate.official_url)
+        )

@@ -145,11 +145,15 @@ class WordPressGrantsConnector:
             seen.add(link)
             acf = item.get("acf") or {}
             summary = _acf_text(acf, "summary", "description", "excerpt", "intro") or title
-            deadline_raw = _acf_text(acf, "deadline", "application_deadline", "closing_date", "close_date")
+            deadline_raw = _acf_text(
+                acf, "deadline", "application_deadline", "closing_date", "close_date"
+            )
             close_date = _parse_wp_date(deadline_raw) if deadline_raw else None
             open_date = _parse_wp_date(str(item.get("date") or ""))
             status_text = (_acf_text(acf, "status", "grant_status") or "").lower()
-            if status_text and any(token in status_text for token in ("closed", "cerrad", "archiv")):
+            if status_text and any(
+                token in status_text for token in ("closed", "cerrad", "archiv")
+            ):
                 continue
             if close_date and close_date.date() < datetime.now(UTC).date():
                 continue
@@ -175,6 +179,8 @@ class WordPressGrantsConnector:
     async def validate(self, candidate: OpportunityCandidate) -> ValidationResult:
         if not candidate.title or not candidate.official_url:
             return ValidationResult(ok=False, reason="missing title or url")
-        if self.allowed_domains and not is_allowed_host(candidate.official_url, self.allowed_domains):
+        if self.allowed_domains and not is_allowed_host(
+            candidate.official_url, self.allowed_domains
+        ):
             return ValidationResult(ok=False, reason="domain not allowed")
         return ValidationResult(ok=True)

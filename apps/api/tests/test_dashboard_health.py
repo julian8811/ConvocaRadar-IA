@@ -85,6 +85,7 @@ def _clean_opportunities() -> None:
         db.close()
     # Clear the health cache so stale results from previous tests don't pollute
     from app.api.v1.dashboard import _health_cache
+
     _health_cache.clear()
     yield
 
@@ -129,7 +130,9 @@ async def _make_opportunity(
 ) -> str:
     db = SessionLocal()
     try:
-        organization = db.scalar(select(Organization).where(Organization.slug == "convocaradar-local"))
+        organization = db.scalar(
+            select(Organization).where(Organization.slug == "convocaradar-local")
+        )
         assert organization is not None
         organization_id = organization.id
         source = db.scalar(select(Source).where(Source.key == "grants-gov"))

@@ -6,7 +6,13 @@ from urllib.parse import urljoin, urlparse
 from selectolax.parser import HTMLParser
 
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
-from app.connectors.common import BROWSER_UA, clean_text, fetch_httpx_text, looks_like_noise_text, parse_date_text
+from app.connectors.common import (
+    BROWSER_UA,
+    clean_text,
+    fetch_httpx_text,
+    looks_like_noise_text,
+    parse_date_text,
+)
 
 
 CLOSED_KEYWORDS = (
@@ -122,5 +128,7 @@ class HeadingListHtmlConnector:
 
     async def validate(self, candidate: OpportunityCandidate) -> ValidationResult:
         host = urlparse(candidate.official_url).hostname or ""
-        allowed = any(host == domain or host.endswith(f".{domain}") for domain in self.allowed_domains)
+        allowed = any(
+            host == domain or host.endswith(f".{domain}") for domain in self.allowed_domains
+        )
         return ValidationResult(ok=bool(candidate.title and candidate.official_url and allowed))

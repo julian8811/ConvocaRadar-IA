@@ -110,9 +110,7 @@ def test_all_migrations_have_downgrade() -> None:
     migrations_dir = _api_dir() / "migrations" / "versions"
     migration_files = sorted(migrations_dir.glob("*.py"))
 
-    assert len(migration_files) >= 3, (
-        f"Expected >=3 migration files, found {len(migration_files)}"
-    )
+    assert len(migration_files) >= 3, f"Expected >=3 migration files, found {len(migration_files)}"
 
     for mf in migration_files:
         tree = ast.parse(mf.read_text(encoding="utf-8"))

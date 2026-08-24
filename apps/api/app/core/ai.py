@@ -140,17 +140,46 @@ def infer_language(text: str, fallback: str = "en") -> str:
         return fallback
     spanish_signals = sum(
         1
-        for token in [" convocatoria ", " requisitos ", " cierre ", " financi", " innovacion ", " investig", " beca ", " postulacion ", " elegible "]
+        for token in [
+            " convocatoria ",
+            " requisitos ",
+            " cierre ",
+            " financi",
+            " innovacion ",
+            " investig",
+            " beca ",
+            " postulacion ",
+            " elegible ",
+        ]
         if token in f" {normalized} "
     )
     english_signals = sum(
         1
-        for token in [" call ", " funding ", " deadline ", " requirements ", " eligible ", " scholarship ", " innovation ", " research ", " application "]
+        for token in [
+            " call ",
+            " funding ",
+            " deadline ",
+            " requirements ",
+            " eligible ",
+            " scholarship ",
+            " innovation ",
+            " research ",
+            " application ",
+        ]
         if token in f" {normalized} "
     )
     portuguese_signals = sum(
         1
-        for token in [" inscricoes ", " inscricoes ate ", " pesquisa ", " universidade ", " bolsa ", " edital ", " financiamento ", " desenvolvimento "]
+        for token in [
+            " inscricoes ",
+            " inscricoes ate ",
+            " pesquisa ",
+            " universidade ",
+            " bolsa ",
+            " edital ",
+            " financiamento ",
+            " desenvolvimento ",
+        ]
         if token in f" {normalized} "
     )
     if portuguese_signals > max(spanish_signals, english_signals):
@@ -230,7 +259,11 @@ def _extract_summary(text: str) -> str:
     normalized = normalize_text(text)
     if not normalized:
         return "Resumen pendiente de contenido suficiente."
-    sentences = [sentence for sentence in re.split(r"(?<=[.!?])\s+", normalized) if sentence and not _looks_like_noise_line(sentence)]
+    sentences = [
+        sentence
+        for sentence in re.split(r"(?<=[.!?])\s+", normalized)
+        if sentence and not _looks_like_noise_line(sentence)
+    ]
     if not sentences:
         return "Resumen pendiente de contenido suficiente."
     return " ".join(sentences[:3])[:600]
@@ -250,7 +283,9 @@ def _risk_flags(text: str, confidence: float) -> list[str]:
     return flags or ["Revisión automática pendiente."]
 
 
-def _recommendation(confidence: float, categories: list[str], risk_flags: list[str]) -> tuple[str, str]:
+def _recommendation(
+    confidence: float, categories: list[str], risk_flags: list[str]
+) -> tuple[str, str]:
     if confidence >= 0.82 and "research" in categories:
         return "Alta prioridad para revisión.", "high"
     if confidence >= 0.68:
@@ -266,7 +301,9 @@ def _coerce_text_list(value: Any) -> list[str]:
     if value is None:
         return []
     if isinstance(value, str):
-        return [item for item in (normalize_text(part) for part in re.split(r"[;,|]\s*", value)) if item]
+        return [
+            item for item in (normalize_text(part) for part in re.split(r"[;,|]\s*", value)) if item
+        ]
     if isinstance(value, list):
         items: list[str] = []
         for item in value:
@@ -323,7 +360,9 @@ def _normalize_remote_extraction(payload: dict[str, Any]) -> dict[str, Any]:
     mapped["model_version"] = normalize_text(str(mapped.get("model_version") or remote_model))
     mapped["provider"] = normalize_text(str(mapped.get("provider") or get_settings().llm_provider))
     mapped["prompt_version"] = normalize_text(str(mapped.get("prompt_version") or PROMPT_VERSION))
-    mapped["extraction_strategy"] = normalize_text(str(mapped.get("extraction_strategy") or "remote"))
+    mapped["extraction_strategy"] = normalize_text(
+        str(mapped.get("extraction_strategy") or "remote")
+    )
     return mapped
 
 
@@ -411,7 +450,9 @@ def build_local_extraction(text: str) -> dict[str, Any]:
     language = infer_language(normalized)
     extraction_notes = [
         "Structured extraction generated locally.",
-        f"Matched keywords: {', '.join(categories)}" if categories else "No category keywords detected.",
+        f"Matched keywords: {', '.join(categories)}"
+        if categories
+        else "No category keywords detected.",
         f"Confidence basis: {len(normalized)} chars, {len(requirements)} requirements, {len(documents_required)} documents.",
     ]
     return {
@@ -462,13 +503,19 @@ async def extract_opportunity_structured(text: str) -> AIExtraction:
         try:
             validated = AiOpportunityExtract.model_validate(merged).model_dump()
         except ValidationError:
-            return AIExtraction(data=normalized, confidence=normalized["confidence"], provider="local")
+            return AIExtraction(
+                data=normalized, confidence=normalized["confidence"], provider="local"
+            )
         validated.setdefault("language", normalized["language"])
         validated.setdefault("model_version", MODEL_VERSION)
         validated.setdefault("provider", get_settings().llm_provider)
         validated.setdefault("prompt_version", PROMPT_VERSION)
         validated.setdefault("extraction_strategy", "remote-llm")
-        return AIExtraction(data={**merged, **validated}, confidence=merged["confidence"], provider=str(merged["provider"]))
+        return AIExtraction(
+            data={**merged, **validated},
+            confidence=merged["confidence"],
+            provider=str(merged["provider"]),
+        )
     local = build_local_extraction(text)
     return AIExtraction(data=local, confidence=local["confidence"], provider="local")
 

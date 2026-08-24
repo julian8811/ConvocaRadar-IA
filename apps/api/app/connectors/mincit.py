@@ -12,7 +12,11 @@ from app.connectors.common import BROWSER_UA, clean_text, fetch_httpx_text, pars
 
 
 MINCIT_PORTAL_BASE = "https://convocatoriasturismo.mincit.gov.co"
-MINCIT_LISTING_PATHS = ("/listado-convocatorias/7", "/listado-convocatorias/19", "/listado-convocatorias/1")
+MINCIT_LISTING_PATHS = (
+    "/listado-convocatorias/7",
+    "/listado-convocatorias/19",
+    "/listado-convocatorias/1",
+)
 MINCIT_REQUEST_HEADERS = {"User-Agent": BROWSER_UA, "Accept": "text/html,application/xhtml+xml"}
 
 
@@ -84,7 +88,9 @@ class MincitConvocatoriasConnector:
             title = clean_text(title_match.group(1))
             if not title or title.lower().startswith("otras convocatorias"):
                 continue
-            close_date = parse_date_text(deadline_match.group(1).strip()) if deadline_match else None
+            close_date = (
+                parse_date_text(deadline_match.group(1).strip()) if deadline_match else None
+            )
             if close_date and close_date.date() < datetime.now(UTC).date():
                 continue
             seen.add(official_url)
@@ -112,5 +118,7 @@ class MincitConvocatoriasConnector:
 
     async def validate(self, candidate: OpportunityCandidate) -> ValidationResult:
         return ValidationResult(
-            ok=bool(candidate.title and "convocatoriasturismo.mincit.gov.co" in candidate.official_url)
+            ok=bool(
+                candidate.title and "convocatoriasturismo.mincit.gov.co" in candidate.official_url
+            )
         )

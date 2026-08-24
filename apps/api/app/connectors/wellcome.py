@@ -62,7 +62,9 @@ class WellcomeConnector:
         )
 
     async def parse(self, raw: RawSourceResult) -> list[OpportunityCandidate]:
-        match = re.search(r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>', raw.content, re.S)
+        match = re.search(
+            r'<script id="__NEXT_DATA__" type="application/json">(.*?)</script>', raw.content, re.S
+        )
         if not match:
             return []
         try:
@@ -79,7 +81,9 @@ class WellcomeConnector:
             path = clean_text(str(item.get("url") or ""))
             if not title or not path or path in seen:
                 continue
-            status = clean_text(str(item.get("scheme_status") or item.get("scheme_accepting_applications") or "")).lower()
+            status = clean_text(
+                str(item.get("scheme_status") or item.get("scheme_accepting_applications") or "")
+            ).lower()
             if status in CLOSED_STATUSES:
                 continue
             close_date = parse_date_text(str(item.get("scheme_closes_for_applications") or ""))
@@ -87,7 +91,11 @@ class WellcomeConnector:
                 raw_deadline = clean_text(str(item.get("scheme_closes_for_applications") or ""))
                 for fmt in ("%d %B %Y", "%d %b %Y"):
                     try:
-                        close_date = datetime.strptime(raw_deadline, fmt).replace(tzinfo=UTC).replace(tzinfo=None)
+                        close_date = (
+                            datetime.strptime(raw_deadline, fmt)
+                            .replace(tzinfo=UTC)
+                            .replace(tzinfo=None)
+                        )
                         break
                     except ValueError:
                         continue
@@ -121,4 +129,6 @@ class WellcomeConnector:
         return candidates[:50]
 
     async def validate(self, candidate: OpportunityCandidate) -> ValidationResult:
-        return ValidationResult(ok=bool(candidate.title and candidate.official_url.startswith("https://wellcome.org/")))
+        return ValidationResult(
+            ok=bool(candidate.title and candidate.official_url.startswith("https://wellcome.org/"))
+        )

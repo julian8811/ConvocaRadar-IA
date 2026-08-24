@@ -1,4 +1,4 @@
-﻿from app.connectors.configurable_html import ConfigurableHtmlConnector
+from app.connectors.configurable_html import ConfigurableHtmlConnector
 from app.connectors.registry import get_connector
 from app.connectors.generic_html import GenericHtmlConnector
 from app.connectors.grants_gov import GrantsGovConnector  # noqa: F401 — @register side effect
@@ -29,6 +29,7 @@ from app.connectors.heading_list_html import HeadingListHtmlConnector
 from app.connectors.idrc_funding import IdrcFundingConnector  # noqa: F401 — @register side effect
 from app.connectors.usaid_grants import UsaidGrantsConnector  # noqa: F401 — @register side effect
 from app.connectors.giz_funding import GizFundingConnector
+
 # from app.connectors.cordis_h2020 import CordisH2020Connector  # Removed: Horizon 2020 ended in 2020
 from app.connectors.eic_accelerator import EicAcceleratorConnector  # noqa: F401 — @register side effect
 from app.connectors.global_innovation_fund import GlobalInnovationFundConnector  # noqa: F401 — @register side effect
@@ -54,13 +55,23 @@ BDN_CONVOCATORIAS_SOURCE_KEYS = {
         "search_query": "CDTI",
         "entity_name": "CDTI",
         "default_country": "Spain",
-        "allowed_domains": ["infosubvenciones.es", "www.infosubvenciones.es", "cdti.es", "www.cdti.es"],
+        "allowed_domains": [
+            "infosubvenciones.es",
+            "www.infosubvenciones.es",
+            "cdti.es",
+            "www.cdti.es",
+        ],
     },
     "isciii-convocatorias": {
         "search_query": "Instituto de Salud Carlos III",
         "entity_name": "ISCIII",
         "default_country": "Spain",
-        "allowed_domains": ["infosubvenciones.es", "www.infosubvenciones.es", "isciii.es", "www.isciii.es"],
+        "allowed_domains": [
+            "infosubvenciones.es",
+            "www.infosubvenciones.es",
+            "isciii.es",
+            "www.isciii.es",
+        ],
     },
 }
 
@@ -119,18 +130,41 @@ def _wordpress_connector(source_key: str, base_url: str) -> WordPressGrantsConne
     )
 
 
-def connector_for(source_key: str, base_url: str | None = None, source_type: str | None = None, *, entity_name: str | None = None, default_country: str | None = None, default_categories: list[str] | None = None, connector_config: dict | None = None):
+def connector_for(
+    source_key: str,
+    base_url: str | None = None,
+    source_type: str | None = None,
+    *,
+    entity_name: str | None = None,
+    default_country: str | None = None,
+    default_categories: list[str] | None = None,
+    connector_config: dict | None = None,
+):
     # â”€â”€ Special construction cases (non-standard __init__) â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€â”€
     # These connectors take ``source_key`` as a positional argument, so
     # the standard ``cls(base_url, **kwargs)`` registry pattern doesn't
     # fit.  They *are* registered for introspection but must be constructed
     # explicitly here during the gradual migration.
     if source_key == "finep-brasil":
-        return FinepConnector(source_key, base_url or "", entity_name=entity_name or "FINEP", default_country=default_country or "Brazil", default_categories=default_categories)
+        return FinepConnector(
+            source_key,
+            base_url or "",
+            entity_name=entity_name or "FINEP",
+            default_country=default_country or "Brazil",
+            default_categories=default_categories,
+        )
     if source_key == "dane-convocatorias":
-        return DaneConnector(source_key, base_url or "", entity_name=entity_name or "DANE", default_country=default_country or "Colombia", default_categories=default_categories)
+        return DaneConnector(
+            source_key,
+            base_url or "",
+            entity_name=entity_name or "DANE",
+            default_country=default_country or "Colombia",
+            default_categories=default_categories,
+        )
     if source_key == "developmentaid-tenders":
-        return DevelopmentAidConnector(source_key, base_url or "", connector_config=connector_config)
+        return DevelopmentAidConnector(
+            source_key, base_url or "", connector_config=connector_config
+        )
     if source_key in {"grants-gov-rss", "grants-gov-forecast"}:
         return GrantsGovRssConnector(source_key, base_url or "")
     if source_key == "nsf-funding-rss":
@@ -172,19 +206,17 @@ def connector_for(source_key: str, base_url: str | None = None, source_type: str
     # ConfigurableHtmlConnector instead of hardcoded GenericHtmlConnector.
     if connector_config is not None:
         return ConfigurableHtmlConnector(
-            source_key, base_url or "",
+            source_key,
+            base_url or "",
             connector_config,
             entity_name=entity_name,
             default_country=default_country,
             default_categories=default_categories,
         )
     return GenericHtmlConnector(
-        source_key, base_url or "",
+        source_key,
+        base_url or "",
         entity_name=entity_name,
         default_country=default_country,
         default_categories=default_categories,
     )
-
-
-
-

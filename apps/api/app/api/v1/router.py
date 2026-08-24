@@ -1,7 +1,20 @@
 from fastapi import APIRouter, Depends
 
 from app.api.deps import verify_csrf
-from app.api.v1 import admin, ai, alerts, auth, dashboard, internal, opportunities, ops, organizations, reports, sources, tasks
+from app.api.v1 import (
+    admin,
+    ai,
+    alerts,
+    auth,
+    dashboard,
+    internal,
+    opportunities,
+    ops,
+    organizations,
+    reports,
+    sources,
+    tasks,
+)
 
 api_router = APIRouter(prefix="/api/v1")
 
@@ -12,9 +25,13 @@ api_router.include_router(auth.router, tags=["auth"])
 # Custom headers trigger a CORS preflight that validates the origin against
 # the allowlist, preventing cross-site request forgery.
 api_router.include_router(dashboard.router, tags=["dashboard"], dependencies=[Depends(verify_csrf)])
-api_router.include_router(organizations.router, tags=["organizations"], dependencies=[Depends(verify_csrf)])
+api_router.include_router(
+    organizations.router, tags=["organizations"], dependencies=[Depends(verify_csrf)]
+)
 api_router.include_router(sources.router, tags=["sources"], dependencies=[Depends(verify_csrf)])
-api_router.include_router(opportunities.router, tags=["opportunities"], dependencies=[Depends(verify_csrf)])
+api_router.include_router(
+    opportunities.router, tags=["opportunities"], dependencies=[Depends(verify_csrf)]
+)
 api_router.include_router(reports.router, tags=["reports"], dependencies=[Depends(verify_csrf)])
 api_router.include_router(alerts.router, tags=["alerts"], dependencies=[Depends(verify_csrf)])
 api_router.include_router(ai.router, tags=["ai"], dependencies=[Depends(verify_csrf)])

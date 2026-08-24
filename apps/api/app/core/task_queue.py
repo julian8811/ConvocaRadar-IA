@@ -44,4 +44,3 @@ def enqueue_seed_default_sources(organization_id: str) -> str | None:
         return None
     finally:
         db.close()
-

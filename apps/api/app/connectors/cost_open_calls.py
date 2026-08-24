@@ -1,4 +1,5 @@
 """COST Actions open calls connector via WordPress REST API."""
+
 from __future__ import annotations
 
 import re
@@ -27,7 +28,9 @@ class CostOpenCallsConnector:
 
     async def fetch(self) -> RawSourceResult:
         url = f"{self.base_url}?search={COST_TERMS}&per_page=20&_fields=id,title,content,excerpt,date,modified,link"
-        final_url, content, content_type = await fetch_httpx_text(url, fallback_content_type="application/json")
+        final_url, content, content_type = await fetch_httpx_text(
+            url, fallback_content_type="application/json"
+        )
         return RawSourceResult(
             source_key=self.source_key,
             url=final_url,
@@ -37,6 +40,7 @@ class CostOpenCallsConnector:
 
     async def parse(self, raw: RawSourceResult) -> list[OpportunityCandidate]:
         import json
+
         try:
             items = json.loads(raw.content)
         except json.JSONDecodeError:
@@ -49,7 +53,9 @@ class CostOpenCallsConnector:
             if not isinstance(item, dict):
                 continue
             title_raw = item.get("title", {})
-            title = clean_text(title_raw.get("rendered", "") if isinstance(title_raw, dict) else str(title_raw))
+            title = clean_text(
+                title_raw.get("rendered", "") if isinstance(title_raw, dict) else str(title_raw)
+            )
             if not title or title in seen:
                 continue
             seen.add(title)
@@ -63,7 +69,11 @@ class CostOpenCallsConnector:
                 or (content_raw.get("rendered", "") if isinstance(content_raw, dict) else "")
             )
             # Extract close date from content if available
-            date_match = re.search(r"(\d{1,2}\s+(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4})", summary, re.IGNORECASE)
+            date_match = re.search(
+                r"(\d{1,2}\s+(?:January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{4})",
+                summary,
+                re.IGNORECASE,
+            )
             close_date = _parse_cost_date(date_match.group(1)) if date_match else None
             raw_date = str(item.get("date", ""))
             open_date = _parse_cost_date(raw_date) if raw_date else None

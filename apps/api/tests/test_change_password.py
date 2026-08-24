@@ -144,7 +144,11 @@ def test_change_password_success_bumps_password_changed_at() -> None:
     bumped = user.password_changed_at
     if bumped.tzinfo is None:
         bumped = bumped.replace(tzinfo=None)
-    assert before.replace(tzinfo=None) <= bumped <= after.replace(tzinfo=None) + __import__("datetime").timedelta(seconds=2), (
+    assert (
+        before.replace(tzinfo=None)
+        <= bumped
+        <= after.replace(tzinfo=None) + __import__("datetime").timedelta(seconds=2)
+    ), (
         f"password_changed_at={bumped} is outside the expected window "
         f"[{before}, {after}]. The bump is using the wrong clock source."
     )
@@ -207,8 +211,7 @@ def test_change_password_wrong_current_password_returns_400() -> None:
         headers={"Authorization": f"Bearer {token}"},
     )
     assert response.status_code == 400, (
-        f"Expected 400 on wrong current_password, got {response.status_code}: "
-        f"{response.text}"
+        f"Expected 400 on wrong current_password, got {response.status_code}: {response.text}"
     )
     detail = response.json().get("detail", "")
     assert "incorrect" in detail.lower() or "current" in detail.lower(), (
@@ -240,8 +243,7 @@ def test_change_password_short_new_password_returns_422() -> None:
         headers={"Authorization": f"Bearer {token}"},
     )
     assert response.status_code == 422, (
-        f"Expected 422 on short new_password, got {response.status_code}: "
-        f"{response.text}"
+        f"Expected 422 on short new_password, got {response.status_code}: {response.text}"
     )
     # Hash must NOT have changed
     user = _get_user("cp-short@example.com")
