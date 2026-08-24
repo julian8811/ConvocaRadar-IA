@@ -364,7 +364,7 @@ def test_source_model_has_new_fields() -> None:
 @pytest.mark.asyncio
 async def test_run_source_returns_none_when_source_auto_paused() -> None:
     """run_source should return None when source is auto_paused and within cooldown."""
-    from unittest.mock import AsyncMock, MagicMock
+    from unittest.mock import MagicMock
     from datetime import UTC, datetime, timedelta
     from app.models import Source
     from app.scraper.dispatcher import run_source

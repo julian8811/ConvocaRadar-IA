@@ -24,7 +24,7 @@ from jose import jwt
 from sqlalchemy import select
 
 from app.core.config import get_settings
-from app.core.security import create_access_token, create_reset_token, hash_password
+from app.core.security import create_reset_token, hash_password
 from app.db.seed import seed
 from app.db.session import SessionLocal
 from app.main import app

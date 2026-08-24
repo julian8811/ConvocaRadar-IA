@@ -6,7 +6,6 @@ from unittest.mock import MagicMock
 
 from app.services.scoring import (
     _compute_score,
-    calculate_score,
     priority_for_score,
 )
 from app.models import Opportunity, OrganizationProfile, Priority

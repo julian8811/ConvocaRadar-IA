@@ -6,7 +6,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
+from app.connectors.base import OpportunityCandidate, RawSourceResult
 from app.connectors.findeter import FindeterConnector
 from app.connectors.registry import get_connector, registered_keys
 

@@ -10,7 +10,6 @@ from dataclasses import dataclass
 from html import unescape
 from typing import Any
 
-import httpx
 from pydantic import ValidationError
 
 from app.core.config import effective_llm_provider, get_settings

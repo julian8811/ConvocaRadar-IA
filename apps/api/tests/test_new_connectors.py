@@ -11,7 +11,7 @@ from app.connectors.cost_open_calls import CostOpenCallsConnector
 from app.connectors.erc_calls import ErcCallsConnector
 from app.connectors.caricom import CaricomConnector
 from app.connectors.ascun import AscunConnector
-from app.connectors.registry import get_connector, registered_keys
+from app.connectors.registry import registered_keys
 
 # ── Fixture data ────────────────────────────────────────────────────────────
 

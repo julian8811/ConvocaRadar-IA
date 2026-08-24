@@ -2,9 +2,7 @@
 
 from __future__ import annotations
 
-from unittest.mock import AsyncMock
 
-import pytest
 
 from app.connectors.common import clean_opportunity_title, infer_country_from_entity
 

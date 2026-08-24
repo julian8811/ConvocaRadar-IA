@@ -3,7 +3,6 @@ from app.connectors.registry import register
 
 
 import json
-from datetime import UTC, datetime
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
 from app.connectors.common import fetch_httpx_text, parse_date_text

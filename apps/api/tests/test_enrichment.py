@@ -13,7 +13,6 @@ from unittest.mock import AsyncMock
 import pytest
 
 from app.connectors.common import enrich_from_detail_page
-from app.connectors.base import OpportunityCandidate
 
 
 # ── Sample HTML with close date and funding amount ────────────────────────

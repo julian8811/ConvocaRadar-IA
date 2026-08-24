@@ -8,7 +8,7 @@ from __future__ import annotations
 import hashlib
 import json
 import re
-from datetime import UTC, datetime
+from datetime import datetime
 
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session

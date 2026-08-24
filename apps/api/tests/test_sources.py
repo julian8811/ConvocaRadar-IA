@@ -286,10 +286,8 @@ def test_run_all_sources_uses_dispatcher_instead_of_locally(monkeypatch) -> None
     execute_source_run_locally. Assert the dispatcher is invoked per source.
     """
     import threading as _threading
-    from unittest.mock import AsyncMock
 
     from app.api.v1 import sources as sources_module
-    from app.scraper.dispatcher import run_source
 
     call_log: list[dict[str, object]] = []
 

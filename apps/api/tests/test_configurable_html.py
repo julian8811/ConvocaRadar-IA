@@ -10,7 +10,7 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
+from app.connectors.base import OpportunityCandidate
 from app.connectors.configurable_html import ConfigurableHtmlConnector, HtmlConnectorConfig
 
 

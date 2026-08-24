@@ -1,13 +1,12 @@
 """CARICOM procurement tenders connector via HTML scraping."""
 from __future__ import annotations
 
-import re
 from urllib.parse import urljoin
 
 from selectolax.parser import HTMLParser
 
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
-from app.connectors.common import clean_text, fetch_httpx_text, parse_date_text
+from app.connectors.common import clean_text, fetch_httpx_text
 from app.connectors.registry import register
 
 CARICOM_TENDERS_URL = "https://caricom.org/tenders/"

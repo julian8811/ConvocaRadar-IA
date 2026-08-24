@@ -15,7 +15,6 @@ from __future__ import annotations
 
 import os
 import uuid
-from pathlib import Path
 
 # Match the conftest's DB to share tables with the rest of the suite.
 os.environ.setdefault("DATABASE_URL", "sqlite:///./test_convocaradar.db")

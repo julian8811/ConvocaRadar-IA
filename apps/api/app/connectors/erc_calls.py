@@ -2,11 +2,9 @@
 from __future__ import annotations
 
 import json
-from datetime import UTC, datetime
-from urllib.parse import quote_plus
+from datetime import datetime
 
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
-from app.connectors.common import fetch_httpx_text
 from app.connectors.registry import register
 
 ERC_TOPIC_URL = "https://ec.europa.eu/info/funding-tenders/opportunities/portal/screen/opportunities/topic-details/{identifier}"

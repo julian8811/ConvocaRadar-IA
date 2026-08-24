@@ -31,9 +31,8 @@ from sqlalchemy import select  # noqa: E402
 
 from app.db.seed import seed  # noqa: E402
 from app.db.session import SessionLocal  # noqa: E402
-import app.main as app_main  # noqa: E402
 from app.main import app  # noqa: E402
-from app.models import Opportunity, Organization, Role, Source, User  # noqa: E402
+from app.models import Organization, Role, Source, User  # noqa: E402
 from app.schemas import OpportunityCreate  # noqa: E402
 from app.services import create_opportunity  # noqa: E402
 from app.core.security import hash_password  # noqa: E402

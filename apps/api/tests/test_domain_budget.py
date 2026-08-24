@@ -5,7 +5,6 @@ TDD Cycle: tests written FIRST, then implementation.
 from __future__ import annotations
 
 import threading
-import time
 
 from app.scraper.domain_budget import DomainBudgetManager
 

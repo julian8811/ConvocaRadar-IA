@@ -16,10 +16,9 @@ from __future__ import annotations
 
 import argparse
 import sys
-import time
 from datetime import UTC, datetime
 
-from sqlalchemy import func, select, update
+from sqlalchemy import func, select
 
 from app.connectors.common import extract_close_date
 from app.db.session import SessionLocal

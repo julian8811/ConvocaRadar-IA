@@ -12,7 +12,6 @@ from unittest.mock import AsyncMock
 
 import pytest
 
-from app.connectors.base import RawSourceResult
 from app.connectors.configurable_html import ConfigurableHtmlConnector
 
 # ── Fondo Emprender SENA ─────────────────────────────────────────────────
