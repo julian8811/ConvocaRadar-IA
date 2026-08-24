@@ -61,9 +61,17 @@ jobs:
 
   docker:
     runs-on: ubuntu-latest
+    # docker-compose.yml hard-fails via ${VAR:?must be set}; provide dummy
+    # values so the smoke stack can come up on a fresh checkout.
+    env:
+      POSTGRES_PASSWORD: ci-dummy-postgres-password-0123456789abcdef
+      MINIO_ROOT_PASSWORD: ci-dummy-minio-root-password-0123456789abcdef
+      INTERNAL_API_KEY: ci-dummy-internal-api-key-0123456789abcdef
     steps:
       - uses: actions/checkout@v4
       - run: docker compose build api
       - run: docker compose up -d postgres minio
       - run: sleep 10 && docker compose up -d api
-      - run: sleep 15 && curl -sf http://localhost:8000/health
+      # Compose maps the api service 8002:8000; /api/v1/health/live matches
+      # the container's own healthcheck path.
+      - run: sleep 15 && curl -sf http://localhost:8002/api/v1/health/live
