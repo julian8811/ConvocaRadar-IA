@@ -57,6 +57,9 @@ asyncio_mode = "auto"
 [tool.ruff]
 line-length = 100
 target-version = "py312"
+# Applied Alembic revisions are historical artifacts: they must stay
+# byte-exact, so lint/format never rewrites them.
+extend-exclude = ["migrations"]
 
 [tool.setuptools]
 include-package-data = true
