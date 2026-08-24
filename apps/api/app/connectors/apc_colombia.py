@@ -95,17 +95,23 @@ class ApcColombiaConnector:
         # If no pages succeeded, try the first URL one more time as single-source
         if not pages:
             final_url, content, _ = await fetch_httpx_text(
-                APC_URLS[0], fallback_content_type="text/html",
+                APC_URLS[0],
+                fallback_content_type="text/html",
             )
             pages = [{"url": final_url, "content": content}]
 
         combined = "\n<!-- APC_PAGE_BREAK -->\n".join(page["content"] for page in pages)
         return RawSourceResult(
-            source_key=self.source_key, url=self.base_url,
-            content=combined, content_type="text/html", metadata={"pages": pages},
+            source_key=self.source_key,
+            url=self.base_url,
+            content=combined,
+            content_type="text/html",
+            metadata={"pages": pages},
         )
 
-    def _candidate_from_anchor(self, anchor, page_url: str, container_text: str) -> OpportunityCandidate | None:
+    def _candidate_from_anchor(
+        self, anchor, page_url: str, container_text: str
+    ) -> OpportunityCandidate | None:
         title = clean_text(anchor.text())
         href = anchor.attributes.get("href") or ""
         if not title or not href:
@@ -118,16 +124,25 @@ class ApcColombiaConnector:
         if not _is_candidate_text(lowered):
             return None
         official_url = urljoin(page_url, href)
-        if urlparse(official_url).netloc not in {"www.apccolombia.gov.co", "portalservicios-apccolombia.gov.co"}:
+        if urlparse(official_url).netloc not in {
+            "www.apccolombia.gov.co",
+            "portalservicios-apccolombia.gov.co",
+        }:
             return None
         summary = container_text.replace(title, "", 1).strip(" -:*•")
         status = "Abierta" if "abierta" in lowered else "Cerrada" if "cerrada" in lowered else ""
         if status and status.lower() not in summary.lower():
             summary = f"{status}. {summary}".strip()
         # Try Spanish dates first ("08 de mayo de 2026"), then numeric
-        sp_match = re.search(r"(\d{1,2})\s+de\s+([A-Za-záéíóúñ]+)\s+de\s+(\d{4})", container_text, flags=re.IGNORECASE)
+        sp_match = re.search(
+            r"(\d{1,2})\s+de\s+([A-Za-záéíóúñ]+)\s+de\s+(\d{4})",
+            container_text,
+            flags=re.IGNORECASE,
+        )
         if sp_match:
-            open_date = parse_date_text(f"{sp_match.group(1)} de {sp_match.group(2)} de {sp_match.group(3)}")
+            open_date = parse_date_text(
+                f"{sp_match.group(1)} de {sp_match.group(2)} de {sp_match.group(3)}"
+            )
         else:
             date_match = re.search(r"(\d{2}/\d{2}/\d{4}|\d{4}-\d{2}-\d{2})", container_text)
             open_date = parse_date_text(date_match.group(1) if date_match else container_text)
@@ -154,7 +169,13 @@ class ApcColombiaConnector:
         for page in pages:
             page_url = str(page["url"])
             tree = HTMLParser(str(page["content"]))
-            containers = [*tree.css("article.page.teaser"), *tree.css(".az-text"), *tree.css(".field--item"), *tree.css("article"), *tree.css("section")]
+            containers = [
+                *tree.css("article.page.teaser"),
+                *tree.css(".az-text"),
+                *tree.css(".field--item"),
+                *tree.css("article"),
+                *tree.css("section"),
+            ]
             for container in containers:
                 container_text = _clean(container.text())
                 for anchor in container.css("a[href]"):
@@ -177,7 +198,10 @@ class ApcColombiaConnector:
                 official_url = urljoin(page_url, link.attributes.get("href") or "")
                 if official_url in seen:
                     continue
-                if urlparse(official_url).netloc not in {"www.apccolombia.gov.co", "portalservicios-apccolombia.gov.co"}:
+                if urlparse(official_url).netloc not in {
+                    "www.apccolombia.gov.co",
+                    "portalservicios-apccolombia.gov.co",
+                }:
                     continue
                 seen.add(official_url)
                 if _is_closed_text(title):
@@ -201,7 +225,10 @@ class ApcColombiaConnector:
     async def validate(self, candidate: OpportunityCandidate) -> ValidationResult:
         if not candidate.title or not candidate.official_url:
             return ValidationResult(ok=False, reason="Missing title or URL")
-        if "apccolombia.gov.co" not in candidate.official_url and "portalservicios-apccolombia.gov.co" not in candidate.official_url:
+        if (
+            "apccolombia.gov.co" not in candidate.official_url
+            and "portalservicios-apccolombia.gov.co" not in candidate.official_url
+        ):
             return ValidationResult(ok=False, reason="URL is outside APC Colombia")
         if _is_closed_text(f"{candidate.title} {candidate.summary} {candidate.raw_text}"):
             return ValidationResult(ok=False, reason="Opportunity appears closed")

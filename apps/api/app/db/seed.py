@@ -19,7 +19,9 @@ def _seed_admin_user(db, organization) -> None:
         return  # no password configured → skip
 
     existing = db.scalar(
-        select(User).where(User.email == admin_email, User.organization_id == organization.id).limit(1),
+        select(User)
+        .where(User.email == admin_email, User.organization_id == organization.id)
+        .limit(1),
     )
     if existing:
         return  # already seeded
@@ -307,7 +309,11 @@ def seed_default_sources(
             "region": "LatAm",
             "source_type": "html",
             "category": ["convocatorias", "innovacion", "emprendimiento"],
-            "allowed_domains": ["mincit.gov.co", "www.mincit.gov.co", "convocatoriasturismo.mincit.gov.co"],
+            "allowed_domains": [
+                "mincit.gov.co",
+                "www.mincit.gov.co",
+                "convocatoriasturismo.mincit.gov.co",
+            ],
             "scraping_frequency": "daily",
         },
         {
@@ -340,7 +346,12 @@ def seed_default_sources(
             "region": "Europe",
             "source_type": "api",
             "category": ["convocatorias", "health", "research"],
-            "allowed_domains": ["infosubvenciones.es", "www.infosubvenciones.es", "isciii.es", "www.isciii.es"],
+            "allowed_domains": [
+                "infosubvenciones.es",
+                "www.infosubvenciones.es",
+                "isciii.es",
+                "www.isciii.es",
+            ],
             "scraping_frequency": "daily",
         },
         {
@@ -351,7 +362,12 @@ def seed_default_sources(
             "region": "Europe",
             "source_type": "api",
             "category": ["convocatorias", "innovacion", "research"],
-            "allowed_domains": ["infosubvenciones.es", "www.infosubvenciones.es", "cdti.es", "www.cdti.es"],
+            "allowed_domains": [
+                "infosubvenciones.es",
+                "www.infosubvenciones.es",
+                "cdti.es",
+                "www.cdti.es",
+            ],
             "scraping_frequency": "daily",
         },
         {
@@ -417,7 +433,12 @@ def seed_default_sources(
             "region": "LatAm",
             "source_type": "html",
             "category": ["convocatorias", "exportacion", "turismo", "internacionalizacion"],
-            "allowed_domains": ["procolombia.co", "www.procolombia.co", "groovy-hickory-42b.notion.site", "drive.google.com"],
+            "allowed_domains": [
+                "procolombia.co",
+                "www.procolombia.co",
+                "groovy-hickory-42b.notion.site",
+                "drive.google.com",
+            ],
             "scraping_frequency": "weekly",
         },
         {
@@ -431,7 +452,6 @@ def seed_default_sources(
             "allowed_domains": ["anii.org.uy", "www.anii.org.uy"],
             "scraping_frequency": "daily",
         },
-
         # ================================================================
         # COLOMBIA — 30 new sources
         # ================================================================
@@ -607,7 +627,6 @@ def seed_default_sources(
             "allowed_domains": ["ccc.org.co", "www.ccc.org.co"],
             "scraping_frequency": "daily",
         },
-
         # ================================================================
         # LATINOAMÉRICA — 20 new sources
         # ================================================================
@@ -774,7 +793,6 @@ def seed_default_sources(
             "allowed_domains": ["parlatino.org", "www.parlatino.org"],
             "scraping_frequency": "weekly",
         },
-
         # ================================================================
         # MORE COLOMBIA — 15 adicionales
         # ================================================================
@@ -856,7 +874,6 @@ def seed_default_sources(
             "allowed_domains": ["camarabaq.org.co", "www.camarabaq.org.co"],
             "scraping_frequency": "daily",
         },
-
         # ================================================================
         # BRAZIL — 10 new sources (biggest LatAm funding ecosystem)
         # ================================================================
@@ -927,7 +944,6 @@ def seed_default_sources(
             "allowed_domains": ["gov.br", "anp.gov.br"],
             "scraping_frequency": "weekly",
         },
-
         # ================================================================
         # MORE INTERNATIONAL — 15 new sources
         # ================================================================
@@ -1192,39 +1208,92 @@ def seed_default_sources(
         source_type = defn.get("source_type", "html")
         # Strategic: proven high-quality connectors
         strategic = {
-            "grants-gov", "grants-gov-rss", "grants-gov-forecast", "simpler-grants",
-            "nsf-funding", "nsf-funding-rss", "minciencias", "icetex-vigentes",
-            "icetex-otras-becas", "innpulsa", "apc-colombia", "ukri-opportunities",
-            "wellcome-grants", "horizon-europe-sedia", "anii-uruguay",
-            "novo-nordisk-grants", "global-innovation-fund", "undef",
-            "unesco-call-for-proposals", "unwomen-innovate", "usaid-grants",
-            "eic-accelerator", "giz-funding", "procolombia-convocatorias",
-            "findeter-convocatorias", "fondecyt-chile", "conicet-argentina",
-            "fapesp-brasil", "cnpq-brasil", "developmentaid-tenders",
+            "grants-gov",
+            "grants-gov-rss",
+            "grants-gov-forecast",
+            "simpler-grants",
+            "nsf-funding",
+            "nsf-funding-rss",
+            "minciencias",
+            "icetex-vigentes",
+            "icetex-otras-becas",
+            "innpulsa",
+            "apc-colombia",
+            "ukri-opportunities",
+            "wellcome-grants",
+            "horizon-europe-sedia",
+            "anii-uruguay",
+            "novo-nordisk-grants",
+            "global-innovation-fund",
+            "undef",
+            "unesco-call-for-proposals",
+            "unwomen-innovate",
+            "usaid-grants",
+            "eic-accelerator",
+            "giz-funding",
+            "procolombia-convocatorias",
+            "findeter-convocatorias",
+            "fondecyt-chile",
+            "conicet-argentina",
+            "fapesp-brasil",
+            "cnpq-brasil",
+            "developmentaid-tenders",
         }
         # Complementary: useful but lower data quality
         complementary = {
-            "lundbeck-foundation", "velux-foundation", "idrc-funding",
-            "cdti-convocatorias", "isciii-convocatorias", "mincit-innovacion",
-            "mineducacion-becas", "uniandes-investigacion", "colfuturo-convocatorias",
-            "gates-foundation-grants", "dfg-grants", "colciencias-historico",
-            "universidad-nacional-colombia", "universidad-antioquia",
-            "camara-comercio-bogota", "camara-comercio-medellin",
-            "camara-comercio-cali", "concytec-peru", "conacyt-paraguay",
-            "bid-convocatorias", "oei-convocatorias", "cepal-convocatorias",
-            "camara-comercio-bquilla", "fapemig-brasil", "anp-brasil",
-            "undp-funding", "ford-foundation-grants", "rockefeller-foundation",
-            "mozilla-foundation", "interamerican-foundation",
-            "global-environment-facility", "green-climate-fund",
-            "sida-sweden", "norad-norway", "danida-denmark",
-            "darwin-initiative", "eureka-network-biotech",
-            "world-bank-procurement", "bancoldex-convocatorias",
-            "sena-convocatorias", "artesanias-colombia", "colombia-productiva",
-            "mintic-convocatorias", "minambiente-colombia",
-            "icbf-convocatorias", "supersolidaria-convocatorias",
-            "fondo-emprender-sena", "connect-bogota",
-            "innpulsa-colombia-startup", "procolombia-inversion",
-            "fapesp-pipe", "capes-brasil", "inct-brasil",
+            "lundbeck-foundation",
+            "velux-foundation",
+            "idrc-funding",
+            "cdti-convocatorias",
+            "isciii-convocatorias",
+            "mincit-innovacion",
+            "mineducacion-becas",
+            "uniandes-investigacion",
+            "colfuturo-convocatorias",
+            "gates-foundation-grants",
+            "dfg-grants",
+            "colciencias-historico",
+            "universidad-nacional-colombia",
+            "universidad-antioquia",
+            "camara-comercio-bogota",
+            "camara-comercio-medellin",
+            "camara-comercio-cali",
+            "concytec-peru",
+            "conacyt-paraguay",
+            "bid-convocatorias",
+            "oei-convocatorias",
+            "cepal-convocatorias",
+            "camara-comercio-bquilla",
+            "fapemig-brasil",
+            "anp-brasil",
+            "undp-funding",
+            "ford-foundation-grants",
+            "rockefeller-foundation",
+            "mozilla-foundation",
+            "interamerican-foundation",
+            "global-environment-facility",
+            "green-climate-fund",
+            "sida-sweden",
+            "norad-norway",
+            "danida-denmark",
+            "darwin-initiative",
+            "eureka-network-biotech",
+            "world-bank-procurement",
+            "bancoldex-convocatorias",
+            "sena-convocatorias",
+            "artesanias-colombia",
+            "colombia-productiva",
+            "mintic-convocatorias",
+            "minambiente-colombia",
+            "icbf-convocatorias",
+            "supersolidaria-convocatorias",
+            "fondo-emprender-sena",
+            "connect-bogota",
+            "innpulsa-colombia-startup",
+            "procolombia-inversion",
+            "fapesp-pipe",
+            "capes-brasil",
+            "inct-brasil",
         }
         if key in strategic:
             return "strategic"
@@ -1285,7 +1354,9 @@ def seed() -> None:
     create_all()
     db = SessionLocal()
     try:
-        organization = db.scalar(select(Organization).where(Organization.slug == "convocaradar-local"))
+        organization = db.scalar(
+            select(Organization).where(Organization.slug == "convocaradar-local")
+        )
         if not organization:
             organization = Organization(
                 name="ConvocaRadar Local",
@@ -1303,7 +1374,12 @@ def seed() -> None:
                     country="Colombia",
                     regions_of_interest=["LatAm", "Global"],
                     organization_type="university",
-                    areas_of_interest=["innovacion", "investigacion", "inteligencia artificial", "sostenibilidad"],
+                    areas_of_interest=[
+                        "innovacion",
+                        "investigacion",
+                        "inteligencia artificial",
+                        "sostenibilidad",
+                    ],
                     funding_types=["grant", "cofinancing", "award"],
                     min_funding_amount=10000000,
                     max_funding_amount=500000000,
@@ -1332,4 +1408,3 @@ def seed() -> None:
 
 if __name__ == "__main__":
     seed()
-

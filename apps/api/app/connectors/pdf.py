@@ -6,6 +6,7 @@ from datetime import datetime
 
 try:
     from pypdf import PdfReader
+
     HAS_PYPDF = True
 except ImportError:
     HAS_PYPDF = False
@@ -87,9 +88,27 @@ def _split_sections(text: str) -> list[str]:
             and len(line) <= 120
             and not line.endswith(".")
             and (
-                re.match(r"^(call|convocatoria|grant|funding|opportunity|scholarship|beca|program)", normalized)
+                re.match(
+                    r"^(call|convocatoria|grant|funding|opportunity|scholarship|beca|program)",
+                    normalized,
+                )
                 or ("call" in normalized and any(char.isdigit() for char in normalized))
-                or (any(char.isdigit() for char in normalized) and any(keyword in normalized for keyword in ("grant", "fund", "award", "opportunity", "scholarship", "program", "convocatoria", "beca")))
+                or (
+                    any(char.isdigit() for char in normalized)
+                    and any(
+                        keyword in normalized
+                        for keyword in (
+                            "grant",
+                            "fund",
+                            "award",
+                            "opportunity",
+                            "scholarship",
+                            "program",
+                            "convocatoria",
+                            "beca",
+                        )
+                    )
+                )
             )
         )
         if len(current) >= 8 or (current and looks_like_title):
@@ -108,8 +127,15 @@ class PdfConnector:
         self.base_url = base_url
 
     async def fetch(self) -> RawSourceResult:
-        final_url, content, content_type = await fetch_httpx_bytes(self.base_url, fallback_content_type="application/pdf")
-        return RawSourceResult(source_key=self.source_key, url=final_url, content=content.decode("latin-1", errors="ignore"), content_type=content_type)
+        final_url, content, content_type = await fetch_httpx_bytes(
+            self.base_url, fallback_content_type="application/pdf"
+        )
+        return RawSourceResult(
+            source_key=self.source_key,
+            url=final_url,
+            content=content.decode("latin-1", errors="ignore"),
+            content_type=content_type,
+        )
 
     def _extract_text(self, raw: RawSourceResult) -> str:
         if not HAS_PYPDF:
@@ -130,12 +156,21 @@ class PdfConnector:
             candidate = line.strip(" -*:•")
             lowered = normalize_text(candidate)
             words = len(candidate.split())
-            if 2 <= words <= 12 and 8 <= len(candidate) <= 120 and not lowered.startswith("close date") and not candidate.endswith("."):
+            if (
+                2 <= words <= 12
+                and 8 <= len(candidate) <= 120
+                and not lowered.startswith("close date")
+                and not candidate.endswith(".")
+            ):
                 return candidate
         for line in lines[:6]:
             candidate = line.strip(" -*:•")
             lowered = normalize_text(candidate)
-            if 2 <= len(candidate.split()) <= 12 and 8 <= len(candidate) <= 120 and not lowered.startswith("close date"):
+            if (
+                2 <= len(candidate.split()) <= 12
+                and 8 <= len(candidate) <= 120
+                and not lowered.startswith("close date")
+            ):
                 return candidate
         return fallback
 
@@ -155,7 +190,21 @@ class PdfConnector:
             if not section_clean:
                 continue
             lowered = normalize_text(section_clean)
-            if not any(keyword in lowered for keyword in ("grant", "funding", "funded", "award", "research", "science", "innovation", "convocatoria", "beca", "call")):
+            if not any(
+                keyword in lowered
+                for keyword in (
+                    "grant",
+                    "funding",
+                    "funded",
+                    "award",
+                    "research",
+                    "science",
+                    "innovation",
+                    "convocatoria",
+                    "beca",
+                    "call",
+                )
+            ):
                 continue
             title = self._title_from_section(section, normalized[:140])
             if title in seen:

@@ -4,6 +4,7 @@ Guards against duplicate runs for the same source:
 if a SourceRun with status='running' already exists, the call is skipped.
 Also handles auto-recovery for paused sources after a cooldown period.
 """
+
 from __future__ import annotations
 
 from datetime import UTC, datetime
@@ -18,9 +19,7 @@ from app.scraper.runner import run_source_inline
 _AUTO_PAUSE_COOLDOWN_HOURS = 24
 
 
-async def run_source(
-    db, source: Source, organization_id: str | None = None
-) -> SourceRun | None:
+async def run_source(db, source: Source, organization_id: str | None = None) -> SourceRun | None:
     """Dispatch a source scrape — runs inline.
 
     Checks for an existing running SourceRun before delegating.
@@ -39,6 +38,7 @@ async def run_source(
                 source.consecutive_empty_runs = 0
                 source.selector_failures = 0
                 import structlog
+
                 structlog.get_logger(__name__).info(
                     "source_auto_reactivated",
                     source_key=source.key,

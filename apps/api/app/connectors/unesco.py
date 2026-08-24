@@ -15,7 +15,6 @@ from app.connectors.common import clean_text, fetch_httpx_text, parse_date_text
 UNESCO_HOSTS = {"unesco.org", "www.unesco.org"}
 
 
-
 def _title_from(container) -> str:
     heading = container.css_first("h1, h2, h3, h4")
     if heading:
@@ -48,8 +47,12 @@ class UNESCOConnector:
         self.base_url = base_url or "https://www.unesco.org/en/articles/call-proposals"
 
     async def fetch(self) -> RawSourceResult:
-        final_url, content, content_type = await fetch_httpx_text(self.base_url, fallback_content_type="text/html")
-        return RawSourceResult(source_key=self.source_key, url=final_url, content=content, content_type=content_type)
+        final_url, content, content_type = await fetch_httpx_text(
+            self.base_url, fallback_content_type="text/html"
+        )
+        return RawSourceResult(
+            source_key=self.source_key, url=final_url, content=content, content_type=content_type
+        )
 
     async def parse(self, raw: RawSourceResult) -> list[OpportunityCandidate]:
         tree = HTMLParser(raw.content)
@@ -93,7 +96,10 @@ class UNESCOConnector:
         if not candidates:
             page_text = clean_text(tree.text())
             if any(keyword in page_text.lower() for keyword in keywords):
-                title = clean_text(_title_from(tree) if hasattr(tree, "css_first") else "") or "UNESCO Call for Proposals"
+                title = (
+                    clean_text(_title_from(tree) if hasattr(tree, "css_first") else "")
+                    or "UNESCO Call for Proposals"
+                )
                 if "@" in title or title.lower().startswith("mailto:"):
                     title = "UNESCO Call for Proposals"
                 close_date = parse_date_text(page_text)

@@ -14,7 +14,9 @@ from app.connectors.common import fetch_httpx_text
 from app.connectors.registry import register
 
 WORLD_BANK_API_URL = "https://search.worldbank.org/api/v2/procnotices"
-WORLD_BANK_DETAIL_URL = "https://projects.worldbank.org/en/projects-operations/procurement-detail/{id}"
+WORLD_BANK_DETAIL_URL = (
+    "https://projects.worldbank.org/en/projects-operations/procurement-detail/{id}"
+)
 
 
 def _parse_wb_date(value: str | None) -> datetime | None:
@@ -91,7 +93,9 @@ class WorldBankConnector:
                     summary=project_name or title,
                     categories=categories,
                     topics=["world-bank-procurement"],
-                    raw_text=notice_text[:3000] if notice_text else json.dumps(item, ensure_ascii=False),
+                    raw_text=notice_text[:3000]
+                    if notice_text
+                    else json.dumps(item, ensure_ascii=False),
                     confidence_score=0.85,
                     close_date=close_date,
                 )

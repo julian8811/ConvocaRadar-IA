@@ -10,6 +10,7 @@ Covers:
 - 4.4.5: Timeout on fetch/parse within 15s
 - 4.4.6: ProbeReport structure and counts
 """
+
 from __future__ import annotations
 
 import os
@@ -53,7 +54,9 @@ def db(_seed):
 # ---------------------------------------------------------------------------
 
 
-def _make_mock_connector(fetch_result=None, parse_result=None, fetch_side_effect=None, parse_side_effect=None):
+def _make_mock_connector(
+    fetch_result=None, parse_result=None, fetch_side_effect=None, parse_side_effect=None
+):
     """Build a mock connector object with async fetch/parse."""
     mock = MagicMock()
     mock.fetch = AsyncMock(return_value=fetch_result, side_effect=fetch_side_effect)
@@ -63,7 +66,10 @@ def _make_mock_connector(fetch_result=None, parse_result=None, fetch_side_effect
 
 class FakeRawResult:
     """Minimal stand-in for connector fetch() return value."""
-    def __init__(self, url="https://example.com/data", content_type="text/html", content="<html></html>"):
+
+    def __init__(
+        self, url="https://example.com/data", content_type="text/html", content="<html></html>"
+    ):
         self.url = url
         self.content_type = content_type
         self.content = content
@@ -71,6 +77,7 @@ class FakeRawResult:
 
 class FakeCandidate:
     """Minimal stand-in for a parsed candidate."""
+
     def __init__(self, title="Test Opportunity"):
         self.title = title
         self.summary = ""
@@ -312,9 +319,7 @@ async def test_undp_seed_definition_has_connector_config():
 
     session = SessionLocal()
     try:
-        source = session.scalar(
-            select(Source).where(Source.key == "undp-funding").limit(1)
-        )
+        source = session.scalar(select(Source).where(Source.key == "undp-funding").limit(1))
         assert source is not None, "undp-funding not found in seeded DB"
         cc = source.connector_config
         assert cc is not None, "undp Source.connector_config is None"

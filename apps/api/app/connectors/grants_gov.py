@@ -49,7 +49,9 @@ class GrantsGovConnector:
                 timeout_seconds=30,
             )
         except Exception:
-            final_url, content, content_type = await fetch_httpx_text(GRANTS_GOV_SEARCH_PAGE, fallback_content_type="text/html")
+            final_url, content, content_type = await fetch_httpx_text(
+                GRANTS_GOV_SEARCH_PAGE, fallback_content_type="text/html"
+            )
         return RawSourceResult(
             source_key=self.source_key,
             url=final_url,
@@ -80,7 +82,16 @@ class GrantsGovConnector:
             number = str(hit.get("number") or "").strip()
             status = str(hit.get("oppStatus") or "").strip()
             alns = ", ".join(hit.get("alnist") or [])
-            summary_parts = [part for part in [number, agency, f"Status: {status}" if status else "", f"ALN: {alns}" if alns else ""] if part]
+            summary_parts = [
+                part
+                for part in [
+                    number,
+                    agency,
+                    f"Status: {status}" if status else "",
+                    f"ALN: {alns}" if alns else "",
+                ]
+                if part
+            ]
             candidates.append(
                 OpportunityCandidate(
                     title=title[:180],
@@ -101,6 +112,8 @@ class GrantsGovConnector:
     async def validate(self, candidate: OpportunityCandidate) -> ValidationResult:
         if not candidate.title:
             return ValidationResult(ok=False, reason="Missing title")
-        if not candidate.official_url.startswith(("https://www.grants.gov/", "https://simpler.grants.gov/")):
+        if not candidate.official_url.startswith(
+            ("https://www.grants.gov/", "https://simpler.grants.gov/")
+        ):
             return ValidationResult(ok=False, reason="Unexpected official URL")
         return ValidationResult(ok=True)

@@ -30,7 +30,13 @@ SOURCE_ENTITIES = {
     "innovamos-fid": "Innovamos - Fondo para la Innovacion en el Desarrollo",
 }
 JS_RENDER_MARKERS = ('ng-app="nosune"', "call.model")
-RENDERED_MARKERS = ("txt-organization", "openClose-deadline", "wrap-deadline", "carousel-content", "globalinnovation.fund")
+RENDERED_MARKERS = (
+    "txt-organization",
+    "openClose-deadline",
+    "wrap-deadline",
+    "carousel-content",
+    "globalinnovation.fund",
+)
 INNOVAMOS_RENDER_SELECTOR = "h1, .txt-organization, .openClose-deadline, .wrap-deadline"
 
 
@@ -152,7 +158,9 @@ class InnovamosConnector:
         if not content:
             raise RuntimeError("Innovamos page unavailable")
 
-        return RawSourceResult(source_key=self.source_key, url=final_url, content=content, content_type=content_type)
+        return RawSourceResult(
+            source_key=self.source_key, url=final_url, content=content, content_type=content_type
+        )
 
     def _candidate_from_rendered_page(self, raw: RawSourceResult) -> OpportunityCandidate | None:
         tree = HTMLParser(raw.content)
@@ -193,7 +201,12 @@ class InnovamosConnector:
             if not href:
                 continue
             official_url = urljoin(raw.url, href)
-            if urlparse(official_url).netloc not in {"www.innovamos.gov.co", "innovamos.gov.co", "www.globalinnovation.fund", "globalinnovation.fund"}:
+            if urlparse(official_url).netloc not in {
+                "www.innovamos.gov.co",
+                "innovamos.gov.co",
+                "www.globalinnovation.fund",
+                "globalinnovation.fund",
+            }:
                 continue
             if text:
                 links.append(official_url)
@@ -209,10 +222,16 @@ class InnovamosConnector:
         for label in ("Descripción", "Objetivo"):
             idx = body_text.find(label)
             if idx != -1:
-                summary_parts.append(body_text[idx + len(label): idx + len(label) + 700].strip(" :\n"))
+                summary_parts.append(
+                    body_text[idx + len(label) : idx + len(label) + 700].strip(" :\n")
+                )
         summary = " ".join(part for part in summary_parts if part) or body_text[:900] or title
         categories = _categories_from_text(merged_text) or ["innovacion", "financiacion"]
-        country = "International" if "cualquier país" in merged_text.lower() or "any country" in merged_text.lower() else "Colombia"
+        country = (
+            "International"
+            if "cualquier país" in merged_text.lower() or "any country" in merged_text.lower()
+            else "Colombia"
+        )
         requirements = []
         if "inglés" in merged_text.lower() or "ingles" in merged_text.lower():
             requirements.append("Manejo del idioma inglés")
@@ -262,7 +281,12 @@ class InnovamosConnector:
         official_url = urljoin(raw_url, href) if href else raw_url
         raw_host = urlparse(raw_url).netloc.lower()
         official_host = urlparse(official_url).netloc.lower()
-        if official_host and raw_host and official_host != raw_host and not official_host.endswith(f".{raw_host}"):
+        if (
+            official_host
+            and raw_host
+            and official_host != raw_host
+            and not official_host.endswith(f".{raw_host}")
+        ):
             return None
         summary = text.replace(title, "", 1).strip(" -*:")
         categories = _categories_from_text(lowered) or ["innovacion", "financiacion"]
@@ -289,7 +313,15 @@ class InnovamosConnector:
         tree = HTMLParser(raw.content)
         candidates: list[OpportunityCandidate] = []
         seen: set[str] = set()
-        selectors = ("article", "section", "li", ".card", ".views-row", ".field--item", ".content-block")
+        selectors = (
+            "article",
+            "section",
+            "li",
+            ".card",
+            ".views-row",
+            ".field--item",
+            ".content-block",
+        )
         for selector in selectors:
             for container in tree.css(selector):
                 candidate = self._candidate_from_container(container, raw.url)
@@ -328,6 +360,11 @@ class InnovamosConnector:
     async def validate(self, candidate: OpportunityCandidate) -> ValidationResult:
         if not candidate.title or not candidate.official_url:
             return ValidationResult(ok=False, reason="Missing title or URL")
-        if urlparse(candidate.official_url).netloc not in {"www.innovamos.gov.co", "innovamos.gov.co", "www.globalinnovation.fund", "globalinnovation.fund"}:
+        if urlparse(candidate.official_url).netloc not in {
+            "www.innovamos.gov.co",
+            "innovamos.gov.co",
+            "www.globalinnovation.fund",
+            "globalinnovation.fund",
+        }:
             return ValidationResult(ok=False, reason="URL is outside Innovamos")
         return ValidationResult(ok=True)

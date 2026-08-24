@@ -19,4 +19,6 @@ class ManualConnector:
         return []
 
     async def validate(self, candidate: OpportunityCandidate) -> ValidationResult:
-        return ValidationResult(ok=False, reason="Manual sources are curated outside automated scraping")
+        return ValidationResult(
+            ok=False, reason="Manual sources are curated outside automated scraping"
+        )

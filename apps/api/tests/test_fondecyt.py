@@ -84,7 +84,9 @@ class TestFondecytConnectorConfig:
         from app.connectors.factory import connector_for
 
         connector = connector_for(
-            FONDECYT_KEY, FONDECYT_URL, "html",
+            FONDECYT_KEY,
+            FONDECYT_URL,
+            "html",
             entity_name="FONDECYT",
             default_country="Chile",
             connector_config=FONDECYT_CONFIG,
@@ -99,13 +101,13 @@ class TestFondecytParse:
     @pytest.mark.asyncio
     async def test_fetch_and_parse_yields_candidates(self, monkeypatch):
         """Happy path: at least 2 candidates from sample HTML."""
-        mock = AsyncMock(
-            return_value=(FONDECYT_URL, SAMPLE_HTML, "text/html")
-        )
+        mock = AsyncMock(return_value=(FONDECYT_URL, SAMPLE_HTML, "text/html"))
         monkeypatch.setattr("app.connectors.common.fetch_httpx_text", mock)
 
         connector = ConfigurableHtmlConnector(
-            FONDECYT_KEY, FONDECYT_URL, FONDECYT_CONFIG,
+            FONDECYT_KEY,
+            FONDECYT_URL,
+            FONDECYT_CONFIG,
             entity_name="FONDECYT",
             default_country="Chile",
         )
@@ -120,13 +122,13 @@ class TestFondecytParse:
     @pytest.mark.asyncio
     async def test_fetch_and_parse_skips_closed(self, monkeypatch):
         """Convocatorias with past close dates are filtered out."""
-        mock = AsyncMock(
-            return_value=(FONDECYT_URL, SAMPLE_HTML, "text/html")
-        )
+        mock = AsyncMock(return_value=(FONDECYT_URL, SAMPLE_HTML, "text/html"))
         monkeypatch.setattr("app.connectors.common.fetch_httpx_text", mock)
 
         connector = ConfigurableHtmlConnector(
-            FONDECYT_KEY, FONDECYT_URL, FONDECYT_CONFIG,
+            FONDECYT_KEY,
+            FONDECYT_URL,
+            FONDECYT_CONFIG,
             entity_name="FONDECYT",
             default_country="Chile",
         )
@@ -139,13 +141,13 @@ class TestFondecytParse:
     @pytest.mark.asyncio
     async def test_empty_html_returns_empty_list(self, monkeypatch):
         """When the page has no .jet-listing-grid__item, parse returns []."""
-        mock = AsyncMock(
-            return_value=(FONDECYT_URL, EMPTY_HTML, "text/html")
-        )
+        mock = AsyncMock(return_value=(FONDECYT_URL, EMPTY_HTML, "text/html"))
         monkeypatch.setattr("app.connectors.common.fetch_httpx_text", mock)
 
         connector = ConfigurableHtmlConnector(
-            FONDECYT_KEY, FONDECYT_URL, FONDECYT_CONFIG,
+            FONDECYT_KEY,
+            FONDECYT_URL,
+            FONDECYT_CONFIG,
             entity_name="FONDECYT",
             default_country="Chile",
         )
@@ -156,13 +158,13 @@ class TestFondecytParse:
     @pytest.mark.asyncio
     async def test_garbage_html_does_not_raise(self, monkeypatch):
         """Malformed HTML should not cause parse() to raise."""
-        mock = AsyncMock(
-            return_value=(FONDECYT_URL, GARBAGE_HTML, "text/html")
-        )
+        mock = AsyncMock(return_value=(FONDECYT_URL, GARBAGE_HTML, "text/html"))
         monkeypatch.setattr("app.connectors.common.fetch_httpx_text", mock)
 
         connector = ConfigurableHtmlConnector(
-            FONDECYT_KEY, FONDECYT_URL, FONDECYT_CONFIG,
+            FONDECYT_KEY,
+            FONDECYT_URL,
+            FONDECYT_CONFIG,
             entity_name="FONDECYT",
             default_country="Chile",
         )
@@ -176,13 +178,13 @@ class TestFondecytParse:
     @pytest.mark.asyncio
     async def test_selectors_diagnostics_tracked(self, monkeypatch):
         """After parse, selector_diagnostics shows which selectors matched."""
-        mock = AsyncMock(
-            return_value=(FONDECYT_URL, SAMPLE_HTML, "text/html")
-        )
+        mock = AsyncMock(return_value=(FONDECYT_URL, SAMPLE_HTML, "text/html"))
         monkeypatch.setattr("app.connectors.common.fetch_httpx_text", mock)
 
         connector = ConfigurableHtmlConnector(
-            FONDECYT_KEY, FONDECYT_URL, FONDECYT_CONFIG,
+            FONDECYT_KEY,
+            FONDECYT_URL,
+            FONDECYT_CONFIG,
             entity_name="FONDECYT",
             default_country="Chile",
         )

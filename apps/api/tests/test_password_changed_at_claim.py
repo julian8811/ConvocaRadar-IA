@@ -30,7 +30,9 @@ from app.main import app
 from app.models import Organization, Role, User
 
 
-def _create_user_with_pca(*, email: str, password: str, password_changed_at: datetime | None) -> str:
+def _create_user_with_pca(
+    *, email: str, password: str, password_changed_at: datetime | None
+) -> str:
     """Create a user with a controlled ``password_changed_at`` value.
 
     Returns the user_id. The value can be None (never changed) or any
@@ -117,9 +119,7 @@ def test_get_current_user_rejects_token_with_stale_password_changed_at_claim() -
         "invalidated" in detail.lower()
         or "password change" in detail.lower()
         or "password_changed_at" in detail.lower()
-    ), (
-        f"Expected 401 detail to mention password change, got {detail!r}."
-    )
+    ), f"Expected 401 detail to mention password change, got {detail!r}."
 
 
 def test_get_current_user_accepts_token_with_matching_password_changed_at_claim() -> None:

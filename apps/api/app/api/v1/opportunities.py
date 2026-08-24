@@ -11,7 +11,14 @@ from app.api.deps import get_current_organization, get_current_profile, get_curr
 from app.core.config import get_settings
 from app.core.storage import delete_object, put_bytes, read_bytes
 from app.db.session import get_db
-from app.models import Opportunity, OpportunityDocument, OpportunityScore, Organization, OrganizationProfile, User
+from app.models import (
+    Opportunity,
+    OpportunityDocument,
+    OpportunityScore,
+    Organization,
+    OrganizationProfile,
+    User,
+)
 from app.schemas import (
     OpportunityDocumentRead,
     OpportunityList,
@@ -45,11 +52,19 @@ ALLOWED_UPLOAD_TYPES = {
 
 
 def _opportunity_scope(organization_id: str):
-    return (Opportunity.organization_id == organization_id) | (Opportunity.organization_id.is_(None))
+    return (Opportunity.organization_id == organization_id) | (
+        Opportunity.organization_id.is_(None)
+    )
 
 
-def _get_opportunity_for_org(db: Session, opportunity_id: str, organization: Organization) -> Opportunity:
-    opportunity = db.scalar(select(Opportunity).where(Opportunity.id == opportunity_id, _opportunity_scope(organization.id)))
+def _get_opportunity_for_org(
+    db: Session, opportunity_id: str, organization: Organization
+) -> Opportunity:
+    opportunity = db.scalar(
+        select(Opportunity).where(
+            Opportunity.id == opportunity_id, _opportunity_scope(organization.id)
+        )
+    )
     if not opportunity:
         raise HTTPException(status_code=404, detail="Opportunity not found")
     if is_noise_payload(opportunity.title, opportunity.summary, opportunity.raw_text):
@@ -57,7 +72,9 @@ def _get_opportunity_for_org(db: Session, opportunity_id: str, organization: Org
     return opportunity
 
 
-def _get_document_for_org(db: Session, document_id: str, organization: Organization) -> OpportunityDocument:
+def _get_document_for_org(
+    db: Session, document_id: str, organization: Organization
+) -> OpportunityDocument:
     document = db.scalar(
         select(OpportunityDocument)
         .join(Opportunity, Opportunity.id == OpportunityDocument.opportunity_id)
@@ -82,11 +99,15 @@ def list_opportunities(
     max_amount: float | None = None,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=25, ge=1, le=100),
-    include_closed: bool = Query(default=False, description="Include closed opportunities (past close_date)"),
-    include_no_url: bool = Query(default=False, description="Include opportunities without official_url"),
+    include_closed: bool = Query(
+        default=False, description="Include closed opportunities (past close_date)"
+    ),
+    include_no_url: bool = Query(
+        default=False, description="Include opportunities without official_url"
+    ),
     organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
-    ) -> OpportunityList:
+) -> OpportunityList:
     stmt = build_opportunity_query(
         organization.id,
         country=country,
@@ -117,7 +138,10 @@ async def semantic_search(
     matches = await semantic_search_opportunities(db, organization.id, query, limit=limit)
     return OpportunitySemanticList(
         query=query,
-        items=[{"opportunity": opportunity, "similarity": similarity} for opportunity, similarity in matches],
+        items=[
+            {"opportunity": opportunity, "similarity": similarity}
+            for opportunity, similarity in matches
+        ],
     )
 
 
@@ -134,20 +158,26 @@ def export_opportunities(
     close_date, funding_amount, official_url.
     """
     scope = _opportunity_scope(organization.id)
-    opportunities = list(db.scalars(select(Opportunity).where(scope).order_by(Opportunity.created_at.desc())))
+    opportunities = list(
+        db.scalars(select(Opportunity).where(scope).order_by(Opportunity.created_at.desc()))
+    )
 
     if format == "xlsx":
         content = export_xlsx(opportunities)
         return Response(
             content,
             media_type="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-            headers={"Content-Disposition": f"attachment; filename=convocatorias_{datetime.now(UTC).date().isoformat()}.xlsx"},
+            headers={
+                "Content-Disposition": f"attachment; filename=convocatorias_{datetime.now(UTC).date().isoformat()}.xlsx"
+            },
         )
     content = export_csv(opportunities)
     return Response(
         content,
         media_type="text/csv",
-        headers={"Content-Disposition": f"attachment; filename=convocatorias_{datetime.now(UTC).date().isoformat()}.csv"},
+        headers={
+            "Content-Disposition": f"attachment; filename=convocatorias_{datetime.now(UTC).date().isoformat()}.csv"
+        },
     )
 
 
@@ -172,7 +202,9 @@ async def update_opportunity(
     for key, value in payload.model_dump(exclude_unset=True).items():
         setattr(opportunity, key, value)
     await upsert_opportunity_embedding(db, opportunity)
-    profile = db.scalar(select(OrganizationProfile).where(OrganizationProfile.organization_id == organization.id))
+    profile = db.scalar(
+        select(OrganizationProfile).where(OrganizationProfile.organization_id == organization.id)
+    )
     if profile:
         calculate_score(db, opportunity, profile)
     audit(db, "update_opportunity", "opportunity", user, opportunity.id)
@@ -302,7 +334,9 @@ async def reanalyze_all_opportunities(
     return {"processed": processed, "updated": updated, "rescored": rescored}
 
 
-@router.get("/opportunities/{opportunity_id}/documents", response_model=list[OpportunityDocumentRead])
+@router.get(
+    "/opportunities/{opportunity_id}/documents", response_model=list[OpportunityDocumentRead]
+)
 def list_documents(
     opportunity_id: str,
     organization: Organization = Depends(get_current_organization),
@@ -348,7 +382,9 @@ async def upload_document(
         file_type=content_type,
         storage_path=stored.storage_path,
         checksum=checksum,
-        text_content=content[:5000].decode("utf-8", errors="ignore") if content_type.startswith("text/") else "",
+        text_content=content[:5000].decode("utf-8", errors="ignore")
+        if content_type.startswith("text/")
+        else "",
     )
     db.add(document)
     db.flush()
@@ -385,8 +421,12 @@ async def check_opportunity_urls(
     from app.services import url_is_reachable
 
     return {
-        "official_url": url_is_reachable(opportunity.official_url) if opportunity.official_url else False,
-        "application_url": url_is_reachable(opportunity.application_url) if opportunity.application_url else False,
+        "official_url": url_is_reachable(opportunity.official_url)
+        if opportunity.official_url
+        else False,
+        "application_url": url_is_reachable(opportunity.application_url)
+        if opportunity.application_url
+        else False,
     }
 
 

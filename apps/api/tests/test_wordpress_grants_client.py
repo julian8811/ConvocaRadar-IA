@@ -2,6 +2,7 @@
 
 Strict TDD: tests written FIRST, implementation follows.
 """
+
 from __future__ import annotations
 
 from unittest.mock import AsyncMock, MagicMock, patch
@@ -24,11 +25,15 @@ class TestWordPressGrantsConnectorUsesGlobalClient:
             entity_name="Test Source",
         )
 
-        with patch("app.connectors.wordpress_grants.http_client", new_callable=AsyncMock) as mock_http_client:
+        with patch(
+            "app.connectors.wordpress_grants.http_client", new_callable=AsyncMock
+        ) as mock_http_client:
             mock_client = AsyncMock()
             # First request returns a page with 1 item, then empty to stop pagination
             page1_response = AsyncMock()
-            page1_response.json = MagicMock(return_value=[{"id": 1, "title": "Grant 1", "status": "publish"}])
+            page1_response.json = MagicMock(
+                return_value=[{"id": 1, "title": "Grant 1", "status": "publish"}]
+            )
             page1_response.headers = {"X-WP-TotalPages": "1"}
             page1_response.raise_for_status = MagicMock()
             page1_response.url = "https://test.example.com/wp-json/wp/v2/posts?page=1"
@@ -61,10 +66,14 @@ class TestWordPressGrantsConnectorUsesGlobalClient:
             entity_name="Test Source",
         )
 
-        with patch("app.connectors.wordpress_grants.http_client", new_callable=AsyncMock) as mock_http_client:
+        with patch(
+            "app.connectors.wordpress_grants.http_client", new_callable=AsyncMock
+        ) as mock_http_client:
             mock_client = AsyncMock()
             page1_response = AsyncMock()
-            page1_response.json = MagicMock(return_value=[{"id": 1, "title": "Grant 1", "status": "publish"}])
+            page1_response.json = MagicMock(
+                return_value=[{"id": 1, "title": "Grant 1", "status": "publish"}]
+            )
             page1_response.headers = {"X-WP-TotalPages": "1"}
             page1_response.raise_for_status = MagicMock()
             page1_response.url = "https://test.example.com/wp-json/wp/v2/posts?page=1"

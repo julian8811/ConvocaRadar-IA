@@ -93,6 +93,7 @@ CONNECTOR_URL = "http://example.com"
 # 1. Config parsing (HtmlConnectorConfig)
 # ═══════════════════════════════════════════════════════════════
 
+
 class TestHtmlConnectorConfig:
     """HtmlConnectorConfig parsing from dicts and JSON strings."""
 
@@ -111,7 +112,13 @@ class TestHtmlConnectorConfig:
         """Only required fields — pagination defaults to None."""
         config = HtmlConnectorConfig.from_dict(dict(VALID_CONFIG))
         assert config.pagination is None
-        for field in ("list_selectors", "title_selectors", "link_selectors", "content_selectors", "date_labels"):
+        for field in (
+            "list_selectors",
+            "title_selectors",
+            "link_selectors",
+            "content_selectors",
+            "date_labels",
+        ):
             assert getattr(config, field, None) is not None
 
     def test_empty_dict_raises_value_error(self):
@@ -122,10 +129,12 @@ class TestHtmlConnectorConfig:
     def test_empty_selector_lists_raises_value_error(self):
         """An empty list_selectors list should be rejected."""
         with pytest.raises(ValueError, match="empty|at least one"):
-            HtmlConnectorConfig.from_dict({
-                **VALID_CONFIG,
-                "list_selectors": [],
-            })
+            HtmlConnectorConfig.from_dict(
+                {
+                    **VALID_CONFIG,
+                    "list_selectors": [],
+                }
+            )
 
     def test_from_valid_json_string(self):
         """Parsing from a JSON string works."""
@@ -147,6 +156,7 @@ class TestHtmlConnectorConfig:
 # 2. Connector initialization
 # ═══════════════════════════════════════════════════════════════
 
+
 class TestConfigurableHtmlConnectorInit:
     """ConfigurableHtmlConnector construction."""
 
@@ -165,7 +175,9 @@ class TestConfigurableHtmlConnectorInit:
     def test_custom_entity_name_used(self):
         """Explicit entity_name is stored."""
         connector = ConfigurableHtmlConnector(
-            CONNECTOR_KEY, CONNECTOR_URL, VALID_CONFIG,
+            CONNECTOR_KEY,
+            CONNECTOR_URL,
+            VALID_CONFIG,
             entity_name="Custom Entity",
         )
         assert connector._entity_name == "Custom Entity"
@@ -178,7 +190,9 @@ class TestConfigurableHtmlConnectorInit:
     def test_custom_default_country(self):
         """Explicit default_country is stored."""
         connector = ConfigurableHtmlConnector(
-            CONNECTOR_KEY, CONNECTOR_URL, VALID_CONFIG,
+            CONNECTOR_KEY,
+            CONNECTOR_URL,
+            VALID_CONFIG,
             default_country="Colombia",
         )
         assert connector._default_country == "Colombia"
@@ -187,6 +201,7 @@ class TestConfigurableHtmlConnectorInit:
 # ═══════════════════════════════════════════════════════════════
 # 3. Selector fallback chain
 # ═══════════════════════════════════════════════════════════════
+
 
 class TestSelectorFallback:
     """Each selector group is tried in order; the first match wins."""
@@ -269,6 +284,7 @@ class TestSelectorFallback:
 # 4. Pagination
 # ═══════════════════════════════════════════════════════════════
 
+
 class TestPagination:
     """Pagination modes: next_link."""
 
@@ -319,6 +335,7 @@ class TestPagination:
 # 5. Embedded JSON extraction (JSON-LD, __NEXT_DATA__)
 # ═══════════════════════════════════════════════════════════════
 
+
 class TestEmbeddedJSON:
     """Connector extracts structured data from embedded JSON before HTML parsing."""
 
@@ -353,6 +370,7 @@ class TestEmbeddedJSON:
 # 6. Detail page enrichment
 # ═══════════════════════════════════════════════════════════════
 
+
 class TestDetailEnrichment:
     """Low-confidence candidates enriched via detail page fetch."""
 
@@ -384,6 +402,7 @@ class TestDetailEnrichment:
 # 7. Factory routing
 # ═══════════════════════════════════════════════════════════════
 
+
 class TestFactoryRouting:
     """connector_for returns ConfigurableHtmlConnector when given connector_config."""
 
@@ -392,7 +411,9 @@ class TestFactoryRouting:
         from app.connectors.factory import connector_for
 
         connector = connector_for(
-            CONNECTOR_KEY, CONNECTOR_URL, "html",
+            CONNECTOR_KEY,
+            CONNECTOR_URL,
+            "html",
             connector_config=VALID_CONFIG,
         )
         assert isinstance(connector, ConfigurableHtmlConnector)
@@ -410,7 +431,9 @@ class TestFactoryRouting:
 
         config = {**VALID_CONFIG, "pagination": {"type": "next_link", "selector": "a.next"}}
         connector = connector_for(
-            CONNECTOR_KEY, CONNECTOR_URL, "html",
+            CONNECTOR_KEY,
+            CONNECTOR_URL,
+            "html",
             connector_config=config,
         )
         assert isinstance(connector, ConfigurableHtmlConnector)
@@ -420,6 +443,7 @@ class TestFactoryRouting:
 # ═══════════════════════════════════════════════════════════════
 # 8. Validate method
 # ═══════════════════════════════════════════════════════════════
+
 
 class TestValidate:
     """Validate method follows the same contract as SourceConnector protocol."""

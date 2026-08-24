@@ -3,6 +3,7 @@
 Phase 1: pure extraction of scraping lifecycle. No Redis, no Celery.
 Phase 2 (PR2): updated to track progress after each lifecycle phase.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -139,22 +140,14 @@ async def _scrape_source_candidates_with_timeout(
     """
     settings = get_settings()
     timeout_seconds = max(settings.scraping_max_source_seconds, 30)
-    timeout_seconds = min(
-        timeout_seconds, int(settings.per_connector_timeout_seconds)
-    )
+    timeout_seconds = min(timeout_seconds, int(settings.per_connector_timeout_seconds))
     try:
-        return await asyncio.wait_for(
-            _scrape_candidates(source, stats), timeout=timeout_seconds
-        )
+        return await asyncio.wait_for(_scrape_candidates(source, stats), timeout=timeout_seconds)
     except TimeoutError as exc:
-        raise TimeoutError(
-            f"Scrape for source {source.key} exceeded {timeout_seconds}s"
-        ) from exc
+        raise TimeoutError(f"Scrape for source {source.key} exceeded {timeout_seconds}s") from exc
 
 
-def _setup_run(
-    db, source: Source, organization_id: str | None
-) -> tuple[SourceRun, Task, datetime]:
+def _setup_run(db, source: Source, organization_id: str | None) -> tuple[SourceRun, Task, datetime]:
     """Create SourceRun + Task records for this scrape."""
     started_at = datetime.now(UTC).replace(tzinfo=None)
     run = SourceRun(
@@ -166,11 +159,7 @@ def _setup_run(
     source.last_run_at = started_at
     db.add(run)
     db.flush()
-    org_id = (
-        organization_id
-        or source.organization_id
-        or "00000000-0000-0000-0000-000000000000"
-    )
+    org_id = organization_id or source.organization_id or "00000000-0000-0000-0000-000000000000"
     task = Task(
         organization_id=org_id,
         source_run_id=run.id,
@@ -212,19 +201,26 @@ async def _persist_opportunities(
                 updated += 1
         except Exception as exc:
             failed_items += 1
-            run.logs.append({
-                "level": "warning",
-                "message": "Candidate skipped during local persistence",
-                "title": getattr(opportunity_data, "title", ""),
-                "error": str(exc),
-            })
+            run.logs.append(
+                {
+                    "level": "warning",
+                    "message": "Candidate skipped during local persistence",
+                    "title": getattr(opportunity_data, "title", ""),
+                    "error": str(exc),
+                }
+            )
     return created, updated, failed_items
 
 
 def _finalize_run(
-    db, run: SourceRun, task: Task, source: Source,
+    db,
+    run: SourceRun,
+    task: Task,
+    source: Source,
     opportunities: list[OpportunityCreate],
-    created: int, updated: int, failed_items: int,
+    created: int,
+    updated: int,
+    failed_items: int,
     scrape_stats: dict[str, object],
 ) -> None:
     """Update SourceRun, Task, and Source with final status after successful scrape."""
@@ -239,8 +235,12 @@ def _finalize_run(
         *run.logs,
         {"level": "info", "message": "Local connector executed", "task_id": task.id},
         {"level": "info", "message": "Connector diagnostics", **scrape_stats},
-        {"level": "info", "message": "Candidates normalized",
-         "items_found": len(opportunities), "items_failed": failed_items},
+        {
+            "level": "info",
+            "message": "Candidates normalized",
+            "items_found": len(opportunities),
+            "items_failed": failed_items,
+        },
     ]
     task.status = run.status
     task.finished_at = finished_at
@@ -254,7 +254,8 @@ def _finalize_run(
         source.last_error = None
     if len(opportunities) == 0:
         create_source_health_alert(
-            db, source,
+            db,
+            source,
             reason="no se detectaron oportunidades nuevas en la ultima corrida",
         )
     # Track consecutive empty runs and auto-pause
@@ -264,10 +265,12 @@ def _finalize_run(
     )
     if should_auto_pause(source.consecutive_empty_runs):
         source.auto_paused = True
-        run.logs.append({
-            "level": "warn",
-            "message": f"Source auto-paused after {source.consecutive_empty_runs} consecutive empty runs",
-        })
+        run.logs.append(
+            {
+                "level": "warn",
+                "message": f"Source auto-paused after {source.consecutive_empty_runs} consecutive empty runs",
+            }
+        )
     # Track selector failures and auto-pause
     if len(opportunities) == 0:
         source.selector_failures = (source.selector_failures or 0) + 1
@@ -275,15 +278,21 @@ def _finalize_run(
         source.selector_failures = 0
     if (source.selector_failures or 0) >= 3:
         source.auto_paused = True
-        run.logs.append({
-            "level": "warn",
-            "message": f"Source auto-paused after {source.selector_failures} consecutive selector failures",
-        })
+        run.logs.append(
+            {
+                "level": "warn",
+                "message": f"Source auto-paused after {source.selector_failures} consecutive selector failures",
+            }
+        )
     db.flush()
 
 
 def _handle_run_error(
-    db, run: SourceRun, task: Task, source: Source, exc: Exception,
+    db,
+    run: SourceRun,
+    task: Task,
+    source: Source,
+    exc: Exception,
 ) -> None:
     """Update run/task/source on scrape error."""
     finished_at = datetime.now(UTC).replace(tzinfo=None)
@@ -307,9 +316,7 @@ def _handle_run_error(
         create_source_health_alert(db, source, reason=error_message)
 
 
-async def run_source_inline(
-    db, source: Source, organization_id: str | None = None
-) -> SourceRun:
+async def run_source_inline(db, source: Source, organization_id: str | None = None) -> SourceRun:
     """Scrape a source, persist opportunities, and return the SourceRun.
 
     Orchestrates: setup → scrape → persist → finalize (or error handling).
@@ -342,7 +349,10 @@ async def run_source_inline(
         run.status = "failed"
         run.finished_at = finished_at
         run.error_message = "Scrape cancelled (shutdown or timeout)"
-        run.logs = [*run.logs, {"level": "error", "message": "Scrape cancelled", "error_type": "TIMEOUT"}]
+        run.logs = [
+            *run.logs,
+            {"level": "error", "message": "Scrape cancelled", "error_type": "TIMEOUT"},
+        ]
         task.status = "failed"
         task.finished_at = finished_at
         task.error_message = "Scrape cancelled"
@@ -391,16 +401,20 @@ def _update_dom_hash(
     source.dom_hash = new_hash
 
     if old_hash is None:
-        run.logs.append({
-            "level": "info",
-            "message": "DOM hash recorded for the first time",
-            "dom_hash": new_hash[:16],
-        })
+        run.logs.append(
+            {
+                "level": "info",
+                "message": "DOM hash recorded for the first time",
+                "dom_hash": new_hash[:16],
+            }
+        )
     elif old_hash != new_hash:
         source.dom_hash_changed_at = datetime.now(UTC).replace(tzinfo=None)
-        run.logs.append({
-            "level": "warn",
-            "message": "DOM hash changed — page structure may have changed",
-            "old_hash_prefix": old_hash[:16],
-            "new_hash_prefix": new_hash[:16],
-        })
+        run.logs.append(
+            {
+                "level": "warn",
+                "message": "DOM hash changed — page structure may have changed",
+                "old_hash_prefix": old_hash[:16],
+                "new_hash_prefix": new_hash[:16],
+            }
+        )

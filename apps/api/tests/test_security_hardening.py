@@ -111,15 +111,12 @@ def test_login_cookie_has_samesite_none() -> None:
         "/api/v1/auth/login",
         json={"email": "samesite-test@example.com", "password": "Sup3rStrong!"},
     )
-    assert response.status_code == 200, (
-        f"Login failed: {response.status_code}: {response.text}"
-    )
+    assert response.status_code == 200, f"Login failed: {response.status_code}: {response.text}"
     set_cookie = response.headers.get("set-cookie", "")
     assert set_cookie, "No Set-Cookie header on login response"
     samesite = _extract_cookie_samesite(set_cookie)
     assert samesite == "none", (
-        f"Login cookie SameSite={samesite!r}, expected 'none'. "
-        f"Full Set-Cookie: {set_cookie}"
+        f"Login cookie SameSite={samesite!r}, expected 'none'. Full Set-Cookie: {set_cookie}"
     )
 
 
@@ -144,15 +141,12 @@ def test_register_cookie_has_samesite_none() -> None:
             "country": "Mexico",
         },
     )
-    assert response.status_code == 200, (
-        f"Register failed: {response.status_code}: {response.text}"
-    )
+    assert response.status_code == 200, f"Register failed: {response.status_code}: {response.text}"
     set_cookie = response.headers.get("set-cookie", "")
     assert set_cookie, "No Set-Cookie header on register response"
     samesite = _extract_cookie_samesite(set_cookie)
     assert samesite == "none", (
-        f"Register cookie SameSite={samesite!r}, expected 'none'. "
-        f"Full Set-Cookie: {set_cookie}"
+        f"Register cookie SameSite={samesite!r}, expected 'none'. Full Set-Cookie: {set_cookie}"
     )
 
     # Cleanup
@@ -180,8 +174,7 @@ def test_logout_clears_cookie_with_samesite_none() -> None:
     assert set_cookie, "No Set-Cookie header on logout"
     samesite = _extract_cookie_samesite(set_cookie)
     assert samesite == "none", (
-        f"Logout cookie SameSite={samesite!r}, expected 'none'. "
-        f"Full Set-Cookie: {set_cookie}"
+        f"Logout cookie SameSite={samesite!r}, expected 'none'. Full Set-Cookie: {set_cookie}"
     )
 
 
@@ -293,9 +286,7 @@ def test_login_rate_limit_is_per_email() -> None:
         "/api/v1/auth/login",
         json={"email": "login-rl-alice@example.com", "password": "wrong-password"},
     )
-    assert alice_resp.status_code == 429, (
-        f"Alice should be throttled, got {alice_resp.status_code}"
-    )
+    assert alice_resp.status_code == 429, f"Alice should be throttled, got {alice_resp.status_code}"
 
     # Bob must NOT be throttled
     bob_resp = c.post(
@@ -411,9 +402,7 @@ def test_reset_token_has_expiry() -> None:
     exp = payload.get("exp")
     assert exp is not None, "Reset token is missing the 'exp' claim"
     exp_dt = datetime.fromtimestamp(exp, tz=UTC)
-    assert exp_dt > datetime.now(UTC), (
-        f"Reset token exp ({exp_dt}) is in the past"
-    )
+    assert exp_dt > datetime.now(UTC), f"Reset token exp ({exp_dt}) is in the past"
 
 
 def test_forgot_password_uses_reset_token_secret() -> None:
@@ -586,9 +575,7 @@ def test_cors_rejects_unknown_origin() -> None:
     )
     # When the origin is not allowed, the CORS middleware should NOT
     # return Access-Control-Allow-Origin in the response.
-    assert "access-control-allow-origin" not in {
-        k.lower() for k in response.headers
-    }, (
+    assert "access-control-allow-origin" not in {k.lower() for k in response.headers}, (
         "CORS middleware returned Access-Control-Allow-Origin for an unknown "
         "origin (https://evil-site.com). The allow_origins list is too permissive."
     )

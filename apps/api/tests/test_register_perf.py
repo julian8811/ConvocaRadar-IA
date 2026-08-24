@@ -57,6 +57,7 @@ def _payload(prefix: str) -> dict[str, Any]:
 
 def _assert_user_created(email: str) -> None:
     from app.models import User
+
     db = SessionLocal()
     try:
         assert db.scalar(select(User).where(User.email == email)) is not None
@@ -91,6 +92,7 @@ def test_register_returns_under_1s(monkeypatch: pytest.MonkeyPatch) -> None:
     import, the patch fails fast and the latency check is a smoke
     assertion on the decoupled path.
     """
+
     def _slow(*_a: Any, **_k: Any) -> dict[str, int]:
         time.sleep(5)
         return {"inserted": 0, "updated": 0, "skipped": 0}
@@ -159,7 +161,9 @@ def test_register_does_not_call_seed_inline(monkeypatch: pytest.MonkeyPatch) -> 
     response = c.post("/api/v1/auth/register", json=payload)
 
     assert response.status_code == 200, response.text
-    assert call_log == [], f"seed_default_sources was called {len(call_log)} time(s) during register"
+    assert call_log == [], (
+        f"seed_default_sources was called {len(call_log)} time(s) during register"
+    )
     _assert_user_created(payload["email"])
     assert not handler_imports_seed, (
         "seed_default_sources is still imported into app.api.v1.auth — inline call not removed"
@@ -177,6 +181,7 @@ def test_enqueue_seed_default_sources_returns_success() -> None:
     db = SessionLocal()
     try:
         from app.models import Organization
+
         org = db.scalar(select(Organization).where(Organization.slug == "convocaradar-local"))
         assert org is not None, "seeded org must exist"
         org_id = org.id
@@ -184,9 +189,7 @@ def test_enqueue_seed_default_sources_returns_success() -> None:
         db.close()
 
     result = enqueue_seed_default_sources(org_id)
-    assert result == "inline", (
-        f"expected 'inline' for the seeded org, got {result!r}"
-    )
+    assert result == "inline", f"expected 'inline' for the seeded org, got {result!r}"
 
 
 def test_enqueue_seed_default_sources_returns_none_on_invalid_org() -> None:
@@ -213,7 +216,8 @@ def test_register_logs_info_when_broker_down(monkeypatch: pytest.MonkeyPatch) ->
     assert "access_token" in response.json()
     # No warning expected — the inline path always succeeds.
     warning_events = [
-        log for log in captured
+        log
+        for log in captured
         if log.get("log_level") == "warning" and "seed" in log.get("event", "")
     ]
     assert len(warning_events) == 0, (

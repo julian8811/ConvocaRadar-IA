@@ -14,7 +14,9 @@ from app.models import PGVECTOR_AVAILABLE, Opportunity, OpportunityDocument, Opp
 
 def _get_opportunity_embedding(db: Session, opportunity_id: str) -> OpportunityEmbedding | None:
     """Get existing embedding for an opportunity (from DB or pending flush)."""
-    existing = db.scalar(select(OpportunityEmbedding).where(OpportunityEmbedding.opportunity_id == opportunity_id))
+    existing = db.scalar(
+        select(OpportunityEmbedding).where(OpportunityEmbedding.opportunity_id == opportunity_id)
+    )
     if existing:
         return existing
     for pending in db.new:
@@ -99,7 +101,9 @@ def opportunity_reanalysis_text(db: Session, opportunity: Opportunity) -> str:
     )
 
 
-async def upsert_opportunity_embedding(db: Session, opportunity: Opportunity) -> OpportunityEmbedding:
+async def upsert_opportunity_embedding(
+    db: Session, opportunity: Opportunity
+) -> OpportunityEmbedding:
     """Create or update the embedding for an opportunity."""
     source_text = opportunity_embedding_text(opportunity)
     vector = await build_embedding(source_text)
@@ -121,9 +125,13 @@ async def upsert_opportunity_embedding(db: Session, opportunity: Opportunity) ->
     return embedding
 
 
-async def rebuild_opportunity_embeddings(db: Session, organization_id: str, *, limit: int | None = None) -> dict[str, int]:
+async def rebuild_opportunity_embeddings(
+    db: Session, organization_id: str, *, limit: int | None = None
+) -> dict[str, int]:
     """Rebuild embeddings for all opportunities visible to the org."""
-    scope = or_(Opportunity.organization_id == organization_id, Opportunity.organization_id.is_(None))
+    scope = or_(
+        Opportunity.organization_id == organization_id, Opportunity.organization_id.is_(None)
+    )
     stmt = select(Opportunity).where(scope).order_by(Opportunity.updated_at.desc())
     if limit is not None:
         stmt = stmt.limit(limit)
@@ -131,7 +139,11 @@ async def rebuild_opportunity_embeddings(db: Session, organization_id: str, *, l
     created = 0
     updated = 0
     for opportunity in opportunities:
-        existing = db.scalar(select(OpportunityEmbedding).where(OpportunityEmbedding.opportunity_id == opportunity.id))
+        existing = db.scalar(
+            select(OpportunityEmbedding).where(
+                OpportunityEmbedding.opportunity_id == opportunity.id
+            )
+        )
         source_text = opportunity_embedding_text(opportunity)
         vector = await build_embedding(source_text)
         if existing:

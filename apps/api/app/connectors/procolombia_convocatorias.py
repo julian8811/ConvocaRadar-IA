@@ -15,8 +15,12 @@ PROCOLOMBIA_SITEMAP_URL = "https://www.procolombia.co/sitemap.xml"
 
 # Hub URLs now redirect externally (Notion / GDrive), but we still include
 # them so parse() can extract named links from those destinations.
-PROCOLOMBIA_GDRIVE_FOLDER = "https://drive.google.com/drive/folders/14b2BnJeQR905gBKFNdakfgLmIrKlvze9"
-PROCOLOMBIA_NOTION_URL = "https://groovy-hickory-42b.notion.site/Convocatorias-en-curso-306b1395748780e6a226ca192452a37b"
+PROCOLOMBIA_GDRIVE_FOLDER = (
+    "https://drive.google.com/drive/folders/14b2BnJeQR905gBKFNdakfgLmIrKlvze9"
+)
+PROCOLOMBIA_NOTION_URL = (
+    "https://groovy-hickory-42b.notion.site/Convocatorias-en-curso-306b1395748780e6a226ca192452a37b"
+)
 
 CLOSED_KEYWORDS = ("cerrad", "finaliz", "cerró", "conclu", "vencid")
 ALLOWED_HOSTS = {
@@ -36,6 +40,7 @@ GDRIVE_CONVOCATORIA_CATEGORIES = [
     "Capacitaciones exportadores",
     "MACRORRUEDA",
 ]
+
 
 def _slug_to_title(slug: str) -> str:
     text = slug.replace("-", " ").strip()
@@ -138,29 +143,44 @@ class ProcolombiaConvocatoriasConnector:
             synthetic_html = "\n".join(
                 f'<a href="{PROCOLOMBIA_GDRIVE_FOLDER}">{name}</a>' for name in gdrive_subfolders
             )
-            pages.append({"url": PROCOLOMBIA_GDRIVE_FOLDER, "content": f"<html><body>{synthetic_html}</body></html>"})
+            pages.append(
+                {
+                    "url": PROCOLOMBIA_GDRIVE_FOLDER,
+                    "content": f"<html><body>{synthetic_html}</body></html>",
+                }
+            )
         if not pages:
             errors = "; ".join(
-                str(error) for error in (primary_error, sitemap_error, gdrive_error) if error is not None
+                str(error)
+                for error in (primary_error, sitemap_error, gdrive_error)
+                if error is not None
             )
-            raise RuntimeError(f"ProColombia sources were unavailable: {errors or 'no live content'}")
+            raise RuntimeError(
+                f"ProColombia sources were unavailable: {errors or 'no live content'}"
+            )
 
-        combined = "\n".join(
-            f"<!-- page:{page['url']} -->\n{page['content']}" for page in pages
-        )
+        combined = "\n".join(f"<!-- page:{page['url']} -->\n{page['content']}" for page in pages)
         return RawSourceResult(
             source_key=self.source_key,
             url=PROCOLOMBIA_GDRIVE_FOLDER,
             content=combined,
             content_type="text/html",
-            metadata={"pages_fetched": len(pages), "sitemap_urls": len(conv_urls), "gdrive_subfolders": len(gdrive_subfolders)},
+            metadata={
+                "pages_fetched": len(pages),
+                "sitemap_urls": len(conv_urls),
+                "gdrive_subfolders": len(gdrive_subfolders),
+            },
         )
 
-    def _candidate_from_url(self, url: str, title: str | None = None) -> OpportunityCandidate | None:
+    def _candidate_from_url(
+        self, url: str, title: str | None = None
+    ) -> OpportunityCandidate | None:
         url = _normalize_procolombia_url(url)
         parsed = urlparse(url)
         host = parsed.hostname or ""
-        if host and not any(host == allowed or host.endswith(f".{allowed}") for allowed in ALLOWED_HOSTS):
+        if host and not any(
+            host == allowed or host.endswith(f".{allowed}") for allowed in ALLOWED_HOSTS
+        ):
             return None
         if not title:
             slug = parsed.path.rstrip("/").split("/")[-1]
@@ -215,7 +235,11 @@ class ProcolombiaConvocatoriasConnector:
             tree = HTMLParser(html)
             title_node = tree.css_first("title, h1")
             page_title = clean_text(title_node.text()) if title_node else ""
-            if page_url and page_url not in seen and page_url.startswith("https://www.procolombia.co"):
+            if (
+                page_url
+                and page_url not in seen
+                and page_url.startswith("https://www.procolombia.co")
+            ):
                 candidate = self._candidate_from_url(page_url, page_title or None)
                 if candidate:
                     seen.add(candidate.official_url)

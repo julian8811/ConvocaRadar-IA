@@ -93,7 +93,9 @@ def get_review_queue(
     Order: ``close_date ASC NULLS LAST`` (soonest first).
     Score: joined from ``OpportunityScore`` for the given org, if any.
     """
-    today_start = datetime.now(UTC).replace(tzinfo=None).replace(hour=0, minute=0, second=0, microsecond=0)
+    today_start = (
+        datetime.now(UTC).replace(tzinfo=None).replace(hour=0, minute=0, second=0, microsecond=0)
+    )
     stmt = (
         select(Opportunity, OpportunityScore, Source)
         .outerjoin(
@@ -374,20 +376,32 @@ def get_health_kpis(db: Session, organization_id: str) -> HealthKpis:
         ~Opportunity.title.ilike("%deadlineDate%"),
         ~Opportunity.title.ilike("%expectedGrants%"),
     )
-    stmt = select(
-        func.count().label("total"),
-        func.count(Case((Opportunity.status == "open", 1), else_=None)).label("open"),
-        func.count(Case((Opportunity.status == "closing_soon", 1), else_=None)).label("closing_soon"),
-        func.count(
-            func.distinct(Case((OpportunityScore.priority == "high", OpportunityScore.opportunity_id), else_=None))
-        ).label("high_match"),
-    ).select_from(Opportunity).outerjoin(
-        OpportunityScore,
-        and_(
-            OpportunityScore.opportunity_id == Opportunity.id,
-            OpportunityScore.organization_id == organization_id,
-        ),
-    ).where(opportunity_scope)
+    stmt = (
+        select(
+            func.count().label("total"),
+            func.count(Case((Opportunity.status == "open", 1), else_=None)).label("open"),
+            func.count(Case((Opportunity.status == "closing_soon", 1), else_=None)).label(
+                "closing_soon"
+            ),
+            func.count(
+                func.distinct(
+                    Case(
+                        (OpportunityScore.priority == "high", OpportunityScore.opportunity_id),
+                        else_=None,
+                    )
+                )
+            ).label("high_match"),
+        )
+        .select_from(Opportunity)
+        .outerjoin(
+            OpportunityScore,
+            and_(
+                OpportunityScore.opportunity_id == Opportunity.id,
+                OpportunityScore.organization_id == organization_id,
+            ),
+        )
+        .where(opportunity_scope)
+    )
 
     row = db.execute(stmt).one()
     return HealthKpis(
@@ -405,7 +419,9 @@ def get_status_breakdown(db: Session, organization_id: str) -> list[DashboardBre
     "http*" prefix) so the chart counts match what the consultant was
     already used to seeing.
     """
-    opportunity_scope = or_(Opportunity.organization_id == organization_id, Opportunity.organization_id.is_(None))
+    opportunity_scope = or_(
+        Opportunity.organization_id == organization_id, Opportunity.organization_id.is_(None)
+    )
     rows = db.execute(
         select(Opportunity.status, func.count())
         .where(opportunity_scope)
@@ -424,7 +440,9 @@ def get_status_breakdown(db: Session, organization_id: str) -> list[DashboardBre
 
 def get_country_breakdown(db: Session, organization_id: str) -> list[DashboardBreakdownItem]:
     """Top-8 country counts; rows with empty country bucket under "Sin dato"."""
-    opportunity_scope = or_(Opportunity.organization_id == organization_id, Opportunity.organization_id.is_(None))
+    opportunity_scope = or_(
+        Opportunity.organization_id == organization_id, Opportunity.organization_id.is_(None)
+    )
     rows = db.execute(
         select(Opportunity.country, func.count())
         .where(opportunity_scope)
@@ -452,7 +470,9 @@ def get_data_coverage(db: Session, organization_id: str) -> DashboardDataCoverag
     # Lazy import: avoid circular dep during init
     from app.services.opportunity import count_query
 
-    opportunity_scope = or_(Opportunity.organization_id == organization_id, Opportunity.organization_id.is_(None))
+    opportunity_scope = or_(
+        Opportunity.organization_id == organization_id, Opportunity.organization_id.is_(None)
+    )
     with_summary = (
         db.scalar(
             select(func.count())
@@ -467,20 +487,27 @@ def get_data_coverage(db: Session, organization_id: str) -> DashboardDataCoverag
             .select_from(Opportunity)
             .where(
                 opportunity_scope,
-                or_(Opportunity.funding_amount_value.is_not(None), Opportunity.funding_amount_raw.is_not(None)),
+                or_(
+                    Opportunity.funding_amount_value.is_not(None),
+                    Opportunity.funding_amount_raw.is_not(None),
+                ),
             )
         )
         or 0
     )
     with_close_date = (
         db.scalar(
-            select(func.count()).select_from(Opportunity).where(opportunity_scope, Opportunity.close_date.is_not(None))
+            select(func.count())
+            .select_from(Opportunity)
+            .where(opportunity_scope, Opportunity.close_date.is_not(None))
         )
         or 0
     )
     with_source = (
         db.scalar(
-            select(func.count()).select_from(Opportunity).where(opportunity_scope, Opportunity.source_id.is_not(None))
+            select(func.count())
+            .select_from(Opportunity)
+            .where(opportunity_scope, Opportunity.source_id.is_not(None))
         )
         or 0
     )
@@ -562,9 +589,13 @@ def get_source_health_summaries(
         if health == "degraded":
             degraded += 1
             if len(alerts) < 5:
-                alerts.append(DashboardSourceAlert(source_id=source.id, name=source.name, status="degraded"))
+                alerts.append(
+                    DashboardSourceAlert(source_id=source.id, name=source.name, status="degraded")
+                )
         elif health == "failing":
             failing += 1
             if len(alerts) < 5:
-                alerts.append(DashboardSourceAlert(source_id=source.id, name=source.name, status="failing"))
+                alerts.append(
+                    DashboardSourceAlert(source_id=source.id, name=source.name, status="failing")
+                )
     return degraded, failing, alerts

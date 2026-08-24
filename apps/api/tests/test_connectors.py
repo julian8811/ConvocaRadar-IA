@@ -40,7 +40,13 @@ GROUPS: list[tuple[str, str, str | None, str, str]] = [
     ("generic-api", "test-api", "api", "generic-api", "ApiConnector"),
     ("grants-gov", "grants-gov", None, "grants-gov", "GrantsGovConnector"),
     ("giz-funding", "giz-funding", None, "httpx-get-html", "GizFundingConnector"),
-    ("procolombia", "procolombia-convocatorias", None, "procolombia-html", "ProcolombiaConvocatoriasConnector"),
+    (
+        "procolombia",
+        "procolombia-convocatorias",
+        None,
+        "procolombia-html",
+        "ProcolombiaConvocatoriasConnector",
+    ),
 ]
 
 
@@ -88,9 +94,7 @@ class TestConnectorHappyPath:
         assert raw.content or raw.content == ""  # empty string is valid
 
         candidates = await connector.parse(raw)
-        assert len(candidates) >= 1, (
-            f"{cls_name} should yield ≥1 candidate with sample data, got 0"
-        )
+        assert len(candidates) >= 1, f"{cls_name} should yield ≥1 candidate with sample data, got 0"
         for c in candidates:
             assert isinstance(c, OpportunityCandidate)
             assert c.title
@@ -113,13 +117,9 @@ class TestConnectorHappyPath:
         apply_fixture_data(mocks, fixture_key, "sample")
         raw = await connector.fetch()
         candidates = await connector.parse(raw)
-        assert len(candidates) >= 1, (
-            f"{cls_name}: need ≥1 candidate for validate test"
-        )
+        assert len(candidates) >= 1, f"{cls_name}: need ≥1 candidate for validate test"
         result = await connector.validate(candidates[0])
-        assert result.ok, (
-            f"{cls_name}: validate({candidates[0].title!r}) failed: {result.reason}"
-        )
+        assert result.ok, f"{cls_name}: validate({candidates[0].title!r}) failed: {result.reason}"
 
 
 # ── Empty data: connector returns empty result ────────────────────
@@ -203,9 +203,7 @@ class TestConnectorGarbageData:
         try:
             candidates = await connector.parse(raw)
         except Exception as exc:
-            pytest.fail(
-                f"{cls_name}.parse() raised on garbage data: {type(exc).__name__}: {exc}"
-            )
+            pytest.fail(f"{cls_name}.parse() raised on garbage data: {type(exc).__name__}: {exc}")
 
         # Must return a list (possibly empty)
         assert isinstance(candidates, list)
@@ -251,9 +249,7 @@ class TestConnectorNetworkError:
 def test_all_fixture_keys_exist() -> None:
     """Every group's fixture_key must be a key in FIXTURE_DATA."""
     for _name, _sk, _st, fkey, _cn in GROUPS:
-        assert fkey in FIXTURE_DATA, (
-            f"fixture_key {fkey!r} not found in FIXTURE_DATA"
-        )
+        assert fkey in FIXTURE_DATA, f"fixture_key {fkey!r} not found in FIXTURE_DATA"
 
 
 # ── Signature compatibility between services wrapper and factory dispatcher ──
@@ -278,14 +274,12 @@ def test_connector_for_signature_compatibility() -> None:
     factory_params = list(factory_sig.parameters.items())
 
     assert len(services_params) == len(factory_params), (
-        f"Parameter count mismatch: services={len(services_params)}, "
-        f"factory={len(factory_params)}"
+        f"Parameter count mismatch: services={len(services_params)}, factory={len(factory_params)}"
     )
 
     for (s_name, s_param), (f_name, f_param) in zip(services_params, factory_params):
         assert s_name == f_name, (
-            f"Parameter name mismatch at position: "
-            f"services.{s_name!r} != factory.{f_name!r}"
+            f"Parameter name mismatch at position: services.{s_name!r} != factory.{f_name!r}"
         )
         assert s_param.kind == f_param.kind, (
             f"Parameter kind mismatch for {s_name!r}: "
@@ -306,12 +300,20 @@ class TestParseFundingAmount:
     def _parse(self, text: str | None) -> tuple[float | None, str | None]:
         """Inline reimplementation so tests don't depend on the full app."""
         import re
+
         if not text:
             return None, None
         t = text.strip()
         upper = t.upper()
         currency = "USD"
-        for code, syms in [("COP", ["COP", "COL$"]), ("BRL", ["BRL", "R$"]), ("MXN", ["MXN", "MX$"]), ("GBP", ["GBP", "£"]), ("EUR", ["EUR", "€"]), ("USD", ["USD", "US$", "$"])]:
+        for code, syms in [
+            ("COP", ["COP", "COL$"]),
+            ("BRL", ["BRL", "R$"]),
+            ("MXN", ["MXN", "MX$"]),
+            ("GBP", ["GBP", "£"]),
+            ("EUR", ["EUR", "€"]),
+            ("USD", ["USD", "US$", "$"]),
+        ]:
             found = False
             for s in syms:
                 if s in upper:

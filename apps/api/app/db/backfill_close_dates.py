@@ -28,9 +28,7 @@ from app.services import inferred_opportunity_status
 
 def _combined_text(opp: Opportunity) -> str:
     return " ".join(
-        part
-        for part in [opp.title, opp.summary, opp.description, opp.raw_text]
-        if part
+        part for part in [opp.title, opp.summary, opp.description, opp.raw_text] if part
     )
 
 
@@ -78,10 +76,7 @@ def main() -> None:
             for opp in samples:
                 text = _combined_text(opp)
                 found = extract_close_date(text)
-                print(
-                    f"  • {opp.title[:60]}..."
-                    f"  → extracted: {found.date() if found else 'None'}"
-                )
+                print(f"  • {opp.title[:60]}...  → extracted: {found.date() if found else 'None'}")
             print(f"\nRun without --dry-run to apply changes to all {total} records.")
             sys.exit(0)
 

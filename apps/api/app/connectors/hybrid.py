@@ -13,7 +13,12 @@ class HybridConnector:
         lowered = self.base_url.lower()
         content_type = (raw.content_type.lower() if raw and raw.content_type else "") if raw else ""
         content = raw.content.lstrip() if raw else ""
-        if "rss" in content_type or lowered.endswith((".rss", ".xml")) or content.startswith("<rss") or content.startswith("<?xml"):
+        if (
+            "rss" in content_type
+            or lowered.endswith((".rss", ".xml"))
+            or content.startswith("<rss")
+            or content.startswith("<?xml")
+        ):
             return RssConnector(self.source_key, self.base_url)
         if "pdf" in content_type or lowered.endswith(".pdf") or content.startswith("%PDF"):
             return PdfConnector(self.source_key, self.base_url)

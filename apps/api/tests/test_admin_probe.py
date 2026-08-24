@@ -8,6 +8,7 @@ Covers:
 - 4.5.3: Accepts optional source_key query parameter
 - 4.5.4: Returns 401 for unauthenticated requests
 """
+
 from __future__ import annotations
 
 import os
@@ -71,8 +72,20 @@ def test_admin_probe_all_sources_returns_report(monkeypatch) -> None:
         yellow=1,
         red=0,
         results=[
-            ProbeResult(source_key="source-a", status="GREEN", candidates_count=5, error_message=None, elapsed_seconds=0.5),
-            ProbeResult(source_key="source-b", status="YELLOW", candidates_count=0, error_message=None, elapsed_seconds=0.3),
+            ProbeResult(
+                source_key="source-a",
+                status="GREEN",
+                candidates_count=5,
+                error_message=None,
+                elapsed_seconds=0.5,
+            ),
+            ProbeResult(
+                source_key="source-b",
+                status="YELLOW",
+                candidates_count=0,
+                error_message=None,
+                elapsed_seconds=0.3,
+            ),
         ],
         started_at=now,
         finished_at=now,
@@ -139,9 +152,18 @@ def test_admin_probe_with_source_key(monkeypatch) -> None:
         call_log.append(source_key)
         now = datetime.now(UTC)
         return ProbeReport(
-            total=1, green=1, yellow=0, red=0,
+            total=1,
+            green=1,
+            yellow=0,
+            red=0,
             results=[
-                ProbeResult(source_key="minciencias", status="GREEN", candidates_count=3, error_message=None, elapsed_seconds=0.2),
+                ProbeResult(
+                    source_key="minciencias",
+                    status="GREEN",
+                    candidates_count=3,
+                    error_message=None,
+                    elapsed_seconds=0.2,
+                ),
             ],
             started_at=now,
             finished_at=now,

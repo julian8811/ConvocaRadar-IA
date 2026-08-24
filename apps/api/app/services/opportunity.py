@@ -154,9 +154,7 @@ def _combined_text(data: OpportunityCreate) -> str:
     gives the regex-based ``extract_close_date`` a much better chance.
     """
     return " ".join(
-        part
-        for part in [data.title, data.summary, data.description, data.raw_text]
-        if part
+        part for part in [data.title, data.summary, data.description, data.raw_text] if part
     )
 
 
@@ -205,10 +203,16 @@ async def enrich_opportunity_payload(data: OpportunityCreate) -> OpportunityCrea
     merged["categories"] = data.categories or list(extraction.get("category") or [])
     merged["topics"] = data.topics or list(extraction.get("matched_keywords") or [])
     merged["summary"] = data.summary or str(extraction.get("summary") or merged["summary"])
-    merged["description"] = data.description or str(extraction.get("summary") or merged["description"])
+    merged["description"] = data.description or str(
+        extraction.get("summary") or merged["description"]
+    )
     merged["requirements"] = data.requirements or list(extraction.get("requirements") or [])
-    merged["documents_required"] = data.documents_required or list(extraction.get("documents_required") or [])
-    merged["evaluation_criteria"] = data.evaluation_criteria or list(extraction.get("evaluation_criteria") or [])
+    merged["documents_required"] = data.documents_required or list(
+        extraction.get("documents_required") or []
+    )
+    merged["evaluation_criteria"] = data.evaluation_criteria or list(
+        extraction.get("evaluation_criteria") or []
+    )
     merged["restrictions"] = data.restrictions or list(extraction.get("restrictions") or [])
     merged["risk_flags"] = data.risk_flags or list(extraction.get("risks") or [])
     merged["funding_amount_raw"] = data.funding_amount_raw or extraction.get("funding_amount_raw")
@@ -224,7 +228,10 @@ async def enrich_opportunity_payload(data: OpportunityCreate) -> OpportunityCrea
         else str(extraction.get("language") or infer_language(raw_text, fallback="es"))
     )
     merged["confidence_score"] = round(
-        max(float(data.confidence_score), float(extraction.get("confidence") or data.confidence_score)),
+        max(
+            float(data.confidence_score),
+            float(extraction.get("confidence") or data.confidence_score),
+        ),
         2,
     )
     merged["close_date"] = data.close_date or _parse_ai_close_date(extraction.get("close_date"))
@@ -270,7 +277,9 @@ async def reanalyze_opportunity(
         opportunity.requirements = list(extraction.get("requirements") or opportunity.requirements)
         changed = True
     if force or not opportunity.documents_required:
-        opportunity.documents_required = list(extraction.get("documents_required") or opportunity.documents_required)
+        opportunity.documents_required = list(
+            extraction.get("documents_required") or opportunity.documents_required
+        )
         changed = True
     if force or not opportunity.risk_flags:
         opportunity.risk_flags = list(extraction.get("risks") or opportunity.risk_flags)
@@ -285,7 +294,9 @@ async def reanalyze_opportunity(
         opportunity.country = str(extraction.get("country") or opportunity.country)
         changed = True
     if force or not opportunity.funding_amount_raw:
-        opportunity.funding_amount_raw = extraction.get("funding_amount_raw") or opportunity.funding_amount_raw
+        opportunity.funding_amount_raw = (
+            extraction.get("funding_amount_raw") or opportunity.funding_amount_raw
+        )
         changed = True
     # Parse funding amount into numeric value + currency if not already set
     if opportunity.funding_amount_raw and not opportunity.funding_amount_value:

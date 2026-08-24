@@ -72,13 +72,18 @@ class GlobalInnovationFundConnector:
                 continue
             official_url = urljoin(raw.url, href)
             host = urlparse(official_url).hostname or ""
-            if not any(host == domain or host.endswith(f".{domain}") for domain in GIF_ALLOWED_DOMAINS):
+            if not any(
+                host == domain or host.endswith(f".{domain}") for domain in GIF_ALLOWED_DOMAINS
+            ):
                 continue
             path = urlparse(official_url).path.rstrip("/") or "/"
             if path in SKIP_PATHS or official_url in seen:
                 continue
             lowered = title.lower()
-            if not any(token in lowered for token in ("fund", "apply", "guideline", "grant", "invest", "pipeline")):
+            if not any(
+                token in lowered
+                for token in ("fund", "apply", "guideline", "grant", "invest", "pipeline")
+            ):
                 continue
             seen.add(official_url)
             candidates.append(
@@ -99,5 +104,7 @@ class GlobalInnovationFundConnector:
 
     async def validate(self, candidate: OpportunityCandidate) -> ValidationResult:
         host = urlparse(candidate.official_url).hostname or ""
-        allowed = any(host == domain or host.endswith(f".{domain}") for domain in GIF_ALLOWED_DOMAINS)
+        allowed = any(
+            host == domain or host.endswith(f".{domain}") for domain in GIF_ALLOWED_DOMAINS
+        )
         return ValidationResult(ok=bool(candidate.title and candidate.official_url and allowed))

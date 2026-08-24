@@ -6,6 +6,7 @@ the default test config). Tests inspect the SYNCHRONOUS log output
 (emitted before the background thread starts) so the background thread's
 DB lock does not interfere with the next test.
 """
+
 from __future__ import annotations
 
 import os
@@ -77,11 +78,10 @@ def test_run_all_sources_emits_sources_loaded_event(monkeypatch) -> None:
     with structlog.testing.capture_logs() as captured:
         response = c.post("/api/v1/sources/run-all")
     assert response.status_code == 200
-    loaded_events = [
-        e for e in captured
-        if e.get("event") == "run_all.sources_loaded"
-    ]
-    assert len(loaded_events) >= 1, f"expected run_all.sources_loaded event, got events: {[e.get('event') for e in captured]}"
+    loaded_events = [e for e in captured if e.get("event") == "run_all.sources_loaded"]
+    assert len(loaded_events) >= 1, (
+        f"expected run_all.sources_loaded event, got events: {[e.get('event') for e in captured]}"
+    )
     loaded = loaded_events[0]
     assert loaded["sources_loaded"] >= 1
     assert loaded["org_id"]
@@ -100,10 +100,7 @@ def test_run_all_sources_emits_decision_summary_event(monkeypatch) -> None:
         response = c.post("/api/v1/sources/run-all")
     assert response.status_code == 200
 
-    summary_events = [
-        e for e in captured
-        if e.get("event") == "run_all.decision_summary"
-    ]
+    summary_events = [e for e in captured if e.get("event") == "run_all.decision_summary"]
     assert len(summary_events) >= 1, (
         f"expected run_all.decision_summary event, got events: {[e.get('event') for e in captured]}"
     )
@@ -176,13 +173,17 @@ def test_run_all_sources_logs_failure_when_execute_raises(monkeypatch) -> None:
     # module itself would not affect it.
     monkeypatch.setattr(sources_module, "dispatcher_run_source", fake_run_source)
     import threading as _threading
+
     def sync_thread(target, *args, **kwargs):
         class SyncThread:
             def __init__(self):
                 self._target = target
+
             def start(self):
                 self._target()
+
         return SyncThread()
+
     monkeypatch.setattr(_threading, "Thread", sync_thread)
 
     with structlog.testing.capture_logs() as captured:
@@ -241,8 +242,10 @@ def test_background_sweep_times_out_hanging_connector(monkeypatch) -> None:
         class SyncThread:
             def __init__(self):
                 self._target = target
+
             def start(self):
                 self._target()
+
         return SyncThread()
 
     monkeypatch.setattr(_threading, "Thread", sync_thread)
@@ -259,25 +262,19 @@ def test_background_sweep_times_out_hanging_connector(monkeypatch) -> None:
     assert response.status_code == 200
 
     # --- Assertions ---
-    timeout_events = [
-        e for e in captured if e.get("event") == "run_all.source_timeout"
-    ]
+    timeout_events = [e for e in captured if e.get("event") == "run_all.source_timeout"]
     assert len(timeout_events) >= 1, (
-        f"expected run_all.source_timeout event, "
-        f"got events: {[e.get('event') for e in captured]}"
+        f"expected run_all.source_timeout event, got events: {[e.get('event') for e in captured]}"
     )
     te = timeout_events[0]
     assert "timeout_seconds" in te
     assert te["timeout_seconds"] == 0.05
 
     # The completed event must report failed > 0.
-    completed_events = [
-        e for e in captured if e.get("event") == "run_all.completed"
-    ]
+    completed_events = [e for e in captured if e.get("event") == "run_all.completed"]
     assert len(completed_events) >= 1
     assert completed_events[0]["failed"] >= 1, (
-        f"expected completed event to report failures, "
-        f"got: {completed_events[0]}"
+        f"expected completed event to report failures, got: {completed_events[0]}"
     )
 
 
@@ -301,8 +298,10 @@ def test_run_all_sources_uses_dispatcher_instead_of_locally(monkeypatch) -> None
         class SyncThread:
             def __init__(self):
                 self._target = target
+
             def start(self):
                 self._target()
+
         return SyncThread()
 
     monkeypatch.setattr(_threading, "Thread", sync_thread)
@@ -313,8 +312,7 @@ def test_run_all_sources_uses_dispatcher_instead_of_locally(monkeypatch) -> None
 
     assert response.status_code == 200
     assert len(call_log) >= 1, (
-        f"expected dispatcher.run_source to be called at least once, "
-        f"got {len(call_log)} calls"
+        f"expected dispatcher.run_source to be called at least once, got {len(call_log)} calls"
     )
     assert call_log[0]["source_key"] is not None
     assert call_log[0]["org_id"] is not None

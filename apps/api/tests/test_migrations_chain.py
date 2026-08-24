@@ -57,9 +57,7 @@ def test_chain_is_linear_from_base_to_head() -> None:
         down = rev.down_revision
         if down is None:
             break
-        assert isinstance(down, str), (
-            f"unexpected branch point at {rev.revision}: {down!r}"
-        )
+        assert isinstance(down, str), f"unexpected branch point at {rev.revision}: {down!r}"
         rev = script.get_revision(down)
 
     walked.reverse()
@@ -89,9 +87,7 @@ def test_0011_upgrade_downgrade_are_idempotency_guarded() -> None:
     on its creation marker so it never drops a pre-existing table."""
 
     def _body(name: str) -> str:
-        source = (MIGRATIONS_DIR / "0011_embedding_bootstrap.py").read_text(
-            encoding="utf-8"
-        )
+        source = (MIGRATIONS_DIR / "0011_embedding_bootstrap.py").read_text(encoding="utf-8")
         tree = ast.parse(source)
         for node in ast.walk(tree):
             if isinstance(node, ast.FunctionDef) and node.name == name:

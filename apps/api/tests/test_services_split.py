@@ -150,19 +150,24 @@ FACADE_FUNCS = [
 
 # Combine ALL symbols that must be importable from app.services
 ALL_SYMBOLS = (
-    VALIDATION_FUNCS + DEDUP_FUNCS + SCORING_FUNCS + EXPORT_FUNCS
-    + SEARCH_FUNCS + EMBEDDINGS_FUNCS + ANALYTICS_FUNCS + GENAI_FUNCS
-    + CONNECTORS_FUNCS + OPPORTUNITY_FUNCS + ALERTS_FUNCS
+    VALIDATION_FUNCS
+    + DEDUP_FUNCS
+    + SCORING_FUNCS
+    + EXPORT_FUNCS
+    + SEARCH_FUNCS
+    + EMBEDDINGS_FUNCS
+    + ANALYTICS_FUNCS
+    + GENAI_FUNCS
+    + CONNECTORS_FUNCS
+    + OPPORTUNITY_FUNCS
+    + ALERTS_FUNCS
     + FACADE_FUNCS
 )
 
 
-
-
-
 class TestDashboardTriageModule:
     """Characterization for 5 triage functions extracted to dashboard.py (PR B-1a).
-    
+
     NOTE: These reference app.services.dashboard which does NOT exist yet.
     They fail until dashboard.py is created (GREEN step).
     """
@@ -182,12 +187,14 @@ class TestDashboardTriageModule:
     def test__triage_days_to_close_none(self) -> None:
         """_triage_days_to_close returns None when close_date is None."""
         from app.services.dashboard import _triage_days_to_close
+
         assert _triage_days_to_close(None) is None
 
     def test_get_review_queue_signature(self) -> None:
         """get_review_queue is callable with typical args."""
         from app.services.dashboard import get_review_queue
         from inspect import signature
+
         sig = signature(get_review_queue)
         assert "db" in sig.parameters
         assert "organization_id" in sig.parameters
@@ -196,6 +203,7 @@ class TestDashboardTriageModule:
         """get_closing_soon_7d is callable with typical args."""
         from app.services.dashboard import get_closing_soon_7d
         from inspect import signature
+
         sig = signature(get_closing_soon_7d)
         assert "db" in sig.parameters
         assert "organization_id" in sig.parameters
@@ -203,6 +211,7 @@ class TestDashboardTriageModule:
     def test__STATUS_LABELS_content(self) -> None:
         """_STATUS_LABELS is a dict with expected keys and Spanish labels."""
         from app.services.dashboard import _STATUS_LABELS
+
         assert isinstance(_STATUS_LABELS, dict)
         assert _STATUS_LABELS["open"] == "Abiertas"
         assert _STATUS_LABELS["closing_soon"] == "Cierran pronto"
@@ -218,6 +227,7 @@ class TestDashboardTriageModule:
             get_closing_soon_7d,
             _STATUS_LABELS,
         )
+
         assert callable(extract_score_reasons)
         assert callable(_triage_days_to_close)
         assert callable(get_review_queue)
@@ -235,12 +245,14 @@ class TestDashboardPipelineModule:
     def test__pipeline_days_to_close_none(self) -> None:
         """_pipeline_days_to_close returns None when close_date is None."""
         from app.services.dashboard import _pipeline_days_to_close
+
         assert _pipeline_days_to_close(None) is None
 
     def test__pipeline_days_to_close_clamps_negative(self) -> None:
         """_pipeline_days_to_close clamps negative to 0."""
         from datetime import timedelta
         from app.services.dashboard import _pipeline_days_to_close
+
         # Must use naive UTC to match the function's internal behavior
         yesterday = datetime.now(UTC).replace(tzinfo=None) - timedelta(days=1)
         assert _pipeline_days_to_close(yesterday) == 0
@@ -249,6 +261,7 @@ class TestDashboardPipelineModule:
         """get_top_scored is callable with typical args."""
         from app.services.dashboard import get_top_scored
         from inspect import signature
+
         sig = signature(get_top_scored)
         assert "db" in sig.parameters
         assert "organization_id" in sig.parameters
@@ -257,6 +270,7 @@ class TestDashboardPipelineModule:
         """get_closing_soon is callable with typical args."""
         from app.services.dashboard import get_closing_soon
         from inspect import signature
+
         sig = signature(get_closing_soon)
         assert "db" in sig.parameters
         assert "organization_id" in sig.parameters
@@ -274,6 +288,7 @@ class TestDashboardHealthModule:
         """get_health_kpis is callable with typical args."""
         from app.services.dashboard import get_health_kpis
         from inspect import signature
+
         sig = signature(get_health_kpis)
         assert "db" in sig.parameters
         assert "organization_id" in sig.parameters
@@ -282,6 +297,7 @@ class TestDashboardHealthModule:
         """get_status_breakdown is callable with typical args."""
         from app.services.dashboard import get_status_breakdown
         from inspect import signature
+
         sig = signature(get_status_breakdown)
         assert "db" in sig.parameters
         assert "organization_id" in sig.parameters
@@ -290,6 +306,7 @@ class TestDashboardHealthModule:
         """get_country_breakdown is callable with typical args."""
         from app.services.dashboard import get_country_breakdown
         from inspect import signature
+
         sig = signature(get_country_breakdown)
         assert "db" in sig.parameters
         assert "organization_id" in sig.parameters
@@ -298,6 +315,7 @@ class TestDashboardHealthModule:
         """get_data_coverage is callable with typical args."""
         from app.services.dashboard import get_data_coverage
         from inspect import signature
+
         sig = signature(get_data_coverage)
         assert "db" in sig.parameters
         assert "organization_id" in sig.parameters
@@ -306,6 +324,7 @@ class TestDashboardHealthModule:
         """get_sources_health is callable with typical args."""
         from app.services.dashboard import get_sources_health
         from inspect import signature
+
         sig = signature(get_sources_health)
         assert "db" in sig.parameters
         assert "organization_id" in sig.parameters
@@ -314,6 +333,7 @@ class TestDashboardHealthModule:
         """get_source_health_summaries is callable with typical args."""
         from app.services.dashboard import get_source_health_summaries
         from inspect import signature
+
         sig = signature(get_source_health_summaries)
         assert "db" in sig.parameters
         assert "organization_id" in sig.parameters
@@ -330,6 +350,7 @@ class TestAnalyticsModule:
         """get_score_distribution is callable with db + organization_id."""
         from app.services.analytics import get_score_distribution
         from inspect import signature
+
         sig = signature(get_score_distribution)
         assert "db" in sig.parameters
         assert "organization_id" in sig.parameters
@@ -338,6 +359,7 @@ class TestAnalyticsModule:
         """_backfill_close_date_text is a pure function."""
         from app.services.analytics import _backfill_close_date_text
         from unittest.mock import MagicMock
+
         opp = MagicMock()
         opp.title = "Test Grant"
         opp.summary = "Summary text"
@@ -353,6 +375,7 @@ class TestAnalyticsModule:
         """_backfill_close_date_text skips None parts."""
         from app.services.analytics import _backfill_close_date_text
         from unittest.mock import MagicMock
+
         opp = MagicMock()
         opp.title = "Title only"
         opp.summary = None
@@ -365,6 +388,7 @@ class TestAnalyticsModule:
         """backfill_close_dates is callable with typical args."""
         from app.services.analytics import backfill_close_dates
         from inspect import signature
+
         sig = signature(backfill_close_dates)
         assert "db" in sig.parameters
         assert "organization_id" in sig.parameters
@@ -373,6 +397,7 @@ class TestAnalyticsModule:
         """backfill_funding_amounts is callable with typical args."""
         from app.services.analytics import backfill_funding_amounts
         from inspect import signature
+
         sig = signature(backfill_funding_amounts)
         assert "db" in sig.parameters
         assert "organization_id" in sig.parameters
@@ -381,6 +406,7 @@ class TestAnalyticsModule:
         """_opportunity_combined_text joins all text fields."""
         from app.services.analytics import _opportunity_combined_text
         from unittest.mock import MagicMock
+
         opp = MagicMock()
         opp.title = "Title"
         opp.summary = "Summary"
@@ -393,6 +419,7 @@ class TestAnalyticsModule:
         """_opportunity_combined_text skips None parts."""
         from app.services.analytics import _opportunity_combined_text
         from unittest.mock import MagicMock
+
         opp = MagicMock()
         opp.title = "Title"
         opp.summary = None
@@ -405,6 +432,7 @@ class TestAnalyticsModule:
         """backfill_close_dates_ai is an async callable."""
         from app.services.analytics import backfill_close_dates_ai
         from inspect import signature
+
         sig = signature(backfill_close_dates_ai)
         assert "db" in sig.parameters
         assert "organization_id" in sig.parameters
@@ -413,6 +441,7 @@ class TestAnalyticsModule:
         """backfill_funding_amounts_ai is an async callable."""
         from app.services.analytics import backfill_funding_amounts_ai
         from inspect import signature
+
         sig = signature(backfill_funding_amounts_ai)
         assert "db" in sig.parameters
         assert "organization_id" in sig.parameters
@@ -421,6 +450,7 @@ class TestAnalyticsModule:
         """get_funding_ranges is callable with db + organization_id."""
         from app.services.analytics import get_funding_ranges
         from inspect import signature
+
         sig = signature(get_funding_ranges)
         assert "db" in sig.parameters
         assert "organization_id" in sig.parameters
@@ -429,6 +459,7 @@ class TestAnalyticsModule:
         """get_source_contribution is callable with db + organization_id."""
         from app.services.analytics import get_source_contribution
         from inspect import signature
+
         sig = signature(get_source_contribution)
         assert "db" in sig.parameters
         assert "organization_id" in sig.parameters
@@ -437,6 +468,7 @@ class TestAnalyticsModule:
         """get_opportunities_timeline is callable with db + organization_id."""
         from app.services.analytics import get_opportunities_timeline
         from inspect import signature
+
         sig = signature(get_opportunities_timeline)
         assert "db" in sig.parameters
         assert "organization_id" in sig.parameters
@@ -445,6 +477,7 @@ class TestAnalyticsModule:
         """get_category_distribution is callable with db + organization_id."""
         from app.services.analytics import get_category_distribution
         from inspect import signature
+
         sig = signature(get_category_distribution)
         assert "db" in sig.parameters
         assert "organization_id" in sig.parameters
@@ -461,6 +494,7 @@ class TestGenaiModule:
         """summarize_missing_opportunities is callable with db + organization_id."""
         from app.services.genai import summarize_missing_opportunities
         from inspect import signature
+
         sig = signature(summarize_missing_opportunities)
         assert "db" in sig.parameters
         assert "organization_id" in sig.parameters
@@ -469,6 +503,7 @@ class TestGenaiModule:
         """rescore_all_opportunities is callable with db + organization_id."""
         from app.services.genai import rescore_all_opportunities
         from inspect import signature
+
         sig = signature(rescore_all_opportunities)
         assert "db" in sig.parameters
         assert "organization_id" in sig.parameters
@@ -477,6 +512,7 @@ class TestGenaiModule:
         """score_unscored_opportunities is callable with db + organization_id."""
         from app.services.genai import score_unscored_opportunities
         from inspect import signature
+
         sig = signature(score_unscored_opportunities)
         assert "db" in sig.parameters
         assert "organization_id" in sig.parameters
@@ -485,6 +521,7 @@ class TestGenaiModule:
         """build_weekly_digest_html is callable with kwargs."""
         from app.services.genai import build_weekly_digest_html
         from inspect import signature
+
         sig = signature(build_weekly_digest_html)
         assert "organization" in sig.parameters
         assert "opportunities" in sig.parameters
@@ -493,6 +530,7 @@ class TestGenaiModule:
         """build_weekly_digest_html produces expected HTML structure."""
         from app.services.genai import build_weekly_digest_html
         from unittest.mock import MagicMock
+
         org = MagicMock()
         org.name = "Test Org"
         opp = MagicMock()
@@ -513,6 +551,7 @@ class TestGenaiModule:
         """send_weekly_digest is callable with db + organization_id."""
         from app.services.genai import send_weekly_digest
         from inspect import signature
+
         sig = signature(send_weekly_digest)
         assert "db" in sig.parameters
         assert "organization_id" in sig.parameters
@@ -529,6 +568,7 @@ class TestConnectorsModule:
         """connector_for is callable with source_key."""
         from app.services.connectors import connector_for
         from inspect import signature
+
         sig = signature(connector_for)
         assert "source_key" in sig.parameters
 
@@ -536,6 +576,7 @@ class TestConnectorsModule:
         """is_slow_scrape_source returns True for known slow keys."""
         from app.services.connectors import is_slow_scrape_source, SLOW_SCRAPE_SOURCE_KEYS
         from unittest.mock import MagicMock
+
         source = MagicMock()
         source.key = next(iter(SLOW_SCRAPE_SOURCE_KEYS))
         source.source_type = "rss"
@@ -545,6 +586,7 @@ class TestConnectorsModule:
         """is_slow_scrape_source returns False for normal keys."""
         from app.services.connectors import is_slow_scrape_source
         from unittest.mock import MagicMock
+
         source = MagicMock()
         source.key = "fast-source"
         source.source_type = "rss"
@@ -554,6 +596,7 @@ class TestConnectorsModule:
         """source_due_for_scraping returns True when never run."""
         from app.services.connectors import source_due_for_scraping
         from unittest.mock import MagicMock
+
         source = MagicMock()
         source.last_run_at = None
         source.scraping_frequency = "daily"
@@ -563,6 +606,7 @@ class TestConnectorsModule:
         """source_due_for_scraping returns True for hourly frequency."""
         from app.services.connectors import source_due_for_scraping
         from unittest.mock import MagicMock
+
         source = MagicMock()
         source.scraping_frequency = "hourly"
         source.last_run_at = None
@@ -571,6 +615,7 @@ class TestConnectorsModule:
     def test_SLOW_SCRAPE_SOURCE_KEYS_content(self) -> None:
         """SLOW_SCRAPE_SOURCE_KEYS is a frozenset with expected entries."""
         from app.services.connectors import SLOW_SCRAPE_SOURCE_KEYS
+
         assert isinstance(SLOW_SCRAPE_SOURCE_KEYS, frozenset)
         assert "innovamos-global-innovation-fund" in SLOW_SCRAPE_SOURCE_KEYS
         assert "apc-colombia" in SLOW_SCRAPE_SOURCE_KEYS
@@ -578,6 +623,7 @@ class TestConnectorsModule:
     def test_SLOW_SCRAPE_SOURCE_TYPES_content(self) -> None:
         """SLOW_SCRAPE_SOURCE_TYPES is a frozenset with 'hybrid'."""
         from app.services.connectors import SLOW_SCRAPE_SOURCE_TYPES
+
         assert isinstance(SLOW_SCRAPE_SOURCE_TYPES, frozenset)
         assert "hybrid" in SLOW_SCRAPE_SOURCE_TYPES
 
@@ -585,6 +631,7 @@ class TestConnectorsModule:
         """execute_source_run_locally is callable with db + source."""
         from app.services.connectors import execute_source_run_locally
         from inspect import signature
+
         sig = signature(execute_source_run_locally)
         assert "db" in sig.parameters
         assert "source" in sig.parameters
@@ -593,6 +640,7 @@ class TestConnectorsModule:
         """_scrape_source_candidates is async callable with source."""
         from app.services.connectors import _scrape_source_candidates
         from inspect import signature
+
         sig = signature(_scrape_source_candidates)
         assert "source" in sig.parameters
 
@@ -600,6 +648,7 @@ class TestConnectorsModule:
         """_scrape_source_candidates_with_timeout is async callable."""
         from app.services.connectors import _scrape_source_candidates_with_timeout
         from inspect import signature
+
         sig = signature(_scrape_source_candidates_with_timeout)
         assert "source" in sig.parameters
 
@@ -614,12 +663,14 @@ class TestOpportunityModule:
     def test__parse_ai_close_date_none(self) -> None:
         """_parse_ai_close_date returns None for empty input."""
         from app.services.opportunity import _parse_ai_close_date
+
         assert _parse_ai_close_date(None) is None
         assert _parse_ai_close_date("") is None
 
     def test__parse_ai_close_date_iso(self) -> None:
         """_parse_ai_close_date parses ISO format."""
         from app.services.opportunity import _parse_ai_close_date
+
         result = _parse_ai_close_date("2025-12-31")
         assert result is not None
         assert result.year == 2025
@@ -630,18 +681,21 @@ class TestOpportunityModule:
         """_parse_ai_close_date passes through datetime objects."""
         from app.services.opportunity import _parse_ai_close_date
         from datetime import datetime
+
         now = datetime.now()
         assert _parse_ai_close_date(now) is now
 
     def test__parse_funding_amount_none(self) -> None:
         """_parse_funding_amount returns (None, None) for empty input."""
         from app.services.opportunity import _parse_funding_amount
+
         assert _parse_funding_amount(None) == (None, None)
         assert _parse_funding_amount("") == (None, None)
 
     def test__parse_funding_amount_usd(self) -> None:
         """_parse_funding_amount parses USD 500,000."""
         from app.services.opportunity import _parse_funding_amount
+
         val, cur = _parse_funding_amount("USD 500,000")
         assert val == 500000.0
         assert cur == "USD"
@@ -649,6 +703,7 @@ class TestOpportunityModule:
     def test__parse_funding_amount_eur_million(self) -> None:
         """_parse_funding_amount parses EUR 1.2 million."""
         from app.services.opportunity import _parse_funding_amount
+
         val, cur = _parse_funding_amount("EUR 1.2 million")
         assert val == 1200000.0
         assert cur == "EUR"
@@ -656,6 +711,7 @@ class TestOpportunityModule:
     def test__parse_funding_amount_cop(self) -> None:
         """_parse_funding_amount parses COP 5,000,000."""
         from app.services.opportunity import _parse_funding_amount
+
         val, cur = _parse_funding_amount("COP 5,000,000")
         assert val == 5000000.0
         assert cur == "COP"
@@ -663,12 +719,14 @@ class TestOpportunityModule:
     def test__parse_funding_amount_no_currency(self) -> None:
         """_parse_funding_amount returns (None,None) when no currency marker."""
         from app.services.opportunity import _parse_funding_amount
+
         assert _parse_funding_amount("500000") == (None, None)
 
     def test__combined_text_joins(self) -> None:
         """_combined_text joins all OpportunityCreate text fields."""
         from app.services.opportunity import _combined_text
         from unittest.mock import MagicMock
+
         data = MagicMock()
         data.title = "Title"
         data.summary = "Summary"
@@ -681,6 +739,7 @@ class TestOpportunityModule:
         """_combined_text skips None/empty parts."""
         from app.services.opportunity import _combined_text
         from unittest.mock import MagicMock
+
         data = MagicMock()
         data.title = "Title"
         data.summary = None
@@ -692,22 +751,26 @@ class TestOpportunityModule:
     def test_opportunity_status_unknown(self) -> None:
         """opportunity_status returns unknown when close_date is None."""
         from app.services.opportunity import opportunity_status
+
         assert opportunity_status(None) == "unknown"
 
     def test_inferred_opportunity_status_unknown_no_text(self) -> None:
         """inferred_opportunity_status returns unknown with no text hint."""
         from app.services.opportunity import inferred_opportunity_status
+
         assert inferred_opportunity_status(None) == "unknown"
 
     def test_inferred_opportunity_status_open_from_text(self) -> None:
         """inferred_opportunity_status returns open when text says 'open'."""
         from app.services.opportunity import inferred_opportunity_status
+
         assert inferred_opportunity_status(None, "This opportunity is open for") == "open"
 
     def test_create_heuristic_extraction_signature(self) -> None:
         """create_heuristic_extraction is callable with a text arg."""
         from app.services.opportunity import create_heuristic_extraction
         from inspect import signature
+
         sig = signature(create_heuristic_extraction)
         assert "text" in sig.parameters
 
@@ -715,6 +778,7 @@ class TestOpportunityModule:
         """create_ai_extraction is an async callable."""
         from app.services.opportunity import create_ai_extraction
         from inspect import signature
+
         sig = signature(create_ai_extraction)
         assert "text" in sig.parameters
 
@@ -722,6 +786,7 @@ class TestOpportunityModule:
         """summarize_text is callable with a text arg."""
         from app.services.opportunity import summarize_text
         from inspect import signature
+
         sig = signature(summarize_text)
         assert "text" in sig.parameters
 
@@ -729,6 +794,7 @@ class TestOpportunityModule:
         """count_query is callable with db + stmt."""
         from app.services.opportunity import count_query
         from inspect import signature
+
         sig = signature(count_query)
         assert "db" in sig.parameters
         assert "stmt" in sig.parameters
@@ -737,6 +803,7 @@ class TestOpportunityModule:
         """enrich_opportunity_payload is async callable."""
         from app.services.opportunity import enrich_opportunity_payload
         from inspect import signature
+
         sig = signature(enrich_opportunity_payload)
         assert "data" in sig.parameters
 
@@ -744,6 +811,7 @@ class TestOpportunityModule:
         """reanalyze_opportunity is async callable with db + opportunity."""
         from app.services.opportunity import reanalyze_opportunity
         from inspect import signature
+
         sig = signature(reanalyze_opportunity)
         assert "db" in sig.parameters
         assert "opportunity" in sig.parameters
@@ -752,6 +820,7 @@ class TestOpportunityModule:
         """create_opportunity is async callable with db + data."""
         from app.services.opportunity import create_opportunity
         from inspect import signature
+
         sig = signature(create_opportunity)
         assert "db" in sig.parameters
         assert "data" in sig.parameters
@@ -760,6 +829,7 @@ class TestOpportunityModule:
         """_update_opportunity is callable with opportunity + data + title."""
         from app.services.opportunity import _update_opportunity
         from inspect import signature
+
         sig = signature(_update_opportunity)
         assert "opportunity" in sig.parameters
         assert "data" in sig.parameters
@@ -769,6 +839,7 @@ class TestOpportunityModule:
         """_update_and_score is async callable with db + opportunity + data."""
         from app.services.opportunity import _update_and_score
         from inspect import signature
+
         sig = signature(_update_and_score)
         assert "db" in sig.parameters
         assert "opportunity" in sig.parameters
@@ -786,6 +857,7 @@ class TestAlertsModule:
         """audit is callable with db + action + resource_type + user."""
         from app.services.alerts import audit
         from inspect import signature
+
         sig = signature(audit)
         assert "db" in sig.parameters
         assert "action" in sig.parameters
@@ -795,12 +867,14 @@ class TestAlertsModule:
     def test__source_health_status_idle(self) -> None:
         """_source_health_status returns 'idle' for empty runs."""
         from app.services.alerts import _source_health_status
+
         assert _source_health_status([]) == "idle"
 
     def test__source_health_status_healthy(self) -> None:
         """_source_health_status returns 'healthy' when first run succeeded."""
         from app.services.alerts import _source_health_status
         from unittest.mock import MagicMock
+
         run = MagicMock()
         run.status = "completed"
         assert _source_health_status([run]) == "healthy"
@@ -809,6 +883,7 @@ class TestAlertsModule:
         """_source_health_status returns 'failing' when first run failed."""
         from app.services.alerts import _source_health_status
         from unittest.mock import MagicMock
+
         run = MagicMock()
         run.status = "failed"
         assert _source_health_status([run]) == "failing"
@@ -817,6 +892,7 @@ class TestAlertsModule:
         """_source_health_status returns 'failing' with 3+ failures."""
         from app.services.alerts import _source_health_status
         from unittest.mock import MagicMock
+
         runs = [MagicMock(status="completed") for _ in range(2)]
         # Add 3 failed runs (after the initial successful ones)
         runs.insert(0, MagicMock(status="failed"))
@@ -828,6 +904,7 @@ class TestAlertsModule:
         """_source_health_status returns 'degraded' with 1-2 non-first failures."""
         from app.services.alerts import _source_health_status
         from unittest.mock import MagicMock
+
         runs = [MagicMock(status="completed"), MagicMock(status="failed")]
         assert _source_health_status(runs) == "degraded"
 
@@ -835,6 +912,7 @@ class TestAlertsModule:
         """create_source_health_alert is callable with db + source + reason."""
         from app.services.alerts import create_source_health_alert
         from inspect import signature
+
         sig = signature(create_source_health_alert)
         assert "db" in sig.parameters
         assert "source" in sig.parameters
@@ -845,40 +923,66 @@ class TestNoLegacyDuplicates:
     """PR C-2b: Verify _legacy.py has been deleted and all functions migrated."""
 
     DELETED_SYMBOLS = [
-        "slugify", "normalize_official_url", "is_private_url", "validate_source_url",
-        "is_public_http_url", "is_noise_title", "is_noise_payload", "url_is_reachable",
-        "opportunity_dedup_key", "_organization_opportunity_scope", "find_duplicate_opportunity",
-        "_normalize_survivor_datetime", "_opportunity_survivor_key", "_reassign_opportunity_relations",
-        "_merge_opportunity_records", "deduplicate_opportunities", "candidate_external_id",
-        "priority_for_score", "_semantic_score", "_compute_score", "calculate_score",
-        "export_csv", "export_xlsx", "export_pdf", "generate_report_html", "_render_pdf_with_playwright",
-        "build_opportunity_query", "_text_search_opportunities", "_lexical_search_score",
+        "slugify",
+        "normalize_official_url",
+        "is_private_url",
+        "validate_source_url",
+        "is_public_http_url",
+        "is_noise_title",
+        "is_noise_payload",
+        "url_is_reachable",
+        "opportunity_dedup_key",
+        "_organization_opportunity_scope",
+        "find_duplicate_opportunity",
+        "_normalize_survivor_datetime",
+        "_opportunity_survivor_key",
+        "_reassign_opportunity_relations",
+        "_merge_opportunity_records",
+        "deduplicate_opportunities",
+        "candidate_external_id",
+        "priority_for_score",
+        "_semantic_score",
+        "_compute_score",
+        "calculate_score",
+        "export_csv",
+        "export_xlsx",
+        "export_pdf",
+        "generate_report_html",
+        "_render_pdf_with_playwright",
+        "build_opportunity_query",
+        "_text_search_opportunities",
+        "_lexical_search_score",
         "semantic_search_opportunities",
-        "_get_opportunity_embedding", "_supports_vector_search", "opportunity_embedding_text",
-        "opportunity_reanalysis_text", "upsert_opportunity_embedding", "rebuild_opportunity_embeddings",
+        "_get_opportunity_embedding",
+        "_supports_vector_search",
+        "opportunity_embedding_text",
+        "opportunity_reanalysis_text",
+        "upsert_opportunity_embedding",
+        "rebuild_opportunity_embeddings",
     ]
 
     def test_legacy_file_deleted(self) -> None:
         """_legacy.py no longer exists in the services directory."""
         import os
-        assert not os.path.exists("app/services/_legacy.py"), (
-            "_legacy.py should have been deleted"
-        )
+
+        assert not os.path.exists("app/services/_legacy.py"), "_legacy.py should have been deleted"
 
     @pytest.mark.parametrize("symbol", DELETED_SYMBOLS)
     def test_all_deleted_symbols_still_importable(self, symbol: str) -> None:
         """All previously-deleted symbols are still importable from app.services."""
         import importlib
+
         mod = importlib.import_module("app.services")
-        assert hasattr(mod, symbol), (
-            f"Symbol {symbol!r} is NOT exported from app.services"
-        )
+        assert hasattr(mod, symbol), f"Symbol {symbol!r} is NOT exported from app.services"
 
     def test_all_extracted_functions_callable_via_facade(self) -> None:
         """Key extracted functions are still callable through app.services."""
         from app.services import (
-            connector_for, audit, create_source_health_alert,
+            connector_for,
+            audit,
+            create_source_health_alert,
         )
+
         assert callable(connector_for)
         assert callable(audit)
         assert callable(create_source_health_alert)
@@ -891,10 +995,9 @@ class TestServicesImportBackwardCompat:
     def test_all_symbols_importable_from_app_services(self, symbol: str) -> None:
         """``from app.services import {symbol}`` must work."""
         import importlib
+
         mod = importlib.import_module("app.services")
-        assert hasattr(mod, symbol), (
-            f"Symbol {symbol!r} is NOT exported from app.services"
-        )
+        assert hasattr(mod, symbol), f"Symbol {symbol!r} is NOT exported from app.services"
 
 
 class TestValidationModule:
@@ -902,6 +1005,7 @@ class TestValidationModule:
 
     def test_is_noise_title(self) -> None:
         from app.services.validation import is_noise_title
+
         assert is_noise_title(None) is True
         assert is_noise_title("   ") is True
         assert is_noise_title("hello@world") is True
@@ -909,22 +1013,26 @@ class TestValidationModule:
 
     def test_is_noise_title_valid(self) -> None:
         from app.services.validation import is_noise_title
+
         assert is_noise_title("Fondo de Innovación Tecnológica 2025") is False
 
     def test_is_private_url(self) -> None:
         from app.services.validation import is_private_url
+
         assert is_private_url("http://localhost:8000") is True
         assert is_private_url("http://192.168.1.1") is True
         assert is_private_url("https://google.com") is False
 
     def test_slugify(self) -> None:
         from app.services.validation import slugify
+
         assert slugify("Hello World") == "hello-world"
         assert slugify("  Foo  Bar  ") == "foo-bar"
         assert slugify("") == "item"
 
     def test_normalize_official_url(self) -> None:
         from app.services.validation import normalize_official_url
+
         assert normalize_official_url(None) is None
         assert normalize_official_url("https://Example.COM/Path/") == "https://example.com/Path"
         assert normalize_official_url("ftp://bad.com") is None
@@ -935,12 +1043,14 @@ class TestDedupModule:
 
     def test_opportunity_dedup_key_url(self) -> None:
         from app.services.dedup import opportunity_dedup_key
+
         key = opportunity_dedup_key("https://grants.gov/search-results-detail/12345", "title")
         assert key == "grants-gov:12345"
 
     def test_candidate_external_id(self) -> None:
         from app.services.dedup import candidate_external_id
         from unittest.mock import MagicMock
+
         source = MagicMock()
         source.key = "test-source"
         eid = candidate_external_id(source, "https://example.com/123", "Test Title")
@@ -953,6 +1063,7 @@ class TestScoringModule:
 
     def test_priority_for_score(self) -> None:
         from app.services.scoring import priority_for_score
+
         assert priority_for_score(80) == "high"
         assert priority_for_score(65) == "medium"
         assert priority_for_score(40) == "low"
@@ -960,6 +1071,7 @@ class TestScoringModule:
 
     def test_semantic_score_empty(self) -> None:
         from app.services.scoring import _semantic_score
+
         assert _semantic_score("", "profile") == 0.0
         assert _semantic_score("text", "") == 0.0
 
@@ -967,6 +1079,7 @@ class TestScoringModule:
         """Verify _compute_score returns the expected dict shape."""
         from app.services.scoring import _compute_score
         from unittest.mock import MagicMock
+
         opp = MagicMock()
         opp.country = "Colombia"
         opp.eligible_applicants = []
@@ -997,6 +1110,7 @@ class TestExportModule:
     def test_export_csv_structure(self) -> None:
         from app.services.export import export_csv
         from unittest.mock import MagicMock
+
         opp = MagicMock()
         opp.title = "Test"
         opp.entity = "Entity"
@@ -1017,6 +1131,7 @@ class TestSearchModule:
     def test_lexical_search_score(self) -> None:
         from app.services.search import _lexical_search_score
         from unittest.mock import MagicMock
+
         opp = MagicMock()
         opp.title = "Fondo de Innovación Tecnológica 2025"
         opp.entity = "MinCiencias"
@@ -1040,6 +1155,7 @@ class TestEmbeddingsModule:
     def test_opportunity_embedding_text(self) -> None:
         from app.services.embeddings import opportunity_embedding_text
         from unittest.mock import MagicMock
+
         opp = MagicMock()
         opp.title = "Test Opportunity"
         opp.entity = "Entity"

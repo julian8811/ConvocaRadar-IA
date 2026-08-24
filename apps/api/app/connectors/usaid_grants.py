@@ -2,7 +2,6 @@ from __future__ import annotations
 from app.connectors.registry import register
 
 
-
 from app.connectors.grants_gov import GrantsGovConnector, GRANTS_GOV_SEARCH_URL
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
 

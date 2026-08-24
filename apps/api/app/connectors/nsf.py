@@ -24,6 +24,7 @@ NSF_CLOSED_KEYWORDS = (
     "solicitation closed",
 )
 
+
 def _title_from(container) -> str:
     heading = container.css_first("h1, h2, h3, h4")
     if heading:
@@ -61,17 +62,33 @@ class NSFFundingConnector:
                     headers=headers,
                     fallback_content_type="text/html",
                 )
-                return RawSourceResult(source_key=self.source_key, url=final_url, content=content, content_type=content_type)
+                return RawSourceResult(
+                    source_key=self.source_key,
+                    url=final_url,
+                    content=content,
+                    content_type=content_type,
+                )
             except Exception:
                 continue
         # Both URLs failed; raise the last exception
-        raise RuntimeError(f"NSF funding page unreachable at both {self.base_url} and {self._fallback_url}")
+        raise RuntimeError(
+            f"NSF funding page unreachable at both {self.base_url} and {self._fallback_url}"
+        )
 
     async def parse(self, raw: RawSourceResult) -> list[OpportunityCandidate]:
         tree = HTMLParser(raw.content)
         candidates: list[OpportunityCandidate] = []
         seen: set[str] = set()
-        keywords = ("funding", "opportunity", "opportunities", "grant", "award", "proposal", "proposals", "call")
+        keywords = (
+            "funding",
+            "opportunity",
+            "opportunities",
+            "grant",
+            "award",
+            "proposal",
+            "proposals",
+            "call",
+        )
 
         for selector in ("article", ".card", ".views-row", "li", "section", "tr"):
             for container in tree.css(selector):

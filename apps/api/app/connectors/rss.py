@@ -37,7 +37,9 @@ class RssConnector:
         self.confidence_score = confidence_score
 
     async def fetch(self) -> RawSourceResult:
-        final_url, content, content_type = await fetch_httpx_text(self.base_url, fallback_content_type="application/rss+xml")
+        final_url, content, content_type = await fetch_httpx_text(
+            self.base_url, fallback_content_type="application/rss+xml"
+        )
         return RawSourceResult(
             source_key=self.source_key,
             url=final_url,
@@ -65,10 +67,16 @@ class RssConnector:
                 or item.findtext("content")
             )
             category = clean_text(item.findtext("category"))
-            pub_date = _parse_pub_date(item.findtext("pubDate") or item.findtext(f"{namespace}updated") or item.findtext(f"{namespace}published"))
+            pub_date = _parse_pub_date(
+                item.findtext("pubDate")
+                or item.findtext(f"{namespace}updated")
+                or item.findtext(f"{namespace}published")
+            )
             if not title or not link:
                 continue
-            categories = list(dict.fromkeys([*self.categories, category.lower() if category else ""]))
+            categories = list(
+                dict.fromkeys([*self.categories, category.lower() if category else ""])
+            )
             categories = [value for value in categories if value]
             candidates.append(
                 OpportunityCandidate(

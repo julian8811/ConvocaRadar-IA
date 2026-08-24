@@ -119,15 +119,23 @@ def test_calculate_source_health_score_freshness_decay() -> None:
 
     # Recent success
     recent = calculate_source_health_score(
-        success_rate=100.0, avg_items_found=10.0,
-        close_date_coverage=100.0, amount_coverage=100.0,
-        url_coverage=100.0, freshness_days=1, selector_stability=100.0,
+        success_rate=100.0,
+        avg_items_found=10.0,
+        close_date_coverage=100.0,
+        amount_coverage=100.0,
+        url_coverage=100.0,
+        freshness_days=1,
+        selector_stability=100.0,
     )
     # Very stale
     stale = calculate_source_health_score(
-        success_rate=100.0, avg_items_found=10.0,
-        close_date_coverage=100.0, amount_coverage=100.0,
-        url_coverage=100.0, freshness_days=365, selector_stability=100.0,
+        success_rate=100.0,
+        avg_items_found=10.0,
+        close_date_coverage=100.0,
+        amount_coverage=100.0,
+        url_coverage=100.0,
+        freshness_days=365,
+        selector_stability=100.0,
     )
     assert recent > stale
     # The difference should be at least the weight of freshness (10% * 100 = 10)
@@ -140,15 +148,23 @@ def test_calculate_source_health_score_avg_items_normalized() -> None:
 
     # Very high items found
     high = calculate_source_health_score(
-        success_rate=0.0, avg_items_found=500.0,
-        close_date_coverage=0.0, amount_coverage=0.0,
-        url_coverage=0.0, freshness_days=None, selector_stability=0.0,
+        success_rate=0.0,
+        avg_items_found=500.0,
+        close_date_coverage=0.0,
+        amount_coverage=0.0,
+        url_coverage=0.0,
+        freshness_days=None,
+        selector_stability=0.0,
     )
     # Very low items found
     low = calculate_source_health_score(
-        success_rate=0.0, avg_items_found=0.0,
-        close_date_coverage=0.0, amount_coverage=0.0,
-        url_coverage=0.0, freshness_days=None, selector_stability=0.0,
+        success_rate=0.0,
+        avg_items_found=0.0,
+        close_date_coverage=0.0,
+        amount_coverage=0.0,
+        url_coverage=0.0,
+        freshness_days=None,
+        selector_stability=0.0,
     )
     assert high >= low
     # With nothing else contributing, the max from avg_items is 20
@@ -161,9 +177,13 @@ def test_calculate_source_health_score_clamps_to_100() -> None:
     from app.services.scoring import calculate_source_health_score
 
     score = calculate_source_health_score(
-        success_rate=100.0, avg_items_found=9999.0,
-        close_date_coverage=100.0, amount_coverage=100.0,
-        url_coverage=100.0, freshness_days=0, selector_stability=100.0,
+        success_rate=100.0,
+        avg_items_found=9999.0,
+        close_date_coverage=100.0,
+        amount_coverage=100.0,
+        url_coverage=100.0,
+        freshness_days=0,
+        selector_stability=100.0,
     )
     assert score <= 100
 
@@ -173,9 +193,13 @@ def test_calculate_source_health_score_returns_int() -> None:
     from app.services.scoring import calculate_source_health_score
 
     score = calculate_source_health_score(
-        success_rate=73.5, avg_items_found=4.2,
-        close_date_coverage=60.0, amount_coverage=30.0,
-        url_coverage=80.0, freshness_days=5, selector_stability=90.0,
+        success_rate=73.5,
+        avg_items_found=4.2,
+        close_date_coverage=60.0,
+        amount_coverage=30.0,
+        url_coverage=80.0,
+        freshness_days=5,
+        selector_stability=90.0,
     )
     assert isinstance(score, int)
 
@@ -186,9 +210,13 @@ def test_calculate_source_health_score_partial_coverage() -> None:
 
     # Only success rate and avg_items contribute; everything else zero
     score = calculate_source_health_score(
-        success_rate=80.0, avg_items_found=10.0,
-        close_date_coverage=0.0, amount_coverage=0.0,
-        url_coverage=0.0, freshness_days=None, selector_stability=0.0,
+        success_rate=80.0,
+        avg_items_found=10.0,
+        close_date_coverage=0.0,
+        amount_coverage=0.0,
+        url_coverage=0.0,
+        freshness_days=None,
+        selector_stability=0.0,
     )
     # 80*0.30 + 20*0.20 + 0 + 0 + 0 + 0 + 0 = 24 + 4 = 28
     assert score == 28
@@ -199,14 +227,22 @@ def test_calculate_source_health_score_selector_stability_contributes() -> None:
     from app.services.scoring import calculate_source_health_score
 
     base = calculate_source_health_score(
-        success_rate=0.0, avg_items_found=0.0,
-        close_date_coverage=0.0, amount_coverage=0.0,
-        url_coverage=0.0, freshness_days=None, selector_stability=0.0,
+        success_rate=0.0,
+        avg_items_found=0.0,
+        close_date_coverage=0.0,
+        amount_coverage=0.0,
+        url_coverage=0.0,
+        freshness_days=None,
+        selector_stability=0.0,
     )
     with_stability = calculate_source_health_score(
-        success_rate=0.0, avg_items_found=0.0,
-        close_date_coverage=0.0, amount_coverage=0.0,
-        url_coverage=0.0, freshness_days=None, selector_stability=100.0,
+        success_rate=0.0,
+        avg_items_found=0.0,
+        close_date_coverage=0.0,
+        amount_coverage=0.0,
+        url_coverage=0.0,
+        freshness_days=None,
+        selector_stability=100.0,
     )
     # 5% of 100 = 5 points contribution
     assert with_stability - base == 5
@@ -217,9 +253,12 @@ def test_calculate_source_health_score_all_mid_values() -> None:
     from app.services.scoring import calculate_source_health_score
 
     score = calculate_source_health_score(
-        success_rate=50.0, avg_items_found=25.0,  # 50 on normalized scale
-        close_date_coverage=50.0, amount_coverage=50.0,
-        url_coverage=50.0, freshness_days=3,  # 80 on freshness scale
+        success_rate=50.0,
+        avg_items_found=25.0,  # 50 on normalized scale
+        close_date_coverage=50.0,
+        amount_coverage=50.0,
+        url_coverage=50.0,
+        freshness_days=3,  # 80 on freshness scale
         selector_stability=50.0,
     )
     # success_rate: 50*0.30 = 15

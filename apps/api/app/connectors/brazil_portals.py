@@ -1,4 +1,5 @@
-﻿"""Dedicated connector types for Brazilian opportunity portals."""
+"""Dedicated connector types for Brazilian opportunity portals."""
+
 from __future__ import annotations
 
 from app.connectors.generic_html import GenericHtmlConnector

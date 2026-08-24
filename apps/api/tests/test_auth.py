@@ -391,7 +391,9 @@ def test_get_current_user_rejects_password_reset_scope() -> None:
     # (which would mean the scope check was skipped and only the user
     # lookup failed).
     detail = response.json().get("detail", "")
-    assert "scope" in detail.lower() or "password_reset" in detail.lower() or detail == "Invalid token", (
+    assert (
+        "scope" in detail.lower() or "password_reset" in detail.lower() or detail == "Invalid token"
+    ), (
         f"Expected 401 detail to indicate a scope rejection, got {detail!r}. "
         "If detail == 'User not found', the scope check ran AFTER the user "
         "lookup and the password_reset token was decoded. If detail == "

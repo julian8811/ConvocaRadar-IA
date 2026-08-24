@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 
-
 from app.connectors.common import clean_opportunity_title, infer_country_from_entity
 
 
@@ -12,7 +11,10 @@ from app.connectors.common import clean_opportunity_title, infer_country_from_en
 
 class TestCleanTitle:
     def test_truncates_long_title_with_instituicao(self):
-        raw = "Bolsa de PD em Química Orgânica / Biologia Celular / Físico-Química Instituição: Instituto de Química, Universidade de São Paulo (IQ-USP) Cidade: São Paulo Inscrições até: 24/07/2026 " * 2
+        raw = (
+            "Bolsa de PD em Química Orgânica / Biologia Celular / Físico-Química Instituição: Instituto de Química, Universidade de São Paulo (IQ-USP) Cidade: São Paulo Inscrições até: 24/07/2026 "
+            * 2
+        )
         cleaned = clean_opportunity_title(raw)
         assert len(cleaned) <= 150
         assert "Bolsa de PD em Química Orgânica" in cleaned
@@ -29,7 +31,10 @@ class TestCleanTitle:
         assert "Cidade" not in cleaned
 
     def test_cleans_inscricoes_pattern(self):
-        raw = "Bolsa de PD em Genômica Instituição: USP and some more text here to make it long enough to trigger the truncation logic " * 2
+        raw = (
+            "Bolsa de PD em Genômica Instituição: USP and some more text here to make it long enough to trigger the truncation logic "
+            * 2
+        )
         cleaned = clean_opportunity_title(raw)
         assert "Instituição" not in cleaned
 

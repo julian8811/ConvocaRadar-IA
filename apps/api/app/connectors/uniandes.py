@@ -93,7 +93,9 @@ class UniandesConnector:
                 except Exception:
                     return []
 
-            sub_results = await asyncio.gather(*[_fetch_sitemap(u) for u in urls[:20]], return_exceptions=True)
+            sub_results = await asyncio.gather(
+                *[_fetch_sitemap(u) for u in urls[:20]], return_exceptions=True
+            )
             for entries in sub_results:
                 if isinstance(entries, list):
                     flat.extend(entries)

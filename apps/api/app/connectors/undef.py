@@ -12,7 +12,16 @@ from app.connectors.common import clean_text, fetch_httpx_text, parse_date_text
 
 
 UNDEF_URL = "https://www.un.org/democracyfund/en/apply-for-funding"
-TITLE_KEYWORDS = ("call", "proposal", "proposals", "fund", "grant", "application", "funding", "opportunity")
+TITLE_KEYWORDS = (
+    "call",
+    "proposal",
+    "proposals",
+    "fund",
+    "grant",
+    "application",
+    "funding",
+    "opportunity",
+)
 STOP_TITLES = {"apply for funding", "united nations democracy fund", "undef"}
 
 
@@ -28,7 +37,9 @@ class UNDEFConnector:
         self.base_url = base_url or UNDEF_URL
 
     async def fetch(self) -> RawSourceResult:
-        final_url, content, content_type = await fetch_httpx_text(self.base_url, fallback_content_type="text/html")
+        final_url, content, content_type = await fetch_httpx_text(
+            self.base_url, fallback_content_type="text/html"
+        )
         return RawSourceResult(
             source_key=self.source_key,
             url=final_url,

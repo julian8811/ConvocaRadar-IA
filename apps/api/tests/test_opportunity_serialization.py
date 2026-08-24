@@ -5,6 +5,7 @@ Strict TDD: tests written FIRST, before removing the model properties.
 T-26: Verify that listing opportunities does NOT trigger url_is_reachable
 for every item — that would be an N+1 HTTP request during serialization.
 """
+
 from __future__ import annotations
 
 import os
@@ -104,7 +105,8 @@ class TestNoNPlusOneSerialization:
                             raw_text=f"Test raw text #{i}.",
                             official_url=f"https://example.com/opp-{i}",
                             application_url=f"https://example.com/apply-{i}",
-                            close_date=datetime.now(UTC).replace(tzinfo=None) + timedelta(days=30 + i),
+                            close_date=datetime.now(UTC).replace(tzinfo=None)
+                            + timedelta(days=30 + i),
                         ),
                         organization_id=org.id,
                     )

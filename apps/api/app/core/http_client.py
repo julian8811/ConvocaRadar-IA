@@ -14,6 +14,7 @@ lifespan / the main loop). When called from a **different** event loop
 reusing the singleton.  Use ``close_per_loop_client()`` inside the secondary
 loop to release those connections.
 """
+
 from __future__ import annotations
 
 import asyncio
@@ -37,7 +38,11 @@ def _build_async_client() -> httpx.AsyncClient:
     return httpx.AsyncClient(
         timeout=settings.scraping_timeout_seconds or 30,
         limits=httpx.Limits(max_connections=100, max_keepalive_connections=20),
-        headers={"User-Agent": getattr(settings, "scraping_user_agent", "Mozilla/5.0 (compatible; ConvocaRadarBot/1.0)")},
+        headers={
+            "User-Agent": getattr(
+                settings, "scraping_user_agent", "Mozilla/5.0 (compatible; ConvocaRadarBot/1.0)"
+            )
+        },
     )
 
 
@@ -56,7 +61,13 @@ def sync_http_client() -> httpx.Client:
                 _client = httpx.Client(
                     timeout=settings.scraping_timeout_seconds or 30,
                     limits=httpx.Limits(max_connections=100, max_keepalive_connections=20),
-                    headers={"User-Agent": getattr(settings, "scraping_user_agent", "Mozilla/5.0 (compatible; ConvocaRadarBot/1.0)")},
+                    headers={
+                        "User-Agent": getattr(
+                            settings,
+                            "scraping_user_agent",
+                            "Mozilla/5.0 (compatible; ConvocaRadarBot/1.0)",
+                        )
+                    },
                 )
     return _client
 
@@ -88,7 +99,11 @@ async def http_client() -> httpx.AsyncClient:
     # A short-lived asyncio.run() may have created the first client. Once
     # that loop closes, its transport cannot be reused or closed from a new
     # loop, so replace the stale singleton deterministically.
-    if _async_client is not None and _async_client_loop is not None and _async_client_loop.is_closed():
+    if (
+        _async_client is not None
+        and _async_client_loop is not None
+        and _async_client_loop.is_closed()
+    ):
         _async_client = None
         _async_client_loop_id = None
         _async_client_loop = None

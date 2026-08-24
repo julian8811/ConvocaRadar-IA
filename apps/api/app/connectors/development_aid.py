@@ -1,4 +1,4 @@
-﻿"""DevelopmentAid.org tender connector — sitemap-driven two-phase extraction.
+"""DevelopmentAid.org tender connector — sitemap-driven two-phase extraction.
 
 Phase 1 (fetch): discover tender URLs from the sitemap index.
 Phase 2 (parse): fetch individual detail pages and extract structured
@@ -29,27 +29,13 @@ MAX_DETAIL_PAGES = 40
 
 # ── Regex patterns for Angular SSR HTML extraction ─────────────────────
 _RE_TITLE = re.compile(r'<h1 class="name"[^>]*>(.*?)</h1>', re.DOTALL)
-_RE_LOCATION = re.compile(
-    r'<span[^>]*>Location:</span>\s*.*?<span[^>]*>(.*?)</span>', re.DOTALL
-)
-_RE_STATUS = re.compile(
-    r'<span[^>]*>Status:</span>\s*.*?<span[^>]*>(.*?)</span>', re.DOTALL
-)
-_RE_SECTORS = re.compile(
-    r'<span[^>]*>Sectors:</span>\s*.*?<span[^>]*>(.*?)</span>', re.DOTALL
-)
-_RE_CATEGORY = re.compile(
-    r'<span[^>]*>Category:</span>\s*.*?<span[^>]*>(.*?)</span>', re.DOTALL
-)
-_RE_FUNDING_AGENCY = re.compile(
-    r'Funding Agency:</span>\s*.*?<a[^>]*>(.*?)</a>', re.DOTALL
-)
-_RE_DATE_POSTED = re.compile(
-    r'<span[^>]*>Posted:</span>\s*.*?<span[^>]*>(.*?)</span>', re.DOTALL
-)
-_RE_EXCERPT = re.compile(
-    r'class="injected-content view-excerpt[^"]*"[^>]*>(.*?)</div>', re.DOTALL
-)
+_RE_LOCATION = re.compile(r"<span[^>]*>Location:</span>\s*.*?<span[^>]*>(.*?)</span>", re.DOTALL)
+_RE_STATUS = re.compile(r"<span[^>]*>Status:</span>\s*.*?<span[^>]*>(.*?)</span>", re.DOTALL)
+_RE_SECTORS = re.compile(r"<span[^>]*>Sectors:</span>\s*.*?<span[^>]*>(.*?)</span>", re.DOTALL)
+_RE_CATEGORY = re.compile(r"<span[^>]*>Category:</span>\s*.*?<span[^>]*>(.*?)</span>", re.DOTALL)
+_RE_FUNDING_AGENCY = re.compile(r"Funding Agency:</span>\s*.*?<a[^>]*>(.*?)</a>", re.DOTALL)
+_RE_DATE_POSTED = re.compile(r"<span[^>]*>Posted:</span>\s*.*?<span[^>]*>(.*?)</span>", re.DOTALL)
+_RE_EXCERPT = re.compile(r'class="injected-content view-excerpt[^"]*"[^>]*>(.*?)</div>', re.DOTALL)
 _RE_TENDER_ID = re.compile(r"/tenders/view/(\d+)")
 
 # ── Helpers ────────────────────────────────────────────────────────────
@@ -95,7 +81,9 @@ def _parse_sitemap_entries(xml_text: str) -> list[dict[str, str]]:
                 continue
             seen.add(loc)
             lastmod_elem = url_elem.find("sm:lastmod", ns)
-            lastmod = lastmod_elem.text.strip() if lastmod_elem is not None and lastmod_elem.text else ""
+            lastmod = (
+                lastmod_elem.text.strip() if lastmod_elem is not None and lastmod_elem.text else ""
+            )
             entries.append({"loc": loc, "lastmod": lastmod})
         return entries
     except etree.ParseError as exc:
@@ -103,9 +91,7 @@ def _parse_sitemap_entries(xml_text: str) -> list[dict[str, str]]:
         return []
 
 
-def _extract_fields_from_html(
-    html: str, url: str
-) -> dict[str, str] | None:
+def _extract_fields_from_html(html: str, url: str) -> dict[str, str] | None:
     """Regex-extract structured fields from an Angular SSR detail page.
 
     Returns None when the required <h1 class="name"> element is missing.
@@ -305,6 +291,7 @@ class DevelopmentAidConnector:
                 return []
 
         import asyncio
+
         sub_results = await asyncio.gather(
             *[_fetch_sub(u) for u in safe_sub_urls],
             return_exceptions=True,

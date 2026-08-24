@@ -23,9 +23,24 @@ from app.db.session import SessionLocal  # noqa: E402
 from app.core.ai import embedding_model_version  # noqa: E402
 import app.main as app_main  # noqa: E402
 from app.main import app  # noqa: E402
-from app.models import Opportunity, OpportunityEmbedding, OpportunityScore, Organization, Role, Source, SourceRun, Task, User  # noqa: E402
+from app.models import (
+    Opportunity,
+    OpportunityEmbedding,
+    OpportunityScore,
+    Organization,
+    Role,
+    Source,
+    SourceRun,
+    Task,
+    User,
+)  # noqa: E402
 from app.schemas import OpportunityCreate  # noqa: E402
-from app.services import create_opportunity, deduplicate_opportunities, is_private_url, opportunity_dedup_key  # noqa: E402
+from app.services import (
+    create_opportunity,
+    deduplicate_opportunities,
+    is_private_url,
+    opportunity_dedup_key,
+)  # noqa: E402
 
 
 def client() -> TestClient:
@@ -65,7 +80,9 @@ def token(c: TestClient) -> str:
 async def create_fixture_opportunity(*, close_days: int = 30) -> str:
     db = SessionLocal()
     try:
-        organization = db.scalar(select(Organization).where(Organization.slug == "convocaradar-local"))
+        organization = db.scalar(
+            select(Organization).where(Organization.slug == "convocaradar-local")
+        )
         assert organization is not None
         source = db.scalar(select(Source).where(Source.key == "grants-gov"))
         assert source is not None
@@ -120,7 +137,11 @@ async def test_opportunities_and_score() -> None:
     assert items
     db = SessionLocal()
     try:
-        auto_scores = list(db.scalars(select(OpportunityScore).where(OpportunityScore.opportunity_id == opportunity_id)))
+        auto_scores = list(
+            db.scalars(
+                select(OpportunityScore).where(OpportunityScore.opportunity_id == opportunity_id)
+            )
+        )
     finally:
         db.close()
     assert auto_scores
@@ -134,7 +155,9 @@ async def test_semantic_search_returns_best_match() -> None:
     c = client()
     auth = {"Authorization": f"Bearer {token(c)}"}
     opportunity_id = await create_fixture_opportunity()
-    response = c.get("/api/v1/opportunities/semantic-search?query=research%20innovation%20grant", headers=auth)
+    response = c.get(
+        "/api/v1/opportunities/semantic-search?query=research%20innovation%20grant", headers=auth
+    )
     assert response.status_code == 200
     payload = response.json()
     # Text ILIKE fallback should find the opportunity even if embedding
@@ -144,7 +167,11 @@ async def test_semantic_search_returns_best_match() -> None:
 
     db = SessionLocal()
     try:
-        embedding = db.scalar(select(OpportunityEmbedding).where(OpportunityEmbedding.opportunity_id == opportunity_id))
+        embedding = db.scalar(
+            select(OpportunityEmbedding).where(
+                OpportunityEmbedding.opportunity_id == opportunity_id
+            )
+        )
     finally:
         db.close()
     assert embedding is not None
@@ -169,7 +196,9 @@ async def test_reanalyze_opportunity_improves_payload() -> None:
     auth = {"Authorization": f"Bearer {token(c)}"}
     db = SessionLocal()
     try:
-        organization = db.scalar(select(Organization).where(Organization.slug == "convocaradar-local"))
+        organization = db.scalar(
+            select(Organization).where(Organization.slug == "convocaradar-local")
+        )
         source = db.scalar(select(Source).where(Source.key == "grants-gov"))
         assert organization is not None and source is not None
         opportunity = await create_opportunity(
@@ -218,7 +247,11 @@ async def test_bulk_reanalyze_opportunities() -> None:
 
     db = SessionLocal()
     try:
-        embedding = db.scalar(select(OpportunityEmbedding).where(OpportunityEmbedding.opportunity_id == opportunity_id))
+        embedding = db.scalar(
+            select(OpportunityEmbedding).where(
+                OpportunityEmbedding.opportunity_id == opportunity_id
+            )
+        )
     finally:
         db.close()
     assert embedding is not None
@@ -231,7 +264,9 @@ def test_seed_includes_real_sources() -> None:
     try:
         apc = list(db.scalars(select(Source).where(Source.key == "apc-colombia")))
         eu = list(db.scalars(select(Source).where(Source.key == "eic-accelerator")))
-        local_user = db.scalar(select(Organization).where(Organization.slug == "convocaradar-local"))
+        local_user = db.scalar(
+            select(Organization).where(Organization.slug == "convocaradar-local")
+        )
     finally:
         db.close()
     assert len(apc) == 1
@@ -268,7 +303,10 @@ def test_seed_includes_grants_gov_source() -> None:
     assert minciencias[0]["country"] == "Colombia"
     icetex = [item for item in response.json() if item["key"] == "icetex-vigentes"]
     assert icetex
-    assert icetex[0]["base_url"] == "https://web.icetex.gov.co/becas/becas-para-estudios-en-el-exterior/becas-vigentes"
+    assert (
+        icetex[0]["base_url"]
+        == "https://web.icetex.gov.co/becas/becas-para-estudios-en-el-exterior/becas-vigentes"
+    )
     men = [item for item in response.json() if item["key"] == "mineducacion-becas"]
     assert men
     gif = [item for item in response.json() if item["key"] == "global-innovation-fund"]
@@ -278,7 +316,10 @@ def test_seed_includes_grants_gov_source() -> None:
     innpulsa = [item for item in response.json() if item["key"] == "innpulsa"]
     assert innpulsa
     assert innpulsa[0]["source_type"] == "api"
-    assert innpulsa[0]["base_url"] == "https://convocatorias.innpulsacolombia.com/api/convocatorias?active_only=true&include_private=false&include_archive=false"
+    assert (
+        innpulsa[0]["base_url"]
+        == "https://convocatorias.innpulsacolombia.com/api/convocatorias?active_only=true&include_private=false&include_archive=false"
+    )
     apc = [item for item in response.json() if item["key"] == "apc-colombia"]
     assert apc
     eu = [item for item in response.json() if item["key"] == "horizon-europe-sedia"]
@@ -366,9 +407,15 @@ def test_rate_limit_blocks_repeated_requests(monkeypatch) -> None:
     c = client()
     monkeypatch.setattr(app_main.settings, "rate_limit_requests_per_minute", 1)
     app_main.app.state.rate_limits.clear()
-    first = c.post("/api/v1/auth/login", json={"email": "admin@convocaradar.io", "password": "ConvocaRadarLocal123!"})
+    first = c.post(
+        "/api/v1/auth/login",
+        json={"email": "admin@convocaradar.io", "password": "ConvocaRadarLocal123!"},
+    )
     assert first.status_code == 200
-    second = c.post("/api/v1/auth/login", json={"email": "admin@convocaradar.io", "password": "ConvocaRadarLocal123!"})
+    second = c.post(
+        "/api/v1/auth/login",
+        json={"email": "admin@convocaradar.io", "password": "ConvocaRadarLocal123!"},
+    )
     assert second.status_code == 429
 
 
@@ -377,7 +424,9 @@ async def test_report_creation() -> None:
     c = client()
     auth = {"Authorization": f"Bearer {token(c)}"}
     await create_fixture_opportunity()
-    response = c.post("/api/v1/reports", headers=auth, json={"title": "Reporte institucional", "format": "html"})
+    response = c.post(
+        "/api/v1/reports", headers=auth, json={"title": "Reporte institucional", "format": "html"}
+    )
     assert response.status_code == 200
     html = response.json()["html_content"]
     assert "Resumen ejecutivo" in html
@@ -385,6 +434,7 @@ async def test_report_creation() -> None:
     assert "Observatorio de Convocatorias" in html
     assert 'href="https://www.grants.gov/search-results-detail/fixture-grants-2026"' in html
     assert "Formato listo para lectura ejecutiva" in html
+
 
 def test_ai_structured_extraction_and_scoring() -> None:
     c = client()
@@ -454,7 +504,9 @@ def test_ai_structured_extraction_ignores_scraping_noise() -> None:
 async def test_create_opportunity_enriches_incomplete_payload() -> None:
     db = SessionLocal()
     try:
-        organization = db.scalar(select(Organization).where(Organization.slug == "convocaradar-local"))
+        organization = db.scalar(
+            select(Organization).where(Organization.slug == "convocaradar-local")
+        )
         source = db.scalar(select(Source).where(Source.key == "grants-gov"))
         assert organization is not None and source is not None
         opportunity = await create_opportunity(
@@ -492,7 +544,9 @@ async def test_create_opportunity_enriches_incomplete_payload() -> None:
 async def test_create_opportunity_rejects_noise_title() -> None:
     db = SessionLocal()
     try:
-        organization = db.scalar(select(Organization).where(Organization.slug == "convocaradar-local"))
+        organization = db.scalar(
+            select(Organization).where(Organization.slug == "convocaradar-local")
+        )
         source = db.scalar(select(Source).where(Source.key == "grants-gov"))
         assert organization is not None and source is not None
         with pytest.raises(ValueError, match="scraping noise"):
@@ -527,7 +581,9 @@ async def test_create_opportunity_merges_cross_source_grants_gov_duplicates() ->
     seed()
     db = SessionLocal()
     try:
-        organization = db.scalar(select(Organization).where(Organization.slug == "convocaradar-local"))
+        organization = db.scalar(
+            select(Organization).where(Organization.slug == "convocaradar-local")
+        )
         grants_source = db.scalar(select(Source).where(Source.key == "grants-gov"))
         usaid_source = db.scalar(select(Source).where(Source.key == "usaid-grants"))
         assert organization is not None and grants_source is not None and usaid_source is not None
@@ -580,7 +636,9 @@ async def test_deduplicate_opportunities_removes_existing_duplicates() -> None:
     seed()
     db = SessionLocal()
     try:
-        organization = db.scalar(select(Organization).where(Organization.slug == "convocaradar-local"))
+        organization = db.scalar(
+            select(Organization).where(Organization.slug == "convocaradar-local")
+        )
         grants_source = db.scalar(select(Source).where(Source.key == "grants-gov"))
         usaid_source = db.scalar(select(Source).where(Source.key == "usaid-grants"))
         assert organization is not None and grants_source is not None and usaid_source is not None
@@ -636,7 +694,9 @@ def test_deduplicate_opportunities_handles_null_created_at() -> None:
     seed()
     db = SessionLocal()
     try:
-        organization = db.scalar(select(Organization).where(Organization.slug == "convocaradar-local"))
+        organization = db.scalar(
+            select(Organization).where(Organization.slug == "convocaradar-local")
+        )
         grants_source = db.scalar(select(Source).where(Source.key == "grants-gov"))
         usaid_source = db.scalar(select(Source).where(Source.key == "usaid-grants"))
         assert organization is not None and grants_source is not None and usaid_source is not None
@@ -700,7 +760,9 @@ def test_admin_deduplicate_opportunities_endpoint() -> None:
 def test_xlsx_report_download() -> None:
     c = client()
     auth = {"Authorization": f"Bearer {token(c)}"}
-    response = c.post("/api/v1/reports", headers=auth, json={"title": "Reporte xlsx", "format": "xlsx"})
+    response = c.post(
+        "/api/v1/reports", headers=auth, json={"title": "Reporte xlsx", "format": "xlsx"}
+    )
     assert response.status_code == 200
     report_id = response.json()["id"]
     download = c.get(f"/api/v1/reports/{report_id}/download", headers=auth)
@@ -783,7 +845,9 @@ def test_source_run_creates_real_opportunity_via_connector(monkeypatch) -> None:
     import app.connectors.factory as connector_factory
 
     monkeypatch.setattr(app_services, "connector_for", lambda *_args, **_kwargs: StubConnector())
-    monkeypatch.setattr(connector_factory, "connector_for", lambda *_args, **_kwargs: StubConnector())
+    monkeypatch.setattr(
+        connector_factory, "connector_for", lambda *_args, **_kwargs: StubConnector()
+    )
     sources = c.get("/api/v1/sources", headers=auth)
     assert sources.status_code == 200
     source_id = [item for item in sources.json() if item["key"] == "grants-gov"][0]["id"]
@@ -793,12 +857,17 @@ def test_source_run_creates_real_opportunity_via_connector(monkeypatch) -> None:
     assert payload["status"] == "success"
     assert payload["items_found"] == 1
     assert any(log["message"] == "Local connector executed" for log in payload["logs"])
-    opportunities = c.get("/api/v1/opportunities?search=Research%20Cooperation%20Call%202026", headers=auth)
+    opportunities = c.get(
+        "/api/v1/opportunities?search=Research%20Cooperation%20Call%202026", headers=auth
+    )
     assert opportunities.status_code == 200
     assert opportunities.json()["total"] >= 1
     tasks = c.get("/api/v1/tasks", headers=auth)
     assert tasks.status_code == 200
-    assert any(item["source_run_id"] == payload["id"] and item["status"] == "success" for item in tasks.json())
+    assert any(
+        item["source_run_id"] == payload["id"] and item["status"] == "success"
+        for item in tasks.json()
+    )
 
 
 def test_internal_source_run_completion_creates_opportunity() -> None:
@@ -929,7 +998,9 @@ def test_send_pending_alert_uses_email_delivery_flow() -> None:
 
     logs = c.get("/api/v1/admin/audit-logs", headers=auth)
     assert logs.status_code == 200
-    assert any(item["action"] == "send_alert" and item["resource_id"] == alert_id for item in logs.json())
+    assert any(
+        item["action"] == "send_alert" and item["resource_id"] == alert_id for item in logs.json()
+    )
 
 
 @pytest.mark.asyncio
@@ -970,7 +1041,10 @@ def test_admin_audit_logs() -> None:
 def test_admin_metrics() -> None:
     c = client()
     auth = {"Authorization": f"Bearer {token(c)}"}
-    c.post("/api/v1/sources/" + c.get("/api/v1/sources", headers=auth).json()[0]["id"] + "/run", headers=auth)
+    c.post(
+        "/api/v1/sources/" + c.get("/api/v1/sources", headers=auth).json()[0]["id"] + "/run",
+        headers=auth,
+    )
     response = c.get("/api/v1/admin/metrics", headers=auth)
     assert response.status_code == 200
     payload = response.json()
@@ -1040,7 +1114,11 @@ async def test_admin_rebuild_embeddings() -> None:
 
     db = SessionLocal()
     try:
-        embedding = db.scalar(select(OpportunityEmbedding).where(OpportunityEmbedding.opportunity_id == opportunity_id))
+        embedding = db.scalar(
+            select(OpportunityEmbedding).where(
+                OpportunityEmbedding.opportunity_id == opportunity_id
+            )
+        )
     finally:
         db.close()
     assert embedding is not None
@@ -1078,7 +1156,9 @@ def test_source_run_marks_degraded_when_no_candidates(monkeypatch) -> None:
     import app.connectors.factory as connector_factory
 
     monkeypatch.setattr(app_services, "connector_for", lambda *_args, **_kwargs: EmptyConnector())
-    monkeypatch.setattr(connector_factory, "connector_for", lambda *_args, **_kwargs: EmptyConnector())
+    monkeypatch.setattr(
+        connector_factory, "connector_for", lambda *_args, **_kwargs: EmptyConnector()
+    )
     sources = c.get("/api/v1/sources", headers=auth)
     source_id = [item for item in sources.json() if item["key"] == "grants-gov"][0]["id"]
     run = c.post(f"/api/v1/sources/{source_id}/run", headers=auth)
@@ -1239,11 +1319,17 @@ def test_seed_admin_creates(monkeypatch: pytest.MonkeyPatch) -> None:
         db.close()
 
     seed()
-    monkeypatch.setattr(sys, "argv", [
-        "convocaradar-seed-admin",
-        "--email", "new-cli-admin@example.com",
-        "--password-env", "SEED_ADMIN_TEST_PW",
-    ])
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "convocaradar-seed-admin",
+            "--email",
+            "new-cli-admin@example.com",
+            "--password-env",
+            "SEED_ADMIN_TEST_PW",
+        ],
+    )
     monkeypatch.setenv("SEED_ADMIN_TEST_PW", "supersecret123!")  # noqa: S105
     with pytest.raises(SystemExit) as exc_info:
         main()
@@ -1295,11 +1381,17 @@ def test_seed_admin_aborts_if_admin_exists(monkeypatch: pytest.MonkeyPatch) -> N
     finally:
         db.close()
 
-    monkeypatch.setattr(sys, "argv", [
-        "convocaradar-seed-admin",
-        "--email", "another-admin@example.com",
-        "--password-env", "SEED_ADMIN_TEST_PW",
-    ])
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "convocaradar-seed-admin",
+            "--email",
+            "another-admin@example.com",
+            "--password-env",
+            "SEED_ADMIN_TEST_PW",
+        ],
+    )
     monkeypatch.setenv("SEED_ADMIN_TEST_PW", "supersecret456!")
     with pytest.raises(SystemExit) as exc_info:
         main()
@@ -1327,11 +1419,17 @@ def test_seed_admin_rejects_missing_password(monkeypatch: pytest.MonkeyPatch) ->
     finally:
         db.close()
     seed()
-    monkeypatch.setattr(sys, "argv", [
-        "convocaradar-seed-admin",
-        "--email", "nobody@example.com",
-        "--password-env", "THIS_ENV_VAR_DOES_NOT_EXIST",
-    ])
+    monkeypatch.setattr(
+        sys,
+        "argv",
+        [
+            "convocaradar-seed-admin",
+            "--email",
+            "nobody@example.com",
+            "--password-env",
+            "THIS_ENV_VAR_DOES_NOT_EXIST",
+        ],
+    )
     monkeypatch.delenv("THIS_ENV_VAR_DOES_NOT_EXIST", raising=False)
     with pytest.raises(SystemExit) as exc_info:
         main()

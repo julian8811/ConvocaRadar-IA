@@ -13,7 +13,6 @@ from app.connectors.common import clean_text, extract_close_date, fetch_httpx_te
 UKRI_HOSTS = {"ukri.org", "www.ukri.org"}
 
 
-
 def _title_from(container) -> str:
     heading = container.css_first("h1, h2, h3, h4")
     if heading:
@@ -32,14 +31,27 @@ class UKRIConnector:
         self.base_url = base_url or "https://www.ukri.org/opportunity/"
 
     async def fetch(self) -> RawSourceResult:
-        final_url, content, content_type = await fetch_httpx_text(self.base_url, fallback_content_type="text/html")
-        return RawSourceResult(source_key=self.source_key, url=final_url, content=content, content_type=content_type)
+        final_url, content, content_type = await fetch_httpx_text(
+            self.base_url, fallback_content_type="text/html"
+        )
+        return RawSourceResult(
+            source_key=self.source_key, url=final_url, content=content, content_type=content_type
+        )
 
     async def parse(self, raw: RawSourceResult) -> list[OpportunityCandidate]:
         tree = HTMLParser(raw.content)
         candidates: list[OpportunityCandidate] = []
         seen: set[str] = set()
-        keywords = ("opportunity", "funding", "grant", "award", "call", "proposal", "proposals", "competition")
+        keywords = (
+            "opportunity",
+            "funding",
+            "grant",
+            "award",
+            "call",
+            "proposal",
+            "proposals",
+            "competition",
+        )
 
         for selector in ("article", ".card", ".cards__item", ".list-item", "li", "section", "tr"):
             for container in tree.css(selector):

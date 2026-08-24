@@ -69,10 +69,12 @@ def main() -> None:
         # Safety check: refuse to create a second admin unless --force
         if not args.force:
             existing_admin = db.scalar(
-                select(User).where(
+                select(User)
+                .where(
                     User.organization_id == org.id,
                     User.role == Role.admin.value,
-                ).limit(1),
+                )
+                .limit(1),
             )
             if existing_admin:
                 print(

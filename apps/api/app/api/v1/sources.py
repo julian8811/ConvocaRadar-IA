@@ -55,6 +55,8 @@ def _run_source_via_dispatcher(source_id: str, org_id: str):
         raise
     finally:
         worker_db.close()
+
+
 logger = logging.getLogger(__name__)
 struct_logger = structlog.get_logger(__name__)
 
@@ -98,7 +100,9 @@ def _health_window_days(source: Source) -> int:
 
 
 def _days_since_last_success(recent_runs: list[SourceRun], source: Source) -> int | None:
-    last_success = next((run for run in recent_runs if run.status == "success" and run.finished_at), None)
+    last_success = next(
+        (run for run in recent_runs if run.status == "success" and run.finished_at), None
+    )
     success_at = last_success.finished_at if last_success else source.last_success_at
     if not success_at:
         return None
@@ -113,28 +117,34 @@ def _source_coverage_ratios(db: Session, source_id: str) -> tuple[float, float, 
     opportunities.
     """
     opportunity_scope = Opportunity.source_id == source_id
-    total_opps = db.scalar(
-        select(func.count()).select_from(Opportunity).where(opportunity_scope)
-    ) or 0
+    total_opps = (
+        db.scalar(select(func.count()).select_from(Opportunity).where(opportunity_scope)) or 0
+    )
     if total_opps == 0:
         return 0.0, 0.0, 0.0
     with_close_date = (
         db.scalar(
-            select(func.count()).select_from(Opportunity)
+            select(func.count())
+            .select_from(Opportunity)
             .where(opportunity_scope, Opportunity.close_date.is_not(None))
-        ) or 0
+        )
+        or 0
     )
     with_amount = (
         db.scalar(
-            select(func.count()).select_from(Opportunity)
+            select(func.count())
+            .select_from(Opportunity)
             .where(opportunity_scope, Opportunity.funding_amount_value.is_not(None))
-        ) or 0
+        )
+        or 0
     )
     with_url = (
         db.scalar(
-            select(func.count()).select_from(Opportunity)
+            select(func.count())
+            .select_from(Opportunity)
             .where(opportunity_scope, Opportunity.official_url.is_not(None))
-        ) or 0
+        )
+        or 0
     )
     return (
         round((with_close_date / total_opps) * 100, 2),
@@ -150,7 +160,9 @@ def list_sources(
 ) -> list[Source]:
     return list(
         db.scalars(
-            select(Source).where((Source.organization_id == organization.id) | (Source.organization_id.is_(None)))
+            select(Source).where(
+                (Source.organization_id == organization.id) | (Source.organization_id.is_(None))
+            )
         )
     )
 
@@ -187,7 +199,9 @@ def _get_source_for_org(db: Session, source_id: str, organization: Organization)
     return source
 
 
-def _source_health(db: Session, source: Source, raw_recent_runs: list[SourceRun] | None = None) -> SourceHealthRead:
+def _source_health(
+    db: Session, source: Source, raw_recent_runs: list[SourceRun] | None = None
+) -> SourceHealthRead:
     if raw_recent_runs is None:
         raw_recent_runs = list(
             db.scalars(
@@ -197,7 +211,9 @@ def _source_health(db: Session, source: Source, raw_recent_runs: list[SourceRun]
                 .limit(10)
             )
         )
-    recent_runs = [run for run in raw_recent_runs if run.status in {"success", "failed", "degraded"}]
+    recent_runs = [
+        run for run in raw_recent_runs if run.status in {"success", "failed", "degraded"}
+    ]
     failures = sum(1 for run in recent_runs if run.status == "failed")
     recent_items_found = sum(run.items_found for run in recent_runs)
     recent_items_created = sum(run.items_created for run in recent_runs)
@@ -206,7 +222,9 @@ def _source_health(db: Session, source: Source, raw_recent_runs: list[SourceRun]
     last_run_duration_seconds = None
     last_completed_run = recent_runs[0] if recent_runs else None
     if last_completed_run and last_completed_run.started_at and last_completed_run.finished_at:
-        last_run_duration_seconds = max((last_completed_run.finished_at - last_completed_run.started_at).total_seconds(), 0.0)
+        last_run_duration_seconds = max(
+            (last_completed_run.finished_at - last_completed_run.started_at).total_seconds(), 0.0
+        )
     successful_runs = sum(1 for run in recent_runs if run.status == "success")
     run_count = len(recent_runs)
     success_rate = round((successful_runs / run_count) * 100, 2) if run_count else 0.0
@@ -222,9 +240,8 @@ def _source_health(db: Session, source: Source, raw_recent_runs: list[SourceRun]
         status = "failing"
     elif recent_runs[0].status == "degraded":
         status = "degraded"
-    elif (
-        (failure_rate >= 60 and average_items_found <= 1)
-        or (days_since_last_success is not None and days_since_last_success >= stale_days * 2)
+    elif (failure_rate >= 60 and average_items_found <= 1) or (
+        days_since_last_success is not None and days_since_last_success >= stale_days * 2
     ):
         status = "failing"
     elif (
@@ -299,7 +316,9 @@ def list_sources_health(
 ) -> list[SourceHealthRead]:
     sources = list(
         db.scalars(
-            select(Source).where((Source.organization_id == organization.id) | (Source.organization_id.is_(None)))
+            select(Source).where(
+                (Source.organization_id == organization.id) | (Source.organization_id.is_(None))
+            )
         )
     )
     runs_by_source = _load_recent_runs_for_sources(db, sources)
@@ -438,9 +457,7 @@ def run_all_sources(
         else:
             frequency = (source.scraping_frequency or "daily").lower()
             last_run = source.last_run_at
-            elapsed_seconds = (
-                (now - last_run).total_seconds() if last_run else None
-            )
+            elapsed_seconds = (now - last_run).total_seconds() if last_run else None
             struct_logger.info(
                 "run_all.skip",
                 source_id=str(source.id),
@@ -460,10 +477,7 @@ def run_all_sources(
     # Materialize primitive values before the request transaction commits.
     # ORM instances expire on commit and cannot safely be read by the
     # background thread afterwards.
-    due_source_items = [
-        {"id": str(source.id), "key": source.key}
-        for source in due_sources
-    ]
+    due_source_items = [{"id": str(source.id), "key": source.key} for source in due_sources]
 
     sweep_task = Task(
         organization_id=org_id,
@@ -482,7 +496,9 @@ def run_all_sources(
     db.flush()
     sweep_task_id = sweep_task.id
 
-    def _update_sweep_task(*, status: str, processed: int, failed: int, finished: bool = False) -> None:
+    def _update_sweep_task(
+        *, status: str, processed: int, failed: int, finished: bool = False
+    ) -> None:
         progress_db = SessionLocal()
         try:
             task = progress_db.get(Task, sweep_task_id)
@@ -512,19 +528,21 @@ def run_all_sources(
             _update_sweep_task(status="running", processed=0, failed=0)
             saved_thread = _base_threading.Thread
             _base_threading.Thread = _original_thread_cls
-            max_workers = min(
-                len(due_sources),
-                max(1, settings.scraping_max_concurrency),
-            ) if due_sources else 1
+            max_workers = (
+                min(
+                    len(due_sources),
+                    max(1, settings.scraping_max_concurrency),
+                )
+                if due_sources
+                else 1
+            )
             # The previous fixed global timeout (2x one connector timeout)
             # could abort a full catalog even while its connectors were
             # completing normally. Scale the sweep window to the number of
             # worker batches so every enabled source gets its turn.
-            sweep_timeout = (
-                settings.per_connector_timeout_seconds
-                * max(1, math.ceil(len(due_sources) / max_workers))
-                + min(30.0, max(1.0, settings.per_connector_timeout_seconds * 0.25))
-            )
+            sweep_timeout = settings.per_connector_timeout_seconds * max(
+                1, math.ceil(len(due_sources) / max_workers)
+            ) + min(30.0, max(1.0, settings.per_connector_timeout_seconds * 0.25))
             pool = concurrent.futures.ThreadPoolExecutor(max_workers=max_workers)
             try:
                 futs = {}
@@ -577,8 +595,12 @@ def run_all_sources(
                 # cancelled by Python. Do not let one such thread prevent the
                 # sweep task (or the API process) from completing.
                 pool.shutdown(wait=False, cancel_futures=True)
-            final_status = "success" if failed == 0 else ("failed" if processed == 0 else "degraded")
-            _update_sweep_task(status=final_status, processed=processed, failed=failed, finished=True)
+            final_status = (
+                "success" if failed == 0 else ("failed" if processed == 0 else "degraded")
+            )
+            _update_sweep_task(
+                status=final_status, processed=processed, failed=failed, finished=True
+            )
             struct_logger.info(
                 "run_all.completed",
                 processed=processed,
@@ -587,7 +609,9 @@ def run_all_sources(
             )
         except Exception as exc:
             remaining = max(len(due_sources) - processed, failed)
-            _update_sweep_task(status="failed", processed=processed, failed=remaining, finished=True)
+            _update_sweep_task(
+                status="failed", processed=processed, failed=remaining, finished=True
+            )
             struct_logger.exception("run_all.sweep_failed", error_message=str(exc)[:500])
 
     audit(db, "run_source_sweep_dispatched", "source_sweep", user, None)
@@ -661,17 +685,23 @@ def claim_default_sources(
     Any non-admin user can call this when their org has no sources.
     With ``force=true``, even sources owned by another org are reassigned.
     """
-    before_total = db.scalar(
-        select(func.count()).select_from(Source).where(
-            or_(Source.organization_id == organization.id, Source.organization_id.is_(None))
+    before_total = (
+        db.scalar(
+            select(func.count())
+            .select_from(Source)
+            .where(or_(Source.organization_id == organization.id, Source.organization_id.is_(None)))
         )
-    ) or 0
+        or 0
+    )
     stats = seed_default_sources(db, organization, force=force)
-    after_total = db.scalar(
-        select(func.count()).select_from(Source).where(
-            or_(Source.organization_id == organization.id, Source.organization_id.is_(None))
+    after_total = (
+        db.scalar(
+            select(func.count())
+            .select_from(Source)
+            .where(or_(Source.organization_id == organization.id, Source.organization_id.is_(None)))
         )
-    ) or 0
+        or 0
+    )
     db.commit()
     audit(db, "claim_default_sources", "source", user, organization.id)
     return {**stats, "force": force, "before_total": before_total, "after_total": after_total}

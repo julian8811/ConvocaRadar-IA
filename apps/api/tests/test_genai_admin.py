@@ -112,7 +112,9 @@ async def _make_opportunity(
 ) -> str:
     db = SessionLocal()
     try:
-        organization = db.scalar(select(Organization).where(Organization.slug == "convocaradar-local"))
+        organization = db.scalar(
+            select(Organization).where(Organization.slug == "convocaradar-local")
+        )
         assert organization is not None
         source = db.scalar(select(Source).where(Source.key == "grants-gov"))
         assert source is not None
@@ -127,7 +129,8 @@ async def _make_opportunity(
                 categories=["grants"],
                 topics=["research"],
                 summary=summary,
-                raw_text=raw_text or f"Convocatoria de investigación sobre {title} con fondos para innovación.",
+                raw_text=raw_text
+                or f"Convocatoria de investigación sobre {title} con fondos para innovación.",
                 official_url="https://example.com/genai",
                 funding_amount_value=25000.0,
                 funding_amount_currency="USD",
@@ -143,7 +146,11 @@ async def _make_opportunity(
         # Flush first so the just-added (in-session) score becomes visible to
         # the follow-up SELECT, otherwise SQLAlchemy skips it.
         db.flush()
-        for score in list(db.scalars(select(OpportunityScore).where(OpportunityScore.opportunity_id == opportunity.id))):
+        for score in list(
+            db.scalars(
+                select(OpportunityScore).where(OpportunityScore.opportunity_id == opportunity.id)
+            )
+        ):
             db.delete(score)
         db.flush()
         # Backdate created_at so the digest query can find it.

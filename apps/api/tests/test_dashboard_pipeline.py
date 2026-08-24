@@ -123,7 +123,9 @@ async def _make_opportunity(
     db = SessionLocal()
     try:
         if organization_id is None:
-            organization = db.scalar(select(Organization).where(Organization.slug == "convocaradar-local"))
+            organization = db.scalar(
+                select(Organization).where(Organization.slug == "convocaradar-local")
+            )
             assert organization is not None
             organization_id = organization.id
         source = db.scalar(select(Source).where(Source.key == "grants-gov"))
@@ -191,7 +193,9 @@ def _make_score(
                 organization_id=organization_id,
                 score=score,
                 priority="high",
-                reasons=reasons if reasons is not None else ["pipeline reason a", "pipeline reason b"],
+                reasons=reasons
+                if reasons is not None
+                else ["pipeline reason a", "pipeline reason b"],
                 warnings=[],
             )
         )
@@ -241,7 +245,9 @@ async def test_top_scored_capped_at_eight() -> None:
 
     db = SessionLocal()
     try:
-        organization = db.scalar(select(Organization).where(Organization.slug == "convocaradar-local"))
+        organization = db.scalar(
+            select(Organization).where(Organization.slug == "convocaradar-local")
+        )
         assert organization is not None
         org_id = organization.id
     finally:
@@ -265,7 +271,9 @@ async def test_top_scored_items_have_numeric_score_and_reasons() -> None:
 
     db = SessionLocal()
     try:
-        organization = db.scalar(select(Organization).where(Organization.slug == "convocaradar-local"))
+        organization = db.scalar(
+            select(Organization).where(Organization.slug == "convocaradar-local")
+        )
         assert organization is not None
         org_id = organization.id
     finally:
@@ -299,7 +307,9 @@ async def test_top_scored_ordered_by_score_desc() -> None:
 
     db = SessionLocal()
     try:
-        organization = db.scalar(select(Organization).where(Organization.slug == "convocaradar-local"))
+        organization = db.scalar(
+            select(Organization).where(Organization.slug == "convocaradar-local")
+        )
         assert organization is not None
         org_id = organization.id
     finally:
@@ -388,7 +398,9 @@ async def test_closing_soon_items_have_numeric_days_to_close() -> None:
     response = c.get("/api/v1/dashboard/pipeline", headers=auth)
     assert response.status_code == 200
     payload = response.json()
-    item = next(item for item in payload["closing_soon"] if item["title"] == "Pipeline Numeric Days")
+    item = next(
+        item for item in payload["closing_soon"] if item["title"] == "Pipeline Numeric Days"
+    )
     assert isinstance(item["days_to_close"], int)
     # 0..30 per the contract.
     assert 0 <= item["days_to_close"] <= 30

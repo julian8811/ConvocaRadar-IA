@@ -3,7 +3,6 @@
 from __future__ import annotations
 
 
-
 from app.connectors.common import (
     _UA_POOL,
     _random_user_agent,
@@ -18,10 +17,14 @@ class TestUserAgentRotation:
     def test_agents_are_diverse(self):
         browsers = []
         for ua in _UA_POOL:
-            if "Chrome" in ua: browsers.append("chrome")
-            elif "Firefox" in ua: browsers.append("firefox")
-            elif "Safari" in ua: browsers.append("safari")
-            elif "Edg" in ua: browsers.append("edge")
+            if "Chrome" in ua:
+                browsers.append("chrome")
+            elif "Firefox" in ua:
+                browsers.append("firefox")
+            elif "Safari" in ua:
+                browsers.append("safari")
+            elif "Edg" in ua:
+                browsers.append("edge")
         # At least 2 different browser families
         assert len(set(browsers)) >= 2
 
@@ -41,6 +44,7 @@ class TestProxyResolution:
     def test_no_proxy_from_settings(self):
         """When settings has no proxies, _resolve_proxy returns None."""
         from app.core.config import get_settings
+
         original = get_settings().scraping_proxy_list
         get_settings.cache_clear()
         try:
@@ -52,6 +56,7 @@ class TestProxyResolution:
     def test_proxy_list_is_comma_separated_config(self):
         """Verify the config field accepts comma-separated proxy list."""
         from app.core.config import Settings
+
         # Just validate the field definition exists and is a list
         s = Settings()
         assert hasattr(s, "scraping_proxy_list")

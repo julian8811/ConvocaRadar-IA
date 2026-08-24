@@ -1,4 +1,5 @@
 """ERC (European Research Council) calls connector via SEDIA API."""
+
 from __future__ import annotations
 
 import json
@@ -10,11 +11,19 @@ from app.connectors.registry import register
 ERC_TOPIC_URL = "https://ec.europa.eu/info/funding-tenders/opportunities/portal/screen/opportunities/topic-details/{identifier}"
 ERC_SEARCH_URL = "https://api.tech.ec.europa.eu/search-api/prod/rest/search"
 ERC_QUERY = "ERC"
-ERC_TERMS = ["ERC", "European Research Council", "Starting Grant", "Consolidator Grant", "Advanced Grant", "Proof of Concept"]
+ERC_TERMS = [
+    "ERC",
+    "European Research Council",
+    "Starting Grant",
+    "Consolidator Grant",
+    "Advanced Grant",
+    "Proof of Concept",
+]
 
 
 def _clean(value: str | None) -> str:
     import re
+
     return re.sub(r"\s+", " ", value or "").strip()
 
 
@@ -47,6 +56,7 @@ class ErcCallsConnector:
 
     async def fetch(self) -> RawSourceResult:
         from app.core.config import get_settings
+
         settings = get_settings()
         api_key = settings.sedia_api_key or "SEDIA"
         # Search for ERC-specific funding topics
@@ -60,6 +70,7 @@ class ErcCallsConnector:
             "filters": [{"field": "kind", "values": ["call-for-proposals"]}],
         }
         from app.connectors.common import http_client
+
         client = await http_client()
         response = await client.post(
             self.base_url,
@@ -98,7 +109,9 @@ class ErcCallsConnector:
             if not any(term.lower() in title_lower for term in ERC_TERMS):
                 continue
             identifier = str(item.get("identifier", item.get("id", "")))
-            summary = _clean(_first_text(item.get("shortDescription")) or _clean(item.get("description", "")))
+            summary = _clean(
+                _first_text(item.get("shortDescription")) or _clean(item.get("description", ""))
+            )
             categories = ["grants", "research", "european research council"]
             if "starting" in title_lower:
                 categories.append("starting grant")
@@ -109,8 +122,12 @@ class ErcCallsConnector:
             if "proof of concept" in title_lower or "poc" in title_lower:
                 categories.append("proof of concept")
             official_url = ERC_TOPIC_URL.format(identifier=identifier) if identifier else raw.url
-            open_date = _parse_date(_first_text(item.get("contentDate")) or _first_text(item.get("startDate")))
-            close_date = _parse_date(_first_text(item.get("deadlineDate")) or _first_text(item.get("endDate")))
+            open_date = _parse_date(
+                _first_text(item.get("contentDate")) or _first_text(item.get("startDate"))
+            )
+            close_date = _parse_date(
+                _first_text(item.get("deadlineDate")) or _first_text(item.get("endDate"))
+            )
             candidates.append(
                 OpportunityCandidate(
                     title=title[:180],

@@ -11,6 +11,7 @@ The seed function must:
 These tests use the same DB as the rest of the suite (test_convocaradar.db)
 and rely on the per-test unique-slug pattern to avoid collisions.
 """
+
 from __future__ import annotations
 
 import os
@@ -50,9 +51,7 @@ def _restore_local_org_sources() -> None:
     """
     db = SessionLocal()
     try:
-        local_org = db.scalar(
-            select(Organization).where(Organization.slug == "convocaradar-local")
-        )
+        local_org = db.scalar(select(Organization).where(Organization.slug == "convocaradar-local"))
         if local_org is None:
             # Create the local org so subsequent tests (e.g. test_api.py)
             # see a stable organization to assign sources to.
@@ -66,11 +65,7 @@ def _restore_local_org_sources() -> None:
             db.add(local_org)
             db.flush()
         # Find all pr4-* test orgs (from any prior test in this module).
-        test_orgs = list(
-            db.scalars(
-                select(Organization).where(Organization.slug.like("pr4-%-%"))
-            )
-        )
+        test_orgs = list(db.scalars(select(Organization).where(Organization.slug.like("pr4-%-%"))))
         # Reassign ANY source whose organization_id points to a non-existent
         # org (orphan) or to a pr4-* test org, back to the local org.
         all_org_ids = {str(o.id) for o in db.scalars(select(Organization))}
@@ -84,6 +79,7 @@ def _restore_local_org_sources() -> None:
         test_org_ids = list(set(test_org_ids))
         if test_org_ids:
             from sqlalchemy import update as sa_update
+
             stmt = (
                 sa_update(Source)
                 .where(Source.organization_id.in_(test_org_ids))

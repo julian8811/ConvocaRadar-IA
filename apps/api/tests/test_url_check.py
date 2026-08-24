@@ -2,6 +2,7 @@
 
 Strict TDD: tests written FIRST, before the endpoint exists.
 """
+
 from __future__ import annotations
 
 import os
@@ -90,7 +91,9 @@ async def _make_opportunity(
     """
     db = SessionLocal()
     try:
-        organization = db.scalar(select(Organization).where(Organization.slug == "convocaradar-local"))
+        organization = db.scalar(
+            select(Organization).where(Organization.slug == "convocaradar-local")
+        )
         assert organization is not None
         source = db.scalar(select(Source).where(Source.key == "grants-gov"))
         assert source is not None

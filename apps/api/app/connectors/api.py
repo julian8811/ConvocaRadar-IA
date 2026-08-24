@@ -13,7 +13,9 @@ class ApiConnector:
         self.base_url = base_url
 
     async def fetch(self) -> RawSourceResult:
-        final_url, content, content_type = await fetch_httpx_text(self.base_url, fallback_content_type="application/json")
+        final_url, content, content_type = await fetch_httpx_text(
+            self.base_url, fallback_content_type="application/json"
+        )
         return RawSourceResult(
             source_key=self.source_key,
             url=final_url,
@@ -49,12 +51,31 @@ class ApiConnector:
             parsed = self._maybe_load_json(payload)
             return self._iter_items(parsed, _depth + 1) if parsed is not None else []
 
-        direct_fields = ("title", "name", "opportunityName", "summary", "description", "url", "link", "opportunityUrl")
+        direct_fields = (
+            "title",
+            "name",
+            "opportunityName",
+            "summary",
+            "description",
+            "url",
+            "link",
+            "opportunityUrl",
+        )
         if any(payload.get(field) for field in direct_fields):
             return [payload]
 
         items: list[dict] = []
-        for key in ("items", "results", "data", "opportunities", "records", "content", "itemListElement", "@graph", "graph"):
+        for key in (
+            "items",
+            "results",
+            "data",
+            "opportunities",
+            "records",
+            "content",
+            "itemListElement",
+            "@graph",
+            "graph",
+        ):
             value = payload.get(key)
             parsed = self._maybe_load_json(value)
             if parsed is not None:
@@ -74,7 +95,9 @@ class ApiConnector:
             return []
         candidates: list[OpportunityCandidate] = []
         for item in self._iter_items(payload):
-            title = str(item.get("title") or item.get("name") or item.get("opportunityName") or "").strip()
+            title = str(
+                item.get("title") or item.get("name") or item.get("opportunityName") or ""
+            ).strip()
             link = str(
                 item.get("url")
                 or item.get("link")
@@ -88,22 +111,36 @@ class ApiConnector:
                 link = urljoin(raw.url, link)
             summary = str(item.get("summary") or item.get("description") or title).strip()
             country = str(item.get("country") or item.get("location") or "Por validar").strip()
-            identifier = str(item.get("id") or item.get("identifier") or item.get("opportunityId") or "").strip()
+            identifier = str(
+                item.get("id") or item.get("identifier") or item.get("opportunityId") or ""
+            ).strip()
             if not link and identifier:
                 link = urljoin(raw.url, f"#{identifier}")
-            categories = [str(value) for value in (item.get("categories") or item.get("tags") or []) if isinstance(value, str)]
+            categories = [
+                str(value)
+                for value in (item.get("categories") or item.get("tags") or [])
+                if isinstance(value, str)
+            ]
             topics = [str(value) for value in (item.get("topics") or []) if isinstance(value, str)]
             if not categories:
                 lowered = f"{title} {summary}".lower()
-                inferred = [label for label, needles in {
-                    "grants": ["grant", "subsidy", "funding", "award"],
-                    "education": ["scholarship", "fellowship", "study", "education"],
-                    "research": ["research", "science", "investigation", "innovation"],
-                    "cooperation": ["cooperation", "partnership", "collaboration"],
-                }.items() if any(needle in lowered for needle in needles)]
+                inferred = [
+                    label
+                    for label, needles in {
+                        "grants": ["grant", "subsidy", "funding", "award"],
+                        "education": ["scholarship", "fellowship", "study", "education"],
+                        "research": ["research", "science", "investigation", "innovation"],
+                        "cooperation": ["cooperation", "partnership", "collaboration"],
+                    }.items()
+                    if any(needle in lowered for needle in needles)
+                ]
                 categories = inferred or ["opportunity"]
             if not topics:
-                topics = [value for value in (str(item.get("theme") or item.get("program") or "").strip(),) if value]
+                topics = [
+                    value
+                    for value in (str(item.get("theme") or item.get("program") or "").strip(),)
+                    if value
+                ]
             candidates.append(
                 OpportunityCandidate(
                     title=title[:180],

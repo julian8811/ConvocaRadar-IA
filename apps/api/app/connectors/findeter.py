@@ -150,7 +150,11 @@ class FindeterConnector:
                 entity_code = part
                 break
 
-        entity = _resolve_entity_name(entity_code) if entity_code else self._resolve_entity_from_slug(slug)
+        entity = (
+            _resolve_entity_name(entity_code)
+            if entity_code
+            else self._resolve_entity_from_slug(slug)
+        )
 
         # Extract a readable type label from the slug or path
         type_codes = {

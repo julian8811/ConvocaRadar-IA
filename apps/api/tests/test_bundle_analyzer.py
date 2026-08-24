@@ -45,6 +45,4 @@ def test_next_config_imports_bundle_analyzer() -> None:
     assert "withBundleAnalyzer" in source or "@next/bundle-analyzer" in source, (
         "next.config.ts must import from @next/bundle-analyzer"
     )
-    assert "withBundleAnalyzer" in source, (
-        "The config must be wrapped with withBundleAnalyzer()"
-    )
+    assert "withBundleAnalyzer" in source, "The config must be wrapped with withBundleAnalyzer()"

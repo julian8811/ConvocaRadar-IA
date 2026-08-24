@@ -78,7 +78,9 @@ def read_bytes(storage_path: str) -> bytes:
     if storage_path.startswith("s3://"):
         client = _s3_client(settings)
         try:
-            response = client.get_object(Bucket=settings.s3_bucket, Key=_s3_key(storage_path, settings))
+            response = client.get_object(
+                Bucket=settings.s3_bucket, Key=_s3_key(storage_path, settings)
+            )
             return response["Body"].read()
         except Exception as exc:
             raise HTTPException(status_code=404, detail="Stored object not found") from exc
@@ -93,7 +95,9 @@ def delete_object(storage_path: str) -> None:
     settings = get_settings()
     if storage_path.startswith("s3://"):
         try:
-            _s3_client(settings).delete_object(Bucket=settings.s3_bucket, Key=_s3_key(storage_path, settings))
+            _s3_client(settings).delete_object(
+                Bucket=settings.s3_bucket, Key=_s3_key(storage_path, settings)
+            )
         except Exception:
             return
         return

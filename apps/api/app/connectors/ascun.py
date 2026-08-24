@@ -1,4 +1,5 @@
 """ASCUN Colombia convocatorias connector via WordPress REST API."""
+
 from __future__ import annotations
 
 import json
@@ -19,7 +20,9 @@ class AscunConnector:
 
     async def fetch(self) -> RawSourceResult:
         url = f"{self.base_url}?search=convocatoria&per_page=20&_fields=id,title,content,excerpt,date,link"
-        final_url, content, content_type = await fetch_httpx_text(url, fallback_content_type="application/json")
+        final_url, content, content_type = await fetch_httpx_text(
+            url, fallback_content_type="application/json"
+        )
         return RawSourceResult(
             source_key=self.source_key,
             url=final_url,
@@ -40,7 +43,9 @@ class AscunConnector:
             if not isinstance(item, dict):
                 continue
             title_raw = item.get("title", {})
-            title = clean_text(title_raw.get("rendered", "") if isinstance(title_raw, dict) else str(title_raw))
+            title = clean_text(
+                title_raw.get("rendered", "") if isinstance(title_raw, dict) else str(title_raw)
+            )
             if not title or title in seen:
                 continue
             seen.add(title)

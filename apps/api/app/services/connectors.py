@@ -63,7 +63,10 @@ SLOW_SCRAPE_SOURCE_TYPES = frozenset({"hybrid"})
 
 
 def is_slow_scrape_source(source: Source) -> bool:
-    return source.key in SLOW_SCRAPE_SOURCE_KEYS or (source.source_type or "") in SLOW_SCRAPE_SOURCE_TYPES
+    return (
+        source.key in SLOW_SCRAPE_SOURCE_KEYS
+        or (source.source_type or "") in SLOW_SCRAPE_SOURCE_TYPES
+    )
 
 
 def source_due_for_scraping(source: Source, *, now: datetime | None = None) -> bool:
@@ -174,9 +177,7 @@ async def _scrape_source_candidates_with_timeout(
             _scrape_source_candidates(source, stats), timeout=timeout_seconds
         )
     except TimeoutError as exc:
-        raise TimeoutError(
-            f"Scrape for source {source.key} exceeded {timeout_seconds}s"
-        ) from exc
+        raise TimeoutError(f"Scrape for source {source.key} exceeded {timeout_seconds}s") from exc
 
 
 def execute_source_run_locally(

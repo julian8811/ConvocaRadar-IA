@@ -76,7 +76,9 @@ class TestEnrichFromDetailPage:
 
         assert result is not None
         assert result.get("funding_amount_raw") is not None
-        assert "500,000" in result["funding_amount_raw"] or "500.000" in result["funding_amount_raw"]
+        assert (
+            "500,000" in result["funding_amount_raw"] or "500.000" in result["funding_amount_raw"]
+        )
 
     @pytest.mark.asyncio
     async def test_enrich_extracts_title_from_h1(self, monkeypatch):

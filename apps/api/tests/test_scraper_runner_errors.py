@@ -8,6 +8,7 @@ Covers:
 - ERR-3: TIMEOUT/NETWORK → status="failed"; PARSE → "degraded"
 - ERR-4: Health alerts created for PARSE/UNKNOWN, NOT for TIMEOUT/NETWORK
 """
+
 from __future__ import annotations
 
 import os
@@ -61,9 +62,7 @@ def source(db):
 def org_id(db):
     from app.models import Organization
 
-    org = db.scalar(
-        select(Organization).where(Organization.slug == "convocaradar-local")
-    )
+    org = db.scalar(select(Organization).where(Organization.slug == "convocaradar-local"))
     assert org is not None, "seeded org not found"
     return str(org.id)
 
@@ -79,9 +78,9 @@ from app.models import Source  # noqa: E402
 
 def _assert_log_has_error_type(run, expected_type: str) -> None:
     """Assert that at least one log entry contains error_type == expected_type."""
-    assert any(
-        log.get("error_type") == expected_type for log in run.logs
-    ), f"No log entry with error_type='{expected_type}' in {run.logs}"
+    assert any(log.get("error_type") == expected_type for log in run.logs), (
+        f"No log entry with error_type='{expected_type}' in {run.logs}"
+    )
 
 
 def _assert_health_alert_called(monkeypatch) -> None:
@@ -96,9 +95,7 @@ def _assert_health_alert_called(monkeypatch) -> None:
 # ---------------------------------------------------------------------------
 
 
-async def test_timeout_error_sets_error_type_in_logs(
-    monkeypatch, db, source, org_id
-):
+async def test_timeout_error_sets_error_type_in_logs(monkeypatch, db, source, org_id):
     """ERR-1/ERR-2: TimeoutError in _scrape_source_candidates_with_timeout
     must produce error_type=TIMEOUT in run logs."""
     from app.scraper.runner import run_source_inline
@@ -132,9 +129,7 @@ async def test_timeout_error_sets_error_type_in_logs(
     assert not health_alert_called, "TIMEOUT should NOT create a health alert"
 
 
-async def test_network_httpx_error_sets_error_type_in_logs(
-    monkeypatch, db, source, org_id
-):
+async def test_network_httpx_error_sets_error_type_in_logs(monkeypatch, db, source, org_id):
     """ERR-1/ERR-2: httpx.HTTPError → error_type=NETWORK in run logs."""
     from app.scraper.runner import run_source_inline
 
@@ -166,9 +161,7 @@ async def test_network_httpx_error_sets_error_type_in_logs(
     assert not health_alert_called, "NETWORK should NOT create a health alert"
 
 
-async def test_network_connection_error_sets_error_type_in_logs(
-    monkeypatch, db, source, org_id
-):
+async def test_network_connection_error_sets_error_type_in_logs(monkeypatch, db, source, org_id):
     """ERR-2: ConnectionError → error_type=NETWORK."""
     from app.scraper.runner import run_source_inline
 
@@ -199,9 +192,7 @@ async def test_network_connection_error_sets_error_type_in_logs(
     assert not health_alert_called, "NETWORK should NOT create a health alert"
 
 
-async def test_unknown_error_sets_error_type_and_creates_alert(
-    monkeypatch, db, source, org_id
-):
+async def test_unknown_error_sets_error_type_and_creates_alert(monkeypatch, db, source, org_id):
     """ERR-2/ERR-4: Generic Exception → error_type=UNKNOWN, health alert created."""
     from app.scraper.runner import run_source_inline
 
@@ -236,9 +227,7 @@ async def test_unknown_error_sets_error_type_and_creates_alert(
     assert health_alert_reason is not None
 
 
-async def test_parse_error_sets_degraded_status_and_creates_alert(
-    monkeypatch, db, source, org_id
-):
+async def test_parse_error_sets_degraded_status_and_creates_alert(monkeypatch, db, source, org_id):
     """ERR-3/ERR-4: PARSE error → status='degraded', health alert created.
 
     Currently PARSE errors are classified via a dummy scenario since
@@ -290,9 +279,7 @@ async def test_parse_error_sets_degraded_status_and_creates_alert(
     assert health_alert_reason is not None
 
 
-async def test_cancelled_error_sets_error_type_in_logs(
-    monkeypatch, db, source, org_id
-):
+async def test_cancelled_error_sets_error_type_in_logs(monkeypatch, db, source, org_id):
     """asyncio.CancelledError → error_type=TIMEOUT in logs, no health alert."""
     from app.scraper.runner import run_source_inline
 
@@ -326,9 +313,7 @@ async def test_cancelled_error_sets_error_type_in_logs(
     assert not health_alert_called, "CancelledError should NOT create a health alert"
 
 
-async def test_error_type_field_present_in_log_entries(
-    monkeypatch, db, source, org_id
-):
+async def test_error_type_field_present_in_log_entries(monkeypatch, db, source, org_id):
     """ERR-1: All error log entries must include the error_type field."""
     from app.scraper.runner import run_source_inline
 
@@ -358,6 +343,4 @@ async def test_error_type_field_present_in_log_entries(
     error_logs = [log for log in run.logs if log.get("level") == "error"]
     assert len(error_logs) > 0, "Should have at least one error log"
     for log in error_logs:
-        assert "error_type" in log, (
-            f"Error log entry missing error_type: {log}"
-        )
+        assert "error_type" in log, f"Error log entry missing error_type: {log}"

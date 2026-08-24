@@ -3,11 +3,10 @@
 from __future__ import annotations
 
 
-
-
 def test_country_inference_fixes_sin_dato():
     """infer_country_from_entity should fix 'Sin dato' countries."""
     from app.connectors.common import infer_country_from_entity
+
     # Known entities
     assert infer_country_from_entity("CONICET Argentina", None) == "Argentina"
     assert infer_country_from_entity("FAPESP Brasil", None) == "Brazil"
@@ -23,6 +22,7 @@ class TestRetryLogic:
         """fetch_httpx_text should accept retries parameter."""
         import inspect
         from app.connectors.common import fetch_httpx_text
+
         sig = inspect.signature(fetch_httpx_text)
         assert "retries" in sig.parameters
         assert sig.parameters["retries"].default == 2

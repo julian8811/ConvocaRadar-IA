@@ -5,7 +5,12 @@ from sqlalchemy.orm import Session
 from app.api.deps import get_current_organization, get_current_user
 from app.db.session import get_db
 from app.models import Organization, OrganizationProfile, User
-from app.schemas import OrganizationProfileRead, OrganizationProfileUpsert, OrganizationRead, OrganizationUpdate
+from app.schemas import (
+    OrganizationProfileRead,
+    OrganizationProfileUpsert,
+    OrganizationRead,
+    OrganizationUpdate,
+)
 
 router = APIRouter()
 

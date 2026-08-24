@@ -5,6 +5,7 @@ Usage
     report = await run_probe(db)
     report = await run_probe(db, source_key="minciencias")
 """
+
 from __future__ import annotations
 
 import asyncio

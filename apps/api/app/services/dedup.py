@@ -13,7 +13,13 @@ from datetime import datetime
 from sqlalchemy import or_, select
 from sqlalchemy.orm import Session
 
-from app.models import Alert, Opportunity, OpportunityDocument, OpportunityEmbedding, OpportunityScore
+from app.models import (
+    Alert,
+    Opportunity,
+    OpportunityDocument,
+    OpportunityEmbedding,
+    OpportunityScore,
+)
 from app.schemas import OpportunityCreate
 
 from app.services.validation import normalize_official_url, slugify
@@ -61,7 +67,9 @@ def opportunity_dedup_key(official_url: str | None, title: str, raw_text: str = 
 
 def _organization_opportunity_scope(organization_id: str | None):
     """Build scope filter for organization-bound opportunities."""
-    return or_(Opportunity.organization_id == organization_id, Opportunity.organization_id.is_(None))
+    return or_(
+        Opportunity.organization_id == organization_id, Opportunity.organization_id.is_(None)
+    )
 
 
 def find_duplicate_opportunity(
@@ -111,7 +119,9 @@ def find_duplicate_opportunity(
     if dedup_key.startswith("url:"):
         normalized_target = dedup_key[4:]
         candidates = db.scalars(
-            select(Opportunity).where(scope, Opportunity.official_url.is_not(None)).order_by(Opportunity.first_seen_at.asc())
+            select(Opportunity)
+            .where(scope, Opportunity.official_url.is_not(None))
+            .order_by(Opportunity.first_seen_at.asc())
         )
         for candidate in candidates:
             if normalize_official_url(candidate.official_url) == normalized_target:
@@ -156,21 +166,31 @@ def _normalize_survivor_datetime(value: datetime | None) -> datetime:
 def _opportunity_survivor_key(opportunity: Opportunity) -> tuple[datetime, datetime, str]:
     """Build a sort key for survivor selection (first_seen, created, id)."""
     first_seen = _normalize_survivor_datetime(opportunity.first_seen_at)
-    created = _normalize_survivor_datetime(opportunity.created_at) if opportunity.created_at else first_seen
+    created = (
+        _normalize_survivor_datetime(opportunity.created_at)
+        if opportunity.created_at
+        else first_seen
+    )
     return (first_seen, created, opportunity.id)
 
 
-def _reassign_opportunity_relations(db: Session, survivor: Opportunity, duplicate: Opportunity) -> None:
+def _reassign_opportunity_relations(
+    db: Session, survivor: Opportunity, duplicate: Opportunity
+) -> None:
     """Reassign all FK relations from duplicate to survivor. Does NOT delete the duplicate."""
     if duplicate.is_favorite and not survivor.is_favorite:
         survivor.is_favorite = True
     if duplicate.user_status not in {"review"} and survivor.user_status == "review":
         survivor.user_status = duplicate.user_status
 
-    for document in db.scalars(select(OpportunityDocument).where(OpportunityDocument.opportunity_id == duplicate.id)):
+    for document in db.scalars(
+        select(OpportunityDocument).where(OpportunityDocument.opportunity_id == duplicate.id)
+    ):
         document.opportunity_id = survivor.id
 
-    for score in db.scalars(select(OpportunityScore).where(OpportunityScore.opportunity_id == duplicate.id)):
+    for score in db.scalars(
+        select(OpportunityScore).where(OpportunityScore.opportunity_id == duplicate.id)
+    ):
         existing_score = db.scalar(
             select(OpportunityScore).where(
                 OpportunityScore.opportunity_id == survivor.id,
@@ -187,9 +207,13 @@ def _reassign_opportunity_relations(db: Session, survivor: Opportunity, duplicat
         else:
             score.opportunity_id = survivor.id
 
-    duplicate_embedding = db.scalar(select(OpportunityEmbedding).where(OpportunityEmbedding.opportunity_id == duplicate.id))
+    duplicate_embedding = db.scalar(
+        select(OpportunityEmbedding).where(OpportunityEmbedding.opportunity_id == duplicate.id)
+    )
     if duplicate_embedding:
-        survivor_embedding = db.scalar(select(OpportunityEmbedding).where(OpportunityEmbedding.opportunity_id == survivor.id))
+        survivor_embedding = db.scalar(
+            select(OpportunityEmbedding).where(OpportunityEmbedding.opportunity_id == survivor.id)
+        )
         if survivor_embedding:
             db.delete(duplicate_embedding)
         else:
@@ -208,10 +232,17 @@ def _merge_opportunity_records(db: Session, survivor: Opportunity, duplicate: Op
 def deduplicate_opportunities(db: Session, organization_id: str | None = None) -> dict[str, int]:
     """Deduplicate all opportunities visible to the given org scope."""
     scope = _organization_opportunity_scope(organization_id)
-    opportunities = list(db.scalars(select(Opportunity).where(scope).order_by(Opportunity.first_seen_at.asc())))
+    opportunities = list(
+        db.scalars(select(Opportunity).where(scope).order_by(Opportunity.first_seen_at.asc()))
+    )
     grouped: dict[str, list[Opportunity]] = {}
     for opportunity in opportunities:
-        key = opportunity_dedup_key(opportunity.official_url, opportunity.title, opportunity.raw_text or "") or f"id:{opportunity.id}"
+        key = (
+            opportunity_dedup_key(
+                opportunity.official_url, opportunity.title, opportunity.raw_text or ""
+            )
+            or f"id:{opportunity.id}"
+        )
         grouped.setdefault(key, []).append(opportunity)
 
     groups_merged = 0

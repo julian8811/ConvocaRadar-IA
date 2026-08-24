@@ -296,6 +296,7 @@ def test_reset_password_short_new_password_returns_422() -> None:
     user = _get_user("reset-short@example.com")
     assert user is not None
     from app.core.security import verify_password
+
     assert verify_password("original-password-1", user.password_hash), (
         "User.password_hash was modified despite a 422 response — the "
         "schema validation is not running before the handler."

@@ -51,6 +51,8 @@ class GrantsGovRssConnector:
     async def validate(self, candidate: OpportunityCandidate) -> ValidationResult:
         if not candidate.title or not candidate.official_url:
             return ValidationResult(ok=False, reason="Missing title or URL")
-        if not candidate.official_url.startswith(("https://www.grants.gov/", "https://simpler.grants.gov/")):
+        if not candidate.official_url.startswith(
+            ("https://www.grants.gov/", "https://simpler.grants.gov/")
+        ):
             return ValidationResult(ok=False, reason="Unexpected official URL")
         return ValidationResult(ok=True)

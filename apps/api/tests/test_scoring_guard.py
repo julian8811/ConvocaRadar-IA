@@ -21,9 +21,7 @@ def test_semantic_score_positive_with_local_hash_embeddings() -> None:
         "Convocatoria de fondos para proyectos de inteligencia artificial "
         "y machine learning en America Latina"
     )
-    profile_text = (
-        "inteligencia artificial machine learning fondos proyectos innovacion"
-    )
+    profile_text = "inteligencia artificial machine learning fondos proyectos innovacion"
     score = _semantic_score(text, profile_text)
     assert score > 0
 

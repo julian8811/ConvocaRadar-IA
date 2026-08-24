@@ -7,7 +7,14 @@ from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_organization, get_current_user
 from app.db.session import get_db
-from app.models import Opportunity, OpportunityScore, Organization, OrganizationProfile, Source, User
+from app.models import (
+    Opportunity,
+    OpportunityScore,
+    Organization,
+    OrganizationProfile,
+    Source,
+    User,
+)
 from app.schemas import (
     DashboardOpportunityItem,
     DashboardProfileSummary,
@@ -63,7 +70,9 @@ STATUS_LABELS = {
 
 def _profile_summary(profile: OrganizationProfile | None) -> DashboardProfileSummary:
     if profile is None:
-        return DashboardProfileSummary(completeness=0.0, missing_fields=[label for _, label in PROFILE_CHECKS])
+        return DashboardProfileSummary(
+            completeness=0.0, missing_fields=[label for _, label in PROFILE_CHECKS]
+        )
 
     filled = 0
     missing: list[str] = []
@@ -87,7 +96,9 @@ def _days_to_close(close_date: datetime | None) -> int | None:
     return max((close_date - datetime.now(UTC).replace(tzinfo=None)).days, 0)
 
 
-def _to_opportunity_item(opportunity: Opportunity, score: OpportunityScore | None = None) -> DashboardOpportunityItem:
+def _to_opportunity_item(
+    opportunity: Opportunity, score: OpportunityScore | None = None
+) -> DashboardOpportunityItem:
     return DashboardOpportunityItem(
         id=opportunity.id,
         title=opportunity.title,
@@ -111,7 +122,9 @@ def _visible_opportunity(opportunity: Opportunity) -> bool:
     # Hide opportunities that are marked as closed or have a past close_date
     if opportunity.status == "closed":
         return False
-    if opportunity.close_date and opportunity.close_date < datetime.now(UTC).replace(tzinfo=None) - timedelta(days=1):
+    if opportunity.close_date and opportunity.close_date < datetime.now(UTC).replace(
+        tzinfo=None
+    ) - timedelta(days=1):
         return False
     return True
 
@@ -159,7 +172,9 @@ def get_dashboard_summary(
     status_breakdown = get_status_breakdown(db, organization.id)
     country_breakdown = get_country_breakdown(db, organization.id)
     data_coverage = get_data_coverage(db, organization.id)
-    degraded_sources, failing_sources, source_alerts = get_source_health_summaries(db, organization.id)
+    degraded_sources, failing_sources, source_alerts = get_source_health_summaries(
+        db, organization.id
+    )
 
     # ---- Alias-specific: top_scored + closing_soon keep the legacy
     # ``DashboardOpportunityItem`` shape (entity, country, status,
@@ -192,11 +207,15 @@ def get_dashboard_summary(
 
     closing_soon = [
         _to_opportunity_item(item)
-        for item in db.scalars(build_opportunity_query(organization.id, status="closing_soon").limit(8))
+        for item in db.scalars(
+            build_opportunity_query(organization.id, status="closing_soon").limit(8)
+        )
         if _visible_opportunity(item)
     ]
 
-    profile = db.scalar(select(OrganizationProfile).where(OrganizationProfile.organization_id == organization.id))
+    profile = db.scalar(
+        select(OrganizationProfile).where(OrganizationProfile.organization_id == organization.id)
+    )
 
     return DashboardSummaryRead(
         total_opportunities=kpis.total,
@@ -286,11 +305,18 @@ def get_dashboard_health(
         timeline = _safe_call(get_opportunities_timeline, db, org.id)
         cat_dist = _safe_call(get_category_distribution, db, org.id)
         payload = HealthRead(
-            kpis=kpis, status_breakdown=status_bd, country_breakdown=country_bd,
-            data_coverage=coverage, sources_health=sources_h,
-            failing_sources=failing, degraded_sources=degraded, source_alerts=source_alerts,
-            score_distribution=score_dist, funding_ranges=funding,
-            source_contribution=contrib, opportunities_timeline=timeline,
+            kpis=kpis,
+            status_breakdown=status_bd,
+            country_breakdown=country_bd,
+            data_coverage=coverage,
+            sources_health=sources_h,
+            failing_sources=failing,
+            degraded_sources=degraded,
+            source_alerts=source_alerts,
+            score_distribution=score_dist,
+            funding_ranges=funding,
+            source_contribution=contrib,
+            opportunities_timeline=timeline,
             category_distribution=cat_dist,
         )
         _health_cache[cache_key] = (now_time, payload)
@@ -304,7 +330,9 @@ def get_dashboard_health(
             country_breakdown=get_country_breakdown(db, org.id),
             data_coverage=get_data_coverage(db, org.id),
             sources_health=get_sources_health(db, org.id),
-            failing_sources=0, degraded_sources=0, source_alerts=[],
+            failing_sources=0,
+            degraded_sources=0,
+            source_alerts=[],
         )
 
 

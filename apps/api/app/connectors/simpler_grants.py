@@ -52,7 +52,11 @@ def _find_after(block: str, label: str) -> str:
     )
     if decoded_match:
         candidate = _clean(decoded_match.group(1)).strip(": ")
-        if candidate and candidate != label and candidate.lower() not in {"div", "span", "$", "null"}:
+        if (
+            candidate
+            and candidate != label
+            and candidate.lower() not in {"div", "span", "$", "null"}
+        ):
             return candidate
     direct_patterns = [
         rf'\[\\"{re.escape(label)}\\",\\":\\"\]\}}\]\}},\\" \\",\\"([^"\\]+)',
@@ -85,7 +89,11 @@ def _find_after(block: str, label: str) -> str:
         for index, value in enumerate(values):
             if value == label and index + 1 < len(values):
                 candidate = _clean(values[index + 1]).strip(": ")
-                if candidate and candidate != ":" and candidate.lower() not in {"div", "span", "$", "null"}:
+                if (
+                    candidate
+                    and candidate != ":"
+                    and candidate.lower() not in {"div", "span", "$", "null"}
+                ):
                     return candidate
     return ""
 
@@ -131,7 +139,11 @@ class SimplerGrantsConnector:
             if not title or opportunity_id in seen:
                 continue
             seen.add(opportunity_id)
-            next_start = matches[index + 1].start() if index + 1 < len(matches) else min(len(content), match.end() + 7000)
+            next_start = (
+                matches[index + 1].start()
+                if index + 1 < len(matches)
+                else min(len(content), match.end() + 7000)
+            )
             block = content[max(0, match.start() - 1800) : next_start]
             number = _find_after(block, "Number")
             agency = _find_after(block, "Agency") or "Simpler Grants"

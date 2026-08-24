@@ -142,7 +142,9 @@ class TestFetchAndParse:
             base_url="https://www.dane.gov.co/convocatorias",
             source_type="html",
         )
-        apply_fixture_data(mocks, "httpx-get-html", "sample", side_effect=RuntimeError("simulated network error"))
+        apply_fixture_data(
+            mocks, "httpx-get-html", "sample", side_effect=RuntimeError("simulated network error")
+        )
 
         with pytest.raises(RuntimeError):
             await connector.fetch()
