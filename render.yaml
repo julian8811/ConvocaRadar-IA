@@ -47,8 +47,8 @@ services:
       - key: SMTP_PORT
         value: "587"
       - key: SMTP_USER
-        value: julianmontoya8811@hotmail.com
+        sync: false
       - key: SMTP_FROM
-        value: julianmontoya8811@hotmail.com
+        sync: false
       - key: SMTP_USE_TLS
         value: "true"
