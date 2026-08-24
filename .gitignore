@@ -46,3 +46,6 @@ openspec/
 sdd/
 backups/*.sql
 backups/*.sql.gz
+
+# Generated audit/report snapshots — regenerate locally, never track
+reports/*.md
