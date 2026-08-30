@@ -80,7 +80,7 @@ class DomainBudgetManager:
         # Burst / daily cap tracking (023 S3) — per-domain counter with window
         self._burst_counts: dict[str, int] = {}
         self._burst_window_start: dict[str, float] = {}
-        self._burst_window_seconds: float = 86400.0  # 24h window for throttle_max_per_day
+        self._burst_window_seconds: float = 604800.0  # 7d window for throttle_max_per_day (spec 023: burst 7d)
 
     # ------------------------------------------------------------------
     # Public API
