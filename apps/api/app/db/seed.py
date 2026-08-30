@@ -463,7 +463,13 @@ def seed_default_sources(
             "region": "LatAm",
             "source_type": "html",
             "category": ["convocatorias", "formacion", "emprendimiento"],
-            "allowed_domains": ["sena.edu.co", "www.sena.edu.co"],
+            "allowed_domains": [
+                "sena.edu.co",
+                "www.sena.edu.co",
+                "senasofiaplus.edu.co",
+                "oferta.senasofiaplus.edu.co",
+                "www.senasofiaplus.edu.co",
+            ],
             "scraping_frequency": "daily",
         },
         {

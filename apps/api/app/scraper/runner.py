@@ -314,6 +314,29 @@ def _handle_run_error(
     source.last_error = error_message
     if error_type not in (ErrorType.TIMEOUT, ErrorType.NETWORK):
         create_source_health_alert(db, source, reason=error_message)
+    # Auto-pause counters must increment also on timeout/network failures (failed category)
+    source.consecutive_empty_runs = update_consecutive_empty_runs(
+        items_found=0,
+        current_count=source.consecutive_empty_runs or 0,
+    )
+    if should_auto_pause(source.consecutive_empty_runs):
+        source.auto_paused = True
+        run.logs.append(
+            {
+                "level": "warn",
+                "message": f"Source auto-paused after {source.consecutive_empty_runs} consecutive empty runs (error)",
+            }
+        )
+    source.selector_failures = (source.selector_failures or 0) + 1
+    if (source.selector_failures or 0) >= 3:
+        source.auto_paused = True
+        run.logs.append(
+            {
+                "level": "warn",
+                "message": f"Source auto-paused after {source.selector_failures} consecutive selector failures (error)",
+            }
+        )
+    db.flush()
 
 
 async def run_source_inline(db, source: Source, organization_id: str | None = None) -> SourceRun:

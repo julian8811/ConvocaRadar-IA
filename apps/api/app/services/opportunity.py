@@ -35,7 +35,7 @@ from app.services.embeddings import (
     upsert_opportunity_embedding,
 )
 from app.services.scoring import calculate_score
-from app.services.validation import is_noise_payload, slugify, url_is_reachable
+from app.services.validation import async_url_is_reachable, is_noise_payload, slugify
 
 
 def _parse_ai_close_date(value: object) -> datetime | None:
@@ -158,6 +158,47 @@ def _combined_text(data: OpportunityCreate) -> str:
     )
 
 
+# ── Thin / metadata summary detection ────────────────────────────────────────
+
+_THIN_NOISE_RE = re.compile(
+    r"official website|here'?s how you know|sitemap entry|^https?://",
+    re.IGNORECASE,
+)
+_LABEL_RE = re.compile(r"[A-Za-z][A-Za-z ,'()/-]{2,48}:")
+
+
+def is_thin_or_metadata_summary(summary: str | None) -> bool:
+    """Detect summaries that carry no real descriptive content.
+
+    Some connectors (Grants.gov, Simpler Grants) build list-page summaries
+    purely from metadata ("Number: X | Agency: Y | Status: posted"). Those
+    must not block AI/heuristic enrichment, and must never overwrite an
+    existing substantive summary on re-scrape.
+    """
+    s = (summary or "").strip()
+    if len(s) < 120:
+        return True
+    if re.match(r"^\s*(number|opportunity\s+number|notice)\s*[:：]", s, re.IGNORECASE):
+        return True
+    if "| status:" in s.lower():
+        return True
+    # Government banner boilerplate at the start.
+    if re.match(
+        r"^(an official website|here'?s how you know|official websites use)",
+        s,
+        re.IGNORECASE,
+    ):
+        return True
+    if s.lower().startswith(("sitemap entry", "title ", "http")):
+        return True
+    # Form-label dumps: several "Field: value" pairs up front.
+    if len(_LABEL_RE.findall(s[:220])) >= 3:
+        return True
+    if _THIN_NOISE_RE.search(s[:200]) and len(re.sub(r"\s+", " ", s)) < 260:
+        return True
+    return False
+
+
 async def enrich_opportunity_payload(data: OpportunityCreate) -> OpportunityCreate:
     raw_text = data.raw_text.strip()
     combined = _combined_text(data)
@@ -176,7 +217,13 @@ async def enrich_opportunity_payload(data: OpportunityCreate) -> OpportunityCrea
             if parsed:
                 merged["close_date"] = parsed
         return OpportunityCreate(**merged)
-    if data.summary and data.categories and data.requirements and data.confidence_score >= 0.75:
+    if (
+        data.summary
+        and not is_thin_or_metadata_summary(data.summary)
+        and data.categories
+        and data.requirements
+        and data.confidence_score >= 0.75
+    ):
         merged = data.model_dump()
         if merged.get("language") in {None, "", "auto"}:
             merged["language"] = infer_language(
@@ -202,7 +249,20 @@ async def enrich_opportunity_payload(data: OpportunityCreate) -> OpportunityCrea
     )
     merged["categories"] = data.categories or list(extraction.get("category") or [])
     merged["topics"] = data.topics or list(extraction.get("matched_keywords") or [])
-    merged["summary"] = data.summary or str(extraction.get("summary") or merged["summary"])
+    incoming_summary = (
+        data.summary if not is_thin_or_metadata_summary(data.summary) else ""
+    )
+    extraction_summary = str(extraction.get("summary") or "")
+    if is_thin_or_metadata_summary(extraction_summary):
+        extraction_summary = ""
+    merged["summary"] = (
+        incoming_summary
+        or extraction_summary
+        # Nada sustancial todavia: conservar el fallback previo del
+        # extractor (p.ej. "Resumen pendiente...") para no dejar vacio.
+        or str(extraction.get("summary") or "")
+        or str(merged.get("summary") or "")
+    )
     merged["description"] = data.description or str(
         extraction.get("summary") or merged["description"]
     )
@@ -358,7 +418,14 @@ def _update_opportunity(
     opportunity.categories = list(data.categories)
     opportunity.topics = list(data.topics)
     opportunity.description = data.description
-    opportunity.summary = data.summary or data.description or opportunity.summary
+    if data.summary and not is_thin_or_metadata_summary(data.summary):
+        # Incoming summary carries real content — adopt it.
+        opportunity.summary = data.summary
+    elif is_thin_or_metadata_summary(opportunity.summary or ""):
+        # Both incoming and existing are thin: fall back to description.
+        opportunity.summary = data.summary or data.description or opportunity.summary
+    # Else: existing summary is substantive and the incoming one is thin
+    # metadata (list-page rebuilds) — keep the better existing summary.
     opportunity.raw_text = data.raw_text or opportunity.raw_text
     opportunity.official_url = data.official_url
     opportunity.application_url = data.application_url
@@ -411,9 +478,9 @@ async def create_opportunity(
         raise ValueError("Opportunity title looks like scraping noise")
     slug = slugify(f"{normalized_title}-{data.entity}")
     score_org_id = organization_id
-    if data.official_url and not url_is_reachable(data.official_url):
+    if data.official_url and not await async_url_is_reachable(data.official_url):
         data = data.model_copy(update={"official_url": None})
-    if data.application_url and not url_is_reachable(data.application_url):
+    if data.application_url and not await async_url_is_reachable(data.application_url):
         data = data.model_copy(update={"application_url": None})
 
     # ── Dedup checks (ordered by specificity) ─────────────────────────────
