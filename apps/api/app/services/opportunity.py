@@ -551,11 +551,21 @@ def _update_opportunity(
     opportunity.raw_text = data.raw_text or opportunity.raw_text
     opportunity.official_url = data.official_url
     opportunity.application_url = data.application_url
-    opportunity.open_date = data.open_date
-    opportunity.close_date = data.close_date
-    opportunity.funding_amount_value = data.funding_amount_value
-    opportunity.funding_amount_currency = data.funding_amount_currency
-    opportunity.funding_amount_raw = data.funding_amount_raw
+    # Backfill funding/close/open only when existing is missing — re-scrape patch
+    if data.funding_amount_value is not None and opportunity.funding_amount_value is None:
+        opportunity.funding_amount_value = data.funding_amount_value
+        opportunity.funding_amount_currency = data.funding_amount_currency
+        if data.funding_amount_raw is not None:
+            opportunity.funding_amount_raw = data.funding_amount_raw
+    elif data.funding_amount_raw is not None and opportunity.funding_amount_raw is None:
+        opportunity.funding_amount_raw = data.funding_amount_raw
+        if data.funding_amount_value is not None and opportunity.funding_amount_value is None:
+            opportunity.funding_amount_value = data.funding_amount_value
+            opportunity.funding_amount_currency = data.funding_amount_currency
+    if data.open_date is not None and opportunity.open_date is None:
+        opportunity.open_date = data.open_date
+    if data.close_date is not None and opportunity.close_date is None:
+        opportunity.close_date = data.close_date
     opportunity.eligible_applicants = list(data.eligible_applicants)
     opportunity.requirements = list(data.requirements)
     opportunity.documents_required = list(data.documents_required)
@@ -564,7 +574,7 @@ def _update_opportunity(
     opportunity.risk_flags = list(data.risk_flags)
     opportunity.confidence_score = data.confidence_score
     opportunity.status = inferred_opportunity_status(
-        data.close_date,
+        opportunity.close_date or data.close_date,
         " ".join([data.summary, data.raw_text]),
     )
 
@@ -576,16 +586,23 @@ async def _update_and_score(
     normalized_title: str,
     score_org_id: str | None,
 ) -> Opportunity:
-    """Update opportunity, recalculate embedding + score."""
+    """Update opportunity, recalculate embedding + score. Embedding is best-effort."""
     _update_opportunity(opportunity, data, normalized_title)
     actual_org_id = opportunity.organization_id or score_org_id
-    await upsert_opportunity_embedding(db, opportunity)
+    try:
+        await upsert_opportunity_embedding(db, opportunity)
+    except Exception:
+        import structlog as _sl
+        _sl.get_logger(__name__).warning("embedding_upsert_failed_backfill", opportunity_id=opportunity.id)
     if actual_org_id:
-        profile = db.scalar(
-            select(OrganizationProfile).where(OrganizationProfile.organization_id == actual_org_id)
-        )
-        if profile:
-            calculate_score(db, opportunity, profile)
+        try:
+            profile = db.scalar(
+                select(OrganizationProfile).where(OrganizationProfile.organization_id == actual_org_id)
+            )
+            if profile:
+                calculate_score(db, opportunity, profile)
+        except Exception:
+            pass
     return opportunity
 
 
@@ -674,7 +691,11 @@ async def create_opportunity(
     )
     if existing:
         _update_opportunity(existing, data, normalized_title)
-        await upsert_opportunity_embedding(db, existing)
+        try:
+            await upsert_opportunity_embedding(db, existing)
+        except Exception:
+            import structlog as _sl
+            _sl.get_logger(__name__).warning("embedding_upsert_failed_slug", opportunity_id=existing.id)
         return existing
 
     # ── Create new opportunity ────────────────────────────────────────────
@@ -697,13 +718,20 @@ async def create_opportunity(
     )
     db.add(opportunity)
     db.flush()
-    await upsert_opportunity_embedding(db, opportunity)
+    try:
+        await upsert_opportunity_embedding(db, opportunity)
+    except Exception:
+        import structlog as _sl
+        _sl.get_logger(__name__).warning("embedding_upsert_failed_create", opportunity_id=opportunity.id)
     if score_org_id:
-        profile = db.scalar(
-            select(OrganizationProfile).where(OrganizationProfile.organization_id == score_org_id)
-        )
-        if profile:
-            calculate_score(db, opportunity, profile)
+        try:
+            profile = db.scalar(
+                select(OrganizationProfile).where(OrganizationProfile.organization_id == score_org_id)
+            )
+            if profile:
+                calculate_score(db, opportunity, profile)
+        except Exception:
+            pass
     return opportunity
 
 
