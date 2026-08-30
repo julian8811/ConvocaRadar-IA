@@ -186,7 +186,20 @@ def _setup_run(db, source: Source, organization_id: str | None) -> tuple[SourceR
 async def _persist_opportunities(
     db, run: SourceRun, opportunities: list[OpportunityCreate], organization_id: str | None
 ) -> tuple[int, int, int]:
-    """Persist scraped opportunities, returning (created, updated, failed)."""
+    """Persist scraped opportunities, returning (created, updated, failed).
+
+    Uses bulk dedup preload_external_ids per source to avoid N+1, with
+    clear_bulk_cache after each source batch.
+    """
+    from app.services.opportunity import clear_bulk_cache, preload_external_ids
+
+    # Preload per-source external_id sets (1 query per source)
+    source_ids = {o.source_id for o in opportunities if o.source_id}
+    for sid in source_ids:
+        try:
+            preload_external_ids(db, sid)
+        except Exception:
+            pass
     created = 0
     updated = 0
     failed_items = 0
@@ -214,6 +227,11 @@ async def _persist_opportunities(
                     "error": str(exc),
                 }
             )
+    # Clear per-source bulk caches so next source starts fresh
+    try:
+        clear_bulk_cache()
+    except Exception:
+        pass
     return created, updated, failed_items
 
 
@@ -281,7 +299,7 @@ def _finalize_run(
         source.selector_failures = (source.selector_failures or 0) + 1
     else:
         source.selector_failures = 0
-    if (source.selector_failures or 0) >= 3:
+    if (source.selector_failures or 0) >= 5:
         source.auto_paused = True
         run.logs.append(
             {
@@ -333,7 +351,7 @@ def _handle_run_error(
             }
         )
     source.selector_failures = (source.selector_failures or 0) + 1
-    if (source.selector_failures or 0) >= 3:
+    if (source.selector_failures or 0) >= 5:
         source.auto_paused = True
         run.logs.append(
             {
@@ -373,15 +391,22 @@ async def run_source_inline(db, source: Source, organization_id: str | None = No
         db.flush()
 
         _finalize_run(db, run, task, source, opportunities, created, updated, failed, scrape_stats)
+        _dur = time.monotonic() - _t0
         _struct_logger.info(
             "scraper_source_complete",
             source_key=source.key,
-            latency_ms=int((time.monotonic() - _t0) * 1000),
+            latency_ms=int(_dur * 1000),
             items_found=len(opportunities),
             created=created,
             updated=updated,
             status=run.status,
         )
+        try:
+            from app.scraper.metrics import record_scrape
+
+            record_scrape(source_key=source.key or source.id, duration_s=_dur, items_found=len(opportunities), status=run.status)
+        except Exception:
+            pass
     except asyncio.CancelledError:
         finished_at = datetime.now(UTC).replace(tzinfo=None)
         run.status = "failed"
@@ -398,13 +423,20 @@ async def run_source_inline(db, source: Source, organization_id: str | None = No
         raise
     except Exception as exc:
         _handle_run_error(db, run, task, source, exc)
+        _dur2 = time.monotonic() - _t0
         _struct_logger.warning(
             "scraper_source_error",
             source_key=source.key,
-            latency_ms=int((time.monotonic() - _t0) * 1000),
+            latency_ms=int(_dur2 * 1000),
             error=str(exc),
             status=run.status,
         )
+        try:
+            from app.scraper.metrics import record_scrape
+
+            record_scrape(source_key=source.key or source.id, duration_s=_dur2, items_found=0, status=run.status)
+        except Exception:
+            pass
     return run
 
 

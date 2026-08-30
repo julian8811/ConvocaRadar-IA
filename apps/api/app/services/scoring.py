@@ -113,8 +113,8 @@ def update_consecutive_empty_runs(items_found: int, current_count: int) -> int:
 
 
 def should_auto_pause(new_count: int) -> bool:
-    """Check if the source should be auto-paused (>= 3 consecutive empty runs)."""
-    return new_count >= 3
+    """Check if the source should be auto-paused (>= 5 consecutive empty runs)."""
+    return new_count >= 5
 
 
 # ── Opportunity scoring (existing) ─────────────────────────────────────────

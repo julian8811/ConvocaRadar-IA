@@ -256,7 +256,7 @@ Key environment variables (see `.env.example` for defaults):
 | `SENTRY_DSN` | Sentry error tracking DSN | — |
 | `SCHEDULER_ENABLED` | Enable background source sweep | `true` |
 | `SCHEDULER_INTERVAL_SECONDS` | Sweep interval | `1800` |
-| `SCRAPING_MAX_CONCURRENCY` | Max concurrent scrapes | `5` |
+| `SCRAPING_MAX_CONCURRENCY` | Max concurrent scrapes | `6` |
 | `SCRAPING_PROXY_LIST` | Proxy rotation URLs | — |
 | `FRONTEND_URL` | Frontend URL for CORS + links | `http://localhost:3000` |
 | `APP_TIMEZONE` | Application timezone | `America/Bogota` |

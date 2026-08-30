@@ -165,7 +165,15 @@ async def _run_periodic_source_sweep(interval_seconds: int | None = None) -> Non
                         )
                     )
                     total = len(sources)
-                    due_sources = [s for s in sources if source_due_for_scraping(s)]
+                    raw_due = [s for s in sources if source_due_for_scraping(s)]
+                    # Priority-sorted queue: strategic first, then complementary/experimental
+                    try:
+                        from app.scraper.priority_queue import build_priority_queue
+
+                        _pq = build_priority_queue(raw_due)
+                        due_sources = _pq.drain_ordered()
+                    except Exception:
+                        due_sources = raw_due
                     # Bounded concurrency: min(6, SCRAPING_MAX_CONCURRENCY), at least 1
                     max_conc = max(1, min(6, int(scheduler_settings.scraping_max_concurrency)))
                     sem = asyncio.Semaphore(max_conc)
@@ -602,7 +610,7 @@ def health_sources_summary() -> dict:
 
 @app.get("/metrics")
 def metrics() -> dict:
-    """Lightweight Prometheus-style metrics (structlog counters)."""
+    """Lightweight Prometheus-style metrics (structlog counters + histogram)."""
     from sqlalchemy import func, select
 
     from app.db.session import SessionLocal
@@ -614,7 +622,26 @@ def metrics() -> dict:
         success = db.scalar(select(func.count(SourceRun.id)).where(SourceRun.status == "success")) or 0
         degraded = db.scalar(select(func.count(SourceRun.id)).where(SourceRun.status == "degraded")) or 0
         failed = db.scalar(select(func.count(SourceRun.id)).where(SourceRun.status == "failed")) or 0
-        return {"total_runs": total_runs, "success": success, "degraded": degraded, "failed": failed}
+        base = {"total_runs": total_runs, "success": success, "degraded": degraded, "failed": failed}
+        try:
+            from app.scraper.metrics import snapshot
+
+            snap = snapshot()
+            base.update(
+                {
+                    "scrape_duration_p50": snap["scrape_duration_p50"],
+                    "scrape_duration_p95": snap["scrape_duration_p95"],
+                    "scrape_duration_avg": snap["scrape_duration_avg"],
+                    "scrape_duration_count": snap["scrape_duration_count"],
+                    "items_found_total": snap["items_found_total"],
+                    "scrapes_total": snap["scrapes_total"],
+                    "errors_total": snap["errors_total"],
+                    "health_gauges": snap["health_gauges"],
+                }
+            )
+        except Exception:
+            pass
+        return base
     finally:
         db.close()
 

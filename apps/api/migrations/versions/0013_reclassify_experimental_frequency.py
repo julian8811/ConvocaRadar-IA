@@ -16,6 +16,7 @@ depends_on = None
 def upgrade() -> None:
     conn = op.get_bind()
     # Move experimental tier (and tier IS NULL legacy rows) from daily to weekly
+    # Allowlist + manual override win: skip if key in allowlist or connector_config has manual_frequency
     conn.execute(
         text(
             """
@@ -24,6 +25,8 @@ def upgrade() -> None:
                 updated_at = CURRENT_TIMESTAMP
             WHERE scraping_frequency = 'daily'
               AND (tier = 'experimental' OR tier IS NULL)
+              AND key NOT IN ('grants-gov', 'grants-gov-rss', 'nsf-funding-rss', 'eic-accelerator')
+              AND (connector_config IS NULL OR CAST(connector_config AS TEXT) NOT LIKE '%manual_frequency%')
             """
         )
     )

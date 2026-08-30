@@ -34,7 +34,7 @@ class Settings(BaseSettings):
     )
     scraping_timeout_seconds: int = 180
     scraping_max_source_seconds: int = 180
-    scraping_max_concurrency: int = 5
+    scraping_max_concurrency: int = 6
     scraping_closing_soon_days: int = 10
     scraping_proxy_list: list[str] = Field(
         default_factory=list,

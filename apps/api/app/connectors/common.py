@@ -58,6 +58,7 @@ async def render_page_html(
     navigation_timeout_ms = timeout_ms or settings.scraping_timeout_seconds * 1000
 
     # Per-domain budget for Playwright — max 1 concurrent Playwright session
+    # Delegates to scraper.playwright_pool.PlaywrightBrowserPool singleton (isolated per connector)
     _budget = _get_budget()
     _pw_budget_acquired = _budget.acquire("playwright")
     budget_wait_deadline = asyncio.get_running_loop().time() + min(
