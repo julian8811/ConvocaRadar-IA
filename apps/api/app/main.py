@@ -637,6 +637,13 @@ def metrics() -> dict:
                     "scrapes_total": snap["scrapes_total"],
                     "errors_total": snap["errors_total"],
                     "health_gauges": snap["health_gauges"],
+                    "funding_coverage": snap.get("funding_coverage", {}),
+                    "close_coverage": snap.get("close_coverage", {}),
+                    "open_coverage": snap.get("open_coverage", {}),
+                    "funding_parsed_total": snap.get("funding_parsed_total", 0),
+                    "close_extracted_total": snap.get("close_extracted_total", 0),
+                    "open_extracted_total": snap.get("open_extracted_total", 0),
+                    "per_source_extraction": snap.get("per_source_extraction", {}),
                 }
             )
         except Exception:
