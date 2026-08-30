@@ -100,6 +100,10 @@ class ErcCallsConnector:
             if not title or title in seen_titles:
                 continue
             seen_titles.add(title)
+            identifier = str(item.get("identifier", item.get("id", "")))
+            summary = _clean(
+                _first_text(item.get("shortDescription")) or _clean(item.get("description", ""))
+            )
             # Relaxed filter: check title, summary, identifier, and keywords for ERC signals.
             title_lower = title.lower()
             summary_lower = summary.lower()
@@ -109,10 +113,6 @@ class ErcCallsConnector:
                 # Keep if result pool small (already filtered server-side) — avoid dropping valid erc variants.
                 if len(results) > 10:
                     continue
-            identifier = str(item.get("identifier", item.get("id", "")))
-            summary = _clean(
-                _first_text(item.get("shortDescription")) or _clean(item.get("description", ""))
-            )
             categories = ["grants", "research", "european research council"]
             if "starting" in title_lower:
                 categories.append("starting grant")
