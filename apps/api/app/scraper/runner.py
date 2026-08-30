@@ -32,6 +32,17 @@ from app.services.scoring import (
     update_consecutive_empty_runs,
 )
 
+# Batch enrichment wiring — extracted for S2 p95 (chunks 20 LLM / 32 embedding, LRU256)
+try:
+    from app.core.ai import extract_opportunities_structured_batch
+except Exception:  # pragma: no cover
+    extract_opportunities_structured_batch = None  # type: ignore
+
+try:
+    from app.services.embeddings import build_embeddings_batch
+except Exception:  # pragma: no cover
+    build_embeddings_batch = None  # type: ignore
+
 # Phases tracked in run.progress
 PROGRESS_STEPS = ["fetch", "parse", "persist"]
 
@@ -150,6 +161,95 @@ async def _scrape_source_candidates_with_timeout(
         return await asyncio.wait_for(_scrape_candidates(source, stats), timeout=timeout_seconds)
     except TimeoutError as exc:
         raise TimeoutError(f"Scrape for source {source.key} exceeded {timeout_seconds}s") from exc
+
+
+async def _batch_enrich(
+    opportunities: list[OpportunityCreate],
+) -> list[OpportunityCreate]:
+    """Batched enrichment for p95 — flag-gated serial vs batch.
+
+    Flag OFF (default): serial parity via enrich_opportunity_payload per item.
+    Flag ON: uses extract_opportunities_structured_batch(chunk_size=20) with LRU256
+             and build_embeddings_batch (chunk 32/20) for p95 ≤4s. No N-loop.
+    """
+    settings = get_settings()
+    if not opportunities:
+        return []
+
+    if not settings.extraction_batch_enabled:
+        # Serial fallback — preserves parity, no cross-contamination
+        from app.services.opportunity import enrich_opportunity_payload
+
+        results: list[OpportunityCreate] = []
+        for oc in opportunities:
+            results.append(await enrich_opportunity_payload(oc))
+        return results
+
+    # Batch path: LLM extraction chunk 20 + embedding batch 32/20
+    texts = [(oc.raw_text or oc.summary or oc.title or "") for oc in opportunities]
+
+    # Embedding batch for p95 (best-effort, does not block enrichment on failure)
+    if build_embeddings_batch is not None:
+        try:
+            await build_embeddings_batch(texts)
+        except Exception:
+            pass
+
+    if extract_opportunities_structured_batch is None:
+        # Fallback to serial if batch unavailable
+        from app.services.opportunity import enrich_opportunity_payload
+
+        results = []
+        for oc in opportunities:
+            results.append(await enrich_opportunity_payload(oc))
+        return results
+
+    extractions = await extract_opportunities_structured_batch(texts, chunk_size=20)
+
+    # Merge extractions into OpportunityCreate copies — parser frozen (d9579f4)
+    enriched: list[OpportunityCreate] = []
+    for orig, ext in zip(opportunities, extractions):
+        data = ext.data if hasattr(ext, "data") else {}
+        merged = orig.model_dump()
+        # Funding raw only if missing
+        if not merged.get("funding_amount_raw") and data.get("funding_amount_raw"):
+            from app.services.opportunity import _is_tr_artifact
+
+            fr = str(data.get("funding_amount_raw") or "")
+            if fr and not _is_tr_artifact(fr):
+                merged["funding_amount_raw"] = fr
+        # Confidence max
+        try:
+            merged["confidence_score"] = round(
+                max(float(orig.confidence_score), float(data.get("confidence") or orig.confidence_score)), 2
+            )
+        except Exception:
+            pass
+        # Title / entity / country fill if missing (ES/EN isolated per candidate)
+        if not merged.get("title") or merged["title"] == "Convocatoria detectada":
+            t = str(data.get("title") or "")
+            if t:
+                merged["title"] = t
+        if not merged.get("entity") or merged["entity"] == "Entidad por validar":
+            e = str(data.get("entity") or "")
+            if e:
+                merged["entity"] = e
+        if not merged.get("country") or merged["country"] in ("Por validar", "Sin dato", ""):
+            c = str(data.get("country") or "")
+            if c:
+                merged["country"] = c
+        # Categories / topics if missing
+        if not merged.get("categories"):
+            cats = data.get("category") or []
+            if cats:
+                merged["categories"] = list(cats)
+        if not merged.get("topics"):
+            kws = data.get("matched_keywords") or []
+            if kws:
+                merged["topics"] = list(kws)
+        enriched.append(OpportunityCreate(**merged))
+
+    return enriched
 
 
 def _setup_run(db, source: Source, organization_id: str | None) -> tuple[SourceRun, Task, datetime]:
@@ -378,6 +478,12 @@ async def run_source_inline(db, source: Source, organization_id: str | None = No
         items_parsed = scrape_stats.get("candidates_parsed")
         if isinstance(items_parsed, int):
             source.last_item_count = items_parsed
+        # S2 batch enrichment — flag-gated, chunks 20/32 LRU256, removes serial N-loop
+        if get_settings().extraction_batch_enabled and opportunities:
+            try:
+                opportunities = await _batch_enrich(opportunities)
+            except Exception as exc:  # pragma: no cover — batch best-effort fallback
+                _struct_logger.warning("batch_enrich_failed_fallback_serial", error=str(exc))
         _set_progress(run, {"fetch": _now(), "parse": _now()})
         db.flush()
 

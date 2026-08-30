@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from app.core.ai import (
     build_local_extraction,
     extract_opportunity_structured,
+    extract_opportunities_structured_batch,
     infer_language,
     summarize_opportunity_text,
 )
@@ -753,6 +754,110 @@ def create_heuristic_extraction(text: str) -> dict[str, object]:
 async def create_ai_extraction(text: str) -> dict[str, object]:
     extraction = await extract_opportunity_structured(text)
     return extraction.data
+
+
+async def enrich_opportunity_payloads_batch(
+    datas: list[OpportunityCreate],
+) -> list[OpportunityCreate]:
+    """Batched variant of enrich_opportunity_payload — respects EXTRACTION_BATCH_ENABLED.
+
+    Flag OFF: serial parity via enrich_opportunity_payload per item (no cross-contamination).
+    Flag ON: uses extract_opportunities_structured_batch(chunk_size=20) with LRU256,
+             processes in chunks of 20, ES/EN isolated, and merges without parser change.
+    """
+    settings = get_settings()
+    if not settings.extraction_batch_enabled:
+        results: list[OpportunityCreate] = []
+        for d in datas:
+            results.append(await enrich_opportunity_payload(d))
+        return results
+
+    if not datas:
+        return []
+
+    texts = [(d.raw_text or d.summary or d.title or "") for d in datas]
+    extractions = await extract_opportunities_structured_batch(texts, chunk_size=20)
+
+    enriched: list[OpportunityCreate] = []
+    for orig, ext in zip(datas, extractions):
+        # Reuse single-item merge logic by constructing a temporary OpportunityCreate
+        # that mimics what enrich_opportunity_payload does with ext.data
+        data = ext.data if hasattr(ext, "data") else {}
+        merged = orig.model_dump()
+
+        # Title / entity / country — only fill if missing (parser frozen)
+        if not merged.get("title") or merged["title"] == "Convocatoria detectada":
+            merged["title"] = str(data.get("title") or merged["title"])
+        if not merged.get("entity") or merged["entity"] == "Entidad por validar":
+            merged["entity"] = str(data.get("entity") or merged["entity"])
+        if not merged.get("country") or merged["country"] in ("Por validar", "Sin dato", ""):
+            merged["country"] = str(data.get("country") or merged["country"])
+
+        # Categories / topics — only if missing
+        if not merged.get("categories"):
+            merged["categories"] = list(data.get("category") or [])
+        if not merged.get("topics"):
+            merged["topics"] = list(data.get("matched_keywords") or [])
+
+        # Funding raw — only if missing, parser delegates to d9579f4
+        if not merged.get("funding_amount_raw"):
+            fr = data.get("funding_amount_raw")
+            if fr and not _is_tr_artifact(str(fr)):
+                merged["funding_amount_raw"] = str(fr)
+
+        # Funding value/currency — prefer LLM normalized
+        if not merged.get("funding_amount_value"):
+            llm_val = data.get("funding_amount_value")
+            llm_cur = data.get("funding_amount_currency")
+            if llm_val is not None:
+                try:
+                    merged["funding_amount_value"] = float(llm_val)
+                    merged["funding_amount_currency"] = str(llm_cur).upper() if llm_cur else None
+                except (TypeError, ValueError):
+                    pass
+            if not merged.get("funding_amount_value") and merged.get("funding_amount_raw"):
+                pv, pc = _parse_funding_amount(
+                    merged["funding_amount_raw"],
+                    country=merged.get("country"),
+                    url=merged.get("official_url"),
+                )
+                if pv is not None:
+                    merged["funding_amount_value"] = pv
+                    merged["funding_amount_currency"] = pc
+
+        # Language
+        if merged.get("language") in {None, "", "auto"}:
+            merged["language"] = str(data.get("language") or merged["language"] or "es")
+
+        # Confidence
+        try:
+            merged["confidence_score"] = round(
+                max(float(orig.confidence_score), float(data.get("confidence") or orig.confidence_score)), 2
+            )
+        except Exception:
+            pass
+
+        # Close/open dates
+        if not merged.get("close_date"):
+            cd = _parse_ai_close_date(data.get("close_date"))
+            if cd:
+                merged["close_date"] = cd
+        if not merged.get("open_date"):
+            od = _parse_ai_open_date(data.get("open_date"))
+            if od:
+                merged["open_date"] = od
+
+        # Ensure title cleaned
+        try:
+            from app.connectors.common import clean_opportunity_title
+
+            merged["title"] = clean_opportunity_title(merged.get("title"))
+        except Exception:
+            pass
+
+        enriched.append(OpportunityCreate(**merged))
+
+    return enriched
 
 
 def summarize_text(text: str) -> str:
