@@ -136,7 +136,14 @@ def _parse_funding_amount(
         is_co_context = True
     if has_bare_dollar and is_co_context:
         currency = "COP"
-    # bare $ without CO context and no explicit currency -> remain None (rejected by gate)
+    # USD inference (symmetric to COP): bare $ in US / grants.gov / .gov (non-CO) context → USD
+    is_us_context = False
+    if country and country.strip() in ("United States", "USA", "US"):
+        is_us_context = True
+    if url and ("grants.gov" in url.lower() or (".gov" in url.lower() and "colombia" not in (country or "").lower())):
+        is_us_context = True
+    # Defer bare $ USD assignment until after value parsing (>=500 guard); gate handles it
+    # bare $ without CO/US context and no explicit currency -> remain None (rejected by gate)
 
     # Normalize: remove currency symbols/text, keep digits ,.
     cleaned = re.sub(r"[^\d,.\s]", " ", text)
@@ -184,12 +191,16 @@ def _parse_funding_amount(
 
     # ── Quality gates ──────────────────────────────────────────────
     if currency is None:
-        # No currency inferred and not bare $ -> reject (avoid years etc.)
-        # But if large number >= 10000 and CO context, infer COP
-        if is_co_context and value >= 10_000:
+        # USD inference for bare $ in US / grants.gov context (symmetric to COP)
+        if has_bare_dollar and is_us_context and value >= 500:
+            currency = "USD"
+        elif is_co_context and value >= 10_000:
             currency = "COP"
         else:
             return None, None
+    # Extra safety: reject tiny values that could be "Adjustment 3" false positives
+    if value < 100 and not re.search(r"(?:USD|US\$|COP|EUR|€|£|R\$)", upper_text):
+        return None, None
 
     # Bare $ weak signal requires >=500 (avoid years/page numbers) — for COP inference
     if currency == "COP" and has_bare_dollar and value < 500:
