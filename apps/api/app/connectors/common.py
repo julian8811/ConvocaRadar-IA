@@ -15,19 +15,15 @@ from app.connectors.base import OpportunityCandidate
 from app.core.config import get_settings
 from app.core.http_client import http_client
 
-# Lazily-imported domain budget singleton — resolved at call time to
-# avoid circular imports during app bootstrap.
-_DOMAIN_BUDGET: object | None = None
+# Unified domain budget singleton — delegates to scraper.domain_budget single source.
+_DOMAIN_BUDGET: object | None = None  # kept for test shim compatibility
 
 
 def _get_budget():
-    """Return the module-level DomainBudgetManager singleton."""
-    global _DOMAIN_BUDGET
-    if _DOMAIN_BUDGET is None:
-        from app.scraper.domain_budget import DomainBudgetManager
+    """Return the shared DomainBudgetManager singleton (single source)."""
+    from app.scraper.domain_budget import get_domain_budget
 
-        _DOMAIN_BUDGET = DomainBudgetManager()
-    return _DOMAIN_BUDGET
+    return get_domain_budget()
 
 
 CHROMIUM_CONTAINER_ARGS = ["--no-sandbox", "--disable-dev-shm-usage"]
@@ -590,11 +586,20 @@ async def fetch_httpx_text(
             except httpx.HTTPStatusError as exc:
                 last_error = exc
                 last_status = exc.response.status_code
+                # 429 backoff via DomainBudgetManager
+                if exc.response.status_code == 429:
+                    try:
+                        from app.scraper.domain_budget import get_domain_budget
+
+                        retry_after = exc.response.headers.get("Retry-After")
+                        get_domain_budget().handle_429(url, retry_after)
+                    except Exception:
+                        pass
+                # 403 JSON API: don't Playwright-fallback (wastes browser)
+                ct = exc.response.headers.get("content-type", "")
+                if exc.response.status_code == 403 and "json" in ct.lower():
+                    raise
                 if attempt + 1 >= retries:
-                    # Don't raise — fall through to Playwright fallback (if enabled).
-                    # WAF/Cloudflare blocks (403) are indistinguishable from
-                    # real 403s at the HTTP layer; Playwright with a real browser
-                    # can often bypass them.
                     break
             except Exception as exc:
                 last_error = exc
@@ -602,6 +607,13 @@ async def fetch_httpx_text(
                     break
         if not playwright_fallback:
             raise last_error or RuntimeError(f"Failed to fetch {url}")
+        # 403 JSON API already raised above; remaining 4xx JSON should not fallback
+        if last_status == 403 and last_error is not None:
+            try:
+                if "json" in str(getattr(getattr(last_error, "response", None), "headers", {}).get("content-type", "")).lower():
+                    raise last_error
+            except Exception:
+                pass
         if _is_private_host(parsed_url.hostname or ""):
             raise last_error or ValueError(f"Blocked unsafe URL: {url}")
         return await render_page_html(

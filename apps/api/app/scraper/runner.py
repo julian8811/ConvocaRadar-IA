@@ -10,8 +10,13 @@ import asyncio
 import inspect
 from datetime import UTC, datetime
 
+import structlog
+import time
+
 from app.core.config import get_settings
 from app.models import Source, SourceRun, Task
+
+_struct_logger = structlog.get_logger(__name__)
 from app.schemas import OpportunityCreate
 from app.scraper.dom_monitor import compute_dom_hash
 from app.scraper.errors import ErrorType, classify_error
@@ -344,6 +349,7 @@ async def run_source_inline(db, source: Source, organization_id: str | None = No
 
     Orchestrates: setup → scrape → persist → finalize (or error handling).
     """
+    _t0 = time.monotonic()
     run, task, _started_at = _setup_run(db, source, organization_id)
     try:
         validate_source_url(source)
@@ -367,6 +373,15 @@ async def run_source_inline(db, source: Source, organization_id: str | None = No
         db.flush()
 
         _finalize_run(db, run, task, source, opportunities, created, updated, failed, scrape_stats)
+        _struct_logger.info(
+            "scraper_source_complete",
+            source_key=source.key,
+            latency_ms=int((time.monotonic() - _t0) * 1000),
+            items_found=len(opportunities),
+            created=created,
+            updated=updated,
+            status=run.status,
+        )
     except asyncio.CancelledError:
         finished_at = datetime.now(UTC).replace(tzinfo=None)
         run.status = "failed"
@@ -383,6 +398,13 @@ async def run_source_inline(db, source: Source, organization_id: str | None = No
         raise
     except Exception as exc:
         _handle_run_error(db, run, task, source, exc)
+        _struct_logger.warning(
+            "scraper_source_error",
+            source_key=source.key,
+            latency_ms=int((time.monotonic() - _t0) * 1000),
+            error=str(exc),
+            status=run.status,
+        )
     return run
 
 

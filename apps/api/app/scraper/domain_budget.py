@@ -55,7 +55,14 @@ class DomainBudgetManager:
         "beta.grants.gov": {"max_concurrent": 3, "delay_seconds": 0},
         "minciencias.gov.co": {"max_concurrent": 1, "delay_seconds": 2},
         "innpulsacolombia.com": {"max_concurrent": 1, "delay_seconds": 1},
+        "fapesp.br": {"max_concurrent": 1, "delay_seconds": 2},
+        "conacyt.mx": {"max_concurrent": 1, "delay_seconds": 2},
+        "conahcyt.mx": {"max_concurrent": 1, "delay_seconds": 2},
+        "*.gov.br": {"max_concurrent": 1, "delay_seconds": 1},
+        "gov.br": {"max_concurrent": 1, "delay_seconds": 1},
         "*playwright*": {"max_concurrent": 5, "delay_seconds": 0},
+        "playwright": {"max_concurrent": 1, "delay_seconds": 0},
+        "*hybrid*": {"max_concurrent": 1, "delay_seconds": 0},
     }
 
     _FALLBACK: dict[str, int] = {"max_concurrent": 2, "delay_seconds": 0}
@@ -138,6 +145,22 @@ class DomainBudgetManager:
             return delay_seconds - elapsed
         return 0.0
 
+    def handle_429(self, url: str, retry_after: str | float | None) -> float:
+        """Record 429 Retry-After for domain — returns effective delay.
+
+        Parses Retry-After header (seconds or HTTP-date not supported) and
+        bumps _last_times so delay_for() enforces backoff. Returns delay.
+        """
+        try:
+            delay = float(str(retry_after).strip()) if retry_after is not None else 5.0
+        except (ValueError, TypeError):
+            delay = 5.0
+        delay = max(1.0, min(delay, 60.0))
+        domain = self._domain_from_url(url)
+        with self._lock:
+            self._last_times[domain] = time.monotonic() + delay - self._config_for(domain).get("delay_seconds", 0)
+        return delay
+
     def clear(self) -> None:
         """Reset all budgets and timestamps — return to initial state.
 
@@ -157,6 +180,9 @@ class DomainBudgetManager:
         """Extract the lowercase hostname from *url*, stripping any port."""
         parsed = urlparse(url)
         hostname = parsed.hostname or parsed.netloc or ""
+        if not hostname and url and "://" not in url:
+            # Handle bare keys like "playwright" used for global pool
+            hostname = url.split("/")[0].split(":")[0]
         # Strip port suffix if present
         if ":" in hostname:
             hostname = hostname.split(":")[0]

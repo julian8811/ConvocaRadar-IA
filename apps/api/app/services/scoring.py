@@ -9,7 +9,7 @@ from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
-from app.core.ai import build_embedding_sync, cosine_similarity
+from app.core.ai import build_embedding, cosine_similarity
 from app.models import Opportunity, OpportunityScore, OrganizationProfile, Priority
 
 # ── Source health score (Change C) ───────────────────────────────────────────
@@ -138,16 +138,53 @@ def priority_for_score(score: float) -> str:
 def _semantic_score(text: str, profile_text: str) -> float:
     """Compare opportunity text with profile text using embedding similarity.
 
-    Returns a float in [0, 1] or 0 if empty input or embedding unavailable.
+    Sync fallback — uses local hash only (no event-loop hack). For batched
+    remote embeddings use ``batch_semantic_scores``.
+    Returns a float in [0, 1] or 0 if empty input.
     """
     if not text.strip() or not profile_text.strip():
         return 0.0
     try:
-        opp_vec = build_embedding_sync(text[:2000])
-        prof_vec = build_embedding_sync(profile_text[:2000])
-        return cosine_similarity(opp_vec, prof_vec)
+        from app.core.ai import tokenize_for_embedding
+        import hashlib, math
+        from app.core.config import get_settings
+
+        settings = get_settings()
+        # Remote provider without async context: skip semantic (batch path covers it)
+        if settings.llm_api_key and settings.embedding_model:
+            from app.core.config import effective_llm_provider
+            if effective_llm_provider(settings.llm_provider) != "local":
+                return 0.0
+        dims = settings.embedding_dimensions or 64
+
+        def _hash_vec(t: str) -> list[float]:
+            v = [0.0] * dims
+            for tok in tokenize_for_embedding(t[:2000]):
+                bucket = int.from_bytes(hashlib.sha256(tok.encode()).digest()[:4], "big") % dims
+                v[bucket] += 1.0 + min(len(tok), 12) / 12.0
+            n = math.sqrt(sum(x * x for x in v))
+            return [round(x / n, 6) for x in v] if n else v
+
+        return cosine_similarity(_hash_vec(text), _hash_vec(profile_text))
     except Exception:
         return 0.0
+
+
+async def batch_semantic_scores(texts: list[str], profile_text: str) -> list[float]:
+    """Batch semantic scores via build_embeddings_batch (remote-aware)."""
+    if not profile_text.strip() or not texts:
+        return [0.0] * len(texts)
+    try:
+        from app.services.embeddings import build_embeddings_batch
+
+        all_texts = [t[:2000] for t in texts] + [profile_text[:2000]]
+        vectors = await build_embeddings_batch(all_texts)
+        if len(vectors) != len(all_texts):
+            return [0.0] * len(texts)
+        prof_vec = vectors[-1]
+        return [cosine_similarity(v, prof_vec) for v in vectors[:-1]]
+    except Exception:
+        return [0.0] * len(texts)
 
 
 def _compute_score(opportunity: Opportunity, profile: OrganizationProfile) -> dict:

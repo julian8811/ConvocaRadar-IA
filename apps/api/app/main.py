@@ -600,5 +600,24 @@ def health_sources_summary() -> dict:
         db.close()
 
 
+@app.get("/metrics")
+def metrics() -> dict:
+    """Lightweight Prometheus-style metrics (structlog counters)."""
+    from sqlalchemy import func, select
+
+    from app.db.session import SessionLocal
+    from app.models import SourceRun
+
+    db = SessionLocal()
+    try:
+        total_runs = db.scalar(select(func.count(SourceRun.id))) or 0
+        success = db.scalar(select(func.count(SourceRun.id)).where(SourceRun.status == "success")) or 0
+        degraded = db.scalar(select(func.count(SourceRun.id)).where(SourceRun.status == "degraded")) or 0
+        failed = db.scalar(select(func.count(SourceRun.id)).where(SourceRun.status == "failed")) or 0
+        return {"total_runs": total_runs, "success": success, "degraded": degraded, "failed": failed}
+    finally:
+        db.close()
+
+
 app.include_router(api_router)
 

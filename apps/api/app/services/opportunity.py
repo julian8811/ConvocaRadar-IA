@@ -30,12 +30,16 @@ from app.services.dedup import (
     _organization_opportunity_scope,
     find_duplicate_opportunity,
 )
+
+# bulk dedup cache: external_id -> Opportunity per source (preloaded 1 query/source)
+_BULK_EXTERNAL_CACHE: dict[str, set[str]] = {}
+_EMBEDDING_HASH_CACHE: dict[str, list[float]] = {}
 from app.services.embeddings import (
     opportunity_reanalysis_text,
     upsert_opportunity_embedding,
 )
 from app.services.scoring import calculate_score
-from app.services.validation import async_url_is_reachable, is_noise_payload, slugify
+from app.services.validation import async_url_is_reachable, is_noise_payload, slugify, url_is_reachable
 
 
 def _parse_ai_close_date(value: object) -> datetime | None:
@@ -465,6 +469,21 @@ async def _update_and_score(
         if profile:
             calculate_score(db, opportunity, profile)
     return opportunity
+
+
+def preload_external_ids(db: Session, source_id: str) -> set[str]:
+    """Bulk preload existing external_ids for a source — 1 query per source."""
+    if source_id in _BULK_EXTERNAL_CACHE:
+        return _BULK_EXTERNAL_CACHE[source_id]
+    rows = db.scalars(select(Opportunity.external_id).where(Opportunity.source_id == source_id)).all()
+    cache = {r for r in rows if r}
+    _BULK_EXTERNAL_CACHE[source_id] = cache
+    return cache
+
+
+def clear_bulk_cache() -> None:
+    _BULK_EXTERNAL_CACHE.clear()
+    _EMBEDDING_HASH_CACHE.clear()
 
 
 async def create_opportunity(
