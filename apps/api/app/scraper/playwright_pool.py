@@ -15,7 +15,7 @@ from app.scraper.domain_budget import get_domain_budget
 
 
 class PlaywrightBrowserPool:
-    """One-slot-per-acquire pool for Playwright browsers."""
+    """One-slot-per-acquire pool for Playwright browsers (023 S3: slot=1 only for SPA retry)."""
 
     def __init__(self) -> None:
         self._budget = get_domain_budget()

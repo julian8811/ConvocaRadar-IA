@@ -15,6 +15,71 @@ from app.connectors.base import OpportunityCandidate
 from app.core.config import get_settings
 from app.core.http_client import http_client
 
+# ── SPA shell detection (023 S3) ──────────────────────────────────────────
+SPA_SHELL_THRESHOLD: int = 8000  # bytes/chars below which text/html with no h1 is considered shell
+SPA_ALLOWLIST: set[str] = {"grants-gov", "grants.gov", "simpler-grants", "simpler.grants.gov", "simpler"}
+
+
+def is_shell_response(content: str, content_type: str, candidates: int) -> bool:
+    """Detect thin SPA shell that warrants a single PW retry.
+
+    Conditions (all must hold):
+    - candidates == 0
+    - content_type starts with text/html
+    - len(content) < SPA_SHELL_THRESHOLD
+    - no <h1 tag in content
+    """
+    if candidates != 0:
+        return False
+    ct = (content_type or "").lower().strip()
+    if not ct.startswith("text/html"):
+        return False
+    if len(content or "") >= SPA_SHELL_THRESHOLD:
+        return False
+    # h1 missing -> shell; if h1 present we have real content
+    if re.search(r"<h1\b", content or "", flags=re.IGNORECASE):
+        return False
+    return True
+
+
+async def maybe_retry_shell_with_pw(
+    *,
+    content: str,
+    content_type: str,
+    candidates: int,
+    source_key: str,
+    url: str,
+) -> tuple[str, str, str] | None:
+    """If shell detected and allowlisted and flag on, retry once via Playwright.
+
+    Returns (final_url, new_content, new_content_type) on retry, else None.
+    Exactly one PW call; gate: flag + allowlist + is_shell_response.
+    """
+    try:
+        if not get_settings().extraction_spa_retry:
+            return None
+    except Exception:
+        return None
+    # allowlist: source_key contains grants/simpler or host matches
+    sk = (source_key or "").lower()
+    allow = any(token in sk for token in ("grants-gov", "grants.gov", "simpler", "simpler-grants"))
+    if not allow:
+        # also check url host
+        try:
+            host = (urlparse(url).hostname or "").lower()
+            allow = any(h in host for h in ("grants.gov", "simpler.grants.gov"))
+        except Exception:
+            pass
+    if not allow:
+        return None
+    if not is_shell_response(content, content_type, candidates):
+        return None
+    try:
+        return await render_page_html(url)
+    except Exception:
+        return None
+
+
 # Unified domain budget singleton — delegates to scraper.domain_budget single source.
 _DOMAIN_BUDGET: object | None = None  # kept for test shim compatibility
 
@@ -596,7 +661,7 @@ async def fetch_httpx_text(
         raise ValueError(f"Blocked unsafe URL: {url}")
     request_timeout = min(timeout_seconds or settings.scraping_timeout_seconds, FETCH_TIMEOUT_CAP)
 
-    # Per-domain budget check
+    # Per-domain budget check + burst accounting (023 S3)
     _budget = _get_budget()
     _delay = _budget.delay_for(url)
     if _delay > 0:
@@ -606,6 +671,11 @@ async def fetch_httpx_text(
     _budget_acquired = _budget.acquire(url)
     if not _budget_acquired:
         raise RuntimeError(f"Domain budget exhausted for {url}")
+    # burst window accounting — count toward throttle_max_per_day 150
+    try:
+        _budget.record_request(url)
+    except Exception:
+        pass
 
     try:
         last_error: Exception | None = None

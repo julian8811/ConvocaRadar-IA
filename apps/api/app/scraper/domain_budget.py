@@ -77,6 +77,10 @@ class DomainBudgetManager:
         self._slots: dict[str, int] = {}
         # Per-domain monotonic timestamp of the last acquired request
         self._last_times: dict[str, float] = {}
+        # Burst / daily cap tracking (023 S3) — per-domain counter with window
+        self._burst_counts: dict[str, int] = {}
+        self._burst_window_start: dict[str, float] = {}
+        self._burst_window_seconds: float = 86400.0  # 24h window for throttle_max_per_day
 
     # ------------------------------------------------------------------
     # Public API
@@ -93,8 +97,19 @@ class DomainBudgetManager:
         :meth:`delay_for` can calculate inter-request spacing.
 
         Thread-safe: acquires ``self._lock``.
+
+        Burst guard: if throttle_max_per_day exceeded, deny without slot.
         """
         domain = self._domain_from_url(url)
+        # burst guard — deny when daily cap exceeded
+        if self.burst_exceeded(url):
+            try:
+                from app.scraper import metrics as _metrics
+
+                _metrics.record_throttled(source_key=domain, delay_s=0.0)
+            except Exception:
+                pass
+            return False
         max_concurrent = self._max_concurrent_for(domain)
 
         with self._lock:
@@ -150,6 +165,7 @@ class DomainBudgetManager:
 
         Parses Retry-After header (seconds or HTTP-date not supported) and
         bumps _last_times so delay_for() enforces backoff. Returns delay.
+        Also increments throttled gauge for observability (023).
         """
         try:
             delay = float(str(retry_after).strip()) if retry_after is not None else 5.0
@@ -159,7 +175,40 @@ class DomainBudgetManager:
         domain = self._domain_from_url(url)
         with self._lock:
             self._last_times[domain] = time.monotonic() + delay - self._config_for(domain).get("delay_seconds", 0)
+        try:
+            from app.scraper import metrics as _metrics
+
+            _metrics.record_throttled(source_key=domain, delay_s=delay)
+        except Exception:
+            pass
         return delay
+
+    # ── Burst / throttle_max_per_day (023 S3) ─────────────────────────────
+
+    def record_request(self, url: str) -> None:
+        """Record one request for burst window accounting (counts toward throttle_max_per_day)."""
+        domain = self._domain_from_url(url)
+        now = time.monotonic()
+        with self._lock:
+            start = self._burst_window_start.get(domain)
+            if start is None or (now - start) > self._burst_window_seconds:
+                self._burst_window_start[domain] = now
+                self._burst_counts[domain] = 0
+            self._burst_counts[domain] = self._burst_counts.get(domain, 0) + 1
+            # also update last time for delay_for symmetry
+            self._last_times.setdefault(domain, now)
+
+    def burst_exceeded(self, url: str) -> bool:
+        domain = self._domain_from_url(url)
+        try:
+            limit = int(getattr(__import__("app.core.config", fromlist=["get_settings"]).get_settings(), "throttle_max_per_day", 150))
+        except Exception:
+            limit = 150
+        with self._lock:
+            return self._burst_counts.get(domain, 0) >= limit
+
+    def throttle_max_per_day_exceeded(self, url: str) -> bool:
+        return self.burst_exceeded(url)
 
     def clear(self) -> None:
         """Reset all budgets and timestamps — return to initial state.
@@ -170,6 +219,8 @@ class DomainBudgetManager:
         with self._lock:
             self._slots.clear()
             self._last_times.clear()
+            self._burst_counts.clear()
+            self._burst_window_start.clear()
 
     # ------------------------------------------------------------------
     # Internal helpers

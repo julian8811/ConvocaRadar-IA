@@ -1,7 +1,7 @@
 import json
 from datetime import datetime
 
-from app.connectors.common import fetch_httpx_text
+from app.connectors.common import fetch_httpx_text, is_shell_response, maybe_retry_shell_with_pw
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
 from app.connectors.registry import register
 from app.connectors.simpler_grants import SimplerGrantsConnector
@@ -61,8 +61,44 @@ class GrantsGovConnector:
         )
 
     async def parse(self, raw: RawSourceResult) -> list[OpportunityCandidate]:
+        # SPA shell retry (023 S3): if 200 text/html thin shell with 0 cands and allowlisted, 1× PW retry
+        if raw.content_type.startswith("text/html") and is_shell_response(raw.content, raw.content_type, 0):
+            retried = await maybe_retry_shell_with_pw(
+                content=raw.content,
+                content_type=raw.content_type,
+                candidates=0,
+                source_key=self.source_key,
+                url=raw.url,
+            )
+            if retried is not None:
+                raw = RawSourceResult(
+                    source_key=raw.source_key,
+                    url=retried[0],
+                    content=retried[1],
+                    content_type=retried[2],
+                    metadata=raw.metadata,
+                )
         if not raw.content.lstrip().startswith("{"):
-            return await SimplerGrantsConnector(GRANTS_GOV_SEARCH_PAGE).parse(raw)
+            # Simpler fallback may also be shell; delegate its own retry
+            cands = await SimplerGrantsConnector(GRANTS_GOV_SEARCH_PAGE).parse(raw)
+            if not cands and is_shell_response(raw.content, raw.content_type, 0):
+                retried = await maybe_retry_shell_with_pw(
+                    content=raw.content,
+                    content_type=raw.content_type,
+                    candidates=0,
+                    source_key=self.source_key,
+                    url=raw.url,
+                )
+                if retried is not None:
+                    raw2 = RawSourceResult(
+                        source_key=raw.source_key,
+                        url=retried[0],
+                        content=retried[1],
+                        content_type=retried[2],
+                        metadata=raw.metadata,
+                    )
+                    return await SimplerGrantsConnector(GRANTS_GOV_SEARCH_PAGE).parse(raw2)
+            return cands
         try:
             payload = json.loads(raw.content)
         except json.JSONDecodeError:
