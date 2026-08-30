@@ -79,6 +79,9 @@ class Settings(BaseSettings):
     extraction_year_max: int = 2028
     extraction_llm_always: bool = False
     extraction_thin_threshold: int = 200
+    extraction_missing_close_penalty: int = 10
+    extraction_missing_funding_penalty: int = 5
+    extraction_llm_cache_size: int = 256
 
     @computed_field  # type: ignore[prop-decorator]
     @property

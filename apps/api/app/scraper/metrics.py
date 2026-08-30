@@ -17,6 +17,14 @@ _counter_items_found: int = 0
 _counter_scrapes: int = 0
 _counter_errors: int = 0
 _gauge_health: dict[str, int] = {}  # source_key -> health_score
+# ── Per-source extraction completeness (022 P2) ──────────────────────────────
+_counter_funding_parsed_total: int = 0
+_counter_close_extracted_total: int = 0
+_counter_open_extracted_total: int = 0
+_gauge_funding_coverage: dict[str, float] = {}  # source_key -> 0-100 %
+_gauge_close_coverage: dict[str, float] = {}  # source_key -> 0-100 %
+_gauge_open_coverage: dict[str, float] = {}  # source_key -> 0-100 %
+_per_source_extraction: dict[str, dict[str, int]] = {}  # source -> {total, funding, close, open}
 
 
 def record_scrape(*, source_key: str, duration_s: float, items_found: int, status: str, health_score: int | None = None) -> None:
@@ -42,6 +50,38 @@ def record_scrape(*, source_key: str, duration_s: float, items_found: int, statu
     )
 
 
+def record_extraction(
+    *,
+    source_key: str,
+    funding_present: bool,
+    close_present: bool,
+    open_present: bool = False,
+) -> None:
+    """Per-source completeness counters for funding/close/open (022 P2)."""
+    with _lock:
+        global _counter_funding_parsed_total, _counter_close_extracted_total, _counter_open_extracted_total
+        if funding_present:
+            _counter_funding_parsed_total += 1
+        if close_present:
+            _counter_close_extracted_total += 1
+        if open_present:
+            _counter_open_extracted_total += 1
+        entry = _per_source_extraction.setdefault(
+            source_key, {"total": 0, "funding": 0, "close": 0, "open": 0}
+        )
+        entry["total"] += 1
+        if funding_present:
+            entry["funding"] += 1
+        if close_present:
+            entry["close"] += 1
+        if open_present:
+            entry["open"] += 1
+        total = entry["total"]
+        _gauge_funding_coverage[source_key] = round(entry["funding"] / total * 100, 1) if total else 0
+        _gauge_close_coverage[source_key] = round(entry["close"] / total * 100, 1) if total else 0
+        _gauge_open_coverage[source_key] = round(entry["open"] / total * 100, 1) if total else 0
+
+
 def snapshot() -> dict:
     with _lock:
         hist = list(_histogram)
@@ -54,6 +94,13 @@ def snapshot() -> dict:
             "scrapes_total": _counter_scrapes,
             "errors_total": _counter_errors,
             "health_gauges": dict(_gauge_health),
+            "funding_parsed_total": _counter_funding_parsed_total,
+            "close_extracted_total": _counter_close_extracted_total,
+            "open_extracted_total": _counter_open_extracted_total,
+            "funding_coverage": dict(_gauge_funding_coverage),
+            "close_coverage": dict(_gauge_close_coverage),
+            "open_coverage": dict(_gauge_open_coverage),
+            "per_source_extraction": {k: dict(v) for k, v in _per_source_extraction.items()},
         }
 
 
@@ -74,7 +121,15 @@ def reset() -> None:
     with _lock:
         _histogram.clear()
         global _counter_items_found, _counter_scrapes, _counter_errors
+        global _counter_funding_parsed_total, _counter_close_extracted_total, _counter_open_extracted_total
         _counter_items_found = 0
         _counter_scrapes = 0
         _counter_errors = 0
+        _counter_funding_parsed_total = 0
+        _counter_close_extracted_total = 0
+        _counter_open_extracted_total = 0
         _gauge_health.clear()
+        _gauge_funding_coverage.clear()
+        _gauge_close_coverage.clear()
+        _gauge_open_coverage.clear()
+        _per_source_extraction.clear()

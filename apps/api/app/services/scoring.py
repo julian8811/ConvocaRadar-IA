@@ -295,6 +295,22 @@ def _compute_score(opportunity: Opportunity, profile: OrganizationProfile) -> di
         score += 2
         reasons.append("Documentos necesarios identificados.")
 
+    # ── 022 P2: penalize missing data (configurable, bounded) ─────────────
+    try:
+        from app.core.config import get_settings as _get_s
+
+        _pen_close = int(_get_s().extraction_missing_close_penalty)
+        _pen_fund = int(_get_s().extraction_missing_funding_penalty)
+    except Exception:
+        _pen_close, _pen_fund = 10, 5
+    if not opportunity.close_date:
+        score -= _pen_close
+        warnings.append("Falta fecha de cierre — penalización aplicada.")
+    if not opportunity.funding_amount_value:
+        score -= _pen_fund
+        warnings.append("Falta monto de financiación — penalización aplicada.")
+    score = max(0.0, score)
+
     if score < 40 and not warnings:
         warnings.append("Compatibilidad baja con los datos disponibles.")
 

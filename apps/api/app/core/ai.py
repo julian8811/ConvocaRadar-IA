@@ -21,6 +21,50 @@ LOCAL_EMBEDDING_MODEL_VERSION = "local-hash-embeddings-v2"
 EMBEDDING_MODEL_VERSION = MODEL_VERSION
 PROMPT_VERSION = "structured-extraction-v4"
 
+# ── LRU cache for LLM extraction by hash(raw_text) (022 P2) ─────────────────
+_LLM_CACHE: dict[str, AIExtraction] = {}
+_LLM_CACHE_ORDER: list[str] = []  # LRU order, oldest first
+
+
+def _llm_cache_key(text: str) -> str:
+    return hashlib.sha256(text[:12000].encode("utf-8")).hexdigest()
+
+
+def _llm_cache_get(key: str) -> AIExtraction | None:
+    hit = _LLM_CACHE.get(key)
+    if hit is not None:
+        # move to end (most recent)
+        try:
+            _LLM_CACHE_ORDER.remove(key)
+        except ValueError:
+            pass
+        _LLM_CACHE_ORDER.append(key)
+    return hit
+
+
+def _llm_cache_set(key: str, value: AIExtraction) -> None:
+    from app.core.config import get_settings as _gs
+
+    try:
+        max_size = int(_gs().extraction_llm_cache_size)
+    except Exception:
+        max_size = 256
+    if key in _LLM_CACHE:
+        try:
+            _LLM_CACHE_ORDER.remove(key)
+        except ValueError:
+            pass
+    _LLM_CACHE[key] = value
+    _LLM_CACHE_ORDER.append(key)
+    while len(_LLM_CACHE_ORDER) > max_size:
+        oldest = _LLM_CACHE_ORDER.pop(0)
+        _LLM_CACHE.pop(oldest, None)
+
+
+def clear_llm_cache() -> None:
+    _LLM_CACHE.clear()
+    _LLM_CACHE_ORDER.clear()
+
 COUNTRY_RULES: list[tuple[str, str]] = [
     ("colombia", "Colombia"),
     ("united states", "United States"),
@@ -521,6 +565,10 @@ LLM_BATCH_SIZE = 20
 
 async def _extract_one_with_fallback(text: str) -> AIExtraction:
     """Single extraction with local-first fallback — extracted for batch reuse."""
+    cache_key = _llm_cache_key(text)
+    cached = _llm_cache_get(cache_key)
+    if cached is not None:
+        return cached
     try:
         remote = await _call_llm(text)
     except Exception:
@@ -553,13 +601,17 @@ async def _extract_one_with_fallback(text: str) -> AIExtraction:
         validated.setdefault("provider", get_settings().llm_provider)
         validated.setdefault("prompt_version", PROMPT_VERSION)
         validated.setdefault("extraction_strategy", "remote-llm")
-        return AIExtraction(
+        result = AIExtraction(
             data={**merged, **validated},
             confidence=merged["confidence"],
             provider=str(merged["provider"]),
         )
+        _llm_cache_set(cache_key, result)
+        return result
     local = build_local_extraction(text)
-    return AIExtraction(data=local, confidence=local["confidence"], provider="local")
+    result_local = AIExtraction(data=local, confidence=local["confidence"], provider="local")
+    _llm_cache_set(cache_key, result_local)
+    return result_local
 
 
 async def extract_opportunity_structured(text: str) -> AIExtraction:
