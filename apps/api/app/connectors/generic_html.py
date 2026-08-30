@@ -10,9 +10,18 @@ from selectolax.parser import HTMLParser
 from app.connectors.common import clean_text, extract_close_date, extract_funding_amount, fetch_httpx_text, looks_like_noise_text, parse_date_text
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
 
-DEEP_FETCH_LIMIT = 10
+DEEP_FETCH_LIMIT = 25
 DETAIL_PAGE_TIMEOUT = 15
 RESOLVE_URL_TIMEOUT = 20  # Max seconds to spend resolving base URL
+
+
+def _detail_limit() -> int:
+    try:
+        from app.core.config import get_settings as _gs
+
+        return int(_gs().extraction_detail_limit)
+    except Exception:
+        return DEEP_FETCH_LIMIT
 
 
 CLOSED_KEYWORDS = (
@@ -723,7 +732,7 @@ class GenericHtmlConnector:
         ``DEEP_FETCH_LIMIT`` per call. Each detail page fetch is independent
         and runs concurrently.
         """
-        to_enrich = [c for c in candidates if c.confidence_score < 0.7][:DEEP_FETCH_LIMIT]
+        to_enrich = [c for c in candidates if c.confidence_score < 0.7][:_detail_limit()]
         if not to_enrich:
             return candidates
 

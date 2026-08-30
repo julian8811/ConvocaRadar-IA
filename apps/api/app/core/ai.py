@@ -19,7 +19,7 @@ from app.schemas import AiOpportunityExtract
 MODEL_VERSION = "local-heuristic-v2"
 LOCAL_EMBEDDING_MODEL_VERSION = "local-hash-embeddings-v2"
 EMBEDDING_MODEL_VERSION = MODEL_VERSION
-PROMPT_VERSION = "structured-extraction-v3"
+PROMPT_VERSION = "structured-extraction-v4"
 
 COUNTRY_RULES: list[tuple[str, str]] = [
     ("colombia", "Colombia"),
@@ -356,6 +356,21 @@ def _normalize_remote_extraction(payload: dict[str, Any]) -> dict[str, Any]:
     mapped["extraction_notes"] = _coerce_text_list(mapped.get("extraction_notes"))
     mapped["priority"] = normalize_text(str(mapped.get("priority") or "")) or "medium"
     mapped["risk_level"] = normalize_text(str(mapped.get("risk_level") or "")) or "medium"
+    # v4 fields — normalize but allow absent (backward compat)
+    if mapped.get("open_date") is not None:
+        mapped["open_date"] = normalize_text(str(mapped.get("open_date") or "")) or None
+    else:
+        mapped["open_date"] = None
+    if mapped.get("funding_amount_raw") is not None:
+        mapped["funding_amount_raw"] = normalize_text(str(mapped.get("funding_amount_raw") or "")) or None
+    if mapped.get("funding_amount_currency") is not None:
+        val = normalize_text(str(mapped.get("funding_amount_currency") or "")).upper()
+        mapped["funding_amount_currency"] = val or None
+    if "funding_amount_value" in mapped and mapped["funding_amount_value"] is not None:
+        try:
+            mapped["funding_amount_value"] = float(mapped["funding_amount_value"])
+        except (TypeError, ValueError):
+            mapped["funding_amount_value"] = None
     remote_model = get_settings().chat_model or get_settings().llm_model
     mapped["model_version"] = normalize_text(str(mapped.get("model_version") or remote_model))
     mapped["provider"] = normalize_text(str(mapped.get("provider") or get_settings().llm_provider))
@@ -377,6 +392,12 @@ async def _call_llm(text: str) -> dict[str, Any] | None:
         f"Devuelve exclusivamente JSON valido usando el esquema version {PROMPT_VERSION}. "
         "Campos obligatorios: title, entity, country, category, status, close_date, requirements, documents_required, "
         "summary, risks, recommendation, confidence, matched_keywords, risk_level, priority, extraction_notes. "
+        "Campos v4 (obligatorios, null si ausente): open_date (ISO 8601 YYYY-MM-DD), "
+        "funding_amount_raw (texto original), funding_amount_value (numero normalizado), "
+        "funding_amount_currency (ISO 4217: COP, USD, EUR, BRL, MXN, GBP). "
+        "Fechas en ISO 8601 sin inventar: si no hay evidencia, null. "
+        "Montos: normaliza separadores locales (CO: 1.234.567,50 -> 1234567.5) y devuelve valor numerico + moneda. "
+        "Bare $ en contexto Colombia/.gov.co -> COP. "
         "Incluye prompt_version, model_version, provider y extraction_strategy si puedes."
     )
     payload = {
@@ -386,7 +407,7 @@ async def _call_llm(text: str) -> dict[str, Any] | None:
             {"role": "user", "content": text[:12000]},
         ],
         "temperature": 0.1,
-        "max_tokens": 1024,
+        "max_tokens": 1536,
         "response_format": {"type": "json_object"},
     }
     client = await http_client()
@@ -433,6 +454,17 @@ def build_local_extraction(text: str) -> dict[str, Any]:
     country = _extract_country(normalized)
     amount = _extract_amount(normalized)
     close_date = _extract_date(normalized)
+    # v4: open_date via second date heuristic, funding normalized locally
+    # Local fallback: open_date None unless two dates found
+    open_date: str | None = None
+    try:
+        # naive: find all ISO-like dates; if >=2, first is open
+        _all = re.findall(r"\b\d{4}-\d{2}-\d{2}\b|\b\d{1,2}/\d{1,2}/\d{4}\b", normalized)
+        if len(_all) >= 2:
+            # parse second as close, first as open — reuse _extract_date ordering
+            open_date = _all[0]  # may be non-ISO, kept as raw
+    except Exception:
+        open_date = None
     confidence = 0.52
     if len(normalized) > 200:
         confidence += 0.08
@@ -462,6 +494,7 @@ def build_local_extraction(text: str) -> dict[str, Any]:
         "category": categories[:5],
         "status": "unknown" if close_date is None else "open",
         "close_date": close_date,
+        "open_date": open_date,
         "requirements": requirements[:5] or ["Validar requisitos en la fuente oficial"],
         "documents_required": documents_required[:5] or ["Documento oficial de la convocatoria"],
         "summary": _extract_summary(normalized),
@@ -472,6 +505,8 @@ def build_local_extraction(text: str) -> dict[str, Any]:
         "risk_level": "medium" if risk_flags else "low",
         "priority": priority,
         "funding_amount_raw": amount,
+        "funding_amount_value": None,
+        "funding_amount_currency": None,
         "extraction_notes": extraction_notes,
         "model_version": MODEL_VERSION,
         "provider": "local",

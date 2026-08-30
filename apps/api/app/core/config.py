@@ -71,6 +71,14 @@ class Settings(BaseSettings):
     scheduler_interval_seconds: int = 1800
     scheduler_initial_delay_seconds: int = 30
     weekly_digest_interval_seconds: int = 604800
+    # ── Extraction flags (022) ──────────────────────────────────────────
+    extraction_cop_default: bool = True
+    extraction_prompt_v4: bool = True
+    extraction_detail_limit: int = 25
+    extraction_year_min: int = 2024
+    extraction_year_max: int = 2028
+    extraction_llm_always: bool = False
+    extraction_thin_threshold: int = 200
 
     @computed_field  # type: ignore[prop-decorator]
     @property

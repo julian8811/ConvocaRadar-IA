@@ -217,79 +217,118 @@ def safe_urljoin(base_url: str, href: str | None) -> str:
     return urljoin(base_url, href or "")
 
 
-def extract_close_date(text: str) -> datetime | None:
-    """Extract a deadline/close date from text using Spanish & English patterns.
-    Tries keyword-prefixed patterns first (more reliable), then falls back to
-    any date-looking text near deadline keywords.
+def _year_guard(dt: datetime | None) -> datetime | None:
+    if dt is None:
+        return None
+    try:
+        s = get_settings()
+        y_min = int(s.extraction_year_min)
+        y_max = int(s.extraction_year_max)
+    except Exception:
+        y_min, y_max = 2024, 2028
+    if dt.year < y_min or dt.year > y_max:
+        return None
+    return dt
+
+
+def extract_dates(text: str) -> tuple[datetime | None, datetime | None]:
+    """Extract (open_date, close_date) from text using tier fallback + dateparser.
+
+    Finds all date candidates via keyword-prefixed tiers and generic sweep,
+    parses each with ``parse_date_text`` (dateparser DMY), filters by year
+    window 2024-2028, then assigns earliest→open, latest→close. Single
+    candidate → (None, that). No candidates → (None, None).
     """
     if not text:
-        return None
-    _text = text[:3000]  # limit to first 3000 chars for performance
+        return None, None
+    _text = text[:4000]
+    candidates: list[datetime] = []
+    seen: set[str] = set()
 
-    # ── Tier 1: Keyword-prefixed patterns (high precision) ──────────────
-    tier1 = [
-        # Spanish: "fecha de cierre: 8 de mayo de 2026"
-        r"(?:fecha\s+(?:de\s+)?(?:\w+\s+)?(?:cierre|limite|limite|maxima|maxima|tope))\s*[:\-]?\s*(\d{1,2}\s+de\s+[a-z]+\s+de\s+\d{4})",
-        # Spanish: "fecha de cierre de la convocatoria: 15/06/2026"
-        r"(?:fecha\s+(?:de\s+)?(?:\w+\s+)?(?:cierre|limite|limite)\s+(?:de\s+la\s+)?(?:convocatoria|presentacion|presentación|solicitud))\s*[:\-]?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{4})",
-        # Portuguese: "data de encerramento: 30/09/2026" / "prazo: 30/09/2026"
-        r"(?:data\s+(?:de\s+)?encerramento|prazo\s+(?:maximo|máximo|final|)?|data\s+limite|data\s+final)\s*[:\-]?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{4}|\d{1,2}\s+de\s+[a-z]+\s+de\s+\d{4})",
-        # Portuguese: "inscrições até: 24/07/2026"
-        r"(?:inscrições?|inscricao|inscrição)\s+(?:ate|até|encerram|finalizam)\s*(?:\:)?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{4}|\d{1,2}\s+de\s+[a-z]+\s+de\s+\d{4})",
-        # Spanish: "cierra el 08 de mayo de 2026"
-        r"(?:cierra|vence|finaliza|termina)\s+(?:el\s+)?(\d{1,2}\s+de\s+[a-z]+\s+de\s+\d{4})",
-        # English: "deadline: May 8, 2026"
+    # Tier patterns that capture a date string group(1)
+    tier_patterns = [
+        r"(?:fecha\s+(?:de\s+)?(?:\w+\s+)?(?:cierre|limite|maxima|tope))\s*[:\-]?\s*(\d{1,2}\s+de\s+[a-záéíóúñ]+\s+de\s+\d{4})",
+        r"(?:fecha\s+(?:de\s+)?(?:\w+\s+)?(?:cierre|limite)\s+(?:de\s+la\s+)?(?:convocatoria|presentacion|presentación|solicitud))\s*[:\-]?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{4})",
+        r"(?:data\s+(?:de\s+)?encerramento|prazo\s+(?:maximo|máximo|final|)?|data\s+limite|data\s+final)\s*[:\-]?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{4}|\d{1,2}\s+de\s+[a-záéíóúñ]+\s+de\s+\d{4})",
+        r"(?:inscrições?|inscricao|inscrição)\s+(?:ate|até|encerram|finalizam)\s*(?:\:)?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{4}|\d{1,2}\s+de\s+[a-záéíóúñ]+\s+de\s+\d{4})",
+        r"(?:cierra|vence|finaliza|termina)\s+(?:el\s+)?(\d{1,2}\s+de\s+[a-záéíóúñ]+\s+de\s+\d{4})",
         r"(?:deadline|closing\s+date|submission\s+deadline|application\s+deadline|applications?\s+due|proposals?\s+due)\s*[:\-]?\s*([a-z]+\s+\d{1,2},?\s+\d{4})",
-        # Spanish/English: "hasta el 8 de mayo de 2026"
-        r"(?:hasta\s+(?:el\s+)?(?:dia\s+)?)(\d{1,2}\s+de\s+[a-z]+\s+de\s+\d{4})",
-        # Spanish: "postulación hasta: 8/5/2026"
-        r"(?:postulacion|postulación|aplicacion|aplicación|envio|envío|recepcion|recepción|inscripcion|inscripción)\s+(?:hasta|cierra|finaliza)\s*(?:\:)?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{4}|\d{1,2}\s+de\s+[a-z]+\s+de\s+\d{4})",
-        # Spanish: "convocatoria cierre: 15/06/2026" / "convocatoria cierra: 15/06/2026"
+        r"(?:hasta\s+(?:el\s+)?(?:dia\s+)?)(\d{1,2}\s+de\s+[a-záéíóúñ]+\s+de\s+\d{4})",
+        r"(?:postulacion|postulación|aplicacion|aplicación|envio|envío|recepcion|recepción|inscripcion|inscripción)\s+(?:hasta|cierra|finaliza)\s*(?:\:)?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{4}|\d{1,2}\s+de\s+[a-záéíóúñ]+\s+de\s+\d{4})",
         r"(?:convocatoria\s+)(?:cierre|cierra|finaliza|vence)\s*[:\-]?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{4})",
-        # "plazo: 8 de mayo de 2026" / "plazo máximo: ..."
-        r"(?:plazo\s+(?:maximo|máximo|tope|max|)?)\s*[:\-]?\s*(\d{1,2}\s+de\s+[a-z]+\s+de\s+\d{4})",
-        # "presentación de ofertas hasta: 15/06/2026"
+        r"(?:plazo\s+(?:maximo|máximo|tope|max|)?)\s*[:\-]?\s*(\d{1,2}\s+de\s+[a-záéíóúñ]+\s+de\s+\d{4})",
         r"(?:presentacion|presentación)\s+(?:de\s+)?(?:ofertas|solicitudes|propuestas)\s+(?:hasta|cierra|finaliza)\s*(?:\:)?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{4})",
-        # "apertura: ... cierre: ..." pattern (common in Latin American portals)
+        r"(?:cierre|fecha\s+de\s+cierre)\s*[:\-]?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{4})",
+        r"(?:apertura|inicio|abre|abierta)\s*[:\-]?\s*(\d{1,2}\s+de\s+[a-záéíóúñ]+\s+de\s+\d{4}|\d{1,2}[/-]\d{1,2}[/-]\d{4})",
+        r"(?:desde|del)\s+(\d{1,2}\s+de\s+[a-záéíóúñ]+\s+de\s+\d{4}|\d{1,2}[/-]\d{1,2}[/-]\d{4})",
+        r"(\d{1,2}\s+de\s+[a-záéíóúñ]+\s+de\s+\d{4})",
+        r"(\d{1,2}\s+de\s+[a-záéíóúñ]+\s+\d{4})",
+        r"(\d{1,2}\s+[a-záéíóúñ]+\s+\d{4})",
+        r"(\d{1,2}[/-]\d{1,2}[/-]\d{4})",
+        r"([a-z]+\s+\d{1,2},?\s+\d{4})",
+        r"(\d{4}-\d{2}-\d{2})",
+    ]
+    for pat in tier_patterns:
+        for m in re.finditer(pat, _text, flags=re.IGNORECASE):
+            raw = m.group(1).strip()
+            if raw.lower() in seen:
+                continue
+            seen.add(raw.lower())
+            parsed = parse_date_text(raw)
+            parsed = _year_guard(parsed)
+            if parsed and parsed not in candidates:
+                candidates.append(parsed)
+
+    # Generic desde...hasta explicit pair fallback (permissive month form)
+    hasta_match = re.search(
+        r"desde\s+(\d{1,2}\s+(?:de\s+)?[a-záéíóúñ]+\s+(?:de\s+)?\d{4}|\d{1,2}[/-]\d{1,2}[/-]\d{4})\s+(?:hasta|al)\s+(\d{1,2}\s+(?:de\s+)?[a-záéíóúñ]+\s+(?:de\s+)?\d{4}|\d{1,2}[/-]\d{1,2}[/-]\d{4})",
+        _text,
+        flags=re.IGNORECASE,
+    )
+    if hasta_match:
+        for idx in (1, 2):
+            raw = hasta_match.group(idx).strip()
+            p = _year_guard(parse_date_text(raw))
+            if p and p not in candidates:
+                candidates.append(p)
+
+    if not candidates:
+        return None, None
+    candidates.sort()
+    if len(candidates) == 1:
+        return None, candidates[0]
+    return candidates[0], candidates[-1]
+
+
+def extract_close_date(text: str) -> datetime | None:
+    """Wrapper over extract_dates — returns close_date (latest)."""
+    if not text:
+        return None
+    # Fast tier-1 path preserved for backward compat precision, then fallback to tuple
+    _text = text[:3000]
+    tier1 = [
+        r"(?:fecha\s+(?:de\s+)?(?:\w+\s+)?(?:cierre|limite|maxima|tope))\s*[:\-]?\s*(\d{1,2}\s+de\s+[a-z]+\s+de\s+\d{4})",
+        r"(?:fecha\s+(?:de\s+)?(?:\w+\s+)?(?:cierre|limite)\s+(?:de\s+la\s+)?(?:convocatoria|presentacion|presentación|solicitud))\s*[:\-]?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{4})",
+        r"(?:data\s+(?:de\s+)?encerramento|prazo\s+(?:maximo|máximo|final|)?|data\s+limite|data\s+final)\s*[:\-]?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{4}|\d{1,2}\s+de\s+[a-z]+\s+de\s+\d{4})",
+        r"(?:inscrições?|inscricao|inscrição)\s+(?:ate|até|encerram|finalizam)\s*(?:\:)?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{4}|\d{1,2}\s+de\s+[a-z]+\s+de\s+\d{4})",
+        r"(?:cierra|vence|finaliza|termina)\s+(?:el\s+)?(\d{1,2}\s+de\s+[a-z]+\s+de\s+\d{4})",
+        r"(?:deadline|closing\s+date|submission\s+deadline|application\s+deadline|applications?\s+due|proposals?\s+due)\s*[:\-]?\s*([a-z]+\s+\d{1,2},?\s+\d{4})",
+        r"(?:hasta\s+(?:el\s+)?(?:dia\s+)?)(\d{1,2}\s+de\s+[a-z]+\s+de\s+\d{4})",
+        r"(?:postulacion|postulación|aplicacion|aplicación|envio|envío|recepcion|recepción|inscripcion|inscripción)\s+(?:hasta|cierra|finaliza)\s*(?:\:)?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{4}|\d{1,2}\s+de\s+[a-z]+\s+de\s+\d{4})",
+        r"(?:convocatoria\s+)(?:cierre|cierra|finaliza|vence)\s*[:\-]?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{4})",
+        r"(?:plazo\s+(?:maximo|máximo|tope|max|)?)\s*[:\-]?\s*(\d{1,2}\s+de\s+[a-z]+\s+de\s+\d{4})",
+        r"(?:presentacion|presentación)\s+(?:de\s+)?(?:ofertas|solicitudes|propuestas)\s+(?:hasta|cierra|finaliza)\s*(?:\:)?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{4})",
         r"(?:cierre|fecha\s+de\s+cierre)\s*[:\-]?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{4})",
     ]
     for pattern in tier1:
         match = re.search(pattern, _text, flags=re.IGNORECASE)
         if match:
-            parsed = parse_date_text(match.group(1))
+            parsed = _year_guard(parse_date_text(match.group(1)))
             if parsed:
                 return parsed
-
-    # ── Tier 2: Any date after a deadline keyword (broader match) ───────
-    tier2 = [
-        # English: "closes May 8, 2026" / "due May 8, 2026" / "by May 8, 2026"
-        r"(?:closes|due date|due on|by\s+)\s*([a-z]+\s+\d{1,2},?\s+\d{4})",
-        # "before May 8, 2026" / "until May 8, 2026"
-        r"(?:before|until|antes\s+del|a\s+mas\s+tardar)\s+(\d{1,2}\s+de\s+[a-z]+\s+de\s+\d{4}|\w+\s+\d{1,2},?\s+\d{4})",
-        # Bare Spanish date after "el" ("recibimos hasta el 8 de mayo de 2026")
-        r"(?:hasta|antes\s+del)\s+(\d{1,2}\s+de\s+[a-z]+\s+de\s+\d{4})",
-        # Bare numeric date preceded by keyword
-        r"(?:cierre|deadline|closing|due)\s*[:\-]?\s*(\d{1,2}[/-]\d{1,2}[/-]\d{4})",
-    ]
-    for pattern in tier2:
-        match = re.search(pattern, _text, flags=re.IGNORECASE)
-        if match:
-            parsed = parse_date_text(match.group(1))
-            if parsed:
-                return parsed
-
-    # ── Tier 3: Last resort — any ISO or slash date near keywords ───────
-    for pattern in [
-        r"(?:cierra|deadline|cierre|vence|closing|due)\s*(?:\:)?\s*(\d{1,2}/\d{1,2}/\d{4})",
-        r"(\d{4}-\d{2}-\d{2})",
-    ]:
-        match = re.search(pattern, _text, flags=re.IGNORECASE)
-        if match:
-            parsed = parse_date_text(match.group(1))
-            if parsed:
-                return parsed
-
-    return None
+    # fallback to tuple
+    _, close = extract_dates(text)
+    return close
 
 
 def _parse_spanish_month(
@@ -309,11 +348,33 @@ def parse_date_text(text: str | None) -> datetime | None:
     value = clean_text(text)
     if not value:
         return None
+    # Primary: dateparser DMY es/en/pt
+    try:
+        import dateparser as _dp
+
+        dp = _dp.parse(
+            value,
+            languages=["es", "en", "pt"],
+            settings={"DATE_ORDER": "DMY", "PREFER_DAY_OF_MONTH": "first"},
+        )
+        if dp is not None:
+            # normalize to naive datetime, guard year
+            dp_naive = dp.replace(tzinfo=None) if dp.tzinfo else dp
+            guarded = _year_guard(dp_naive)
+            if guarded:
+                return guarded
+            # year outside window → fall through to allow None, don't return unguarded
+            if dp.year < 2024 or dp.year > 2028:
+                return None
+            return dp_naive
+    except Exception:
+        pass
+    # Fallback regex (kept for deterministic offline path)
     # 1. ISO format: 2027-06-30
     iso_match = _ISO_DATE.search(value)
     if iso_match:
         try:
-            return datetime.strptime(iso_match.group(1), "%Y-%m-%d")
+            return _year_guard(datetime.strptime(iso_match.group(1), "%Y-%m-%d"))
         except ValueError:
             pass
     # 2. Slash format: 06/30/2027 or 30/06/2027
@@ -321,7 +382,7 @@ def parse_date_text(text: str | None) -> datetime | None:
     if slash_match:
         for fmt in ("%m/%d/%Y", "%d/%m/%Y"):
             try:
-                return datetime.strptime(slash_match.group(1), fmt)
+                return _year_guard(datetime.strptime(slash_match.group(1), fmt))
             except ValueError:
                 continue
     # 3. English: "June 30, 2027" or "Jun 30, 2027"
@@ -330,7 +391,7 @@ def parse_date_text(text: str | None) -> datetime | None:
         candidate = f"{eng_match.group(1).title()} {eng_match.group(2)}, {eng_match.group(3)}"
         for fmt in ("%B %d, %Y", "%b %d, %Y"):
             try:
-                return datetime.strptime(candidate, fmt)
+                return _year_guard(datetime.strptime(candidate, fmt))
             except ValueError:
                 continue
     # 4. Spanish comma: "junio 30, 2027"
@@ -338,13 +399,13 @@ def parse_date_text(text: str | None) -> datetime | None:
     if es_comma:
         result = _parse_spanish_month(text, 1, 2, 3, es_comma)
         if result:
-            return result
+            return _year_guard(result)
     # 5. Spanish "de": "30 de junio de 2027"
     es_de = _SPANISH_DATE_DE.search(value)
     if es_de:
         result = _parse_spanish_month(text, 2, 1, 3, es_de)
         if result:
-            return result
+            return _year_guard(result)
     return None
 
 
@@ -972,7 +1033,7 @@ def infer_country_from_entity(entity_name: str | None, official_url: str | None 
 
 async def enrich_candidates_batch(
     candidates: list[OpportunityCandidate],
-    max_fetches: int = 25,
+    max_fetches: int | None = None,
 ) -> list[OpportunityCandidate]:
     """Batch-enrich low-confidence candidates by fetching detail pages.
 
@@ -983,7 +1044,8 @@ async def enrich_candidates_batch(
     import asyncio
     from copy import deepcopy
 
-    to_enrich = candidates[:max_fetches]
+    limit = max_fetches if max_fetches is not None else int(get_settings().extraction_detail_limit)
+    to_enrich = candidates[:limit]
     tasks = {c.official_url: enrich_from_detail_page(c.official_url) for c in to_enrich}
     results = await asyncio.gather(*tasks.values(), return_exceptions=True)
 

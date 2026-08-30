@@ -31,9 +31,19 @@ CLOSED_KEYWORDS = (
     "closed call",
     "cierre cerrado",
 )
-DEEP_FETCH_LIMIT = 10
+# Use extraction_detail_limit (25) via get_settings; constant kept for tests that import it
+DEEP_FETCH_LIMIT = 25
 DETAIL_PAGE_TIMEOUT = 15
 PAGINATION_MAX_PAGES = 10
+
+
+def _detail_limit() -> int:
+    try:
+        from app.core.config import get_settings as _gs
+
+        return int(_gs().extraction_detail_limit)
+    except Exception:
+        return DEEP_FETCH_LIMIT
 
 
 # ── Config dataclass ─────────────────────────────────────────────────────────
@@ -604,7 +614,7 @@ class ConfigurableHtmlConnector:
         """Enrich low-confidence candidates by fetching their detail pages."""
         import asyncio
 
-        to_enrich = [c for c in candidates if c.confidence_score < 0.7][:DEEP_FETCH_LIMIT]
+        to_enrich = [c for c in candidates if c.confidence_score < 0.7][:_detail_limit()]
         if not to_enrich:
             return candidates
 
