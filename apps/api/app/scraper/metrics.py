@@ -25,6 +25,10 @@ _gauge_funding_coverage: dict[str, float] = {}  # source_key -> 0-100 %
 _gauge_close_coverage: dict[str, float] = {}  # source_key -> 0-100 %
 _gauge_open_coverage: dict[str, float] = {}  # source_key -> 0-100 %
 _per_source_extraction: dict[str, dict[str, int]] = {}  # source -> {total, funding, close, open}
+# ── 023 gauges (throttle/burst) ───────────────────────────────────────────
+_counter_throttled: int = 0
+_gauge_burst_utilization: dict[str, float] = {}
+_gauge_delay_for_wait: float = 0.0
 
 
 def record_scrape(*, source_key: str, duration_s: float, items_found: int, status: str, health_score: int | None = None) -> None:
@@ -82,6 +86,15 @@ def record_extraction(
         _gauge_open_coverage[source_key] = round(entry["open"] / total * 100, 1) if total else 0
 
 
+def record_throttled(*, source_key: str = "unknown", delay_s: float = 0.0) -> None:
+    with _lock:
+        global _counter_throttled, _gauge_delay_for_wait
+        _counter_throttled += 1
+        _gauge_delay_for_wait = round(float(delay_s), 3)
+        if source_key:
+            _gauge_burst_utilization[source_key] = round(min(_counter_throttled / 150 * 100, 100), 1)
+
+
 def snapshot() -> dict:
     with _lock:
         hist = list(_histogram)
@@ -101,6 +114,9 @@ def snapshot() -> dict:
             "close_coverage": dict(_gauge_close_coverage),
             "open_coverage": dict(_gauge_open_coverage),
             "per_source_extraction": {k: dict(v) for k, v in _per_source_extraction.items()},
+            "throttled_count": _counter_throttled,
+            "burst_utilization": dict(_gauge_burst_utilization),
+            "delay_for_wait": _gauge_delay_for_wait,
         }
 
 
@@ -133,3 +149,7 @@ def reset() -> None:
         _gauge_close_coverage.clear()
         _gauge_open_coverage.clear()
         _per_source_extraction.clear()
+        global _counter_throttled, _gauge_delay_for_wait
+        _counter_throttled = 0
+        _gauge_delay_for_wait = 0.0
+        _gauge_burst_utilization.clear()

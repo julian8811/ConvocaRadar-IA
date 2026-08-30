@@ -611,14 +611,23 @@ class ConfigurableHtmlConnector:
         self,
         candidates: list[OpportunityCandidate],
     ) -> list[OpportunityCandidate]:
-        """Enrich low-confidence candidates by fetching their detail pages."""
+        """Enrich candidates with confidence<0.82 OR missing funding via detail pages.
+
+        Bounded by Semaphore(25) per spec Requirement: Detail Gate Correction + Concurrency Bound.
+        """
         import asyncio
 
-        to_enrich = [c for c in candidates if c.confidence_score < 0.7][:_detail_limit()]
+        to_enrich = [c for c in candidates if c.confidence_score < 0.82 or not c.funding_amount_raw][:_detail_limit()]
         if not to_enrich:
             return candidates
 
-        tasks = {c.official_url: self._enrich_from_detail(c.official_url) for c in to_enrich}
+        sem = asyncio.Semaphore(25)
+
+        async def _bounded(url: str):
+            async with sem:
+                return await self._enrich_from_detail(url)
+
+        tasks = {c.official_url: _bounded(c.official_url) for c in to_enrich}
         results = await asyncio.gather(*tasks.values(), return_exceptions=True)
 
         url_to_data: dict[str, dict | None] = {}
@@ -682,6 +691,9 @@ class ConfigurableHtmlConnector:
                 cats = [str(v) for v in (item.get("categories") or [])[:4] if isinstance(v, str)]
                 if cats:
                     result["categories"] = cats
+                amount = str(item.get("funding") or item.get("fundingAmount") or "").strip()
+                if amount:
+                    result["funding_amount_raw"] = amount
                 break
 
         # 2. Meta / OG tags
@@ -727,5 +739,14 @@ class ConfigurableHtmlConnector:
                 cd = common.extract_close_date(all_text)
                 if cd:
                     result["close_date"] = cd
+
+        # 6. Funding mirror (GenericHtml parity — raw only, value via d9579f4)
+        if "funding_amount_raw" not in result:
+            body = tree.css_first("body")
+            if body:
+                all_text = common.clean_text(body.text())
+                amount = common.extract_funding_amount(all_text)
+                if amount:
+                    result["funding_amount_raw"] = amount
 
         return result if result.get("title") else None

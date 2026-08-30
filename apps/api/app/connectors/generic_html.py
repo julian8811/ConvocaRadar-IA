@@ -726,17 +726,21 @@ class GenericHtmlConnector:
         self,
         candidates: list[OpportunityCandidate],
     ) -> list[OpportunityCandidate]:
-        """Enrich low-confidence candidates by fetching their detail pages.
+        """Enrich candidates with confidence<0.82 OR missing funding via detail pages.
 
-        Only processes candidates with confidence < 0.7, up to
-        ``DEEP_FETCH_LIMIT`` per call. Each detail page fetch is independent
-        and runs concurrently.
+        Bounded by Semaphore(25) — mirrors ConfigurableHtml gate correction.
         """
-        to_enrich = [c for c in candidates if c.confidence_score < 0.7][:_detail_limit()]
+        to_enrich = [c for c in candidates if c.confidence_score < 0.82 or not c.funding_amount_raw][:_detail_limit()]
         if not to_enrich:
             return candidates
 
-        tasks = {c.official_url: self._enrich_from_detail(c.official_url) for c in to_enrich}
+        sem = asyncio.Semaphore(25)
+
+        async def _bounded(url: str):
+            async with sem:
+                return await self._enrich_from_detail(url)
+
+        tasks = {c.official_url: _bounded(c.official_url) for c in to_enrich}
         results = await asyncio.gather(*tasks.values(), return_exceptions=True)
 
         url_to_data: dict[str, dict | None] = {}

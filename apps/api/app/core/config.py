@@ -82,6 +82,10 @@ class Settings(BaseSettings):
     extraction_missing_close_penalty: int = 10
     extraction_missing_funding_penalty: int = 5
     extraction_llm_cache_size: int = 256
+    # ── 023 flags (reversible, off-default) ───────────────────────────────
+    extraction_batch_enabled: bool = False
+    extraction_spa_retry: bool = False
+    throttle_max_per_day: int = 150
 
     @computed_field  # type: ignore[prop-decorator]
     @property
