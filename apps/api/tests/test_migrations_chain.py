@@ -34,6 +34,7 @@ EXPECTED_CHAIN = [
     "0011_embedding_bootstrap",
     "0012_fix_sena_allowed_domains",
     "0013_reclassify_experimental_frequency",
+    "0014_scraper_pipeline_indices",
 ]
 
 
@@ -42,8 +43,8 @@ def _script() -> ScriptDirectory:
 
 
 def test_migration_graph_has_exactly_one_head_0011() -> None:
-    """Single-head scenario: exactly one head, and it is 0013."""
-    assert _script().get_heads() == ["0013_reclassify_experimental_frequency"]
+    """Single-head scenario: exactly one head, and it is 0014."""
+    assert _script().get_heads() == ["0014_scraper_pipeline_indices"]
 
 
 def test_chain_is_linear_from_base_to_head() -> None:

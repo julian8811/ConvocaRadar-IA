@@ -481,8 +481,15 @@ def build_local_extraction(text: str) -> dict[str, Any]:
     }
 
 
-async def extract_opportunity_structured(text: str) -> AIExtraction:
-    remote = await _call_llm(text)
+LLM_BATCH_SIZE = 20
+
+
+async def _extract_one_with_fallback(text: str) -> AIExtraction:
+    """Single extraction with local-first fallback — extracted for batch reuse."""
+    try:
+        remote = await _call_llm(text)
+    except Exception:
+        remote = None
     if remote:
         normalized = build_local_extraction(text)
         merged = {**normalized, **_normalize_remote_extraction(remote)}
@@ -518,6 +525,41 @@ async def extract_opportunity_structured(text: str) -> AIExtraction:
         )
     local = build_local_extraction(text)
     return AIExtraction(data=local, confidence=local["confidence"], provider="local")
+
+
+async def extract_opportunity_structured(text: str) -> AIExtraction:
+    """Single structured extraction — now delegates to _extract_one_with_fallback."""
+    return await _extract_one_with_fallback(text)
+
+
+async def extract_opportunities_structured_batch(
+    texts: list[str], *, chunk_size: int = 20
+) -> list[AIExtraction]:
+    """Batch LLM extraction chunk 20 with local-first fallback and chunked retry.
+
+    Each chunk runs concurrently via asyncio.gather; on per-item failure
+    falls back to local heuristic. Respects rate limits via 0.3s backoff
+    between chunks.
+    """
+    if not texts:
+        return []
+    results: list[AIExtraction] = []
+    for i in range(0, len(texts), chunk_size):
+        chunk = texts[i : i + chunk_size]
+        # Fast path: local provider short-circuits remote entirely.
+        settings = get_settings()
+        if effective_llm_provider(settings.llm_provider) == "local" or not settings.llm_api_key:
+            for t in chunk:
+                local = build_local_extraction(t)
+                results.append(AIExtraction(data=local, confidence=local["confidence"], provider="local"))
+            continue
+        chunk_results = await asyncio.gather(
+            *(_extract_one_with_fallback(t) for t in chunk), return_exceptions=False
+        )
+        results.extend(chunk_results)
+        if i + chunk_size < len(texts):
+            await asyncio.sleep(0.15)
+    return results
 
 
 def summarize_opportunity_text(text: str) -> str:

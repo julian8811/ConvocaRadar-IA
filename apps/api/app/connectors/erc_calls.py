@@ -57,9 +57,10 @@ class ErcCallsConnector:
     async def fetch(self) -> RawSourceResult:
         from app.core.config import get_settings
 
+        from app.connectors.common import fetch_httpx_text
+
         settings = get_settings()
         api_key = settings.sedia_api_key or "SEDIA"
-        # Search for ERC-specific funding topics
         payload = {
             "apiKey": api_key,
             "queryString": "ERC",
@@ -69,22 +70,17 @@ class ErcCallsConnector:
             "sort": ["contentDate:desc"],
             "filters": [{"field": "kind", "values": ["call-for-proposals"]}],
         }
-        from app.connectors.common import http_client
-
-        client = await http_client()
-        response = await client.post(
+        url, content, content_type = await fetch_httpx_text(
             self.base_url,
-            json=payload,
-            timeout=30,
-            headers={"Content-Type": "application/json"},
+            method="POST",
+            payload=payload,
+            fallback_content_type="application/json",
         )
-        response.raise_for_status()
-        content = response.text
         return RawSourceResult(
             source_key=self.source_key,
-            url=self.base_url,
+            url=url,
             content=content,
-            content_type="application/json",
+            content_type=content_type,
         )
 
     async def parse(self, raw: RawSourceResult) -> list[OpportunityCandidate]:
@@ -104,10 +100,15 @@ class ErcCallsConnector:
             if not title or title in seen_titles:
                 continue
             seen_titles.add(title)
-            # Check if ERC-related
+            # Relaxed filter: check title, summary, identifier, and keywords for ERC signals.
             title_lower = title.lower()
-            if not any(term.lower() in title_lower for term in ERC_TERMS):
-                continue
+            summary_lower = summary.lower()
+            identifier_lower = identifier.lower()
+            combined = f"{title_lower} {summary_lower} {identifier_lower}"
+            if not any(term.lower() in combined for term in ERC_TERMS):
+                # Keep if result pool small (already filtered server-side) — avoid dropping valid erc variants.
+                if len(results) > 10:
+                    continue
             identifier = str(item.get("identifier", item.get("id", "")))
             summary = _clean(
                 _first_text(item.get("shortDescription")) or _clean(item.get("description", ""))

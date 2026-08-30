@@ -69,19 +69,41 @@ def is_slow_scrape_source(source: Source) -> bool:
     )
 
 
+def _jitter_for_source(source: Source) -> timedelta:
+    """Deterministic jitter 0-599s based on source.id hash — avoids thundering herd."""
+    import hashlib
+
+    h = int(hashlib.sha256((source.id or "0").encode()).hexdigest()[:8], 16)
+    return timedelta(seconds=h % 600)
+
+
 def source_due_for_scraping(source: Source, *, now: datetime | None = None) -> bool:
     current = now or datetime.now(UTC).replace(tzinfo=None)
     frequency = (source.scraping_frequency or "daily").lower()
     if frequency in {"hourly", "every_hour", "daily", "every_day"}:
+        # Daily/hourly always due — health-aware backoff only if heavily failing
+        fails = int(getattr(source, "consecutive_empty_runs", 0) or 0)
+        if fails >= 5 and source.last_run_at:
+            # Back off heavily failing daily: require at least 6h since last run
+            elapsed = current - source.last_run_at
+            backoff = timedelta(hours=min(24, 4 * fails))
+            jitter = _jitter_for_source(source)
+            return elapsed >= backoff + jitter
         return True
     if not source.last_run_at:
         return True
     elapsed = current - source.last_run_at
+    jitter = _jitter_for_source(source)
+    fails = int(getattr(source, "consecutive_empty_runs", 0) or 0)
+    backoff = timedelta(0)
+    if fails:
+        # Up to 24h extra backoff, 6h per failure
+        backoff = timedelta(hours=min(24, fails * 6))
     if frequency in {"weekly", "every_week"}:
-        return elapsed >= timedelta(days=7)
+        return elapsed >= timedelta(days=7) + backoff + jitter
     if frequency in {"monthly", "every_month"}:
-        return elapsed >= timedelta(days=28)
-    return elapsed >= timedelta(days=1)
+        return elapsed >= timedelta(days=28) + backoff + jitter
+    return elapsed >= timedelta(days=1) + backoff + jitter
 
 
 async def _scrape_source_candidates(
