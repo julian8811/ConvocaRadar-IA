@@ -10,8 +10,13 @@ import asyncio
 import inspect
 from datetime import UTC, datetime
 
+import structlog
+import time
+
 from app.core.config import get_settings
 from app.models import Source, SourceRun, Task
+
+_struct_logger = structlog.get_logger(__name__)
 from app.schemas import OpportunityCreate
 from app.scraper.dom_monitor import compute_dom_hash
 from app.scraper.errors import ErrorType, classify_error
@@ -26,6 +31,17 @@ from app.services.scoring import (
     should_auto_pause,
     update_consecutive_empty_runs,
 )
+
+# Batch enrichment wiring — extracted for S2 p95 (chunks 20 LLM / 32 embedding, LRU256)
+try:
+    from app.core.ai import extract_opportunities_structured_batch
+except Exception:  # pragma: no cover
+    extract_opportunities_structured_batch = None  # type: ignore
+
+try:
+    from app.services.embeddings import build_embeddings_batch
+except Exception:  # pragma: no cover
+    build_embeddings_batch = None  # type: ignore
 
 # Phases tracked in run.progress
 PROGRESS_STEPS = ["fetch", "parse", "persist"]
@@ -82,24 +98,35 @@ async def _scrape_candidates(
             candidates = fallback_candidates
     if stats is not None:
         stats["candidates_parsed"] = len(candidates)
+    from app.connectors.common import fill_candidate_from_content
+
     opportunities: list[OpportunityCreate] = []
     noise_rejected = 0
     validation_rejected = 0
     validation_reasons: list[str] = []
     for candidate in candidates:
+        candidate = fill_candidate_from_content(
+            candidate,
+            text=candidate.raw_text or candidate.summary,
+            page_url=candidate.official_url,
+        )
         if is_noise_payload(candidate.title, candidate.summary, candidate.raw_text):
             noise_rejected += 1
             continue
         validation = await connector.validate(candidate)
         if not validation.ok:
-            validation_rejected += 1
-            if len(validation_reasons) < 5:
-                validation_reasons.append(validation.reason or "sin razon")
-            continue
+            reason = (validation.reason or "").lower()
+            appears_closed = "closed" in reason or "cerrad" in reason
+            if not appears_closed:
+                validation_rejected += 1
+                if len(validation_reasons) < 5:
+                    validation_reasons.append(validation.reason or "sin razon")
+                continue
         opportunities.append(
             OpportunityCreate(
                 source_id=source.id,
-                external_id=candidate_external_id(
+                external_id=candidate.external_id
+                or candidate_external_id(
                     source,
                     candidate.official_url,
                     candidate.title,
@@ -108,18 +135,27 @@ async def _scrape_candidates(
                 title=candidate.title,
                 entity=candidate.entity,
                 country=candidate.country,
-                region=source.region,
+                # A region scraped from the page is more specific than the
+                # source-wide default, so it wins when present.
+                region=candidate.region or source.region,
                 language=candidate.language,
                 categories=candidate.categories,
                 topics=candidate.topics,
-                description=candidate.summary or candidate.title,
+                description=candidate.description or candidate.summary or candidate.title,
                 summary=candidate.summary or candidate.title,
                 raw_text=candidate.raw_text,
                 official_url=candidate.official_url,
+                application_url=candidate.application_url,
                 open_date=candidate.open_date,
                 close_date=candidate.close_date,
                 funding_amount_raw=candidate.funding_amount_raw,
+                funding_amount_value=candidate.funding_amount_value,
+                funding_amount_currency=candidate.funding_amount_currency,
+                eligible_applicants=candidate.eligible_applicants,
                 requirements=candidate.requirements,
+                documents_required=candidate.documents_required,
+                evaluation_criteria=candidate.evaluation_criteria,
+                restrictions=candidate.restrictions,
                 confidence_score=candidate.confidence_score,
             )
         )
@@ -145,6 +181,95 @@ async def _scrape_source_candidates_with_timeout(
         return await asyncio.wait_for(_scrape_candidates(source, stats), timeout=timeout_seconds)
     except TimeoutError as exc:
         raise TimeoutError(f"Scrape for source {source.key} exceeded {timeout_seconds}s") from exc
+
+
+async def _batch_enrich(
+    opportunities: list[OpportunityCreate],
+) -> list[OpportunityCreate]:
+    """Batched enrichment for p95 — flag-gated serial vs batch.
+
+    Flag OFF (default): serial parity via enrich_opportunity_payload per item.
+    Flag ON: uses extract_opportunities_structured_batch(chunk_size=20) with LRU256
+             and build_embeddings_batch (chunk 32/20) for p95 ≤4s. No N-loop.
+    """
+    settings = get_settings()
+    if not opportunities:
+        return []
+
+    if not settings.extraction_batch_enabled:
+        # Serial fallback — preserves parity, no cross-contamination
+        from app.services.opportunity import enrich_opportunity_payload
+
+        results: list[OpportunityCreate] = []
+        for oc in opportunities:
+            results.append(await enrich_opportunity_payload(oc))
+        return results
+
+    # Batch path: LLM extraction chunk 20 + embedding batch 32/20
+    texts = [(oc.raw_text or oc.summary or oc.title or "") for oc in opportunities]
+
+    # Embedding batch for p95 (best-effort, does not block enrichment on failure)
+    if build_embeddings_batch is not None:
+        try:
+            await build_embeddings_batch(texts)
+        except Exception:
+            pass
+
+    if extract_opportunities_structured_batch is None:
+        # Fallback to serial if batch unavailable
+        from app.services.opportunity import enrich_opportunity_payload
+
+        results = []
+        for oc in opportunities:
+            results.append(await enrich_opportunity_payload(oc))
+        return results
+
+    extractions = await extract_opportunities_structured_batch(texts, chunk_size=20)
+
+    # Merge extractions into OpportunityCreate copies — parser frozen (d9579f4)
+    enriched: list[OpportunityCreate] = []
+    for orig, ext in zip(opportunities, extractions):
+        data = ext.data if hasattr(ext, "data") else {}
+        merged = orig.model_dump()
+        # Funding raw only if missing
+        if not merged.get("funding_amount_raw") and data.get("funding_amount_raw"):
+            from app.services.opportunity import _is_tr_artifact
+
+            fr = str(data.get("funding_amount_raw") or "")
+            if fr and not _is_tr_artifact(fr):
+                merged["funding_amount_raw"] = fr
+        # Confidence max
+        try:
+            merged["confidence_score"] = round(
+                max(float(orig.confidence_score), float(data.get("confidence") or orig.confidence_score)), 2
+            )
+        except Exception:
+            pass
+        # Title / entity / country fill if missing (ES/EN isolated per candidate)
+        if not merged.get("title") or merged["title"] == "Convocatoria detectada":
+            t = str(data.get("title") or "")
+            if t:
+                merged["title"] = t
+        if not merged.get("entity") or merged["entity"] == "Entidad por validar":
+            e = str(data.get("entity") or "")
+            if e:
+                merged["entity"] = e
+        if not merged.get("country") or merged["country"] in ("Por validar", "Sin dato", ""):
+            c = str(data.get("country") or "")
+            if c:
+                merged["country"] = c
+        # Categories / topics if missing
+        if not merged.get("categories"):
+            cats = data.get("category") or []
+            if cats:
+                merged["categories"] = list(cats)
+        if not merged.get("topics"):
+            kws = data.get("matched_keywords") or []
+            if kws:
+                merged["topics"] = list(kws)
+        enriched.append(OpportunityCreate(**merged))
+
+    return enriched
 
 
 def _setup_run(db, source: Source, organization_id: str | None) -> tuple[SourceRun, Task, datetime]:
@@ -181,7 +306,20 @@ def _setup_run(db, source: Source, organization_id: str | None) -> tuple[SourceR
 async def _persist_opportunities(
     db, run: SourceRun, opportunities: list[OpportunityCreate], organization_id: str | None
 ) -> tuple[int, int, int]:
-    """Persist scraped opportunities, returning (created, updated, failed)."""
+    """Persist scraped opportunities, returning (created, updated, failed).
+
+    Uses bulk dedup preload_external_ids per source to avoid N+1, with
+    clear_bulk_cache after each source batch.
+    """
+    from app.services.opportunity import clear_bulk_cache, preload_external_ids
+
+    # Preload per-source external_id sets (1 query per source)
+    source_ids = {o.source_id for o in opportunities if o.source_id}
+    for sid in source_ids:
+        try:
+            preload_external_ids(db, sid)
+        except Exception:
+            pass
     created = 0
     updated = 0
     failed_items = 0
@@ -209,6 +347,11 @@ async def _persist_opportunities(
                     "error": str(exc),
                 }
             )
+    # Clear per-source bulk caches so next source starts fresh
+    try:
+        clear_bulk_cache()
+    except Exception:
+        pass
     return created, updated, failed_items
 
 
@@ -276,7 +419,7 @@ def _finalize_run(
         source.selector_failures = (source.selector_failures or 0) + 1
     else:
         source.selector_failures = 0
-    if (source.selector_failures or 0) >= 3:
+    if (source.selector_failures or 0) >= 5:
         source.auto_paused = True
         run.logs.append(
             {
@@ -314,6 +457,29 @@ def _handle_run_error(
     source.last_error = error_message
     if error_type not in (ErrorType.TIMEOUT, ErrorType.NETWORK):
         create_source_health_alert(db, source, reason=error_message)
+    # Auto-pause counters must increment also on timeout/network failures (failed category)
+    source.consecutive_empty_runs = update_consecutive_empty_runs(
+        items_found=0,
+        current_count=source.consecutive_empty_runs or 0,
+    )
+    if should_auto_pause(source.consecutive_empty_runs):
+        source.auto_paused = True
+        run.logs.append(
+            {
+                "level": "warn",
+                "message": f"Source auto-paused after {source.consecutive_empty_runs} consecutive empty runs (error)",
+            }
+        )
+    source.selector_failures = (source.selector_failures or 0) + 1
+    if (source.selector_failures or 0) >= 5:
+        source.auto_paused = True
+        run.logs.append(
+            {
+                "level": "warn",
+                "message": f"Source auto-paused after {source.selector_failures} consecutive selector failures (error)",
+            }
+        )
+    db.flush()
 
 
 async def run_source_inline(db, source: Source, organization_id: str | None = None) -> SourceRun:
@@ -321,6 +487,7 @@ async def run_source_inline(db, source: Source, organization_id: str | None = No
 
     Orchestrates: setup → scrape → persist → finalize (or error handling).
     """
+    _t0 = time.monotonic()
     run, task, _started_at = _setup_run(db, source, organization_id)
     try:
         validate_source_url(source)
@@ -331,6 +498,12 @@ async def run_source_inline(db, source: Source, organization_id: str | None = No
         items_parsed = scrape_stats.get("candidates_parsed")
         if isinstance(items_parsed, int):
             source.last_item_count = items_parsed
+        # S2 batch enrichment — flag-gated, chunks 20/32 LRU256, removes serial N-loop
+        if get_settings().extraction_batch_enabled and opportunities:
+            try:
+                opportunities = await _batch_enrich(opportunities)
+            except Exception as exc:  # pragma: no cover — batch best-effort fallback
+                _struct_logger.warning("batch_enrich_failed_fallback_serial", error=str(exc))
         _set_progress(run, {"fetch": _now(), "parse": _now()})
         db.flush()
 
@@ -344,6 +517,22 @@ async def run_source_inline(db, source: Source, organization_id: str | None = No
         db.flush()
 
         _finalize_run(db, run, task, source, opportunities, created, updated, failed, scrape_stats)
+        _dur = time.monotonic() - _t0
+        _struct_logger.info(
+            "scraper_source_complete",
+            source_key=source.key,
+            latency_ms=int(_dur * 1000),
+            items_found=len(opportunities),
+            created=created,
+            updated=updated,
+            status=run.status,
+        )
+        try:
+            from app.scraper.metrics import record_scrape
+
+            record_scrape(source_key=source.key or source.id, duration_s=_dur, items_found=len(opportunities), status=run.status)
+        except Exception:
+            pass
     except asyncio.CancelledError:
         finished_at = datetime.now(UTC).replace(tzinfo=None)
         run.status = "failed"
@@ -360,6 +549,20 @@ async def run_source_inline(db, source: Source, organization_id: str | None = No
         raise
     except Exception as exc:
         _handle_run_error(db, run, task, source, exc)
+        _dur2 = time.monotonic() - _t0
+        _struct_logger.warning(
+            "scraper_source_error",
+            source_key=source.key,
+            latency_ms=int(_dur2 * 1000),
+            error=str(exc),
+            status=run.status,
+        )
+        try:
+            from app.scraper.metrics import record_scrape
+
+            record_scrape(source_key=source.key or source.id, duration_s=_dur2, items_found=0, status=run.status)
+        except Exception:
+            pass
     return run
 
 

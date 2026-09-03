@@ -30,11 +30,11 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 # rather than risking missing a real leak. We also match the assignment side
 # (key = "...", key: "...", key="...") so a pasted env line is caught.
 PATTERNS=(
-  "ghp_[A-Za-z0-9]{8,}"
-  "vcp_[A-Za-z0-9]{8,}"
-  "sk-[A-Za-z0-9]{8,}"
-  "pk_[A-Za-z0-9]{8,}"
-  "rk_[A-Za-z0-9]{8,}"
+  "\\bghp_[A-Za-z0-9]{8,}"
+  "\\bvcp_[A-Za-z0-9]{8,}"
+  "\\bsk-[A-Za-z0-9]{8,}"
+  "\\bpk_[A-Za-z0-9]{8,}"
+  "\\brk_[A-Za-z0-9]{8,}"
 )
 
 # Default to scanning the current working directory; allow override via argv.

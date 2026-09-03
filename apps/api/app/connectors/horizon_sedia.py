@@ -79,11 +79,21 @@ class HorizonSediaConnector:
         results: list[dict[str, object]] = []
         seen: set[str] = set()
         final_url = self.base_url
+        api_key = get_settings().sedia_api_key or "SEDIA"
         for term in HORIZON_TERMS:
-            search_url = f"{HORIZON_SEARCH_URL}?apiKey={get_settings().sedia_api_key}&text={quote_plus(term)}&pageSize=50&pageNumber=1"
+            payload: dict[str, object] = {
+                "apiKey": api_key,
+                "queryString": term,
+                "queryStringLangs": ["en"],
+                "pageSize": 50,
+                "pageNumber": 1,
+                "sort": ["contentDate:desc"],
+                "filters": [{"field": "kind", "values": ["call-for-proposals"]}],
+            }
             final_url, content, _ = await fetch_httpx_text(
-                search_url,
+                HORIZON_SEARCH_URL,
                 method="POST",
+                payload=payload,
                 fallback_content_type="application/json",
             )
             payload = json.loads(content)

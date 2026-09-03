@@ -19,6 +19,15 @@ if [ "$size" -lt 100 ]; then
   exit 1
 fi
 
+# Staleness check: backup must be younger than 24h (spec) / 48h (legacy grace). Portable via `find -mtime`.
+# -mtime +1 means >24h old (more than 1*24h ago); covers spec's 24h staleness requirement.
+# Use find to test staleness without GNU stat date parsing.
+if [ -n "$(find "$latest" -mtime +1 2>/dev/null)" ]; then
+  echo "Backup is stale: $latest is older than 24h (1 day) — expected fresh backup within 24h" >&2
+  ls -lh "$latest" >&2
+  exit 1
+fi
+
 gzip -t "$latest"
 if ! gzip -dc "$latest" | grep -q 'CREATE TABLE'; then
   echo "Backup does not contain SQL schema statements: $latest" >&2

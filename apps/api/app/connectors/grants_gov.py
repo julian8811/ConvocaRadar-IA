@@ -1,7 +1,13 @@
 import json
 from datetime import datetime
 
-from app.connectors.common import fetch_httpx_text
+from app.connectors.common import (
+    extract_funding_details,
+    fetch_httpx_text,
+    fill_candidate_from_content,
+    is_shell_response,
+    maybe_retry_shell_with_pw,
+)
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
 from app.connectors.registry import register
 from app.connectors.simpler_grants import SimplerGrantsConnector
@@ -61,8 +67,44 @@ class GrantsGovConnector:
         )
 
     async def parse(self, raw: RawSourceResult) -> list[OpportunityCandidate]:
+        # SPA shell retry (023 S3): if 200 text/html thin shell with 0 cands and allowlisted, 1× PW retry
+        if raw.content_type.startswith("text/html") and is_shell_response(raw.content, raw.content_type, 0):
+            retried = await maybe_retry_shell_with_pw(
+                content=raw.content,
+                content_type=raw.content_type,
+                candidates=0,
+                source_key=self.source_key,
+                url=raw.url,
+            )
+            if retried is not None:
+                raw = RawSourceResult(
+                    source_key=raw.source_key,
+                    url=retried[0],
+                    content=retried[1],
+                    content_type=retried[2],
+                    metadata=raw.metadata,
+                )
         if not raw.content.lstrip().startswith("{"):
-            return await SimplerGrantsConnector(GRANTS_GOV_SEARCH_PAGE).parse(raw)
+            # Simpler fallback may also be shell; delegate its own retry
+            cands = await SimplerGrantsConnector(GRANTS_GOV_SEARCH_PAGE).parse(raw)
+            if not cands and is_shell_response(raw.content, raw.content_type, 0):
+                retried = await maybe_retry_shell_with_pw(
+                    content=raw.content,
+                    content_type=raw.content_type,
+                    candidates=0,
+                    source_key=self.source_key,
+                    url=raw.url,
+                )
+                if retried is not None:
+                    raw2 = RawSourceResult(
+                        source_key=raw.source_key,
+                        url=retried[0],
+                        content=retried[1],
+                        content_type=retried[2],
+                        metadata=raw.metadata,
+                    )
+                    return await SimplerGrantsConnector(GRANTS_GOV_SEARCH_PAGE).parse(raw2)
+            return cands
         try:
             payload = json.loads(raw.content)
         except json.JSONDecodeError:
@@ -82,29 +124,46 @@ class GrantsGovConnector:
             number = str(hit.get("number") or "").strip()
             status = str(hit.get("oppStatus") or "").strip()
             alns = ", ".join(hit.get("alnist") or [])
-            summary_parts = [
-                part
-                for part in [
-                    number,
-                    agency,
-                    f"Status: {status}" if status else "",
-                    f"ALN: {alns}" if alns else "",
-                ]
-                if part
-            ]
+            synopsis = str(
+                hit.get("synopsis") or hit.get("description") or hit.get("summary") or ""
+            ).strip()
+            summary = synopsis or title
+            funding_blob = (
+                hit.get("awardCeiling")
+                or hit.get("estimatedFunding")
+                or hit.get("awardFloor")
+                or hit.get("funding")
+            )
+            funding_raw, funding_value, funding_currency = (None, None, None)
+            if funding_blob not in (None, ""):
+                funding_raw, funding_value, funding_currency = extract_funding_details(
+                    str(funding_blob)
+                )
+                if not funding_raw:
+                    funding_raw = str(funding_blob).strip()[:200]
+            candidate = OpportunityCandidate(
+                title=title[:180],
+                entity=agency,
+                country="United States",
+                official_url=GRANTS_GOV_OPPORTUNITY_URL.format(opportunity_id=opportunity_id),
+                summary=summary[:700],
+                description=synopsis[:4000] if synopsis else "",
+                categories=["grants", "federal funding"],
+                topics=[status] if status else [],
+                raw_text=json.dumps(hit, ensure_ascii=False),
+                confidence_score=0.82,
+                open_date=_parse_grants_date(hit.get("openDate")),
+                close_date=_parse_grants_date(hit.get("closeDate")),
+                funding_amount_raw=funding_raw,
+                funding_amount_value=funding_value,
+                funding_amount_currency=funding_currency,
+                external_id=opportunity_id or number or None,
+            )
             candidates.append(
-                OpportunityCandidate(
-                    title=title[:180],
-                    entity=agency,
-                    country="United States",
-                    official_url=GRANTS_GOV_OPPORTUNITY_URL.format(opportunity_id=opportunity_id),
-                    summary=" | ".join(summary_parts),
-                    categories=["grants", "federal funding"],
-                    topics=[status] if status else [],
-                    raw_text=json.dumps(hit, ensure_ascii=False),
-                    confidence_score=0.82,
-                    open_date=_parse_grants_date(hit.get("openDate")),
-                    close_date=_parse_grants_date(hit.get("closeDate")),
+                fill_candidate_from_content(
+                    candidate,
+                    text=" ".join(part for part in [synopsis, number, agency, status, alns] if part),
+                    page_url=candidate.official_url,
                 )
             )
         return candidates

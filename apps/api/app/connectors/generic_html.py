@@ -7,12 +7,30 @@ from urllib.parse import urljoin, urlparse
 
 from selectolax.parser import HTMLParser
 
-from app.connectors.common import clean_text, extract_close_date, extract_funding_amount, fetch_httpx_text, looks_like_noise_text, parse_date_text
+from app.connectors.common import (
+    apply_extracted_fields,
+    clean_text,
+    extract_close_date,
+    extract_page_fields,
+    fetch_httpx_text,
+    fill_candidate_from_content,
+    looks_like_noise_text,
+    parse_date_text,
+)
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
 
-DEEP_FETCH_LIMIT = 10
+DEEP_FETCH_LIMIT = 25
 DETAIL_PAGE_TIMEOUT = 15
 RESOLVE_URL_TIMEOUT = 20  # Max seconds to spend resolving base URL
+
+
+def _detail_limit() -> int:
+    try:
+        from app.core.config import get_settings as _gs
+
+        return int(_gs().extraction_detail_limit)
+    except Exception:
+        return DEEP_FETCH_LIMIT
 
 
 CLOSED_KEYWORDS = (
@@ -513,7 +531,7 @@ class GenericHtmlConnector:
                 if official_url in candidates_seen:
                     continue
                 candidates_seen.add(official_url)
-                close_date = parse_date_text(text)
+                close_date = extract_close_date(text)
                 if self._is_closed(title, text, text[:2500], close_date):
                     continue
                 candidates.append(
@@ -592,7 +610,7 @@ class GenericHtmlConnector:
                     if official_url in candidates_seen:
                         continue
                     candidates_seen.add(official_url)
-                    close_date = parse_date_text(text)
+                    close_date = extract_close_date(text)
                     if self._is_closed(text, text, text[:2500], close_date):
                         continue
                     candidates.append(
@@ -607,20 +625,21 @@ class GenericHtmlConnector:
                             close_date=close_date,
                         )
                     )
-        # Deep fetch: enrich low-confidence candidates with detail-page data
+        # Fill list-card fields, then deep-fetch detail pages for the rest.
         if candidates:
+            candidates = [
+                fill_candidate_from_content(
+                    item, text=item.raw_text or item.summary, page_url=item.official_url
+                )
+                for item in candidates
+            ]
             candidates = await self._deep_fetch_candidates(candidates)
         return candidates[:50]
 
     async def _enrich_from_detail(self, url: str) -> dict | None:
-        """Fetch a detail page and extract structured data.
-
-        Returns a dict with keys: title, summary, close_date, categories,
-        funding_amount_raw, or None if the page can't be fetched or has no
-        usable data.
-        """
+        """Fetch a detail page and extract every opportunity field we can read."""
         try:
-            _, content, content_type = await fetch_httpx_text(
+            _, content, _content_type = await fetch_httpx_text(
                 url,
                 timeout_seconds=DETAIL_PAGE_TIMEOUT,
                 retries=1,
@@ -628,106 +647,36 @@ class GenericHtmlConnector:
         except Exception:
             return None
 
-        result: dict = {}
-
-        # 1. Try JSON-LD for highest-confidence data
-        tree = HTMLParser(content)
-        for script in tree.css("script[type='application/ld+json']"):
-            try:
-                payload = json.loads(script.text() or "{}")
-            except json.JSONDecodeError:
-                continue
-            for item in self._iter_items(payload):
-                title = str(item.get("name") or item.get("title") or "").strip()
-                if title:
-                    result["title"] = title
-                desc = str(item.get("description") or item.get("summary") or "").strip()
-                if desc:
-                    result["summary"] = desc
-                cd = self._candidate_close_date(item)
-                if cd:
-                    result["close_date"] = cd
-                cats = [str(v) for v in (item.get("categories") or [])[:4] if isinstance(v, str)]
-                if cats:
-                    result["categories"] = cats
-                amount = str(item.get("funding", item.get("fundingAmount", ""))).strip()
-                if amount:
-                    result["funding_amount_raw"] = amount
-                break  # First valid item is enough
-
-        # 2. Meta / Open Graph tags (fill gaps not covered by JSON-LD)
-        og_title = tree.css_first("meta[property='og:title']")
-        if og_title and "title" not in result:
-            value = (og_title.attributes.get("content") or "").strip()
-            if value:
-                result["title"] = value
-        og_desc = tree.css_first("meta[property='og:description']")
-        if og_desc and "summary" not in result:
-            value = (og_desc.attributes.get("content") or "").strip()
-            if value:
-                result["summary"] = value
-        meta_desc = tree.css_first("meta[name='description']")
-        if meta_desc and "summary" not in result:
-            value = (meta_desc.attributes.get("content") or "").strip()
-            if value:
-                result["summary"] = value
-
-        # 3. h1 fallback for title
-        if "title" not in result:
-            h1 = tree.css_first("h1")
-            if h1:
-                value = clean_text(h1.text())
-                if value:
-                    result["title"] = value
-
-        # 4. Article / main content for summary (last resort)
-        if "summary" not in result:
-            for tag in ("article", "[role='main']", "main", ".content", "#content"):
-                el = tree.css_first(tag)
-                if el:
-                    value = clean_text(el.text())[:700]
-                    if value:
-                        result["summary"] = value
-                        break
-
-        # 5. Scan all text for dates not captured by JSON-LD
-        # Use extract_close_date (keyword-prefixed patterns) over
-        # parse_date_text (any date) because the body text of a detail
-        # page almost always includes deadline keywords.
-        if "close_date" not in result:
-            body = tree.css_first("body")
-            if body:
-                all_text = clean_text(body.text())
-                cd = extract_close_date(all_text)
-                if cd:
-                    result["close_date"] = cd
-
-        # 6. Scan all text for funding amounts not captured by JSON-LD
-        if "funding_amount_raw" not in result:
-            body = tree.css_first("body")
-            if body:
-                all_text = clean_text(body.text())
-                amount = extract_funding_amount(all_text)
-                if amount:
-                    result["funding_amount_raw"] = amount
-
+        result = extract_page_fields(html=content, page_url=url)
         return result if result.get("title") else None
 
     async def _deep_fetch_candidates(
         self,
         candidates: list[OpportunityCandidate],
     ) -> list[OpportunityCandidate]:
-        """Enrich low-confidence candidates by fetching their detail pages.
+        """Enrich candidates with confidence<0.82 OR missing funding via detail pages.
 
-        Only processes candidates with confidence < 0.7, up to
-        ``DEEP_FETCH_LIMIT`` per call. Each detail page fetch is independent
-        and runs concurrently.
+        Bounded by Semaphore(25) — mirrors ConfigurableHtml gate correction.
         """
-        to_enrich = [c for c in candidates if c.confidence_score < 0.7][:DEEP_FETCH_LIMIT]
+        from dataclasses import replace as _replace
+
+        candidates = [
+            fill_candidate_from_content(
+                item, text=item.raw_text or item.summary, page_url=item.official_url
+            )
+            for item in candidates
+        ]
+        to_enrich = [c for c in candidates if c.confidence_score < 0.82 or not c.funding_amount_raw][:_detail_limit()]
         if not to_enrich:
             return candidates
 
-        tasks = {c.official_url: self._enrich_from_detail(c.official_url) for c in to_enrich}
+        sem = asyncio.Semaphore(25)
+
+        async def _bounded(url: str):
+            async with sem:
+                return await self._enrich_from_detail(url)
+
+        tasks = {c.official_url: _bounded(c.official_url) for c in to_enrich}
         results = await asyncio.gather(*tasks.values(), return_exceptions=True)
 
         url_to_data: dict[str, dict | None] = {}
@@ -738,20 +687,8 @@ class GenericHtmlConnector:
         for c in candidates:
             detail = url_to_data.get(c.official_url)
             if detail:
-                enriched.append(
-                    OpportunityCandidate(
-                        title=(detail.get("title") or c.title)[:180],
-                        entity=c.entity,
-                        country=c.country,
-                        official_url=c.official_url,
-                        summary=(detail.get("summary") or c.summary)[:700],
-                        categories=detail.get("categories", c.categories or self._default_categories),
-                        raw_text=c.raw_text,
-                        confidence_score=0.82,  # Confirmed via detail page
-                        close_date=detail.get("close_date") or c.close_date,
-                        funding_amount_raw=detail.get("funding_amount_raw") or c.funding_amount_raw,
-                    )
-                )
+                merged = apply_extracted_fields(c, detail, prefer_extracted_text=True)
+                enriched.append(_replace(merged, confidence_score=0.82))
             else:
                 enriched.append(c)
         return enriched

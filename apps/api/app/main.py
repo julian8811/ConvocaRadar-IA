@@ -165,27 +165,64 @@ async def _run_periodic_source_sweep(interval_seconds: int | None = None) -> Non
                         )
                     )
                     total = len(sources)
-                    run_count = 0
-                    for source in sources:
-                        if not source_due_for_scraping(source):
-                            continue
-                        try:
-                            result = await run_source(db, source, organization_id=orgs[0].id)
-                            if result is not None:
-                                run_count += 1
-                        except Exception as exc:
-                            db.rollback()
-                            struct_logger.warning(
-                                "sweep_source_failed",
-                                source=source.key or source.id,
-                                error=str(exc),
-                            )
-                    if run_count:
+                    raw_due = [s for s in sources if source_due_for_scraping(s)]
+                    # Priority-sorted queue: strategic first, then complementary/experimental
+                    try:
+                        from app.scraper.priority_queue import build_priority_queue
+
+                        _pq = build_priority_queue(raw_due)
+                        due_sources = _pq.drain_ordered()
+                    except Exception:
+                        due_sources = raw_due
+                    # Bounded concurrency: min(6, SCRAPING_MAX_CONCURRENCY), at least 1
+                    max_conc = max(1, min(6, int(scheduler_settings.scraping_max_concurrency)))
+                    sem = asyncio.Semaphore(max_conc)
+
+                    async def _run_one(src) -> int:
+                        async with sem:
+                            # Use a dedicated session per source to avoid
+                            # concurrent use of the shared Session and to
+                            # keep advisory locks isolated per transaction.
+                            from app.db.session import SessionLocal as _SessionLocal
+
+                            _db = _SessionLocal()
+                            try:
+                                _fresh = _db.get(Source, src.id)
+                                if _fresh is None:
+                                    return 0
+                                result = await run_source(_db, _fresh, organization_id=orgs[0].id)
+                                if result is not None:
+                                    _db.commit()
+                                    return 1
+                                _db.rollback()
+                                return 0
+                            except Exception as exc:
+                                _db.rollback()
+                                struct_logger.warning(
+                                    "sweep_source_failed",
+                                    source=src.key or src.id,
+                                    error=str(exc),
+                                )
+                                return 0
+                            finally:
+                                _db.close()
+
+                    if due_sources:
+                        results = await asyncio.gather(
+                            *(_run_one(s) for s in due_sources), return_exceptions=False
+                        )
+                        run_count = sum(results)
+                    else:
+                        run_count = 0
+                    try:
                         db.commit()
+                    except Exception:
+                        db.rollback()
                     struct_logger.info(
                         "periodic_sweep_complete",
                         total=total,
                         due=run_count,
+                        concurrency=max_conc,
                     )
 
                     # Weekly digest. Fires at most once per process lifetime
@@ -567,6 +604,51 @@ def health_sources_summary() -> dict:
             "tiers": tiers,
             "status": "ok",
         }
+    finally:
+        db.close()
+
+
+@app.get("/metrics")
+def metrics() -> dict:
+    """Lightweight Prometheus-style metrics (structlog counters + histogram)."""
+    from sqlalchemy import func, select
+
+    from app.db.session import SessionLocal
+    from app.models import SourceRun
+
+    db = SessionLocal()
+    try:
+        total_runs = db.scalar(select(func.count(SourceRun.id))) or 0
+        success = db.scalar(select(func.count(SourceRun.id)).where(SourceRun.status == "success")) or 0
+        degraded = db.scalar(select(func.count(SourceRun.id)).where(SourceRun.status == "degraded")) or 0
+        failed = db.scalar(select(func.count(SourceRun.id)).where(SourceRun.status == "failed")) or 0
+        base = {"total_runs": total_runs, "success": success, "degraded": degraded, "failed": failed}
+        try:
+            from app.scraper.metrics import snapshot
+
+            snap = snapshot()
+            base.update(
+                {
+                    "scrape_duration_p50": snap["scrape_duration_p50"],
+                    "scrape_duration_p95": snap["scrape_duration_p95"],
+                    "scrape_duration_avg": snap["scrape_duration_avg"],
+                    "scrape_duration_count": snap["scrape_duration_count"],
+                    "items_found_total": snap["items_found_total"],
+                    "scrapes_total": snap["scrapes_total"],
+                    "errors_total": snap["errors_total"],
+                    "health_gauges": snap["health_gauges"],
+                    "funding_coverage": snap.get("funding_coverage", {}),
+                    "close_coverage": snap.get("close_coverage", {}),
+                    "open_coverage": snap.get("open_coverage", {}),
+                    "funding_parsed_total": snap.get("funding_parsed_total", 0),
+                    "close_extracted_total": snap.get("close_extracted_total", 0),
+                    "open_extracted_total": snap.get("open_extracted_total", 0),
+                    "per_source_extraction": snap.get("per_source_extraction", {}),
+                }
+            )
+        except Exception:
+            pass
+        return base
     finally:
         db.close()
 

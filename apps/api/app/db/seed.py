@@ -463,7 +463,13 @@ def seed_default_sources(
             "region": "LatAm",
             "source_type": "html",
             "category": ["convocatorias", "formacion", "emprendimiento"],
-            "allowed_domains": ["sena.edu.co", "www.sena.edu.co"],
+            "allowed_domains": [
+                "sena.edu.co",
+                "www.sena.edu.co",
+                "senasofiaplus.edu.co",
+                "oferta.senasofiaplus.edu.co",
+                "www.senasofiaplus.edu.co",
+            ],
             "scraping_frequency": "daily",
         },
         {
@@ -1161,7 +1167,11 @@ def seed_default_sources(
             "source_type": "api",
             "category": ["grants", "research", "cooperation", "europe"],
             "allowed_domains": ["cost.eu", "www.cost.eu"],
-            "scraping_frequency": "daily",
+            "scraping_frequency": "weekly",
+            "connector_config": {
+                "throttle_max_per_day": 5,
+                "throttle_note": "022 throttle: low-yield, weekly",
+            },
         },
         {
             "key": "caricom-procurement",
@@ -1183,7 +1193,11 @@ def seed_default_sources(
             "source_type": "api",
             "category": ["convocatorias", "educacion", "cooperacion"],
             "allowed_domains": ["ascun.org.co", "www.ascun.org.co"],
-            "scraping_frequency": "daily",
+            "scraping_frequency": "weekly",
+            "connector_config": {
+                "throttle_max_per_day": 5,
+                "throttle_note": "022 throttle: 352 opps 0.9% close, 91-char noise; allowlist bypass via enabled flag",
+            },
         },
         {
             "key": "uniandes-investigacion",

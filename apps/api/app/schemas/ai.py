@@ -10,8 +10,13 @@ class AiOpportunityExtract(BaseModel):
     category: list[str]
     status: str
     close_date: str | None = None
+    open_date: str | None = None
     requirements: list[str]
     documents_required: list[str]
+    eligible_applicants: list[str] = Field(default_factory=list)
+    evaluation_criteria: list[str] = Field(default_factory=list)
+    restrictions: list[str] = Field(default_factory=list)
+    application_url: str | None = None
     summary: str
     risks: list[str]
     recommendation: str
@@ -20,10 +25,12 @@ class AiOpportunityExtract(BaseModel):
     risk_level: str = "medium"
     priority: str = "medium"
     funding_amount_raw: str | None = None
+    funding_amount_value: float | None = None
+    funding_amount_currency: str | None = None
     extraction_notes: list[str] = Field(default_factory=list)
     model_version: str = "local-heuristic-v2"
     provider: str = "local"
-    prompt_version: str = "structured-extraction-v3"
+    prompt_version: str = "structured-extraction-v4"
     extraction_strategy: str = "local-heuristic"
 
 

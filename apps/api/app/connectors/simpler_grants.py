@@ -3,7 +3,7 @@ import re
 from datetime import datetime
 from html import unescape
 
-from app.connectors.common import fetch_httpx_text
+from app.connectors.common import fetch_httpx_text, is_shell_response, maybe_retry_shell_with_pw
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
 
 
@@ -125,6 +125,23 @@ class SimplerGrantsConnector:
         )
 
     async def parse(self, raw: RawSourceResult) -> list[OpportunityCandidate]:
+        # SPA shell retry (023 S3) 1× allowlist slot1
+        if is_shell_response(raw.content, raw.content_type, 0):
+            retried = await maybe_retry_shell_with_pw(
+                content=raw.content,
+                content_type=raw.content_type,
+                candidates=0,
+                source_key=self.source_key,
+                url=raw.url,
+            )
+            if retried is not None:
+                raw = RawSourceResult(
+                    source_key=raw.source_key,
+                    url=retried[0],
+                    content=retried[1],
+                    content_type=retried[2],
+                    metadata=raw.metadata,
+                )
         content = raw.content
         link_pattern = re.compile(
             r'href\\?":\\?"/opportunity/([a-f0-9-]+)\\?".{0,220}?children\\?":\\?"([^"\\]+)',

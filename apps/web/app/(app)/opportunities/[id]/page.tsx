@@ -26,6 +26,7 @@ import { Input } from "@/components/ui/input";
 import { ErrorState, LoadingState } from "@/components/ui/state";
 import { api, downloadOpportunityDocument, uploadOpportunityDocument } from "@/lib/api";
 import { decodeVisibleText } from "@/lib/text";
+import { liveOpportunityStatus } from "@/lib/opportunity-status";
 import type { OpportunityDocument } from "@/lib/types";
 
 const workflowStatuses = ["review", "apply", "discarded", "submitted", "won", "lost"];
@@ -173,6 +174,7 @@ export default function OpportunityDetailPage() {
   }
   const officialUrl = item.official_url && isValidExternalUrl(item.official_url) ? item.official_url : null;
   const applicationUrl = item.application_url && isValidExternalUrl(item.application_url) ? item.application_url : null;
+  const displayStatus = liveOpportunityStatus(item.status, item.close_date);
 
   return (
     <section className="space-y-6">
@@ -184,7 +186,7 @@ export default function OpportunityDetailPage() {
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div>
           <div className="mb-3 flex flex-wrap gap-2">
-            <Badge tone={item.status}>{statusLabel(item.status)}</Badge>
+            <Badge tone={displayStatus}>{statusLabel(displayStatus)}</Badge>
             {item.categories.map((category) => (
               <Badge key={category} tone="medium">
                 {category}

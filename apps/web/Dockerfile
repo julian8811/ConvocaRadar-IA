@@ -49,7 +49,7 @@ RUN groupadd --system --gid 1001 nodejs \
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/standalone/node_modules ./node_modules
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/standalone/apps/web ./srv/app
 COPY --from=builder --chown=nextjs:nodejs /app/apps/web/.next/static ./srv/app/.next/static
-# public/ is optional in this repo — skipped (not present).
+COPY --from=builder --chown=nextjs:nodejs /app/apps/web/public ./srv/app/public
 
 WORKDIR /app/srv/app
 

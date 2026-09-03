@@ -323,11 +323,13 @@ def test_consecutive_empty_runs_resets_on_items_found() -> None:
 
 
 def test_auto_pause_triggered_after_three_empty_runs() -> None:
-    """After 3 consecutive empty runs, auto_paused should be True."""
+    """After 5 consecutive empty runs, auto_paused should be True."""
     from app.services.scoring import should_auto_pause
 
-    assert should_auto_pause(new_count=3) is True
-    assert should_auto_pause(new_count=4) is True
+    assert should_auto_pause(new_count=5) is True
+    assert should_auto_pause(new_count=6) is True
+    assert should_auto_pause(new_count=4) is False
+    assert should_auto_pause(new_count=3) is False
     assert should_auto_pause(new_count=2) is False
     assert should_auto_pause(new_count=0) is False
     assert should_auto_pause(new_count=1) is False

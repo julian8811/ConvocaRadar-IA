@@ -31,10 +31,10 @@ SAMPLE_HTML = """<html><body>
     <div class="jet-engine-listing-overlay-wrap">
         <a href="https://anid.cl/concursos/concurso-fondo-quimal-2026/" class="jet-engine-listing-overlay-link"></a>
     </div>
-    <h3 class="elementor-heading-title">Concurso Fondo QUIMAL 2026</h3>
-    <div class="jet-listing-dynamic-field__content">Inicio: 3 de julio, 2026</div>
-    <div class="jet-listing-dynamic-field__content">Cierre: 14 de agosto, 2026 - 13:00</div>
-    <div class="jet-listing-dynamic-field__content">Fecha estimada de fallo: noviembre 2026</div>
+    <h3 class="elementor-heading-title">Concurso Fondo QUIMAL 2027</h3>
+    <div class="jet-listing-dynamic-field__content">Inicio: 3 de julio, 2027</div>
+    <div class="jet-listing-dynamic-field__content">Cierre: 14 de agosto, 2027 - 13:00</div>
+    <div class="jet-listing-dynamic-field__content">Fecha estimada de fallo: noviembre 2027</div>
     <a class="jet-listing-dynamic-link__link" href="https://anid.cl/concursos/concurso-fondo-quimal-2026/">
         <span>Ver más</span>
     </a>
@@ -43,9 +43,9 @@ SAMPLE_HTML = """<html><body>
     <div class="jet-engine-listing-overlay-wrap">
         <a href="https://anid.cl/concursos/concurso-asignacion-de-tiempo-de-buque-oceanografico-2/" class="jet-engine-listing-overlay-link"></a>
     </div>
-    <h3 class="elementor-heading-title">Concurso Asignación de Tiempo de Buque Oceanográfico 2026</h3>
-    <div class="jet-listing-dynamic-field__content">Inicio: 25 de junio, 2026</div>
-    <div class="jet-listing-dynamic-field__content">Cierre: 29 de julio, 2026 - 13:00</div>
+    <h3 class="elementor-heading-title">Concurso Asignación de Tiempo de Buque Oceanográfico 2027</h3>
+    <div class="jet-listing-dynamic-field__content">Inicio: 25 de junio, 2027</div>
+    <div class="jet-listing-dynamic-field__content">Cierre: 29 de julio, 2027 - 13:00</div>
     <a class="jet-listing-dynamic-link__link" href="https://anid.cl/concursos/concurso-asignacion-de-tiempo-de-buque-oceanografico-2/">
         <span>Ver más</span>
     </a>
@@ -116,8 +116,8 @@ class TestFondecytParse:
 
         assert len(candidates) >= 2
         titles = {c.title for c in candidates}
-        assert "Concurso Fondo QUIMAL 2026" in titles
-        assert "Concurso Asignación de Tiempo de Buque Oceanográfico 2026" in titles
+        assert "Concurso Fondo QUIMAL 2027" in titles
+        assert "Concurso Asignación de Tiempo de Buque Oceanográfico 2027" in titles
 
     @pytest.mark.asyncio
     async def test_fetch_and_parse_skips_closed(self, monkeypatch):
