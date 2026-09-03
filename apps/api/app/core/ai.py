@@ -489,14 +489,79 @@ async def _call_llm(text: str) -> dict[str, Any] | None:
         raise RuntimeError(f"Remote LLM provider {provider!r} returned invalid JSON")
 
 
+_NARRATIVE_SECTION_KEYS = (
+    "eligible_applicants",
+    "requirements",
+    "documents_required",
+    "evaluation_criteria",
+    "restrictions",
+)
+
+
+def _extract_narrative_sections(text: str) -> dict[str, list[str]]:
+    """Extract the labelled narrative sections of a call for proposals.
+
+    Delegates to the shared connector extractors so scraped and enriched data
+    are produced by the same rules. Never raises: a failure here must degrade
+    to empty lists rather than lose the whole extraction.
+    """
+    empty: dict[str, list[str]] = {key: [] for key in _NARRATIVE_SECTION_KEYS}
+    if not text:
+        return empty
+    try:
+        from app.connectors.common import (
+            extract_documents_required,
+            extract_eligibility,
+            extract_evaluation_criteria,
+            extract_requirements,
+            extract_restrictions,
+        )
+    except Exception:  # pragma: no cover — defensive import guard
+        return empty
+    extractors = {
+        "eligible_applicants": extract_eligibility,
+        "requirements": extract_requirements,
+        "documents_required": extract_documents_required,
+        "evaluation_criteria": extract_evaluation_criteria,
+        "restrictions": extract_restrictions,
+    }
+    result: dict[str, list[str]] = {}
+    for key, extractor in extractors.items():
+        try:
+            result[key] = list(extractor(text) or [])
+        except Exception:
+            result[key] = []
+    return result
+
+
+def _extract_funding_value(text: str) -> tuple[float | None, str | None]:
+    """Normalize a funding amount to (value, ISO currency) using shared rules."""
+    if not text:
+        return None, None
+    try:
+        from app.connectors.common import extract_funding_details
+
+        _raw, value, currency = extract_funding_details(text)
+        return value, currency
+    except Exception:
+        return None, None
+
+
 def build_local_extraction(text: str) -> dict[str, Any]:
     normalized = normalize_text(text)
     title = _extract_title(text)
     categories = _extract_keyword_matches(normalized) or ["innovation"]
-    requirements = _extract_bullets(normalized, REQUIREMENT_PATTERNS)
-    documents_required = _extract_bullets(normalized, DOCUMENT_PATTERNS)
     country = _extract_country(normalized)
     amount = _extract_amount(normalized)
+    # Section-aware extraction runs on the ORIGINAL text: normalize_text
+    # collapses newlines, and these helpers rely on line and paragraph breaks
+    # to find where a labelled section ends.
+    sections = _extract_narrative_sections(text)
+    requirements = sections["requirements"] or _extract_bullets(normalized, REQUIREMENT_PATTERNS)
+    documents_required = sections["documents_required"] or _extract_bullets(
+        normalized, DOCUMENT_PATTERNS
+    )
+    funding_value, funding_currency = _extract_funding_value(text)
     close_date = _extract_date(normalized)
     # v4: open_date via second date heuristic, funding normalized locally
     # Local fallback: open_date None unless two dates found
@@ -541,6 +606,9 @@ def build_local_extraction(text: str) -> dict[str, Any]:
         "open_date": open_date,
         "requirements": requirements[:5] or ["Validar requisitos en la fuente oficial"],
         "documents_required": documents_required[:5] or ["Documento oficial de la convocatoria"],
+        "eligible_applicants": sections["eligible_applicants"][:8],
+        "evaluation_criteria": sections["evaluation_criteria"][:8],
+        "restrictions": sections["restrictions"][:8],
         "summary": _extract_summary(normalized),
         "risks": risk_flags,
         "recommendation": recommendation,
@@ -549,8 +617,8 @@ def build_local_extraction(text: str) -> dict[str, Any]:
         "risk_level": "medium" if risk_flags else "low",
         "priority": priority,
         "funding_amount_raw": amount,
-        "funding_amount_value": None,
-        "funding_amount_currency": None,
+        "funding_amount_value": funding_value,
+        "funding_amount_currency": funding_currency,
         "extraction_notes": extraction_notes,
         "model_version": MODEL_VERSION,
         "provider": "local",

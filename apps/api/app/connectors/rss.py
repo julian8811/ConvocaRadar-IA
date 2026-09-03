@@ -2,7 +2,7 @@ from datetime import datetime
 from email.utils import parsedate_to_datetime
 import xml.etree.ElementTree as ET
 
-from app.connectors.common import clean_text, fetch_httpx_text, safe_urljoin
+from app.connectors.common import clean_text, fetch_httpx_text, fill_candidate_from_content, safe_urljoin
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
 
 
@@ -78,18 +78,26 @@ class RssConnector:
                 dict.fromkeys([*self.categories, category.lower() if category else ""])
             )
             categories = [value for value in categories if value]
+            official_url = safe_urljoin(raw.url, link)
+            candidate = OpportunityCandidate(
+                title=title[:180],
+                entity=self.entity,
+                country=self.country,
+                official_url=official_url,
+                summary=description or title,
+                categories=categories,
+                topics=[*self.topics, category] if category else self.topics[:],
+                raw_text=ET.tostring(item, encoding="unicode"),
+                confidence_score=self.confidence_score,
+                open_date=pub_date,
+            )
+            html = description if "<" in (description or "") else None
             candidates.append(
-                OpportunityCandidate(
-                    title=title[:180],
-                    entity=self.entity,
-                    country=self.country,
-                    official_url=safe_urljoin(raw.url, link),
-                    summary=description or title,
-                    categories=categories,
-                    topics=[*self.topics, category] if category else self.topics[:],
-                    raw_text=ET.tostring(item, encoding="unicode"),
-                    confidence_score=self.confidence_score,
-                    open_date=pub_date,
+                fill_candidate_from_content(
+                    candidate,
+                    html=html,
+                    text=description,
+                    page_url=official_url,
                 )
             )
         return candidates[:50]

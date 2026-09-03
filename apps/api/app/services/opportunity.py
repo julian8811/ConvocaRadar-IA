@@ -248,6 +248,9 @@ _THIN_NOISE_RE = re.compile(
 _LABEL_RE = re.compile(r"[A-Za-z][A-Za-z ,'()/-]{2,48}:")
 
 
+_MIN_SUBSTANTIVE_SUMMARY = 80
+
+
 def is_thin_or_metadata_summary(summary: str | None) -> bool:
     """Detect summaries that carry no real descriptive content.
 
@@ -255,13 +258,14 @@ def is_thin_or_metadata_summary(summary: str | None) -> bool:
     purely from metadata ("Number: X | Agency: Y | Status: posted"). Those
     must not block AI/heuristic enrichment, and must never overwrite an
     existing substantive summary on re-scrape.
+
+    This answers "is this junk?", not "is this short?". A genuine one-sentence
+    summary is short but valuable, so the floor here is deliberately much lower
+    than ``extraction_thin_threshold``; use :func:`summary_needs_enrichment`
+    for the enrichment decision.
     """
-    try:
-        thin_threshold = int(get_settings().extraction_thin_threshold)
-    except Exception:
-        thin_threshold = 200
     s = (summary or "").strip()
-    if len(s) < thin_threshold:
+    if len(s) < _MIN_SUBSTANTIVE_SUMMARY:
         return True
     if re.match(r"^\s*(number|opportunity\s+number|notice)\s*[:：]", s, re.IGNORECASE):
         return True
@@ -282,6 +286,22 @@ def is_thin_or_metadata_summary(summary: str | None) -> bool:
     if _THIN_NOISE_RE.search(s[:200]) and len(re.sub(r"\s+", " ", s)) < 260:
         return True
     return False
+
+
+def summary_needs_enrichment(summary: str | None) -> bool:
+    """Whether a summary is junk or too short to stand on its own.
+
+    Used to decide whether to spend extraction effort, which is a lower bar
+    than discarding the text: a short-but-real summary is worth keeping while
+    we still try to find something better.
+    """
+    if is_thin_or_metadata_summary(summary):
+        return True
+    try:
+        threshold = int(get_settings().extraction_thin_threshold)
+    except Exception:
+        threshold = 200
+    return len((summary or "").strip()) < threshold
 
 
 async def enrich_opportunity_payload(data: OpportunityCreate) -> OpportunityCreate:
@@ -311,7 +331,7 @@ async def enrich_opportunity_payload(data: OpportunityCreate) -> OpportunityCrea
         return OpportunityCreate(**merged)
     if (
         data.summary
-        and not is_thin_or_metadata_summary(data.summary)
+        and not summary_needs_enrichment(data.summary)
         and data.categories
         and data.requirements
         and data.confidence_score >= 0.75
@@ -364,6 +384,12 @@ async def enrich_opportunity_payload(data: OpportunityCreate) -> OpportunityCrea
     merged["requirements"] = data.requirements or list(extraction.get("requirements") or [])
     merged["documents_required"] = data.documents_required or list(
         extraction.get("documents_required") or []
+    )
+    merged["eligible_applicants"] = data.eligible_applicants or list(
+        extraction.get("eligible_applicants") or []
+    )
+    merged["application_url"] = data.application_url or (
+        str(extraction.get("application_url") or "") or None
     )
     merged["evaluation_criteria"] = data.evaluation_criteria or list(
         extraction.get("evaluation_criteria") or []
@@ -510,29 +536,42 @@ async def reanalyze_opportunity(
     if changed:
         opportunity.status = inferred_opportunity_status(
             opportunity.close_date,
-            " ".join([opportunity.summary, opportunity.raw_text]),
+            " ".join([opportunity.title, opportunity.summary, opportunity.raw_text]),
         )
         await upsert_opportunity_embedding(db, opportunity)
     return opportunity
 
 
+def _naive_utc(close_date: datetime) -> datetime:
+    if close_date.tzinfo is not None:
+        return close_date.astimezone(UTC).replace(tzinfo=None)
+    return close_date
+
+
 def opportunity_status(close_date: datetime | None) -> str:
     if not close_date:
         return OpportunityStatus.unknown.value
+    close_day = _naive_utc(close_date).date()
+    today = datetime.now(UTC).date()
+    if close_day < today:
+        return OpportunityStatus.closed.value
     now = datetime.now(UTC).replace(tzinfo=None)
     days = get_settings().scraping_closing_soon_days
-    if close_date < now:
-        return OpportunityStatus.closed.value
-    if close_date <= now + timedelta(days=days):
+    close_naive = _naive_utc(close_date)
+    if close_naive <= now + timedelta(days=days):
         return OpportunityStatus.closing_soon.value
     return OpportunityStatus.open.value
 
 
 def inferred_opportunity_status(close_date: datetime | None, text: str = "") -> str:
     status = opportunity_status(close_date)
-    if status == OpportunityStatus.unknown.value and re.search(
-        r"\b(open|posted|abierta|abierto)\b", text, re.IGNORECASE
-    ):
+    if status != OpportunityStatus.unknown.value:
+        return status
+    from app.connectors.common import looks_closed_text
+
+    if looks_closed_text(text):
+        return OpportunityStatus.closed.value
+    if re.search(r"\b(open|posted|abierta|abierto)\b", text, re.IGNORECASE):
         return OpportunityStatus.open.value
     return status
 
@@ -587,7 +626,7 @@ def _update_opportunity(
     opportunity.confidence_score = data.confidence_score
     opportunity.status = inferred_opportunity_status(
         opportunity.close_date or data.close_date,
-        " ".join([data.summary, data.raw_text]),
+        " ".join([normalized_title, data.summary, data.raw_text]),
     )
 
 
@@ -725,7 +764,7 @@ async def create_opportunity(
         slug=slug,
         status=inferred_opportunity_status(
             data.close_date,
-            " ".join([data.summary, data.raw_text]),
+            " ".join([normalized_title, data.summary, data.raw_text]),
         ),
     )
     db.add(opportunity)

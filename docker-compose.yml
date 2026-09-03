@@ -124,7 +124,10 @@
         # Server-side (SSR) calls go through the Next.js rewrite → http://api:8000.
         NEXT_PUBLIC_API_URL: http://localhost:8002/api/v1
     ports:
-      - "3002:3000"
+      # Host port configurable via WEB_PORT (default 3002) to avoid collision
+      # with other projects that occupy 3000 (e.g. CEITTO on 3000).
+      # Contenedor siempre escucha en 3000 interno.
+      - "${WEB_PORT:-3002}:3000"
     healthcheck:
       test: ["CMD", "node", "-e", "fetch('http://localhost:3000/').then(r => process.exit(r.status < 500 ? 0 : 1)).catch(() => process.exit(1))"]
       interval: 30s

@@ -1,0 +1,31 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="120" height="140" viewBox="0 0 120 140" role="img" aria-label="ConvocaRadar favicon">
+  <title>ConvocaRadar — Observatorio de Convocatorias</title>
+  <desc>Escudo Colmayor adaptado con radar: silueta institucional + anillos concéntricos y barrido que evoca vigilancia y alerta temprana.</desc>
+  <!-- Sombra -->
+  <path d="M15 22 L28 14 L50 9 L72 14 L85 22 L88 45 L84 82 L68 105 L50 120 L32 105 L16 82 L12 45 Z" fill="black" opacity="0.15"/>
+  <!-- Escudo base -->
+  <path d="M15 22 L28 14 L50 9 L72 14 L85 22 L88 45 L84 82 L68 105 L50 120 L32 105 L16 82 L12 45 Z" fill="#FFFFFF" stroke="#005652" stroke-width="3" stroke-linejoin="round"/>
+  <!-- Banda superior naranja -->
+  <path d="M15 26 L85 26 L88 38 L12 38 Z" fill="#F5A600"/>
+  <!-- Colinas -->
+  <path d="M16 78 Q34 72 50 78 T84 78 L68 105 L50 120 L32 105 Z" fill="#005652"/>
+  <path d="M16 74 Q34 68 50 74 T84 74 Q69 78 50 78 Q31 78 16 74 Z" fill="#00807D"/>
+  <!-- Radar fondo -->
+  <circle cx="50" cy="62" r="18" fill="#FFFFFF" stroke="#005652" stroke-width="1.2"/>
+  <circle cx="50" cy="62" r="14" fill="none" stroke="#005652" stroke-width="0.9" opacity="0.95"/>
+  <circle cx="50" cy="62" r="9" fill="none" stroke="#005652" stroke-width="0.8" opacity="0.9"/>
+  <circle cx="50" cy="62" r="5" fill="none" stroke="#005652" stroke-width="0.7" opacity="0.85"/>
+  <line x1="50" y1="44" x2="50" y2="80" stroke="#005652" stroke-width="0.6" opacity="0.9"/>
+  <line x1="32" y1="62" x2="68" y2="62" stroke="#005652" stroke-width="0.6" opacity="0.9"/>
+  <!-- Barrido -->
+  <path d="M50 62 L50 44 A18 18 0 0 1 62.7 49.3 Z" fill="#00b3af" opacity="0.92" stroke="#00b3af" stroke-width="0.4"/>
+  <!-- Dots periferia -->
+  <circle cx="60" cy="54" r="1.9" fill="#FFCC00" stroke="#FFFFFF" stroke-width="0.7"/>
+  <circle cx="42" cy="71" r="1.6" fill="#FDF082" stroke="#FFFFFF" stroke-width="0.7"/>
+  <!-- Punto central -->
+  <circle cx="50" cy="62" r="3.6" fill="#FFFFFF" stroke="#005652" stroke-width="0.7"/>
+  <circle cx="50" cy="62" r="2.2" fill="#F5A600" stroke="#FFCC00" stroke-width="0.5"/>
+  <circle cx="50" cy="62" r="0.9" fill="#FFCC00"/>
+  <!-- Borde final -->
+  <path d="M15 22 L28 14 L50 9 L72 14 L85 22 L88 45 L84 82 L68 105 L50 120 L32 105 L16 82 L12 45 Z" fill="none" stroke="#005652" stroke-width="2.8" stroke-linejoin="round"/>
+</svg>

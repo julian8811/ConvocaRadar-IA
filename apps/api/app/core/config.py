@@ -62,7 +62,7 @@ class Settings(BaseSettings):
     resend_api_key: str | None = None
     resend_from: str = "Observatorio de Convocatorias <onboarding@resend.dev>"
     alert_default_recipient: str | None = None
-    frontend_url: str = "http://localhost:3000"
+    frontend_url: str = "http://localhost:3002"
     backend_url: str = "http://localhost:8000"
     app_timezone: str = "America/Bogota"
     rate_limit_requests_per_minute: int = 120

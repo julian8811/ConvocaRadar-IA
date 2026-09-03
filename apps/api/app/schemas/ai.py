@@ -13,6 +13,10 @@ class AiOpportunityExtract(BaseModel):
     open_date: str | None = None
     requirements: list[str]
     documents_required: list[str]
+    eligible_applicants: list[str] = Field(default_factory=list)
+    evaluation_criteria: list[str] = Field(default_factory=list)
+    restrictions: list[str] = Field(default_factory=list)
+    application_url: str | None = None
     summary: str
     risks: list[str]
     recommendation: str

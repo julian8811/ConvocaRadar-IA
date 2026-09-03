@@ -7,7 +7,7 @@ Intelligent grants and opportunities monitoring platform. Scrapes, deduplicates,
 ```
 ┌─────────────────────────────────────────────────────────┐
 │  Frontend (Next.js 15, React 19, TanStack Query)        │
-│  apps/web/        → port 3000                            │
+│  apps/web/        → port 3002 (host) → 3000 (container) │
 ├─────────────────────────────────────────────────────────┤
 │  Backend (FastAPI, SQLAlchemy 2.0, structlog)            │
 │  apps/api/        → port 8000                            │
@@ -32,10 +32,10 @@ The scheduler runs inline using an `asyncio` loop — no Celery, no Redis, no ex
 
 ```sh
 # 1. Clone and configure
-git clone https://github.com/ConvocaRadar/ConvocaRadar-IA.git
+git clone https://github.com/julian8811/ConvocaRadar-IA.git
 cd ConvocaRadar-IA
 cp .env.example .env
-# Edit .env — set INTERNAL_API_KEY and JWT_SECRET (min 32 chars each)
+# Edit .env — set INTERNAL_API_KEY, JWT_SECRET y RESET_TOKEN_SECRET (min 32 chars c/u)
 
 # 2. Start infrastructure
 docker compose up -d postgres minio
@@ -258,7 +258,8 @@ Key environment variables (see `.env.example` for defaults):
 | `SCHEDULER_INTERVAL_SECONDS` | Sweep interval | `1800` |
 | `SCRAPING_MAX_CONCURRENCY` | Max concurrent scrapes | `6` |
 | `SCRAPING_PROXY_LIST` | Proxy rotation URLs | — |
-| `FRONTEND_URL` | Frontend URL for CORS + links | `http://localhost:3000` |
+| `FRONTEND_URL` | Frontend URL for CORS + links | `http://localhost:3002` |
+| `WEB_PORT` | Host port for web container (avoid 3000 collision) | `3002` |
 | `APP_TIMEZONE` | Application timezone | `America/Bogota` |
 
 ## Testing

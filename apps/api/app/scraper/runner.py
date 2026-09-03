@@ -98,24 +98,35 @@ async def _scrape_candidates(
             candidates = fallback_candidates
     if stats is not None:
         stats["candidates_parsed"] = len(candidates)
+    from app.connectors.common import fill_candidate_from_content
+
     opportunities: list[OpportunityCreate] = []
     noise_rejected = 0
     validation_rejected = 0
     validation_reasons: list[str] = []
     for candidate in candidates:
+        candidate = fill_candidate_from_content(
+            candidate,
+            text=candidate.raw_text or candidate.summary,
+            page_url=candidate.official_url,
+        )
         if is_noise_payload(candidate.title, candidate.summary, candidate.raw_text):
             noise_rejected += 1
             continue
         validation = await connector.validate(candidate)
         if not validation.ok:
-            validation_rejected += 1
-            if len(validation_reasons) < 5:
-                validation_reasons.append(validation.reason or "sin razon")
-            continue
+            reason = (validation.reason or "").lower()
+            appears_closed = "closed" in reason or "cerrad" in reason
+            if not appears_closed:
+                validation_rejected += 1
+                if len(validation_reasons) < 5:
+                    validation_reasons.append(validation.reason or "sin razon")
+                continue
         opportunities.append(
             OpportunityCreate(
                 source_id=source.id,
-                external_id=candidate_external_id(
+                external_id=candidate.external_id
+                or candidate_external_id(
                     source,
                     candidate.official_url,
                     candidate.title,
@@ -124,18 +135,27 @@ async def _scrape_candidates(
                 title=candidate.title,
                 entity=candidate.entity,
                 country=candidate.country,
-                region=source.region,
+                # A region scraped from the page is more specific than the
+                # source-wide default, so it wins when present.
+                region=candidate.region or source.region,
                 language=candidate.language,
                 categories=candidate.categories,
                 topics=candidate.topics,
-                description=candidate.summary or candidate.title,
+                description=candidate.description or candidate.summary or candidate.title,
                 summary=candidate.summary or candidate.title,
                 raw_text=candidate.raw_text,
                 official_url=candidate.official_url,
+                application_url=candidate.application_url,
                 open_date=candidate.open_date,
                 close_date=candidate.close_date,
                 funding_amount_raw=candidate.funding_amount_raw,
+                funding_amount_value=candidate.funding_amount_value,
+                funding_amount_currency=candidate.funding_amount_currency,
+                eligible_applicants=candidate.eligible_applicants,
                 requirements=candidate.requirements,
+                documents_required=candidate.documents_required,
+                evaluation_criteria=candidate.evaluation_criteria,
+                restrictions=candidate.restrictions,
                 confidence_score=candidate.confidence_score,
             )
         )

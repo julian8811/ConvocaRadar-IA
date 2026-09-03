@@ -21,7 +21,12 @@ from selectolax.parser import HTMLParser
 from app.connectors import common
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
 
-logger = logging.getLogger(__name__)
+def _container_text(container: Any) -> str:
+    """Visible text with newlines preserved so labelled sections still parse."""
+    try:
+        return (container.text(separator="\n") or "").strip()
+    except TypeError:
+        return (container.text() or "").strip()
 
 CLOSED_KEYWORDS = (
     "closed",
@@ -263,18 +268,22 @@ class ConfigurableHtmlConnector:
             if self._is_closed(title, summary, raw_text, close_date):
                 continue
             candidates.append(
-                OpportunityCandidate(
-                    title=title[:180],
-                    entity=str(item.get("entity") or self._entity_name),
-                    country=str(item.get("country") or self._default_country),
-                    official_url=link,
-                    summary=summary[:700] or title,
-                    categories=[
-                        str(v) for v in (item.get("categories") or [])[:4] if isinstance(v, str)
-                    ],
-                    raw_text=raw_text,
-                    confidence_score=0.72,
-                    close_date=close_date,
+                common.fill_candidate_from_content(
+                    OpportunityCandidate(
+                        title=title[:180],
+                        entity=str(item.get("entity") or self._entity_name),
+                        country=str(item.get("country") or self._default_country),
+                        official_url=link,
+                        summary=summary[:700] or title,
+                        categories=[
+                            str(v) for v in (item.get("categories") or [])[:4] if isinstance(v, str)
+                        ],
+                        raw_text=raw_text,
+                        confidence_score=0.72,
+                        close_date=close_date,
+                    ),
+                    text=summary,
+                    page_url=link,
                 )
             )
 
@@ -490,15 +499,20 @@ class ConfigurableHtmlConnector:
         if self._is_closed(title, text, text[:2500], close_date):
             return None
 
-        return OpportunityCandidate(
-            title=title[:180],
-            entity=self._entity_name,
-            country=self._default_country,
-            official_url=link,
-            summary=text[:700] or title,
-            raw_text=text[:2500],
-            confidence_score=0.55,
-            close_date=close_date,
+        return common.fill_candidate_from_content(
+            OpportunityCandidate(
+                title=title[:180],
+                entity=self._entity_name,
+                country=self._default_country,
+                official_url=link,
+                summary=text[:700] or title,
+                raw_text=text[:2500],
+                confidence_score=0.55,
+                close_date=close_date,
+            ),
+            html=getattr(container, "html", None) if isinstance(getattr(container, "html", None), str) else None,
+            text=_container_text(container) or text,
+            page_url=link,
         )
 
     def _candidate_close_date(self, item: dict, text: str | None = None) -> datetime | None:
@@ -638,30 +652,22 @@ class ConfigurableHtmlConnector:
         for c in candidates:
             detail = url_to_data.get(c.official_url)
             if detail:
-                enriched.append(
-                    OpportunityCandidate(
-                        title=(detail.get("title") or c.title)[:180],
-                        entity=c.entity,
-                        country=c.country,
-                        official_url=c.official_url,
-                        summary=(detail.get("summary") or c.summary)[:700],
-                        categories=detail.get(
-                            "categories", c.categories or self._default_categories
-                        ),
-                        raw_text=c.raw_text,
-                        confidence_score=0.82,
-                        close_date=detail.get("close_date") or c.close_date,
-                        funding_amount_raw=detail.get("funding_amount_raw") or c.funding_amount_raw,
+                from dataclasses import replace as _replace
+
+                merged = common.apply_extracted_fields(c, detail, prefer_extracted_text=True)
+                if detail.get("categories") and not c.categories:
+                    merged = _replace(
+                        merged, categories=detail["categories"] or self._default_categories
                     )
-                )
+                enriched.append(_replace(merged, confidence_score=0.82))
             else:
                 enriched.append(c)
         return enriched
 
     async def _enrich_from_detail(self, url: str) -> dict | None:
-        """Fetch a detail page and extract structured data."""
+        """Fetch a detail page and extract every opportunity field we can read."""
         try:
-            _, content, content_type = await common.fetch_httpx_text(
+            _, content, _content_type = await common.fetch_httpx_text(
                 url,
                 timeout_seconds=DETAIL_PAGE_TIMEOUT,
                 retries=1,
@@ -669,84 +675,5 @@ class ConfigurableHtmlConnector:
         except Exception:
             return None
 
-        result: dict = {}
-
-        # 1. JSON-LD
-        tree = HTMLParser(content)
-        for script in tree.css("script[type='application/ld+json']"):
-            try:
-                payload = json.loads(script.text() or "{}")
-            except json.JSONDecodeError:
-                continue
-            for item in self._iter_items(payload):
-                title = str(item.get("name") or item.get("title") or "").strip()
-                if title:
-                    result["title"] = title
-                desc = str(item.get("description") or item.get("summary") or "").strip()
-                if desc:
-                    result["summary"] = desc
-                cd = self._candidate_close_date(item)
-                if cd:
-                    result["close_date"] = cd
-                cats = [str(v) for v in (item.get("categories") or [])[:4] if isinstance(v, str)]
-                if cats:
-                    result["categories"] = cats
-                amount = str(item.get("funding") or item.get("fundingAmount") or "").strip()
-                if amount:
-                    result["funding_amount_raw"] = amount
-                break
-
-        # 2. Meta / OG tags
-        og_title = tree.css_first("meta[property='og:title']")
-        if og_title and "title" not in result:
-            value = (og_title.attributes.get("content") or "").strip()
-            if value:
-                result["title"] = value
-        og_desc = tree.css_first("meta[property='og:description']")
-        if og_desc and "summary" not in result:
-            value = (og_desc.attributes.get("content") or "").strip()
-            if value:
-                result["summary"] = value
-        meta_desc = tree.css_first("meta[name='description']")
-        if meta_desc and "summary" not in result:
-            value = (meta_desc.attributes.get("content") or "").strip()
-            if value:
-                result["summary"] = value
-
-        # 3. h1 fallback for title
-        if "title" not in result:
-            h1 = tree.css_first("h1")
-            if h1:
-                value = common.clean_text(h1.text())
-                if value:
-                    result["title"] = value
-
-        # 4. Article / main content for summary
-        if "summary" not in result:
-            for tag in ("article", "[role='main']", "main", ".content", "#content"):
-                el = tree.css_first(tag)
-                if el:
-                    value = common.clean_text(el.text())[:700]
-                    if value:
-                        result["summary"] = value
-                        break
-
-        # 5. Date from body text
-        if "close_date" not in result:
-            body = tree.css_first("body")
-            if body:
-                all_text = common.clean_text(body.text())
-                cd = common.extract_close_date(all_text)
-                if cd:
-                    result["close_date"] = cd
-
-        # 6. Funding mirror (GenericHtml parity — raw only, value via d9579f4)
-        if "funding_amount_raw" not in result:
-            body = tree.css_first("body")
-            if body:
-                all_text = common.clean_text(body.text())
-                amount = common.extract_funding_amount(all_text)
-                if amount:
-                    result["funding_amount_raw"] = amount
-
+        result = common.extract_page_fields(html=content, page_url=url)
         return result if result.get("title") else None
