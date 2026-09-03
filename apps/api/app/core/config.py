@@ -2,17 +2,21 @@
 
 from functools import lru_cache
 
-from pydantic import Field, computed_field
+from pydantic import Field, computed_field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 logger = logging.getLogger(__name__)
 
 
+PLACEHOLDERS = {"change-me", "changeme", "change_me", "replace_with", "replace-with", "password", "placeholder"}
+
 class Settings(BaseSettings):
     app_env: str = "development"
     app_name: str = "ConvocaRadar IA"
     database_url: str = "sqlite:///./convocaradar.db"
+    postgres_password: str | None = Field(default=None, description="Postgres password — required in production, >=16 non-placeholder")
+    minio_root_password: str | None = Field(default=None, description="MinIO password — required in production, >=16 non-placeholder")
     jwt_secret: str = Field(min_length=32)
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 60
@@ -86,6 +90,52 @@ class Settings(BaseSettings):
     extraction_batch_enabled: bool = False
     extraction_spa_retry: bool = False
     throttle_max_per_day: int = 150
+
+    @field_validator("jwt_secret", "internal_api_key", mode="after")
+    @classmethod
+    def _strong_secret(cls, v: str) -> str:
+        if v is not None and isinstance(v, str):
+            if len(v) < 16:
+                raise ValueError("secret must be >=16 characters")
+        return v
+
+    @field_validator("postgres_password", "minio_root_password", mode="after")
+    @classmethod
+    def _strong_optional_secret(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        if len(v) < 16:
+            raise ValueError("secret must be >=16 characters")
+        return v
+
+    @field_validator("reset_token_secret", mode="after")
+    @classmethod
+    def _reset_token_secret_strength(cls, v: str | None) -> str | None:
+        if v is None:
+            return v
+        if len(v) < 16:
+            raise ValueError("secret must be >=16 characters")
+        return v
+
+    @model_validator(mode="after")
+    def _prod_guards(self):
+        env = (self.app_env or "").strip().lower()
+        if env == "production":
+            # SQLite forbidden in production — must be PostgreSQL
+            if "sqlite" in (self.database_url or "").lower():
+                raise ValueError("DATABASE_URL must be PostgreSQL in production — SQLite is not safe for concurrent writes")
+            # Strong secrets: placeholder rejection + >=16 in prod
+            for field_name in ("jwt_secret", "internal_api_key", "postgres_password", "minio_root_password"):
+                val = getattr(self, field_name, None)
+                if val is not None:
+                    if len(val) < 16 or any(p in val.lower() for p in PLACEHOLDERS):
+                        raise ValueError(f"{field_name} must be >=16 and not placeholder in production")
+            # reset_token_secret required and strong in prod
+            if self.reset_token_secret is None or len(self.reset_token_secret) < 16:
+                raise ValueError("RESET_TOKEN_SECRET must be >=16 and not placeholder in production")
+            if any(p in self.reset_token_secret.lower() for p in PLACEHOLDERS):
+                raise ValueError("RESET_TOKEN_SECRET must be >=16 and not placeholder in production")
+        return self
 
     @computed_field  # type: ignore[prop-decorator]
     @property
