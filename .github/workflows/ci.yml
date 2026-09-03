@@ -7,6 +7,35 @@ on:
     branches: [main]
 
 jobs:
+  check-secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash scripts/check-secrets.sh
+
+  hadolint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: apps/api/Dockerfile
+          config: .hadolint.yaml
+      - uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: apps/web/Dockerfile
+          config: .hadolint.yaml
+
+  compose-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose config > /dev/null
+        env:
+          POSTGRES_PASSWORD: ci-dummy-postgres-password-0123456789abcdef
+          MINIO_ROOT_PASSWORD: ci-dummy-minio-root-password-0123456789abcdef
+          INTERNAL_API_KEY: ci-dummy-internal-api-key-0123456789abcdef
+
   lint:
     runs-on: ubuntu-latest
     defaults:

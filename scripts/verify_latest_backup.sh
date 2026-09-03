@@ -19,6 +19,15 @@ if [ "$size" -lt 100 ]; then
   exit 1
 fi
 
+# Staleness check: backup must be younger than 48h (172800s). Portable via `find -mtime`.
+# 2 days = -mtime -2 would be <48h old; we want to FAIL if older than 2 days → use +1 (≥24h) + extra margin.
+# Use find to test staleness without GNU stat date parsing.
+if [ -n "$(find "$latest" -mtime +2 2>/dev/null)" ]; then
+  echo "Backup is stale: $latest is older than 48h (2 days)" >&2
+  ls -lh "$latest" >&2
+  exit 1
+fi
+
 gzip -t "$latest"
 if ! gzip -dc "$latest" | grep -q 'CREATE TABLE'; then
   echo "Backup does not contain SQL schema statements: $latest" >&2

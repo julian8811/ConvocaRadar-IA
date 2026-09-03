@@ -2,13 +2,18 @@
 
 ## Reportar una vulnerabilidad
 
-No abras un issue público. Enviá un mail a `julianmontoya8811@gmail.com` con:
+No abras un issue público. Usá uno de estos canales (en orden de preferencia):
+
+1. **GitHub Security Advisory**: `Security` → `Report a vulnerability` en https://github.com/julian8811/ConvocaRadar-IA/security/advisories/new
+2. **Mail institucional**: `security@convocaradar.com` (o `julianmontoya8811@gmail.com` como respaldo)
+
+Incluí:
 
 - Descripción del problema
 - Pasos para reproducir
 - Impacto estimado
 
-Responderemos dentro de 72h.
+Responderemos dentro de 72h. Ver también `security@convocaradar.com` y la pestaña GitHub Advisory para triage privado.
 
 ## Buenas prácticas del repo
 
