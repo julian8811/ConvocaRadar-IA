@@ -456,7 +456,7 @@ def test_ai_structured_extraction_and_scoring() -> None:
     assert "research" in payload["category"] or "innovation" in payload["category"]
     assert payload["priority"] in {"high", "medium", "low", "not_recommended"}
     assert payload["model_version"] == "local-heuristic-v2"
-    assert payload["prompt_version"] == "structured-extraction-v3"
+    assert payload["prompt_version"] == "structured-extraction-v4"
     assert payload["extraction_strategy"] in {"local-heuristic", "remote-llm"}
     assert payload["provider"]
 

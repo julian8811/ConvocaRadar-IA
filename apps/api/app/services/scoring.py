@@ -9,7 +9,7 @@ from datetime import UTC, datetime
 
 from sqlalchemy.orm import Session
 
-from app.core.ai import build_embedding_sync, cosine_similarity
+from app.core.ai import build_embedding, cosine_similarity
 from app.models import Opportunity, OpportunityScore, OrganizationProfile, Priority
 
 # ── Source health score (Change C) ───────────────────────────────────────────
@@ -113,8 +113,8 @@ def update_consecutive_empty_runs(items_found: int, current_count: int) -> int:
 
 
 def should_auto_pause(new_count: int) -> bool:
-    """Check if the source should be auto-paused (>= 3 consecutive empty runs)."""
-    return new_count >= 3
+    """Check if the source should be auto-paused (>= 5 consecutive empty runs)."""
+    return new_count >= 5
 
 
 # ── Opportunity scoring (existing) ─────────────────────────────────────────
@@ -138,16 +138,53 @@ def priority_for_score(score: float) -> str:
 def _semantic_score(text: str, profile_text: str) -> float:
     """Compare opportunity text with profile text using embedding similarity.
 
-    Returns a float in [0, 1] or 0 if empty input or embedding unavailable.
+    Sync fallback — uses local hash only (no event-loop hack). For batched
+    remote embeddings use ``batch_semantic_scores``.
+    Returns a float in [0, 1] or 0 if empty input.
     """
     if not text.strip() or not profile_text.strip():
         return 0.0
     try:
-        opp_vec = build_embedding_sync(text[:2000])
-        prof_vec = build_embedding_sync(profile_text[:2000])
-        return cosine_similarity(opp_vec, prof_vec)
+        from app.core.ai import tokenize_for_embedding
+        import hashlib, math
+        from app.core.config import get_settings
+
+        settings = get_settings()
+        # Remote provider without async context: skip semantic (batch path covers it)
+        if settings.llm_api_key and settings.embedding_model:
+            from app.core.config import effective_llm_provider
+            if effective_llm_provider(settings.llm_provider) != "local":
+                return 0.0
+        dims = settings.embedding_dimensions or 64
+
+        def _hash_vec(t: str) -> list[float]:
+            v = [0.0] * dims
+            for tok in tokenize_for_embedding(t[:2000]):
+                bucket = int.from_bytes(hashlib.sha256(tok.encode()).digest()[:4], "big") % dims
+                v[bucket] += 1.0 + min(len(tok), 12) / 12.0
+            n = math.sqrt(sum(x * x for x in v))
+            return [round(x / n, 6) for x in v] if n else v
+
+        return cosine_similarity(_hash_vec(text), _hash_vec(profile_text))
     except Exception:
         return 0.0
+
+
+async def batch_semantic_scores(texts: list[str], profile_text: str) -> list[float]:
+    """Batch semantic scores via build_embeddings_batch (remote-aware)."""
+    if not profile_text.strip() or not texts:
+        return [0.0] * len(texts)
+    try:
+        from app.services.embeddings import build_embeddings_batch
+
+        all_texts = [t[:2000] for t in texts] + [profile_text[:2000]]
+        vectors = await build_embeddings_batch(all_texts)
+        if len(vectors) != len(all_texts):
+            return [0.0] * len(texts)
+        prof_vec = vectors[-1]
+        return [cosine_similarity(v, prof_vec) for v in vectors[:-1]]
+    except Exception:
+        return [0.0] * len(texts)
 
 
 def _compute_score(opportunity: Opportunity, profile: OrganizationProfile) -> dict:
@@ -257,6 +294,22 @@ def _compute_score(opportunity: Opportunity, profile: OrganizationProfile) -> di
     if opportunity.documents_required:
         score += 2
         reasons.append("Documentos necesarios identificados.")
+
+    # ── 022 P2: penalize missing data (configurable, bounded) ─────────────
+    try:
+        from app.core.config import get_settings as _get_s
+
+        _pen_close = int(_get_s().extraction_missing_close_penalty)
+        _pen_fund = int(_get_s().extraction_missing_funding_penalty)
+    except Exception:
+        _pen_close, _pen_fund = 10, 5
+    if not opportunity.close_date:
+        score -= _pen_close
+        warnings.append("Falta fecha de cierre — penalización aplicada.")
+    if not opportunity.funding_amount_value:
+        score -= _pen_fund
+        warnings.append("Falta monto de financiación — penalización aplicada.")
+    score = max(0.0, score)
 
     if score < 40 and not warnings:
         warnings.append("Compatibilidad baja con los datos disponibles.")

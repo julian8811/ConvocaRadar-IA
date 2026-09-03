@@ -49,7 +49,7 @@ def classify_error(exc: Exception) -> ErrorType:
     ErrorType
         The matching error category.
     """
-    if isinstance(exc, asyncio.TimeoutError):
+    if isinstance(exc, TimeoutError) or isinstance(exc, asyncio.TimeoutError):
         return ErrorType.TIMEOUT
     if isinstance(exc, httpx.HTTPError) or isinstance(exc, ConnectionError):
         return ErrorType.NETWORK

@@ -8,7 +8,7 @@ from __future__ import annotations
 import os
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -98,7 +98,7 @@ async def _make_opportunity(
         source = db.scalar(select(Source).where(Source.key == "grants-gov"))
         assert source is not None
 
-        with patch("app.services.opportunity.url_is_reachable", return_value=True):
+        with patch("app.services.opportunity.async_url_is_reachable", new=AsyncMock(return_value=True)):
             opportunity = await create_opportunity(
                 db,
                 OpportunityCreate(
@@ -135,7 +135,7 @@ class TestUrlCheckEndpoint:
         auth = {"Authorization": f"Bearer {token(c)}"}
         opportunity_id = await _make_opportunity()
 
-        with patch("app.services.url_is_reachable", return_value=True):
+        with patch("app.services.validation.async_url_is_reachable", new=AsyncMock(return_value=True)):
             response = c.get(
                 f"/api/v1/opportunities/{opportunity_id}/url-check",
                 headers=auth,
@@ -155,7 +155,7 @@ class TestUrlCheckEndpoint:
         auth = {"Authorization": f"Bearer {token(c)}"}
         opportunity_id = await _make_opportunity()
 
-        with patch("app.services.url_is_reachable", return_value=True):
+        with patch("app.services.validation.async_url_is_reachable", new=AsyncMock(return_value=True)):
             response = c.get(
                 f"/api/v1/opportunities/{opportunity_id}/url-check",
                 headers=auth,
@@ -172,7 +172,7 @@ class TestUrlCheckEndpoint:
         auth = {"Authorization": f"Bearer {token(c)}"}
         opportunity_id = await _make_opportunity()
 
-        with patch("app.services.url_is_reachable", return_value=False):
+        with patch("app.services.validation.async_url_is_reachable", new=AsyncMock(return_value=False)):
             response = c.get(
                 f"/api/v1/opportunities/{opportunity_id}/url-check",
                 headers=auth,
@@ -189,7 +189,7 @@ class TestUrlCheckEndpoint:
         auth = {"Authorization": f"Bearer {token(c)}"}
         opportunity_id = await _make_opportunity(official_url=None)
 
-        with patch("app.services.url_is_reachable", return_value=True):
+        with patch("app.services.validation.async_url_is_reachable", new=AsyncMock(return_value=True)):
             response = c.get(
                 f"/api/v1/opportunities/{opportunity_id}/url-check",
                 headers=auth,
@@ -206,7 +206,7 @@ class TestUrlCheckEndpoint:
         auth = {"Authorization": f"Bearer {token(c)}"}
         opportunity_id = await _make_opportunity(application_url=None)
 
-        with patch("app.services.url_is_reachable", return_value=True):
+        with patch("app.services.validation.async_url_is_reachable", new=AsyncMock(return_value=True)):
             response = c.get(
                 f"/api/v1/opportunities/{opportunity_id}/url-check",
                 headers=auth,
@@ -223,7 +223,7 @@ class TestUrlCheckEndpoint:
         auth = {"Authorization": f"Bearer {token(c)}"}
         opportunity_id = await _make_opportunity(official_url=None, application_url=None)
 
-        with patch("app.services.url_is_reachable", return_value=True) as mock_reachable:
+        with patch("app.services.validation.async_url_is_reachable", new=AsyncMock(return_value=True)) as mock_reachable:
             response = c.get(
                 f"/api/v1/opportunities/{opportunity_id}/url-check",
                 headers=auth,
@@ -233,7 +233,7 @@ class TestUrlCheckEndpoint:
         data = response.json()
         assert data["official_url"] is False
         assert data["application_url"] is False
-        # url_is_reachable should NOT be called when both URLs are None
+        # async_url_is_reachable should NOT be called when both URLs are None
         mock_reachable.assert_not_called()
 
     async def test_url_check_returns_404_for_unknown_opportunity(self) -> None:

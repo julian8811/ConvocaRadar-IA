@@ -15,6 +15,7 @@ import { EmptyState, ErrorState, LoadingState } from "@/components/ui/state";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { api } from "@/lib/api";
 import { decodeVisibleText, isNoiseVisibleText } from "@/lib/text";
+import { liveOpportunityStatus } from "@/lib/opportunity-status";
 import type { Opportunity, Source } from "@/lib/types";
 
 const statuses = [
@@ -229,7 +230,9 @@ export default function OpportunitiesPage() {
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {items.map((item) => (
+                {items.map((item) => {
+                  const displayStatus = liveOpportunityStatus(item.status, item.close_date);
+                  return (
                   <TableRow key={item.id} className={selected.has(item.id) ? "bg-cyan-50/50 dark:bg-cyan-400/5" : ""}>
                     <TableCell>
                       <input
@@ -255,7 +258,7 @@ export default function OpportunitiesPage() {
                     </TableCell>
                     <TableCell>{item.close_date ? new Date(item.close_date).toLocaleDateString("es-CO") : "Sin fecha"}</TableCell>
                     <TableCell>{formatAmount(item.funding_amount_raw)}</TableCell>
-                    <TableCell><Badge tone={item.status}>{translateOpportunityStatus(item.status)}</Badge></TableCell>
+                    <TableCell><Badge tone={displayStatus}>{translateOpportunityStatus(displayStatus)}</Badge></TableCell>
                     <TableCell>
                       <div className="flex gap-2">
                         <Button variant="outline" size="icon" title="Favorita" onClick={() => favorite.mutate(item.id)}>
@@ -267,7 +270,8 @@ export default function OpportunitiesPage() {
                       </div>
                     </TableCell>
                   </TableRow>
-                ))}
+                  );
+                })}
               </TableBody>
             </Table>
             <div className="flex items-center justify-between gap-3 px-4 pb-4 pt-2">

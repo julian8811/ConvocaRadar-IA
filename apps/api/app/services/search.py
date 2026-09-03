@@ -8,11 +8,11 @@ from __future__ import annotations
 import re
 from datetime import UTC, datetime
 
-from sqlalchemy import ColumnElement, Select, and_, func as sa_func, or_, select
+from sqlalchemy import ColumnElement, Date, Select, and_, cast, func as sa_func, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.ai import build_embedding, cosine_similarity
-from app.models import Opportunity, OpportunityEmbedding
+from app.models import Opportunity, OpportunityEmbedding, OpportunityStatus
 
 
 def _unaccent_sql(col: ColumnElement) -> ColumnElement:
@@ -75,17 +75,42 @@ def build_opportunity_query(
         stmt = stmt.where(Opportunity.country == country)
     if category:
         stmt = stmt.where(Opportunity.categories.contains([category]))
-    if status:
+    today = datetime.now(UTC).date()
+    close_day = cast(Opportunity.close_date, Date)
+    if status == OpportunityStatus.open.value:
+        stmt = stmt.where(
+            or_(
+                close_day >= today,
+                and_(
+                    Opportunity.close_date.is_(None),
+                    Opportunity.status.in_(
+                        [
+                            OpportunityStatus.open.value,
+                            OpportunityStatus.closing_soon.value,
+                            OpportunityStatus.unknown.value,
+                        ]
+                    ),
+                ),
+            )
+        )
+    elif status == OpportunityStatus.closing_soon.value:
+        stmt = stmt.where(
+            Opportunity.status == OpportunityStatus.closing_soon.value,
+            or_(Opportunity.close_date.is_(None), close_day >= today),
+        )
+    elif status == OpportunityStatus.closed.value:
+        stmt = stmt.where(
+            or_(
+                Opportunity.status == OpportunityStatus.closed.value,
+                and_(Opportunity.close_date.is_not(None), close_day < today),
+            )
+        )
+    elif status:
         stmt = stmt.where(Opportunity.status == status)
     elif exclude_closed:
         # Filter by close_date regardless of stored status so opportunities
         # whose deadline passed since the last scrape are hidden immediately.
-        stmt = stmt.where(
-            or_(
-                Opportunity.close_date.is_(None),
-                Opportunity.close_date >= datetime.now(UTC).replace(tzinfo=None),
-            )
-        )
+        stmt = stmt.where(or_(Opportunity.close_date.is_(None), close_day >= today))
     if exclude_no_url:
         stmt = stmt.where(Opportunity.official_url.is_not(None), Opportunity.official_url != "")
     if source_id:

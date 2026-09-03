@@ -1,0 +1,9 @@
+# CODEOWNERS — ConvocaRadar IA
+# University-ready governance: every change requires owner review.
+# See https://docs.github.com/en/repositories/managing-your-repositorys-settings-and-features/customizing-your-repository/about-code-owners
+
+* @julian8811
+/docs/ @julian8811
+.github/ @julian8811
+apps/ @julian8811
+scripts/ @julian8811

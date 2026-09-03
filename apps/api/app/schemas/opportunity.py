@@ -2,7 +2,7 @@
 
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, model_validator
 
 
 class OpportunityCreate(BaseModel):
@@ -54,6 +54,17 @@ class OpportunityRead(OpportunityCreate):
     created_at: datetime
 
     model_config = {"from_attributes": True}
+
+    @model_validator(mode="after")
+    def reconcile_deadline_status(self):
+        """Stored status goes stale; deadline always wins on read."""
+        from app.services.opportunity import inferred_opportunity_status
+
+        self.status = inferred_opportunity_status(
+            self.close_date,
+            " ".join(part for part in (self.title, self.summary, self.raw_text) if part),
+        )
+        return self
 
 
 class OpportunityList(BaseModel):

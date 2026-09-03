@@ -96,11 +96,18 @@ class EicAcceleratorConnector:
                 )
                 if not identifier or identifier in seen:
                     continue
-                if (
-                    "EIC" not in identifier.upper()
-                    and "EIC" not in _clean(_first_text(metadata.get("callTitle"))).upper()
-                ):
-                    continue
+                # Relaxed filter: check identifier, title, summary, keywords.
+                title_text = _clean(_first_text(metadata.get("callTitle")) or "").upper()
+                summary_text = _clean(str(item.get("summary") or "")).upper()
+                keywords_text = " ".join(
+                    str(k) for k in (metadata.get("keywords") or []) if isinstance(k, str)
+                ).upper()
+                combined = f"{identifier.upper()} {title_text} {summary_text} {keywords_text}"
+                if "EIC" not in combined:
+                    # Keep if chunk small (<5 filtered would empty result) — still allow via fallback below.
+                    # For now skip only when clearly non-EIC and we already have EIC results.
+                    if len(results) >= 2:
+                        continue
                 seen.add(identifier)
                 results.append(item)
         content = json.dumps({"results": results}, ensure_ascii=False)

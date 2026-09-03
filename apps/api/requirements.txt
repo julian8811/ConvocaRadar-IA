@@ -10,6 +10,7 @@ python-multipart
 structlog
 httpx
 python-dateutil
+dateparser==1.2.0
 email-validator
 pgvector
 selectolax

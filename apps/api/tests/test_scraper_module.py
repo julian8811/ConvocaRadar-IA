@@ -514,7 +514,7 @@ async def test_run_source_tracks_selector_failures(monkeypatch, db, source, org_
 
 
 async def test_selector_failures_auto_pause_after_three(monkeypatch, db, source, org_id):
-    """After 3 consecutive selector failures, source auto-pauses."""
+    """After 5 consecutive selector failures, source auto-pauses."""
     from app.scraper.runner import run_source_inline
 
     async def mock_empty_scrape(_source, _stats=None):
@@ -526,8 +526,8 @@ async def test_selector_failures_auto_pause_after_three(monkeypatch, db, source,
     monkeypatch.setattr("app.scraper.runner._scrape_candidates", mock_empty_scrape)
     monkeypatch.setattr("app.scraper.runner.create_opportunity", mock_create_never)
 
-    # Set up 2 prior failures
-    source.selector_failures = 2
+    # Set up 4 prior failures — threshold is 5 per spec (REQ-SP-01 / scoring.should_auto_pause >=5)
+    source.selector_failures = 4
     db.flush()
 
     run = await run_source_inline(db, source, org_id)

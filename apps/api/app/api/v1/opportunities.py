@@ -418,15 +418,23 @@ async def check_opportunity_urls(
     db: Session = Depends(get_db),
 ) -> dict[str, bool]:
     opportunity = _get_opportunity_for_org(db, opportunity_id, organization)
-    from app.services import url_is_reachable
+    import asyncio
 
+    from app.services.validation import async_url_is_reachable
+
+    tasks: dict[str, asyncio.Task[bool]] = {}
+    if opportunity.official_url:
+        tasks["official_url"] = asyncio.create_task(async_url_is_reachable(opportunity.official_url))
+    if opportunity.application_url:
+        tasks["application_url"] = asyncio.create_task(async_url_is_reachable(opportunity.application_url))
+    results: dict[str, bool] = {}
+    if tasks:
+        vals = await asyncio.gather(*tasks.values())
+        for k, v in zip(tasks.keys(), vals, strict=False):
+            results[k] = bool(v)
     return {
-        "official_url": url_is_reachable(opportunity.official_url)
-        if opportunity.official_url
-        else False,
-        "application_url": url_is_reachable(opportunity.application_url)
-        if opportunity.application_url
-        else False,
+        "official_url": results.get("official_url", False),
+        "application_url": results.get("application_url", False),
     }
 
 

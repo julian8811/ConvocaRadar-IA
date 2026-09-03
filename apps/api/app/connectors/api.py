@@ -3,7 +3,12 @@ from __future__ import annotations
 import json
 from urllib.parse import urljoin
 
-from app.connectors.common import fetch_httpx_text
+from app.connectors.common import (
+    extract_funding_details,
+    fill_candidate_from_content,
+    fetch_httpx_text,
+    parse_date_text,
+)
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
 
 
@@ -141,17 +146,71 @@ class ApiConnector:
                     for value in (str(item.get("theme") or item.get("program") or "").strip(),)
                     if value
                 ]
+            description = str(item.get("description") or summary).strip()
+            application_url = str(
+                item.get("applicationUrl")
+                or item.get("application_url")
+                or item.get("applyUrl")
+                or ""
+            ).strip() or None
+            if application_url and not application_url.startswith(("http://", "https://")):
+                application_url = urljoin(raw.url, application_url)
+            open_date = None
+            for key in ("openDate", "open_date", "startDate", "start_date", "openingDate"):
+                open_date = parse_date_text(item.get(key) if item.get(key) is not None else None)
+                if open_date:
+                    break
+            close_date = None
+            for key in (
+                "closeDate",
+                "close_date",
+                "deadline",
+                "endDate",
+                "dueDate",
+                "applicationDeadline",
+            ):
+                close_date = parse_date_text(item.get(key) if item.get(key) is not None else None)
+                if close_date:
+                    break
+            funding_blob = (
+                item.get("fundingAmount")
+                or item.get("funding_amount")
+                or item.get("funding")
+                or item.get("budget")
+                or item.get("awardCeiling")
+            )
+            funding_raw, funding_value, funding_currency = (None, None, None)
+            if funding_blob not in (None, ""):
+                funding_raw, funding_value, funding_currency = extract_funding_details(
+                    str(funding_blob)
+                )
+                if not funding_raw:
+                    funding_raw = str(funding_blob).strip()[:200]
+            raw_text = json.dumps(item, ensure_ascii=False)[:15000]
+            candidate = OpportunityCandidate(
+                title=title[:180],
+                entity=str(item.get("entity") or item.get("agency") or self.source_key),
+                country=country or "Por validar",
+                official_url=link or raw.url,
+                summary=summary[:700],
+                description=description[:4000],
+                categories=categories[:5],
+                topics=topics[:5],
+                raw_text=raw_text or summary[:2500],
+                confidence_score=0.66 if link else 0.52,
+                open_date=open_date,
+                close_date=close_date,
+                funding_amount_raw=funding_raw,
+                funding_amount_value=funding_value,
+                funding_amount_currency=funding_currency,
+                application_url=application_url,
+                external_id=identifier or None,
+            )
             candidates.append(
-                OpportunityCandidate(
-                    title=title[:180],
-                    entity=str(item.get("entity") or item.get("agency") or self.source_key),
-                    country=country or "Por validar",
-                    official_url=link or raw.url,
-                    summary=summary[:700],
-                    categories=categories[:5],
-                    topics=topics[:5],
-                    raw_text=summary[:2500],
-                    confidence_score=0.66 if link else 0.52,
+                fill_candidate_from_content(
+                    candidate,
+                    text=f"{summary}\n{description}",
+                    page_url=candidate.official_url,
                 )
             )
         return candidates[:50]

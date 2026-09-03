@@ -58,5 +58,7 @@ class TestResolveBaseUrlDeadline:
 class TestDeepFetchLimitAlignment:
     def test_matches_configurable_connector_limit(self) -> None:
         from app.connectors import configurable_html as ch
+        from app.core.config import get_settings
 
-        assert gh.DEEP_FETCH_LIMIT == ch.DEEP_FETCH_LIMIT == 10
+        expected = get_settings().extraction_detail_limit
+        assert gh.DEEP_FETCH_LIMIT == ch.DEEP_FETCH_LIMIT == expected

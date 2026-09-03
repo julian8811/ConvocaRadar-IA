@@ -1,0 +1,41 @@
+# safe-settings — branch protection as code for university self-hosted governance
+# Applied by https://github.com/apps/safe-settings
+# Docs: https://github.com/github/safe-settings
+
+repository:
+  description: "ConvocaRadar IA — rastreador universitario de convocatorias"
+  has_issues: true
+  has_projects: false
+  has_wiki: false
+  default_branch: main
+  delete_branch_on_merge: true
+  allow_squash_merge: true
+  allow_merge_commit: false
+  allow_rebase_merge: true
+
+branches:
+  - name: main
+    protection:
+      required_status_checks:
+        strict: true
+        contexts:
+          - lint
+          - test
+          - frontend
+          - docker
+          - check-secrets
+          - hadolint
+          - compose-lint
+      enforce_admins: false
+      required_pull_request_reviews:
+        required_approving_review_count: 1
+        dismiss_stale_reviews: true
+        require_code_owner_reviews: true
+        require_last_push_approval: false
+      restrictions: null
+      allow_force_pushes: false
+      allow_deletions: false
+      required_conversation_resolution: true
+
+collaborators: []
+teams: []

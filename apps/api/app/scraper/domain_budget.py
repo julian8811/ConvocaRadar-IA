@@ -55,7 +55,14 @@ class DomainBudgetManager:
         "beta.grants.gov": {"max_concurrent": 3, "delay_seconds": 0},
         "minciencias.gov.co": {"max_concurrent": 1, "delay_seconds": 2},
         "innpulsacolombia.com": {"max_concurrent": 1, "delay_seconds": 1},
+        "fapesp.br": {"max_concurrent": 1, "delay_seconds": 2},
+        "conacyt.mx": {"max_concurrent": 1, "delay_seconds": 2},
+        "conahcyt.mx": {"max_concurrent": 1, "delay_seconds": 2},
+        "*.gov.br": {"max_concurrent": 1, "delay_seconds": 1},
+        "gov.br": {"max_concurrent": 1, "delay_seconds": 1},
         "*playwright*": {"max_concurrent": 5, "delay_seconds": 0},
+        "playwright": {"max_concurrent": 1, "delay_seconds": 0},
+        "*hybrid*": {"max_concurrent": 1, "delay_seconds": 0},
     }
 
     _FALLBACK: dict[str, int] = {"max_concurrent": 2, "delay_seconds": 0}
@@ -70,6 +77,10 @@ class DomainBudgetManager:
         self._slots: dict[str, int] = {}
         # Per-domain monotonic timestamp of the last acquired request
         self._last_times: dict[str, float] = {}
+        # Burst / daily cap tracking (023 S3) — per-domain counter with window
+        self._burst_counts: dict[str, int] = {}
+        self._burst_window_start: dict[str, float] = {}
+        self._burst_window_seconds: float = 604800.0  # 7d window for throttle_max_per_day (spec 023: burst 7d)
 
     # ------------------------------------------------------------------
     # Public API
@@ -86,8 +97,19 @@ class DomainBudgetManager:
         :meth:`delay_for` can calculate inter-request spacing.
 
         Thread-safe: acquires ``self._lock``.
+
+        Burst guard: if throttle_max_per_day exceeded, deny without slot.
         """
         domain = self._domain_from_url(url)
+        # burst guard — deny when daily cap exceeded
+        if self.burst_exceeded(url):
+            try:
+                from app.scraper import metrics as _metrics
+
+                _metrics.record_throttled(source_key=domain, delay_s=0.0)
+            except Exception:
+                pass
+            return False
         max_concurrent = self._max_concurrent_for(domain)
 
         with self._lock:
@@ -138,6 +160,56 @@ class DomainBudgetManager:
             return delay_seconds - elapsed
         return 0.0
 
+    def handle_429(self, url: str, retry_after: str | float | None) -> float:
+        """Record 429 Retry-After for domain — returns effective delay.
+
+        Parses Retry-After header (seconds or HTTP-date not supported) and
+        bumps _last_times so delay_for() enforces backoff. Returns delay.
+        Also increments throttled gauge for observability (023).
+        """
+        try:
+            delay = float(str(retry_after).strip()) if retry_after is not None else 5.0
+        except (ValueError, TypeError):
+            delay = 5.0
+        delay = max(1.0, min(delay, 60.0))
+        domain = self._domain_from_url(url)
+        with self._lock:
+            self._last_times[domain] = time.monotonic() + delay - self._config_for(domain).get("delay_seconds", 0)
+        try:
+            from app.scraper import metrics as _metrics
+
+            _metrics.record_throttled(source_key=domain, delay_s=delay)
+        except Exception:
+            pass
+        return delay
+
+    # ── Burst / throttle_max_per_day (023 S3) ─────────────────────────────
+
+    def record_request(self, url: str) -> None:
+        """Record one request for burst window accounting (counts toward throttle_max_per_day)."""
+        domain = self._domain_from_url(url)
+        now = time.monotonic()
+        with self._lock:
+            start = self._burst_window_start.get(domain)
+            if start is None or (now - start) > self._burst_window_seconds:
+                self._burst_window_start[domain] = now
+                self._burst_counts[domain] = 0
+            self._burst_counts[domain] = self._burst_counts.get(domain, 0) + 1
+            # also update last time for delay_for symmetry
+            self._last_times.setdefault(domain, now)
+
+    def burst_exceeded(self, url: str) -> bool:
+        domain = self._domain_from_url(url)
+        try:
+            limit = int(getattr(__import__("app.core.config", fromlist=["get_settings"]).get_settings(), "throttle_max_per_day", 150))
+        except Exception:
+            limit = 150
+        with self._lock:
+            return self._burst_counts.get(domain, 0) >= limit
+
+    def throttle_max_per_day_exceeded(self, url: str) -> bool:
+        return self.burst_exceeded(url)
+
     def clear(self) -> None:
         """Reset all budgets and timestamps — return to initial state.
 
@@ -147,6 +219,8 @@ class DomainBudgetManager:
         with self._lock:
             self._slots.clear()
             self._last_times.clear()
+            self._burst_counts.clear()
+            self._burst_window_start.clear()
 
     # ------------------------------------------------------------------
     # Internal helpers
@@ -157,6 +231,9 @@ class DomainBudgetManager:
         """Extract the lowercase hostname from *url*, stripping any port."""
         parsed = urlparse(url)
         hostname = parsed.hostname or parsed.netloc or ""
+        if not hostname and url and "://" not in url:
+            # Handle bare keys like "playwright" used for global pool
+            hostname = url.split("/")[0].split(":")[0]
         # Strip port suffix if present
         if ":" in hostname:
             hostname = hostname.split(":")[0]

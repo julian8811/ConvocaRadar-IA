@@ -45,16 +45,18 @@ def test_consecutive_empty_runs_resets():
 
 
 def test_auto_pause_triggered():
-    """After 3 consecutive empty runs, should_auto_pause returns True."""
+    """After 5 consecutive empty runs, should_auto_pause returns True."""
     from app.services.scoring import should_auto_pause
 
-    assert should_auto_pause(3) is True
     assert should_auto_pause(5) is True
+    assert should_auto_pause(6) is True
+    assert should_auto_pause(3) is False
 
 
 def test_auto_pause_not_triggered():
-    """Below 3 consecutive empty runs, should not auto-pause."""
+    """Below 5 consecutive empty runs, should not auto-pause."""
     from app.services.scoring import should_auto_pause
 
     assert should_auto_pause(0) is False
     assert should_auto_pause(2) is False
+    assert should_auto_pause(4) is False

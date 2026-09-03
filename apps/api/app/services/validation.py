@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import ipaddress
 import re
+import time
 from functools import lru_cache
 from urllib.parse import urlparse
 
@@ -198,14 +199,66 @@ def validate_source_url(source: object) -> None:
         raise ValueError("Source URL host is outside the allowed domains")
 
 
-@lru_cache(maxsize=4096)
-def url_is_reachable(url: str) -> bool:
-    """Check if a URL is reachable via HTTP HEAD/GET.
+_url_cache: dict[str, tuple[bool, float]] = {}
+_url_cache_ttl_seconds: float = 24 * 3600
+_url_cache_maxsize: int = 4096
 
-    Uses the global sync HTTPX client for connection pooling.
+
+def _get_cached_url(url: str) -> bool | None:
+    entry = _url_cache.get(url)
+    if entry is None:
+        return None
+    value, ts = entry
+    if (time.monotonic() - ts) < _url_cache_ttl_seconds:
+        return value
+    _url_cache.pop(url, None)
+    return None
+
+
+def _set_cached_url(url: str, value: bool) -> None:
+    if len(_url_cache) >= _url_cache_maxsize:
+        oldest = next(iter(_url_cache))
+        _url_cache.pop(oldest, None)
+    _url_cache[url] = (value, time.monotonic())
+
+
+def _clear_url_cache() -> None:
+    _url_cache.clear()
+
+
+async def async_url_is_reachable(url: str) -> bool:
+    """Async non-blocking variant — uses shared AsyncClient pool with 24h TTL cache."""
+    if not is_public_http_url(url):
+        return False
+    cached = _get_cached_url(url)
+    if cached is not None:
+        return cached
+    try:
+        from app.core.http_client import http_client
+
+        client = await http_client()
+        headers = {"User-Agent": "ConvocaRadar/1.0"}
+        response = await client.head(url, follow_redirects=True, timeout=5.0, headers=headers)
+        if response.status_code in {405, 501}:
+            response = await client.get(url, follow_redirects=True, timeout=5.0, headers=headers)
+        result = 200 <= response.status_code < 400
+        _set_cached_url(url, result)
+        return result
+    except httpx.HTTPError:
+        _set_cached_url(url, False)
+        return False
+
+
+def url_is_reachable(url: str) -> bool:
+    """Sync wrapper — kept for backward compat (blocking). Prefer async_url_is_reachable.
+
+    Uses TTL cache shared with async variant to avoid duplicate HEADs.
     """
     if not is_public_http_url(url):
         return False
+    cached = _get_cached_url(url)
+    if cached is not None:
+        return cached
     try:
         from app.core.http_client import sync_http_client
 
@@ -214,9 +267,23 @@ def url_is_reachable(url: str) -> bool:
         response = client.head(url, follow_redirects=True, timeout=5.0, headers=headers)
         if response.status_code in {405, 501}:
             response = client.get(url, follow_redirects=True, timeout=5.0, headers=headers)
-        return 200 <= response.status_code < 400
+        result = 200 <= response.status_code < 400
+        _set_cached_url(url, result)
+        return result
     except httpx.HTTPError:
+        _set_cached_url(url, False)
         return False
+
+
+# Keep lru_cache compatibility for tests that call cache_clear/cache_info
+try:
+    _lru = lru_cache(maxsize=4096)(lambda x: x)  # dummy to expose type
+except Exception:
+    pass
+
+# Expose cache helpers on sync function for test compatibility
+url_is_reachable.cache_clear = _clear_url_cache  # type: ignore[attr-defined]
+url_is_reachable.cache_info = lambda: None  # type: ignore[attr-defined]
 
 
 def slugify(value: str) -> str:

@@ -132,12 +132,16 @@ def generate_report_html(title: str, organization: object, opportunities: list[O
         # Filter sitemap noise (with or without colon)
         if text.lower().startswith('sitemap entry'):
             return ''
+        import re as _re
+        if _re.match(r'^\s*(number|opportunity\s+number|notice)\s*[:：]', text, _re.IGNORECASE):
+            return ''
+        if ' | Agency:' in text:
+            return ''
         # Filter sitemap noise from connectors
         slug_prefixes = ('convocatoria uniandes:', 'findeter ')
         if any(text.lower().startswith(p) for p in slug_prefixes):
             return ''
         # Filter grant ID patterns like "DFOP0018586 | DOS-SA | Status: posted"
-        import re as _re
         if _re.match(r'^[A-Z0-9\-]+\s*\|\s*[A-Z0-9\-]+\s*\|\s*Status:\s*', text):
             return ''
         # Filter lines starting with "Title " (UNDP RFP titles)
@@ -176,7 +180,7 @@ def generate_report_html(title: str, organization: object, opportunities: list[O
         return f"""
         <article class="story-card{' story-card--compact' if not has_summary else ''}">
           <div class="story-card__top">
-            <span class="badge badge--{safe_escape(item.status)}">{safe_escape(item.status.replace('_', ' '))}</span>
+            <span class="badge badge--{safe_escape(item.status or 'unknown')}">{safe_escape((item.status or 'unknown').replace('_', ' '))}</span>
             <span class="story-card__country">{safe_escape(item.country or '')}</span>
           </div>
           <h3 class="story-card__title">{f'<a href="{safe_escape(url)}" target="_blank" rel="noopener noreferrer">{safe_escape(repair_mojibake(item.title))}</a>' if url != '#' else safe_escape(repair_mojibake(item.title))}</h3>

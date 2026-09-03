@@ -82,8 +82,8 @@ _SITEMAP_NS = {"ns": "http://www.sitemaps.org/schemas/sitemap/0.9"}
 # Accepts formats like: paf-euc-o-152-2024, con-0413-2025, cs-0085-2025
 _CONVOCATORIA_YEAR_RE = re.compile(r"(\d{4})$")
 
-# Only include URLs from these years (potential active listings).
-_ALLOWED_YEARS = frozenset({"2024", "2025", "2026"})
+# Only include URLs from these years (potential active listings). 2023 retained for long-running calls.
+_ALLOWED_YEARS = frozenset({"2023", "2024", "2025", "2026"})
 
 _MAX_CANDIDATES = 100
 
@@ -178,6 +178,11 @@ class FindeterConnector:
         return f"Findeter {entity}{type_label}"[:180]
 
     async def parse(self, raw: RawSourceResult) -> list[OpportunityCandidate]:
+        # Perfdrive / bot-challenge detection: HTML challenge instead of XML sitemap
+        lowered = raw.content.lower()
+        if "perfdrive" in lowered or "checking if the site connection is secure" in lowered:
+            logger.warning("findeter_perfdrive_challenge_detected", url=raw.url)
+            return []
         if not raw.content.strip().startswith("<"):
             return []
 

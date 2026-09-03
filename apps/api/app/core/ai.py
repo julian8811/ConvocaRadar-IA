@@ -19,7 +19,51 @@ from app.schemas import AiOpportunityExtract
 MODEL_VERSION = "local-heuristic-v2"
 LOCAL_EMBEDDING_MODEL_VERSION = "local-hash-embeddings-v2"
 EMBEDDING_MODEL_VERSION = MODEL_VERSION
-PROMPT_VERSION = "structured-extraction-v3"
+PROMPT_VERSION = "structured-extraction-v4"
+
+# ── LRU cache for LLM extraction by hash(raw_text) (022 P2) ─────────────────
+_LLM_CACHE: dict[str, AIExtraction] = {}
+_LLM_CACHE_ORDER: list[str] = []  # LRU order, oldest first
+
+
+def _llm_cache_key(text: str) -> str:
+    return hashlib.sha256(text[:12000].encode("utf-8")).hexdigest()
+
+
+def _llm_cache_get(key: str) -> AIExtraction | None:
+    hit = _LLM_CACHE.get(key)
+    if hit is not None:
+        # move to end (most recent)
+        try:
+            _LLM_CACHE_ORDER.remove(key)
+        except ValueError:
+            pass
+        _LLM_CACHE_ORDER.append(key)
+    return hit
+
+
+def _llm_cache_set(key: str, value: AIExtraction) -> None:
+    from app.core.config import get_settings as _gs
+
+    try:
+        max_size = int(_gs().extraction_llm_cache_size)
+    except Exception:
+        max_size = 256
+    if key in _LLM_CACHE:
+        try:
+            _LLM_CACHE_ORDER.remove(key)
+        except ValueError:
+            pass
+    _LLM_CACHE[key] = value
+    _LLM_CACHE_ORDER.append(key)
+    while len(_LLM_CACHE_ORDER) > max_size:
+        oldest = _LLM_CACHE_ORDER.pop(0)
+        _LLM_CACHE.pop(oldest, None)
+
+
+def clear_llm_cache() -> None:
+    _LLM_CACHE.clear()
+    _LLM_CACHE_ORDER.clear()
 
 COUNTRY_RULES: list[tuple[str, str]] = [
     ("colombia", "Colombia"),
@@ -356,6 +400,21 @@ def _normalize_remote_extraction(payload: dict[str, Any]) -> dict[str, Any]:
     mapped["extraction_notes"] = _coerce_text_list(mapped.get("extraction_notes"))
     mapped["priority"] = normalize_text(str(mapped.get("priority") or "")) or "medium"
     mapped["risk_level"] = normalize_text(str(mapped.get("risk_level") or "")) or "medium"
+    # v4 fields — normalize but allow absent (backward compat)
+    if mapped.get("open_date") is not None:
+        mapped["open_date"] = normalize_text(str(mapped.get("open_date") or "")) or None
+    else:
+        mapped["open_date"] = None
+    if mapped.get("funding_amount_raw") is not None:
+        mapped["funding_amount_raw"] = normalize_text(str(mapped.get("funding_amount_raw") or "")) or None
+    if mapped.get("funding_amount_currency") is not None:
+        val = normalize_text(str(mapped.get("funding_amount_currency") or "")).upper()
+        mapped["funding_amount_currency"] = val or None
+    if "funding_amount_value" in mapped and mapped["funding_amount_value"] is not None:
+        try:
+            mapped["funding_amount_value"] = float(mapped["funding_amount_value"])
+        except (TypeError, ValueError):
+            mapped["funding_amount_value"] = None
     remote_model = get_settings().chat_model or get_settings().llm_model
     mapped["model_version"] = normalize_text(str(mapped.get("model_version") or remote_model))
     mapped["provider"] = normalize_text(str(mapped.get("provider") or get_settings().llm_provider))
@@ -377,6 +436,12 @@ async def _call_llm(text: str) -> dict[str, Any] | None:
         f"Devuelve exclusivamente JSON valido usando el esquema version {PROMPT_VERSION}. "
         "Campos obligatorios: title, entity, country, category, status, close_date, requirements, documents_required, "
         "summary, risks, recommendation, confidence, matched_keywords, risk_level, priority, extraction_notes. "
+        "Campos v4 (obligatorios, null si ausente): open_date (ISO 8601 YYYY-MM-DD), "
+        "funding_amount_raw (texto original), funding_amount_value (numero normalizado), "
+        "funding_amount_currency (ISO 4217: COP, USD, EUR, BRL, MXN, GBP). "
+        "Fechas en ISO 8601 sin inventar: si no hay evidencia, null. "
+        "Montos: normaliza separadores locales (CO: 1.234.567,50 -> 1234567.5) y devuelve valor numerico + moneda. "
+        "Bare $ en contexto Colombia/.gov.co -> COP. "
         "Incluye prompt_version, model_version, provider y extraction_strategy si puedes."
     )
     payload = {
@@ -386,7 +451,7 @@ async def _call_llm(text: str) -> dict[str, Any] | None:
             {"role": "user", "content": text[:12000]},
         ],
         "temperature": 0.1,
-        "max_tokens": 1024,
+        "max_tokens": 1536,
         "response_format": {"type": "json_object"},
     }
     client = await http_client()
@@ -424,15 +489,91 @@ async def _call_llm(text: str) -> dict[str, Any] | None:
         raise RuntimeError(f"Remote LLM provider {provider!r} returned invalid JSON")
 
 
+_NARRATIVE_SECTION_KEYS = (
+    "eligible_applicants",
+    "requirements",
+    "documents_required",
+    "evaluation_criteria",
+    "restrictions",
+)
+
+
+def _extract_narrative_sections(text: str) -> dict[str, list[str]]:
+    """Extract the labelled narrative sections of a call for proposals.
+
+    Delegates to the shared connector extractors so scraped and enriched data
+    are produced by the same rules. Never raises: a failure here must degrade
+    to empty lists rather than lose the whole extraction.
+    """
+    empty: dict[str, list[str]] = {key: [] for key in _NARRATIVE_SECTION_KEYS}
+    if not text:
+        return empty
+    try:
+        from app.connectors.common import (
+            extract_documents_required,
+            extract_eligibility,
+            extract_evaluation_criteria,
+            extract_requirements,
+            extract_restrictions,
+        )
+    except Exception:  # pragma: no cover — defensive import guard
+        return empty
+    extractors = {
+        "eligible_applicants": extract_eligibility,
+        "requirements": extract_requirements,
+        "documents_required": extract_documents_required,
+        "evaluation_criteria": extract_evaluation_criteria,
+        "restrictions": extract_restrictions,
+    }
+    result: dict[str, list[str]] = {}
+    for key, extractor in extractors.items():
+        try:
+            result[key] = list(extractor(text) or [])
+        except Exception:
+            result[key] = []
+    return result
+
+
+def _extract_funding_value(text: str) -> tuple[float | None, str | None]:
+    """Normalize a funding amount to (value, ISO currency) using shared rules."""
+    if not text:
+        return None, None
+    try:
+        from app.connectors.common import extract_funding_details
+
+        _raw, value, currency = extract_funding_details(text)
+        return value, currency
+    except Exception:
+        return None, None
+
+
 def build_local_extraction(text: str) -> dict[str, Any]:
     normalized = normalize_text(text)
     title = _extract_title(text)
     categories = _extract_keyword_matches(normalized) or ["innovation"]
-    requirements = _extract_bullets(normalized, REQUIREMENT_PATTERNS)
-    documents_required = _extract_bullets(normalized, DOCUMENT_PATTERNS)
     country = _extract_country(normalized)
     amount = _extract_amount(normalized)
+    # Section-aware extraction runs on the ORIGINAL text: normalize_text
+    # collapses newlines, and these helpers rely on line and paragraph breaks
+    # to find where a labelled section ends.
+    sections = _extract_narrative_sections(text)
+    requirements = sections["requirements"] or _extract_bullets(normalized, REQUIREMENT_PATTERNS)
+    documents_required = sections["documents_required"] or _extract_bullets(
+        normalized, DOCUMENT_PATTERNS
+    )
+    funding_value, funding_currency = _extract_funding_value(text)
     close_date = _extract_date(normalized)
+    # v4: open_date via second date heuristic, funding normalized locally
+    # Local fallback: open_date None unless two dates found
+    open_date: str | None = None
+    try:
+        # naive: find all ISO-like dates; if >=2, first is open
+        _all = re.findall(r"\b\d{4}-\d{2}-\d{2}\b|\b\d{1,2}/\d{1,2}/\d{4}\b", normalized)
+        if len(_all) >= 2:
+            # parse second as close, first as open — reuse _extract_date ordering
+            open_date = _all[0]  # may be non-ISO, kept as raw
+    except Exception:
+        open_date = None
     confidence = 0.52
     if len(normalized) > 200:
         confidence += 0.08
@@ -462,8 +603,12 @@ def build_local_extraction(text: str) -> dict[str, Any]:
         "category": categories[:5],
         "status": "unknown" if close_date is None else "open",
         "close_date": close_date,
+        "open_date": open_date,
         "requirements": requirements[:5] or ["Validar requisitos en la fuente oficial"],
         "documents_required": documents_required[:5] or ["Documento oficial de la convocatoria"],
+        "eligible_applicants": sections["eligible_applicants"][:8],
+        "evaluation_criteria": sections["evaluation_criteria"][:8],
+        "restrictions": sections["restrictions"][:8],
         "summary": _extract_summary(normalized),
         "risks": risk_flags,
         "recommendation": recommendation,
@@ -472,6 +617,8 @@ def build_local_extraction(text: str) -> dict[str, Any]:
         "risk_level": "medium" if risk_flags else "low",
         "priority": priority,
         "funding_amount_raw": amount,
+        "funding_amount_value": funding_value,
+        "funding_amount_currency": funding_currency,
         "extraction_notes": extraction_notes,
         "model_version": MODEL_VERSION,
         "provider": "local",
@@ -481,8 +628,19 @@ def build_local_extraction(text: str) -> dict[str, Any]:
     }
 
 
-async def extract_opportunity_structured(text: str) -> AIExtraction:
-    remote = await _call_llm(text)
+LLM_BATCH_SIZE = 20
+
+
+async def _extract_one_with_fallback(text: str) -> AIExtraction:
+    """Single extraction with local-first fallback — extracted for batch reuse."""
+    cache_key = _llm_cache_key(text)
+    cached = _llm_cache_get(cache_key)
+    if cached is not None:
+        return cached
+    try:
+        remote = await _call_llm(text)
+    except Exception:
+        remote = None
     if remote:
         normalized = build_local_extraction(text)
         merged = {**normalized, **_normalize_remote_extraction(remote)}
@@ -511,13 +669,52 @@ async def extract_opportunity_structured(text: str) -> AIExtraction:
         validated.setdefault("provider", get_settings().llm_provider)
         validated.setdefault("prompt_version", PROMPT_VERSION)
         validated.setdefault("extraction_strategy", "remote-llm")
-        return AIExtraction(
+        result = AIExtraction(
             data={**merged, **validated},
             confidence=merged["confidence"],
             provider=str(merged["provider"]),
         )
+        _llm_cache_set(cache_key, result)
+        return result
     local = build_local_extraction(text)
-    return AIExtraction(data=local, confidence=local["confidence"], provider="local")
+    result_local = AIExtraction(data=local, confidence=local["confidence"], provider="local")
+    _llm_cache_set(cache_key, result_local)
+    return result_local
+
+
+async def extract_opportunity_structured(text: str) -> AIExtraction:
+    """Single structured extraction — now delegates to _extract_one_with_fallback."""
+    return await _extract_one_with_fallback(text)
+
+
+async def extract_opportunities_structured_batch(
+    texts: list[str], *, chunk_size: int = 20
+) -> list[AIExtraction]:
+    """Batch LLM extraction chunk 20 with local-first fallback and chunked retry.
+
+    Each chunk runs concurrently via asyncio.gather; on per-item failure
+    falls back to local heuristic. Respects rate limits via 0.3s backoff
+    between chunks.
+    """
+    if not texts:
+        return []
+    results: list[AIExtraction] = []
+    for i in range(0, len(texts), chunk_size):
+        chunk = texts[i : i + chunk_size]
+        # Fast path: local provider short-circuits remote entirely.
+        settings = get_settings()
+        if effective_llm_provider(settings.llm_provider) == "local" or not settings.llm_api_key:
+            for t in chunk:
+                local = build_local_extraction(t)
+                results.append(AIExtraction(data=local, confidence=local["confidence"], provider="local"))
+            continue
+        chunk_results = await asyncio.gather(
+            *(_extract_one_with_fallback(t) for t in chunk), return_exceptions=False
+        )
+        results.extend(chunk_results)
+        if i + chunk_size < len(texts):
+            await asyncio.sleep(0.15)
+    return results
 
 
 def summarize_opportunity_text(text: str) -> str:

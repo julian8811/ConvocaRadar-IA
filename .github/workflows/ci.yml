@@ -7,6 +7,58 @@ on:
     branches: [main]
 
 jobs:
+  check-secrets:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: bash scripts/check-secrets.sh
+
+  hadolint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: apps/api/Dockerfile
+          config: .hadolint.yaml
+      - uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: apps/web/Dockerfile
+          config: .hadolint.yaml
+
+  compose-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker compose config > /dev/null
+        env:
+          POSTGRES_PASSWORD: ci-dummy-postgres-password-0123456789abcdef
+          MINIO_ROOT_PASSWORD: ci-dummy-minio-root-password-0123456789abcdef
+          INTERNAL_API_KEY: ci-dummy-internal-api-key-0123456789abcdef
+
+  prod-asserts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: |
+          echo "Validating prod overlay: docker compose -f docker-compose.yml -f docker-compose.prod.yml config"
+          POSTGRES_PASSWORD=ci-dummy-postgres-password-0123456789abcdef \
+          MINIO_ROOT_PASSWORD=ci-dummy-minio-root-password-0123456789abcdef \
+          INTERNAL_API_KEY=ci-dummy-internal-api-key-0123456789abcdef \
+          docker compose -f docker-compose.yml -f docker-compose.prod.yml config > /tmp/prod-config.yml
+          echo "Checking port isolation — 5434:5432 must NOT appear in prod config"
+          if grep -q "5434:5432" /tmp/prod-config.yml; then echo "FAIL: prod config still exposes 5434:5432" >&2; exit 1; fi
+          if grep -q "9004:9000" /tmp/prod-config.yml; then echo "FAIL: prod config still exposes 9004:9000" >&2; exit 1; fi
+          echo "Checking hardening present"
+          grep -q "cap_drop" /tmp/prod-config.yml || (echo "FAIL: cap_drop missing in prod config" >&2; exit 1)
+          grep -q "no-new-privileges" /tmp/prod-config.yml || (echo "FAIL: no-new-privileges missing" >&2; exit 1)
+          grep -q "read_only" /tmp/prod-config.yml || (echo "FAIL: read_only missing in prod config" >&2; exit 1)
+          echo "prod-asserts PASS"
+        env:
+          POSTGRES_PASSWORD: ci-dummy-postgres-password-0123456789abcdef
+          MINIO_ROOT_PASSWORD: ci-dummy-minio-root-password-0123456789abcdef
+          INTERNAL_API_KEY: ci-dummy-internal-api-key-0123456789abcdef
+
   lint:
     runs-on: ubuntu-latest
     defaults:

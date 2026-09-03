@@ -27,6 +27,7 @@ from app.services.opportunity import (  # noqa: F401
     create_opportunity,
     enrich_opportunity_payload,
     inferred_opportunity_status,
+    is_thin_or_metadata_summary,
     opportunity_status,
     reanalyze_opportunity,
     create_ai_extraction,
@@ -44,6 +45,7 @@ from app.services.alerts import (  # noqa: F401
 
 # ── validation.py — pure validation functions ────────────────────────────────
 from app.services.validation import (  # noqa: F401
+    async_url_is_reachable,
     is_noise_payload,
     is_noise_title,
     is_private_url,

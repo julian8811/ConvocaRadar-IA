@@ -1,0 +1,13 @@
+override:
+  error:
+    - DL3008
+    - DL3013
+  warning:
+    - DL3042
+trustedRegistries:
+  - docker.io
+  - ghcr.io
+failure-threshold: warning
+ignored:
+  - DL3006
+  - DL3007

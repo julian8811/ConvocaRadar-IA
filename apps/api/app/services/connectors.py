@@ -15,8 +15,6 @@ from sqlalchemy.orm import Session
 from app.core.config import get_settings
 from app.models import Source
 from app.schemas import OpportunityCreate
-from app.services.dedup import candidate_external_id
-from app.services.validation import is_noise_payload
 
 
 def connector_for(
@@ -69,101 +67,50 @@ def is_slow_scrape_source(source: Source) -> bool:
     )
 
 
+def _jitter_for_source(source: Source) -> timedelta:
+    """Deterministic jitter 0-599s based on source.id hash — avoids thundering herd."""
+    import hashlib
+
+    h = int(hashlib.sha256((source.id or "0").encode()).hexdigest()[:8], 16)
+    return timedelta(seconds=h % 600)
+
+
 def source_due_for_scraping(source: Source, *, now: datetime | None = None) -> bool:
     current = now or datetime.now(UTC).replace(tzinfo=None)
     frequency = (source.scraping_frequency or "daily").lower()
     if frequency in {"hourly", "every_hour", "daily", "every_day"}:
+        # Daily/hourly always due — health-aware backoff only if heavily failing
+        fails = int(getattr(source, "consecutive_empty_runs", 0) or 0)
+        if fails >= 5 and source.last_run_at:
+            # Back off heavily failing daily: require at least 6h since last run
+            elapsed = current - source.last_run_at
+            backoff = timedelta(hours=min(24, 4 * fails))
+            jitter = _jitter_for_source(source)
+            return elapsed >= backoff + jitter
         return True
     if not source.last_run_at:
         return True
     elapsed = current - source.last_run_at
+    jitter = _jitter_for_source(source)
+    fails = int(getattr(source, "consecutive_empty_runs", 0) or 0)
+    backoff = timedelta(0)
+    if fails:
+        # Up to 24h extra backoff, 6h per failure
+        backoff = timedelta(hours=min(24, fails * 6))
     if frequency in {"weekly", "every_week"}:
-        return elapsed >= timedelta(days=7)
+        return elapsed >= timedelta(days=7) + backoff + jitter
     if frequency in {"monthly", "every_month"}:
-        return elapsed >= timedelta(days=28)
-    return elapsed >= timedelta(days=1)
+        return elapsed >= timedelta(days=28) + backoff + jitter
+    return elapsed >= timedelta(days=1) + backoff + jitter
 
 
 async def _scrape_source_candidates(
     source: Source, stats: dict[str, object] | None = None
 ) -> list[OpportunityCreate]:
-    connector = connector_for(
-        source.key,
-        source.base_url,
-        source.source_type,
-        entity_name=source.name,
-        default_country=source.country,
-        default_categories=source.category,
-    )
-    raw = await connector.fetch()
-    if stats is not None:
-        stats["raw_url"] = raw.url
-        stats["raw_content_type"] = raw.content_type
-        stats["raw_content_length"] = len(raw.content or "")
-    candidates = await connector.parse(raw)
-    if not candidates and source.key in {
-        "grants-gov",
-        "grants-gov-rss",
-        "grants-gov-forecast",
-        "simpler-grants",
-    }:
-        fallback_connector = connector_for(source.key, None, source.source_type)
-        fallback_raw = await fallback_connector.fetch()
-        fallback_candidates = await fallback_connector.parse(fallback_raw)
-        if stats is not None:
-            stats["fallback_raw_url"] = fallback_raw.url
-            stats["fallback_raw_content_type"] = fallback_raw.content_type
-            stats["fallback_raw_content_length"] = len(fallback_raw.content or "")
-            stats["fallback_candidates_parsed"] = len(fallback_candidates)
-        if fallback_candidates:
-            connector = fallback_connector
-            candidates = fallback_candidates
-    if stats is not None:
-        stats["candidates_parsed"] = len(candidates)
-    opportunities: list[OpportunityCreate] = []
-    noise_rejected = 0
-    validation_rejected = 0
-    validation_reasons: list[str] = []
-    for candidate in candidates:
-        if is_noise_payload(candidate.title, candidate.summary, candidate.raw_text):
-            noise_rejected += 1
-            continue
-        validation = await connector.validate(candidate)
-        if not validation.ok:
-            validation_rejected += 1
-            if len(validation_reasons) < 5:
-                validation_reasons.append(validation.reason or "sin razon")
-            continue
-        opportunities.append(
-            OpportunityCreate(
-                source_id=source.id,
-                external_id=candidate_external_id(
-                    source, candidate.official_url, candidate.title, candidate.raw_text or ""
-                ),
-                title=candidate.title,
-                entity=candidate.entity,
-                country=candidate.country,
-                region=source.region,
-                language=candidate.language,
-                categories=candidate.categories,
-                topics=candidate.topics,
-                description=candidate.summary or candidate.title,
-                summary=candidate.summary or candidate.title,
-                raw_text=candidate.raw_text,
-                official_url=candidate.official_url,
-                open_date=candidate.open_date,
-                close_date=candidate.close_date,
-                funding_amount_raw=candidate.funding_amount_raw,
-                requirements=candidate.requirements,
-                confidence_score=candidate.confidence_score,
-            )
-        )
-    if stats is not None:
-        stats["noise_rejected"] = noise_rejected
-        stats["validation_rejected"] = validation_rejected
-        stats["validation_reasons"] = validation_reasons
-        stats["opportunities_normalized"] = len(opportunities)
-    return opportunities
+    """Compatibility wrapper — the live scrape path is ``app.scraper.runner``."""
+    from app.scraper.runner import _scrape_candidates
+
+    return await _scrape_candidates(source, stats)
 
 
 async def _scrape_source_candidates_with_timeout(

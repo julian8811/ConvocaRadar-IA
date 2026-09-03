@@ -33,12 +33,12 @@ migrate:
 	$(COMPOSE) exec -T api alembic upgrade head
 
 health:
-	curl -fsS http://localhost:8000/health
-	curl -fsS http://localhost:3000/login >/dev/null
+	curl -fsS http://localhost:8002/api/v1/health/live
+	curl -fsS http://localhost:3002/ >/dev/null
 
 backup:
 	$(COMPOSE) exec -T postgres pg_dump -U convocaradar -d convocaradar > backups/manual-$$(date -u +%Y%m%dT%H%M%SZ).sql
 
 probe-sources:
-	 exec -T api python /tmp/probe_source_contracts.py
+	$(COMPOSE) exec -T api python -m app.scraper.probe 2>/dev/null || $(COMPOSE) exec -T api python /tmp/probe_source_contracts.py
 

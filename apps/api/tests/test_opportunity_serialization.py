@@ -11,7 +11,7 @@ from __future__ import annotations
 import os
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from unittest.mock import patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 
@@ -90,7 +90,11 @@ class TestNoNPlusOneSerialization:
             source = db.scalar(select(Source).where(Source.key == "grants-gov"))
             assert source is not None
 
-            with patch("app.services.opportunity.url_is_reachable", return_value=True):
+            with patch(
+                "app.services.validation.async_url_is_reachable", new_callable=AsyncMock, return_value=True
+            ), patch(
+                "app.services.opportunity.async_url_is_reachable", new_callable=AsyncMock, return_value=True
+            ):
                 for i in range(count):
                     await create_opportunity(
                         db,
@@ -125,16 +129,17 @@ class TestNoNPlusOneSerialization:
         auth = {"Authorization": f"Bearer {token(c)}"}
         await self._make_opportunities(count=5)
 
-        with patch("app.services.url_is_reachable") as mock_reachable:
+        with patch("app.services.validation.async_url_is_reachable", new_callable=AsyncMock) as mock_async, patch(
+            "app.services.url_is_reachable"
+        ) as mock_sync:
             response = c.get("/api/v1/opportunities?page_size=100", headers=auth)
 
         assert response.status_code == 200
         data = response.json()
         assert len(data["items"]) >= 5
-        # url_is_reachable MUST NOT be called during serialization.
-        # If this assertion fails, the N+1 bug is still present:
-        # the model @properties are triggering HTTP requests.
-        mock_reachable.assert_not_called()
+        # url_is_reachable (sync or async) MUST NOT be called during serialization.
+        mock_async.assert_not_called()
+        mock_sync.assert_not_called()
 
     async def test_opportunity_detail_does_not_call_url_is_reachable(self) -> None:
         """GET /opportunities/{id} should NOT trigger url_is_reachable."""
@@ -147,11 +152,14 @@ class TestNoNPlusOneSerialization:
         assert list_resp.status_code == 200
         opp_id = list_resp.json()["items"][0]["id"]
 
-        with patch("app.services.url_is_reachable") as mock_reachable:
+        with patch("app.services.validation.async_url_is_reachable", new_callable=AsyncMock) as mock_async, patch(
+            "app.services.url_is_reachable"
+        ) as mock_sync:
             response = c.get(f"/api/v1/opportunities/{opp_id}", headers=auth)
 
         assert response.status_code == 200
-        mock_reachable.assert_not_called()
+        mock_async.assert_not_called()
+        mock_sync.assert_not_called()
 
     async def test_list_100_opportunities_no_nplus1(self) -> None:
         """Listing 100 opportunities should complete without HTTP calls."""
@@ -159,11 +167,14 @@ class TestNoNPlusOneSerialization:
         auth = {"Authorization": f"Bearer {token(c)}"}
         await self._make_opportunities(count=100)
 
-        with patch("app.services.url_is_reachable") as mock_reachable:
+        with patch("app.services.validation.async_url_is_reachable", new_callable=AsyncMock) as mock_async, patch(
+            "app.services.url_is_reachable"
+        ) as mock_sync:
             response = c.get("/api/v1/opportunities?page_size=100", headers=auth)
 
         assert response.status_code == 200
         data = response.json()
         assert len(data["items"]) >= 95
         # The key assertion: zero calls to url_is_reachable during list
-        mock_reachable.assert_not_called()
+        mock_async.assert_not_called()
+        mock_sync.assert_not_called()

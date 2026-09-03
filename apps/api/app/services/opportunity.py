@@ -16,6 +16,7 @@ from sqlalchemy.orm import Session
 from app.core.ai import (
     build_local_extraction,
     extract_opportunity_structured,
+    extract_opportunities_structured_batch,
     infer_language,
     summarize_opportunity_text,
 )
@@ -30,12 +31,16 @@ from app.services.dedup import (
     _organization_opportunity_scope,
     find_duplicate_opportunity,
 )
+
+# bulk dedup cache: external_id -> Opportunity per source (preloaded 1 query/source)
+_BULK_EXTERNAL_CACHE: dict[str, set[str]] = {}
+_EMBEDDING_HASH_CACHE: dict[str, list[float]] = {}
 from app.services.embeddings import (
     opportunity_reanalysis_text,
     upsert_opportunity_embedding,
 )
 from app.services.scoring import calculate_score
-from app.services.validation import is_noise_payload, slugify, url_is_reachable
+from app.services.validation import async_url_is_reachable, is_noise_payload, slugify, url_is_reachable
 
 
 def _parse_ai_close_date(value: object) -> datetime | None:
@@ -56,7 +61,18 @@ def _parse_ai_close_date(value: object) -> datetime | None:
     return None
 
 
-def _parse_funding_amount(funding_raw: str | None) -> tuple[float | None, str | None]:
+def _is_tr_artifact(raw: str | None) -> bool:
+    if not raw:
+        return False
+    s = raw.strip().lower()
+    return s in {"tr", "td", "th", "table", "tbody", "thead"}
+
+
+def _parse_funding_amount(
+    funding_raw: str | None,
+    country: str | None = None,
+    url: str | None = None,
+) -> tuple[float | None, str | None]:
     """Parse ``funding_amount_raw`` into (numeric_value, currency_code).
 
     Handles formats like:
@@ -64,25 +80,41 @@ def _parse_funding_amount(funding_raw: str | None) -> tuple[float | None, str | 
       - ``$500,000`` / ``$5,000,000 COP`` / ``$1.2M``
       - ``US$ 500,000`` / ``€ 1.200.000``
       - ``5.000.000.000`` (Spanish notation, dots as thousands sep)
+      - ``$980.000.000`` with COP inference for .gov.co / Colombia
+      - ``18e9`` scientific notation
     Returns ``(None, None)`` when no pattern matches or when the
-    extracted value looks like a non-funding number (too small, no
-    explicit currency indicator).
+    extracted value looks like a non-funding number.
     """
     if not funding_raw:
         return None, None
 
+    # F2: filter React JSON artifact "tr" (183 polluted)
+    if _is_tr_artifact(funding_raw):
+        return None, None
+
     text = funding_raw.strip()
+    # also reject bare tr inside longer html artifact
+    if text.strip().lower() == "tr":
+        return None, None
     upper_text = text.upper()
 
-    # Guard: require at least one digit for any amount parsing
+    # Guard: require at least one digit
     if not re.search(r"\d", text):
         return None, None
 
-    # Detect currency from prefix/suffix — require explicit currency
-    # marker to avoid picking up random numbers from body text.
+    # Scientific 18e9 → expand before other parsing
+    sci = re.search(r"(\d+(?:\.\d+)?)\s*[eE]\s*(\d+)", text)
+    sci_value: float | None = None
+    if sci:
+        try:
+            sci_value = float(sci.group(1)) * (10 ** int(sci.group(2)))
+        except (ValueError, OverflowError):
+            sci_value = None
+
+    # Detect currency from explicit markers
     currency = None
     currency_map: list[tuple[str | None, list[str]]] = [
-        ("COP", ["COP", "COL$"]),
+        ("COP", ["COP", "COL$", "COL $"]),
         ("EUR", ["EUR", "€"]),
         ("GBP", ["GBP", "£"]),
         ("BRL", ["BRL", "R$"]),
@@ -94,26 +126,61 @@ def _parse_funding_amount(funding_raw: str | None) -> tuple[float | None, str | 
             currency = code
             break
 
-    # Normalize: remove currency symbols and text, normalize Spanish notation
+    # Bare $ detection (no explicit currency yet, but $ present)
+    has_bare_dollar = "$" in text and currency is None
+
+    # COP inference: bare $ in Colombia context → COP; do NOT infer USD without explicit marker
+    is_co_context = False
+    if country and country.strip().lower() == "colombia":
+        is_co_context = True
+    if url and any(dom in url.lower() for dom in [".gov.co", ".edu.co", "fondoemprender.com", "minciencias.gov.co"]):
+        is_co_context = True
+    if has_bare_dollar and is_co_context:
+        currency = "COP"
+    # USD inference (symmetric to COP): bare $ in US / grants.gov / .gov (non-CO) context → USD
+    is_us_context = False
+    if country and country.strip() in ("United States", "USA", "US"):
+        is_us_context = True
+    if url and ("grants.gov" in url.lower() or (".gov" in url.lower() and "colombia" not in (country or "").lower())):
+        is_us_context = True
+    # Defer bare $ USD assignment until after value parsing (>=500 guard); gate handles it
+    # bare $ without CO/US context and no explicit currency -> remain None (rejected by gate)
+
+    # Normalize: remove currency symbols/text, keep digits ,.
     cleaned = re.sub(r"[^\d,.\s]", " ", text)
+    # Remove scientific part already handled - avoid double count
+    if sci:
+        cleaned = re.sub(r"\d+(?:\.\d+)?\s*[eE]\s*\d+", " ", cleaned)
     cleaned = re.sub(r"\s+", " ", cleaned).strip()
 
-    # Spanish notation: dots as thousands, commas as decimals → normalize
-    if re.search(r"\d\.\d{3}", cleaned):
+    # Locale-aware thousands/decimal handling (CO)
+    # If both . and , present: CO locale 1.234.567,50 -> 1234567.50
+    # If only dots with 3-digit groups: strip dots
+    if "." in cleaned and "," in cleaned:
+        # Assume CO: dots are thousands, comma is decimal
+        if re.search(r"\d\.\d{3}", cleaned):
+            cleaned = cleaned.replace(".", "").replace(",", ".")
+        else:
+            cleaned = cleaned.replace(",", ".")
+    elif re.search(r"\d\.\d{3}", cleaned):
         cleaned = cleaned.replace(".", "")
+        cleaned = cleaned.replace(",", "")
+    else:
+        cleaned = cleaned.replace(",", "").strip()
 
-    cleaned = cleaned.replace(",", "").strip()
-
-    # Extract numeric value
     numbers = re.findall(r"\d+(?:\.\d+)?", cleaned)
-    if not numbers:
-        return None, None
+    if sci_value is not None:
+        # scientific is primary; combine if numbers also present take max
+        if numbers:
+            value = max(max(float(n) for n in numbers), sci_value)
+        else:
+            value = sci_value
+    else:
+        if not numbers:
+            return None, None
+        value = max(float(n) for n in numbers)
 
-    # Take the largest number (covers "USD 500,000 - USD 1,000,000" ranges)
-    value = max(float(n) for n in numbers)
-
-    # Handle million/k suffixes — but only when the suffix is attached
-    # to the number, not to arbitrary body text.
+    # Handle million/k suffixes
     million_suffix = re.search(r"(?:million|MM|millón|millones)\b", text, re.IGNORECASE)
     k_suffix = re.search(r"\b[kK]\b", text)
     ends_with_m = bool(re.search(r"\d+M(?:$|\s)", text))
@@ -124,25 +191,39 @@ def _parse_funding_amount(funding_raw: str | None) -> tuple[float | None, str | 
         value *= 1_000
 
     # ── Quality gates ──────────────────────────────────────────────
-    # Reject values that look like non-funding numbers from body text.
-
-    # If no explicit currency was detected, require a larger number
-    # (>= 1000) to avoid picking up page numbers, years, or counts.
     if currency is None:
+        # USD inference for bare $ in US / grants.gov context (symmetric to COP)
+        if has_bare_dollar and is_us_context and value >= 500:
+            currency = "USD"
+        elif is_co_context and value >= 10_000:
+            currency = "COP"
+        else:
+            return None, None
+    # Extra safety: reject tiny values that could be "Adjustment 3" false positives
+    if value < 100 and not re.search(r"(?:USD|US\$|COP|EUR|€|£|R\$)", upper_text):
         return None, None
 
-    # If currency is a strong code (COP, EUR, GBP, BRL, MXN) accept it.
-    # For USD detected via bare "$" (weak signal), require >= 500.
-    if currency == "USD" and not re.search(r"(?:USD|US\$)", upper_text):
-        # USD detected only by bare "$" — require a meaningful amount
+    # Bare $ weak signal requires >=500 (avoid years/page numbers) — for COP inference
+    if currency == "COP" and has_bare_dollar and value < 500:
+        return None, None
+    if currency == "USD" and has_bare_dollar and not re.search(r"(?:USD|US\$)", upper_text):
         if value < 500:
             return None, None
+    # If still USD via explicit marker, accept; otherwise bare $ non-CO already None via gate
 
-    # Cap absurdly large values (> 1 trillion) — likely parsing error
+    # Cap absurdly large values (> 1e12) — likely parsing error, allow up to 18e9
     if value > 1_000_000_000_000:
         return None, None
 
+    # Infer COP default for large bare numbers without marker but CO context
+    # already handled
+
     return value, currency
+
+
+def _parse_ai_open_date(value: object) -> datetime | None:
+    """Parse open_date same as close_date — reuse _parse_ai_close_date logic."""
+    return _parse_ai_close_date(value)
 
 
 def _combined_text(data: OpportunityCreate) -> str:
@@ -158,9 +239,79 @@ def _combined_text(data: OpportunityCreate) -> str:
     )
 
 
+# ── Thin / metadata summary detection ────────────────────────────────────────
+
+_THIN_NOISE_RE = re.compile(
+    r"official website|here'?s how you know|sitemap entry|^https?://",
+    re.IGNORECASE,
+)
+_LABEL_RE = re.compile(r"[A-Za-z][A-Za-z ,'()/-]{2,48}:")
+
+
+_MIN_SUBSTANTIVE_SUMMARY = 80
+
+
+def is_thin_or_metadata_summary(summary: str | None) -> bool:
+    """Detect summaries that carry no real descriptive content.
+
+    Some connectors (Grants.gov, Simpler Grants) build list-page summaries
+    purely from metadata ("Number: X | Agency: Y | Status: posted"). Those
+    must not block AI/heuristic enrichment, and must never overwrite an
+    existing substantive summary on re-scrape.
+
+    This answers "is this junk?", not "is this short?". A genuine one-sentence
+    summary is short but valuable, so the floor here is deliberately much lower
+    than ``extraction_thin_threshold``; use :func:`summary_needs_enrichment`
+    for the enrichment decision.
+    """
+    s = (summary or "").strip()
+    if len(s) < _MIN_SUBSTANTIVE_SUMMARY:
+        return True
+    if re.match(r"^\s*(number|opportunity\s+number|notice)\s*[:：]", s, re.IGNORECASE):
+        return True
+    if "| status:" in s.lower():
+        return True
+    # Government banner boilerplate at the start.
+    if re.match(
+        r"^(an official website|here'?s how you know|official websites use)",
+        s,
+        re.IGNORECASE,
+    ):
+        return True
+    if s.lower().startswith(("sitemap entry", "title ", "http")):
+        return True
+    # Form-label dumps: several "Field: value" pairs up front.
+    if len(_LABEL_RE.findall(s[:220])) >= 3:
+        return True
+    if _THIN_NOISE_RE.search(s[:200]) and len(re.sub(r"\s+", " ", s)) < 260:
+        return True
+    return False
+
+
+def summary_needs_enrichment(summary: str | None) -> bool:
+    """Whether a summary is junk or too short to stand on its own.
+
+    Used to decide whether to spend extraction effort, which is a lower bar
+    than discarding the text: a short-but-real summary is worth keeping while
+    we still try to find something better.
+    """
+    if is_thin_or_metadata_summary(summary):
+        return True
+    try:
+        threshold = int(get_settings().extraction_thin_threshold)
+    except Exception:
+        threshold = 200
+    return len((summary or "").strip()) < threshold
+
+
 async def enrich_opportunity_payload(data: OpportunityCreate) -> OpportunityCreate:
     raw_text = data.raw_text.strip()
     combined = _combined_text(data)
+    settings = get_settings()
+    # LLM 100% coverage: force LLM if close_date/funding missing even when not thin,
+    # or when EXTRACTION_LLM_ALWAYS flag is set (covers thin→0 goal).
+    missing_critical = (data.close_date is None and data.funding_amount_raw is None and data.open_date is None)
+    force_llm_for_missing = missing_critical or bool(settings.extraction_llm_always)
     if not raw_text or len(raw_text) < 120:
         merged = data.model_dump()
         if merged.get("language") in {None, "", "auto"}:
@@ -168,28 +319,39 @@ async def enrich_opportunity_payload(data: OpportunityCreate) -> OpportunityCrea
                 " ".join([data.title, data.summary, data.raw_text, data.description]),
                 fallback="es",
             )
-        # Try regex-based close_date extraction from combined text
-        if not merged.get("close_date") and combined:
-            from app.connectors.common import extract_close_date
+        # Try date extraction from combined text (extract_dates covers open+close)
+        if combined:
+            from app.connectors.common import extract_dates
 
-            parsed = extract_close_date(combined)
-            if parsed:
-                merged["close_date"] = parsed
+            od, cd = extract_dates(combined)
+            if not merged.get("open_date") and od:
+                merged["open_date"] = od
+            if not merged.get("close_date") and cd:
+                merged["close_date"] = cd
         return OpportunityCreate(**merged)
-    if data.summary and data.categories and data.requirements and data.confidence_score >= 0.75:
+    if (
+        data.summary
+        and not summary_needs_enrichment(data.summary)
+        and data.categories
+        and data.requirements
+        and data.confidence_score >= 0.75
+        and not force_llm_for_missing
+    ):
         merged = data.model_dump()
         if merged.get("language") in {None, "", "auto"}:
             merged["language"] = infer_language(
                 " ".join([data.title, data.summary, data.raw_text, data.description]),
                 fallback="es",
             )
-        # Try regex-based close_date extraction from combined text
-        if not merged.get("close_date") and combined:
-            from app.connectors.common import extract_close_date
+        # Try date extraction from combined text even on early return
+        if combined:
+            from app.connectors.common import extract_dates
 
-            parsed = extract_close_date(combined)
-            if parsed:
-                merged["close_date"] = parsed
+            od, cd = extract_dates(combined)
+            if not merged.get("open_date") and od:
+                merged["open_date"] = od
+            if not merged.get("close_date") and cd:
+                merged["close_date"] = cd
         return OpportunityCreate(**merged)
     extraction = await create_ai_extraction(raw_text)
     merged = data.model_dump()
@@ -202,7 +364,20 @@ async def enrich_opportunity_payload(data: OpportunityCreate) -> OpportunityCrea
     )
     merged["categories"] = data.categories or list(extraction.get("category") or [])
     merged["topics"] = data.topics or list(extraction.get("matched_keywords") or [])
-    merged["summary"] = data.summary or str(extraction.get("summary") or merged["summary"])
+    incoming_summary = (
+        data.summary if not is_thin_or_metadata_summary(data.summary) else ""
+    )
+    extraction_summary = str(extraction.get("summary") or "")
+    if is_thin_or_metadata_summary(extraction_summary):
+        extraction_summary = ""
+    merged["summary"] = (
+        incoming_summary
+        or extraction_summary
+        # Nada sustancial todavia: conservar el fallback previo del
+        # extractor (p.ej. "Resumen pendiente...") para no dejar vacio.
+        or str(extraction.get("summary") or "")
+        or str(merged.get("summary") or "")
+    )
     merged["description"] = data.description or str(
         extraction.get("summary") or merged["description"]
     )
@@ -210,18 +385,40 @@ async def enrich_opportunity_payload(data: OpportunityCreate) -> OpportunityCrea
     merged["documents_required"] = data.documents_required or list(
         extraction.get("documents_required") or []
     )
+    merged["eligible_applicants"] = data.eligible_applicants or list(
+        extraction.get("eligible_applicants") or []
+    )
+    merged["application_url"] = data.application_url or (
+        str(extraction.get("application_url") or "") or None
+    )
     merged["evaluation_criteria"] = data.evaluation_criteria or list(
         extraction.get("evaluation_criteria") or []
     )
     merged["restrictions"] = data.restrictions or list(extraction.get("restrictions") or [])
     merged["risk_flags"] = data.risk_flags or list(extraction.get("risks") or [])
     merged["funding_amount_raw"] = data.funding_amount_raw or extraction.get("funding_amount_raw")
-    # Parse funding amount into numeric value + currency
+    if _is_tr_artifact(merged.get("funding_amount_raw")):
+        merged["funding_amount_raw"] = None
+    # Funding value/currency — prefer LLM normalized, fallback to parser
     if not data.funding_amount_value:
-        parsed_value, parsed_currency = _parse_funding_amount(merged["funding_amount_raw"])
-        if parsed_value is not None:
-            merged["funding_amount_value"] = parsed_value
-            merged["funding_amount_currency"] = parsed_currency
+        # Use LLM normalized value if present and valid
+        llm_val = extraction.get("funding_amount_value")
+        llm_cur = extraction.get("funding_amount_currency")
+        if llm_val is not None:
+            try:
+                merged["funding_amount_value"] = float(llm_val)
+                merged["funding_amount_currency"] = str(llm_cur).upper() if llm_cur else None
+            except (TypeError, ValueError):
+                pass
+        if not merged.get("funding_amount_value"):
+            parsed_value, parsed_currency = _parse_funding_amount(
+                merged["funding_amount_raw"],
+                country=merged.get("country"),
+                url=merged.get("official_url") or data.official_url,
+            )
+            if parsed_value is not None:
+                merged["funding_amount_value"] = parsed_value
+                merged["funding_amount_currency"] = parsed_currency
     merged["language"] = (
         data.language
         if data.language not in {"", "auto"}
@@ -235,13 +432,16 @@ async def enrich_opportunity_payload(data: OpportunityCreate) -> OpportunityCrea
         2,
     )
     merged["close_date"] = data.close_date or _parse_ai_close_date(extraction.get("close_date"))
-    # Fallback: try regex-based close_date extraction from combined text
-    if not merged["close_date"] and combined:
-        from app.connectors.common import extract_close_date
+    merged["open_date"] = data.open_date or _parse_ai_open_date(extraction.get("open_date"))
+    # Fallback: try extract_dates from combined text (covers open+close, unlabeled desde...hasta)
+    if combined and (not merged["close_date"] or not merged["open_date"]):
+        from app.connectors.common import extract_dates
 
-        parsed = extract_close_date(combined)
-        if parsed:
-            merged["close_date"] = parsed
+        od, cd = extract_dates(combined)
+        if not merged["open_date"] and od:
+            merged["open_date"] = od
+        if not merged["close_date"] and cd:
+            merged["close_date"] = cd
     if merged["close_date"] and merged.get("risk_flags"):
         merged["risk_flags"] = [
             flag
@@ -294,13 +494,29 @@ async def reanalyze_opportunity(
         opportunity.country = str(extraction.get("country") or opportunity.country)
         changed = True
     if force or not opportunity.funding_amount_raw:
-        opportunity.funding_amount_raw = (
-            extraction.get("funding_amount_raw") or opportunity.funding_amount_raw
-        )
-        changed = True
-    # Parse funding amount into numeric value + currency if not already set
+        incoming_raw = extraction.get("funding_amount_raw") or opportunity.funding_amount_raw
+        if _is_tr_artifact(incoming_raw):
+            incoming_raw = None
+        if incoming_raw != opportunity.funding_amount_raw:
+            opportunity.funding_amount_raw = incoming_raw
+            changed = True
+    # Funding value/currency — prefer LLM normalized
+    if not opportunity.funding_amount_value:
+        llm_val = extraction.get("funding_amount_value")
+        llm_cur = extraction.get("funding_amount_currency")
+        if llm_val is not None:
+            try:
+                opportunity.funding_amount_value = float(llm_val)
+                opportunity.funding_amount_currency = str(llm_cur).upper() if llm_cur else None
+                changed = True
+            except (TypeError, ValueError):
+                pass
     if opportunity.funding_amount_raw and not opportunity.funding_amount_value:
-        parsed_value, parsed_currency = _parse_funding_amount(opportunity.funding_amount_raw)
+        parsed_value, parsed_currency = _parse_funding_amount(
+            opportunity.funding_amount_raw,
+            country=opportunity.country,
+            url=opportunity.official_url,
+        )
         if parsed_value is not None:
             opportunity.funding_amount_value = parsed_value
             opportunity.funding_amount_currency = parsed_currency
@@ -313,32 +529,49 @@ async def reanalyze_opportunity(
     if close_date and (force or not opportunity.close_date):
         opportunity.close_date = close_date
         changed = True
+    open_date = _parse_ai_open_date(extraction.get("open_date"))
+    if open_date and (force or not opportunity.open_date):
+        opportunity.open_date = open_date
+        changed = True
     if changed:
         opportunity.status = inferred_opportunity_status(
             opportunity.close_date,
-            " ".join([opportunity.summary, opportunity.raw_text]),
+            " ".join([opportunity.title, opportunity.summary, opportunity.raw_text]),
         )
         await upsert_opportunity_embedding(db, opportunity)
     return opportunity
 
 
+def _naive_utc(close_date: datetime) -> datetime:
+    if close_date.tzinfo is not None:
+        return close_date.astimezone(UTC).replace(tzinfo=None)
+    return close_date
+
+
 def opportunity_status(close_date: datetime | None) -> str:
     if not close_date:
         return OpportunityStatus.unknown.value
+    close_day = _naive_utc(close_date).date()
+    today = datetime.now(UTC).date()
+    if close_day < today:
+        return OpportunityStatus.closed.value
     now = datetime.now(UTC).replace(tzinfo=None)
     days = get_settings().scraping_closing_soon_days
-    if close_date < now:
-        return OpportunityStatus.closed.value
-    if close_date <= now + timedelta(days=days):
+    close_naive = _naive_utc(close_date)
+    if close_naive <= now + timedelta(days=days):
         return OpportunityStatus.closing_soon.value
     return OpportunityStatus.open.value
 
 
 def inferred_opportunity_status(close_date: datetime | None, text: str = "") -> str:
     status = opportunity_status(close_date)
-    if status == OpportunityStatus.unknown.value and re.search(
-        r"\b(open|posted|abierta|abierto)\b", text, re.IGNORECASE
-    ):
+    if status != OpportunityStatus.unknown.value:
+        return status
+    from app.connectors.common import looks_closed_text
+
+    if looks_closed_text(text):
+        return OpportunityStatus.closed.value
+    if re.search(r"\b(open|posted|abierta|abierto)\b", text, re.IGNORECASE):
         return OpportunityStatus.open.value
     return status
 
@@ -358,15 +591,32 @@ def _update_opportunity(
     opportunity.categories = list(data.categories)
     opportunity.topics = list(data.topics)
     opportunity.description = data.description
-    opportunity.summary = data.summary or data.description or opportunity.summary
+    if data.summary and not is_thin_or_metadata_summary(data.summary):
+        # Incoming summary carries real content — adopt it.
+        opportunity.summary = data.summary
+    elif is_thin_or_metadata_summary(opportunity.summary or ""):
+        # Both incoming and existing are thin: fall back to description.
+        opportunity.summary = data.summary or data.description or opportunity.summary
+    # Else: existing summary is substantive and the incoming one is thin
+    # metadata (list-page rebuilds) — keep the better existing summary.
     opportunity.raw_text = data.raw_text or opportunity.raw_text
     opportunity.official_url = data.official_url
     opportunity.application_url = data.application_url
-    opportunity.open_date = data.open_date
-    opportunity.close_date = data.close_date
-    opportunity.funding_amount_value = data.funding_amount_value
-    opportunity.funding_amount_currency = data.funding_amount_currency
-    opportunity.funding_amount_raw = data.funding_amount_raw
+    # Backfill funding/close/open only when existing is missing — re-scrape patch
+    if data.funding_amount_value is not None and opportunity.funding_amount_value is None:
+        opportunity.funding_amount_value = data.funding_amount_value
+        opportunity.funding_amount_currency = data.funding_amount_currency
+        if data.funding_amount_raw is not None:
+            opportunity.funding_amount_raw = data.funding_amount_raw
+    elif data.funding_amount_raw is not None and opportunity.funding_amount_raw is None:
+        opportunity.funding_amount_raw = data.funding_amount_raw
+        if data.funding_amount_value is not None and opportunity.funding_amount_value is None:
+            opportunity.funding_amount_value = data.funding_amount_value
+            opportunity.funding_amount_currency = data.funding_amount_currency
+    if data.open_date is not None and opportunity.open_date is None:
+        opportunity.open_date = data.open_date
+    if data.close_date is not None and opportunity.close_date is None:
+        opportunity.close_date = data.close_date
     opportunity.eligible_applicants = list(data.eligible_applicants)
     opportunity.requirements = list(data.requirements)
     opportunity.documents_required = list(data.documents_required)
@@ -375,8 +625,8 @@ def _update_opportunity(
     opportunity.risk_flags = list(data.risk_flags)
     opportunity.confidence_score = data.confidence_score
     opportunity.status = inferred_opportunity_status(
-        data.close_date,
-        " ".join([data.summary, data.raw_text]),
+        opportunity.close_date or data.close_date,
+        " ".join([normalized_title, data.summary, data.raw_text]),
     )
 
 
@@ -387,17 +637,39 @@ async def _update_and_score(
     normalized_title: str,
     score_org_id: str | None,
 ) -> Opportunity:
-    """Update opportunity, recalculate embedding + score."""
+    """Update opportunity, recalculate embedding + score. Embedding is best-effort."""
     _update_opportunity(opportunity, data, normalized_title)
     actual_org_id = opportunity.organization_id or score_org_id
-    await upsert_opportunity_embedding(db, opportunity)
+    try:
+        await upsert_opportunity_embedding(db, opportunity)
+    except Exception:
+        import structlog as _sl
+        _sl.get_logger(__name__).warning("embedding_upsert_failed_backfill", opportunity_id=opportunity.id)
     if actual_org_id:
-        profile = db.scalar(
-            select(OrganizationProfile).where(OrganizationProfile.organization_id == actual_org_id)
-        )
-        if profile:
-            calculate_score(db, opportunity, profile)
+        try:
+            profile = db.scalar(
+                select(OrganizationProfile).where(OrganizationProfile.organization_id == actual_org_id)
+            )
+            if profile:
+                calculate_score(db, opportunity, profile)
+        except Exception:
+            pass
     return opportunity
+
+
+def preload_external_ids(db: Session, source_id: str) -> set[str]:
+    """Bulk preload existing external_ids for a source — 1 query per source."""
+    if source_id in _BULK_EXTERNAL_CACHE:
+        return _BULK_EXTERNAL_CACHE[source_id]
+    rows = db.scalars(select(Opportunity.external_id).where(Opportunity.source_id == source_id)).all()
+    cache = {r for r in rows if r}
+    _BULK_EXTERNAL_CACHE[source_id] = cache
+    return cache
+
+
+def clear_bulk_cache() -> None:
+    _BULK_EXTERNAL_CACHE.clear()
+    _EMBEDDING_HASH_CACHE.clear()
 
 
 async def create_opportunity(
@@ -411,9 +683,9 @@ async def create_opportunity(
         raise ValueError("Opportunity title looks like scraping noise")
     slug = slugify(f"{normalized_title}-{data.entity}")
     score_org_id = organization_id
-    if data.official_url and not url_is_reachable(data.official_url):
+    if data.official_url and not await async_url_is_reachable(data.official_url):
         data = data.model_copy(update={"official_url": None})
-    if data.application_url and not url_is_reachable(data.application_url):
+    if data.application_url and not await async_url_is_reachable(data.application_url):
         data = data.model_copy(update={"application_url": None})
 
     # ── Dedup checks (ordered by specificity) ─────────────────────────────
@@ -470,7 +742,11 @@ async def create_opportunity(
     )
     if existing:
         _update_opportunity(existing, data, normalized_title)
-        await upsert_opportunity_embedding(db, existing)
+        try:
+            await upsert_opportunity_embedding(db, existing)
+        except Exception:
+            import structlog as _sl
+            _sl.get_logger(__name__).warning("embedding_upsert_failed_slug", opportunity_id=existing.id)
         return existing
 
     # ── Create new opportunity ────────────────────────────────────────────
@@ -488,18 +764,25 @@ async def create_opportunity(
         slug=slug,
         status=inferred_opportunity_status(
             data.close_date,
-            " ".join([data.summary, data.raw_text]),
+            " ".join([normalized_title, data.summary, data.raw_text]),
         ),
     )
     db.add(opportunity)
     db.flush()
-    await upsert_opportunity_embedding(db, opportunity)
+    try:
+        await upsert_opportunity_embedding(db, opportunity)
+    except Exception:
+        import structlog as _sl
+        _sl.get_logger(__name__).warning("embedding_upsert_failed_create", opportunity_id=opportunity.id)
     if score_org_id:
-        profile = db.scalar(
-            select(OrganizationProfile).where(OrganizationProfile.organization_id == score_org_id)
-        )
-        if profile:
-            calculate_score(db, opportunity, profile)
+        try:
+            profile = db.scalar(
+                select(OrganizationProfile).where(OrganizationProfile.organization_id == score_org_id)
+            )
+            if profile:
+                calculate_score(db, opportunity, profile)
+        except Exception:
+            pass
     return opportunity
 
 
@@ -510,6 +793,110 @@ def create_heuristic_extraction(text: str) -> dict[str, object]:
 async def create_ai_extraction(text: str) -> dict[str, object]:
     extraction = await extract_opportunity_structured(text)
     return extraction.data
+
+
+async def enrich_opportunity_payloads_batch(
+    datas: list[OpportunityCreate],
+) -> list[OpportunityCreate]:
+    """Batched variant of enrich_opportunity_payload — respects EXTRACTION_BATCH_ENABLED.
+
+    Flag OFF: serial parity via enrich_opportunity_payload per item (no cross-contamination).
+    Flag ON: uses extract_opportunities_structured_batch(chunk_size=20) with LRU256,
+             processes in chunks of 20, ES/EN isolated, and merges without parser change.
+    """
+    settings = get_settings()
+    if not settings.extraction_batch_enabled:
+        results: list[OpportunityCreate] = []
+        for d in datas:
+            results.append(await enrich_opportunity_payload(d))
+        return results
+
+    if not datas:
+        return []
+
+    texts = [(d.raw_text or d.summary or d.title or "") for d in datas]
+    extractions = await extract_opportunities_structured_batch(texts, chunk_size=20)
+
+    enriched: list[OpportunityCreate] = []
+    for orig, ext in zip(datas, extractions):
+        # Reuse single-item merge logic by constructing a temporary OpportunityCreate
+        # that mimics what enrich_opportunity_payload does with ext.data
+        data = ext.data if hasattr(ext, "data") else {}
+        merged = orig.model_dump()
+
+        # Title / entity / country — only fill if missing (parser frozen)
+        if not merged.get("title") or merged["title"] == "Convocatoria detectada":
+            merged["title"] = str(data.get("title") or merged["title"])
+        if not merged.get("entity") or merged["entity"] == "Entidad por validar":
+            merged["entity"] = str(data.get("entity") or merged["entity"])
+        if not merged.get("country") or merged["country"] in ("Por validar", "Sin dato", ""):
+            merged["country"] = str(data.get("country") or merged["country"])
+
+        # Categories / topics — only if missing
+        if not merged.get("categories"):
+            merged["categories"] = list(data.get("category") or [])
+        if not merged.get("topics"):
+            merged["topics"] = list(data.get("matched_keywords") or [])
+
+        # Funding raw — only if missing, parser delegates to d9579f4
+        if not merged.get("funding_amount_raw"):
+            fr = data.get("funding_amount_raw")
+            if fr and not _is_tr_artifact(str(fr)):
+                merged["funding_amount_raw"] = str(fr)
+
+        # Funding value/currency — prefer LLM normalized
+        if not merged.get("funding_amount_value"):
+            llm_val = data.get("funding_amount_value")
+            llm_cur = data.get("funding_amount_currency")
+            if llm_val is not None:
+                try:
+                    merged["funding_amount_value"] = float(llm_val)
+                    merged["funding_amount_currency"] = str(llm_cur).upper() if llm_cur else None
+                except (TypeError, ValueError):
+                    pass
+            if not merged.get("funding_amount_value") and merged.get("funding_amount_raw"):
+                pv, pc = _parse_funding_amount(
+                    merged["funding_amount_raw"],
+                    country=merged.get("country"),
+                    url=merged.get("official_url"),
+                )
+                if pv is not None:
+                    merged["funding_amount_value"] = pv
+                    merged["funding_amount_currency"] = pc
+
+        # Language
+        if merged.get("language") in {None, "", "auto"}:
+            merged["language"] = str(data.get("language") or merged["language"] or "es")
+
+        # Confidence
+        try:
+            merged["confidence_score"] = round(
+                max(float(orig.confidence_score), float(data.get("confidence") or orig.confidence_score)), 2
+            )
+        except Exception:
+            pass
+
+        # Close/open dates
+        if not merged.get("close_date"):
+            cd = _parse_ai_close_date(data.get("close_date"))
+            if cd:
+                merged["close_date"] = cd
+        if not merged.get("open_date"):
+            od = _parse_ai_open_date(data.get("open_date"))
+            if od:
+                merged["open_date"] = od
+
+        # Ensure title cleaned
+        try:
+            from app.connectors.common import clean_opportunity_title
+
+            merged["title"] = clean_opportunity_title(merged.get("title"))
+        except Exception:
+            pass
+
+        enriched.append(OpportunityCreate(**merged))
+
+    return enriched
 
 
 def summarize_text(text: str) -> str:
