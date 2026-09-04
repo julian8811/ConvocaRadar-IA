@@ -1,8 +1,9 @@
-"""Orphan seed wiring + factory World Bank registration (PR4 / 025).
+"""Orphan seed wiring + factory World Bank registration (PR4 / 025 / 028).
 
 Factory must side-effect-import world_bank so ``connector_for`` resolves the
 registered class without the caller importing the connector module first.
-Six orphan source definitions must exist with ``enabled=False``.
+Four orphan source definitions remain with ``enabled=False`` (WB + DevelopmentAid
+were enabled in 028).
 """
 
 from __future__ import annotations
@@ -11,19 +12,15 @@ import ast
 from pathlib import Path
 
 ORPHAN_KEYS = (
-    "world-bank-procurement",
     "innovamos-fid",
     "innovamos-global-innovation-fund",
-    "developmentaid-tenders",
     "finep-brasil",
     "dane-convocatorias",
 )
 
 ORPHAN_URLS = {
-    "world-bank-procurement": "https://search.worldbank.org/api/v2/procnotices",
     "innovamos-fid": "https://www.innovamos.gov.co/convocatorias",
     "innovamos-global-innovation-fund": "https://www.innovamos.gov.co/convocatorias",
-    "developmentaid-tenders": "https://www.developmentaid.org/tenders_sitemap.xml",
     "finep-brasil": "https://www.finep.gov.br/oportunidades",
     "dane-convocatorias": (
         "https://www.dane.gov.co/index.php/component/content/category/"
