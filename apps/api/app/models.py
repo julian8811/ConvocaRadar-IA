@@ -337,6 +337,54 @@ class Report(Base):
     created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
 
 
+class Faculty(Base):
+    __tablename__ = "faculties"
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=uuid)
+    key: Mapped[str] = mapped_column(String, unique=True, index=True)
+    name: Mapped[str] = mapped_column(String)
+    slug: Mapped[str] = mapped_column(String, unique=True)
+    color: Mapped[str] = mapped_column(String, default="#0e7490")
+    icon: Mapped[str] = mapped_column(String, default="briefcase")
+    description: Mapped[str] = mapped_column(Text, default="")
+
+
+class InstitutionalAxis(Base):
+    __tablename__ = "institutional_axes"
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=uuid)
+    key: Mapped[str] = mapped_column(String, unique=True, index=True)
+    label: Mapped[str] = mapped_column(String)
+    description: Mapped[str] = mapped_column(Text, default="")
+
+
+class FacultyProfile(Base):
+    __tablename__ = "faculty_profiles"
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=uuid)
+    faculty_id: Mapped[str] = mapped_column(ForeignKey("faculties.id"), index=True)
+    axis_id: Mapped[str] = mapped_column(ForeignKey("institutional_axes.id"), index=True)
+    description: Mapped[str] = mapped_column(Text, default="")
+    embedding: Mapped[list[float]] = mapped_column(EmbeddingVector(1024), default=list)
+    threshold: Mapped[float] = mapped_column(Float, default=0.35)
+    color: Mapped[str] = mapped_column(String, default="#0e7490")
+    version: Mapped[int] = mapped_column(Integer, default=1)
+    source_url: Mapped[str | None] = mapped_column(String, nullable=True)
+    updated_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now(), onupdate=func.now())
+
+
+class OpportunityAxisMatch(Base):
+    __tablename__ = "opportunity_axis_matches"
+    id: Mapped[str] = mapped_column(String, primary_key=True, default=uuid)
+    organization_id: Mapped[str] = mapped_column(ForeignKey("organizations.id"), index=True)
+    opportunity_id: Mapped[str] = mapped_column(ForeignKey("opportunities.id"), index=True)
+    faculty_id: Mapped[str] = mapped_column(ForeignKey("faculties.id"), index=True)
+    axis_id: Mapped[str] = mapped_column(ForeignKey("institutional_axes.id"), index=True)
+    embedding_score: Mapped[float] = mapped_column(Float, default=0.0)
+    llm_score: Mapped[float | None] = mapped_column(Float, nullable=True)
+    final_score: Mapped[float] = mapped_column(Float, default=0.0)
+    reasons: Mapped[list | dict] = mapped_column(JSON, default=list)
+    verified_by: Mapped[str | None] = mapped_column(String, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(DateTime, server_default=func.now())
+
+
 class Alert(Base):
     __tablename__ = "alerts"
 
@@ -345,6 +393,7 @@ class Alert(Base):
     opportunity_id: Mapped[str | None] = mapped_column(
         ForeignKey("opportunities.id"), nullable=True
     )
+    faculty_id: Mapped[str | None] = mapped_column(ForeignKey("faculties.id"), nullable=True)
     alert_type: Mapped[str] = mapped_column(String)
     channel: Mapped[str] = mapped_column(String, default="email")
     recipient: Mapped[str] = mapped_column(String)

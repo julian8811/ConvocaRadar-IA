@@ -7,6 +7,14 @@ from app.db.session import SessionLocal, create_all
 from app.models import Organization, OrganizationProfile, Role, Source, User
 
 
+def _seed_faculties_if_needed(db) -> None:
+    try:
+        from app.db.seed_faculties import seed_faculties_sync
+        seed_faculties_sync(db)
+    except Exception:
+        pass
+
+
 def _seed_admin_user(db, organization) -> None:
     """Create the admin user from env vars if it doesn't exist yet.
 
@@ -3846,6 +3854,7 @@ def seed() -> None:
         seed_default_sources(db, organization, bootstrap_mode=True)
 
         _seed_admin_user(db, organization)
+        _seed_faculties_if_needed(db)
 
         db.commit()
     finally:
