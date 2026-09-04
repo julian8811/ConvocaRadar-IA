@@ -73,6 +73,8 @@ export default function OpportunitiesPage() {
   const [status, setStatus] = useState("open");
   const [country, setCountry] = useState("");
   const [category, setCategory] = useState("");
+  const [faculty, setFaculty] = useState("");
+  const [axis, setAxis] = useState("");
   const [closeDateFrom, setCloseDateFrom] = useState("");
   const [closeDateTo, setCloseDateTo] = useState("");
   const [minAmount, setMinAmount] = useState("");
@@ -91,6 +93,8 @@ export default function OpportunitiesPage() {
     if (status) params.set("status", status);
     if (country) params.set("country", country);
     if (category) params.set("category", category);
+    if (faculty) params.set("faculty", faculty);
+    if (axis) params.set("axis", axis);
     if (closeDateFrom) params.set("close_date_from", closeDateFrom);
     if (closeDateTo) params.set("close_date_to", closeDateTo);
     if (minAmount) params.set("min_amount", minAmount);
@@ -98,7 +102,7 @@ export default function OpportunitiesPage() {
     params.set("page", String(page));
     params.set("page_size", String(pageSize));
     return params.toString() ? `?${params.toString()}` : "";
-  }, [search, status, country, category, closeDateFrom, closeDateTo, minAmount, maxAmount, page]);
+  }, [search, status, country, category, faculty, axis, closeDateFrom, closeDateTo, minAmount, maxAmount, page]);
 
   const sources = useQuery({ queryKey: ["sources"], queryFn: api.sources });
   const opportunities = useQuery({ queryKey: ["opportunities", query], queryFn: () => api.opportunities(query) });
@@ -154,7 +158,25 @@ export default function OpportunitiesPage() {
           </Select>
           <Input placeholder="Buscar..." value={search} onChange={(e) => { setSearch(e.target.value); setPage(1); }} />
           <Input placeholder="País" value={country} onChange={(e) => { setCountry(e.target.value); setPage(1); }} />
-          <Input placeholder="Categoría" value={category} onChange={(e) => { setCategory(e.target.value); setPage(1); }} />
+          <Select value={faculty} onChange={(e) => { setFaculty(e.target.value); setPage(1); }}>
+            <option value="">Todas las facultades</option>
+            <option value="F1">F1 Administración</option>
+            <option value="F2">F2 Arq. e Ing.</option>
+            <option value="F3">F3 Salud</option>
+            <option value="F4">F4 Sociales</option>
+          </Select>
+          <Select value={axis} onChange={(e) => { setAxis(e.target.value); setPage(1); }}>
+            <option value="">Todos los ejes</option>
+            <option value="docencia">Docencia</option>
+            <option value="investigacion">Investigación</option>
+            <option value="extension">Extensión</option>
+            <option value="internacionalizacion">Internacionalización</option>
+            <option value="bienestar">Bienestar</option>
+            <option value="innovacion">Innovación</option>
+          </Select>
+        </CardContent>
+        <CardContent className="flex gap-3 border-t border-slate-200 p-4 dark:border-slate-700">
+          <Input placeholder="Categoría" value={category} onChange={(e) => { setCategory(e.target.value); setPage(1); }} className="max-w-xs" />
           <Button variant="outline" onClick={() => setShowAdvanced(!showAdvanced)}>
             {showAdvanced ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
             Filtros avanzados

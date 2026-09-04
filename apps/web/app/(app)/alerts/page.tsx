@@ -1,7 +1,7 @@
 "use client";
 
 import { Bell, BellOff, Pause, Play, Send, Trash2 } from "lucide-react";
-import { FormEvent } from "react";
+import { FormEvent, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
@@ -125,7 +125,8 @@ function AlertCard({ alert }: { alert: Alert }) {
 
 export default function AlertsPage() {
   const queryClient = useQueryClient();
-  const alerts = useQuery({ queryKey: ["alerts"], queryFn: api.alerts });
+  const [confirmOpen, setConfirmOpen] = useState(false);
+  const alerts = useQuery({ queryKey: ["alerts"], queryFn: () => api.alerts() });
   const createAlert = useMutation({
     mutationFn: api.createAlert,
     onSuccess: () => {
@@ -149,6 +150,15 @@ export default function AlertsPage() {
       queryClient.invalidateQueries({ queryKey: ["alerts"] });
     },
     onError: (error) => toast.error(error instanceof Error ? error.message : "No se pudieron generar alertas"),
+  });
+  const deleteAllAlerts = useMutation({
+    mutationFn: api.deleteAllAlerts,
+    onSuccess: (data) => {
+      toast.success(data.deleted_count ? `${data.deleted_count} alertas eliminadas` : "No había alertas para borrar");
+      queryClient.invalidateQueries({ queryKey: ["alerts"] });
+      setConfirmOpen(false);
+    },
+    onError: (error) => toast.error(error instanceof Error ? error.message : "No se pudieron borrar las alertas"),
   });
 
   function submit(event: FormEvent<HTMLFormElement>) {
@@ -181,10 +191,20 @@ export default function AlertsPage() {
             Correos auditables para novedades, cierres próximos y oportunidades de alta compatibilidad.
           </p>
         </div>
-        <Button variant="outline" disabled={generateAlerts.isPending} onClick={() => generateAlerts.mutate()}>
-          <Bell className="h-4 w-4" />
-          Generar sugeridas
-        </Button>
+        <div className="flex gap-2">
+          <Button variant="outline" disabled={generateAlerts.isPending} onClick={() => generateAlerts.mutate()}>
+            <Bell className="h-4 w-4" />
+            Generar sugeridas
+          </Button>
+          <Button
+            variant="destructive"
+            disabled={(alerts.data?.length ?? 0) === 0 || deleteAllAlerts.isPending}
+            onClick={() => setConfirmOpen(true)}
+          >
+            <Trash2 className="h-4 w-4" />
+            Borrar todas
+          </Button>
+        </div>
       </div>
 
       <div className="grid gap-4 xl:grid-cols-[1.5fr_1fr]">
@@ -241,6 +261,22 @@ export default function AlertsPage() {
           <AlertCard key={alert.id} alert={alert} />
         ))}
       </div>
+      {confirmOpen && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 p-4">
+          <Card className="w-full max-w-md">
+            <CardHeader>
+              <CardTitle>Confirmar borrado</CardTitle>
+              <CardDescription>¿Borrar {alerts.data?.length ?? 0} alertas? Esta acción no se puede deshacer.</CardDescription>
+            </CardHeader>
+            <CardContent className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setConfirmOpen(false)}>Cancelar</Button>
+              <Button variant="destructive" disabled={deleteAllAlerts.isPending} onClick={() => deleteAllAlerts.mutate()}>
+                Borrar
+              </Button>
+            </CardContent>
+          </Card>
+        </div>
+      )}
     </section>
   );
 }
