@@ -1,4 +1,4 @@
-"""Batch-1 parse fixtures (026 PR1: Chile + Peru). Mocked fetch only — no live HTTP."""
+"""Batch-1 parse fixtures (026: Chile/Peru + IDB/Fulbright). Mocked fetch only — no live HTTP."""
 
 from __future__ import annotations
 
@@ -11,7 +11,7 @@ import pytest
 from app.connectors.configurable_html import ConfigurableHtmlConnector
 from app.connectors.factory import connector_for
 
-PR1 = {
+BATCH1 = {
     "anid-concursos": {
         "url": "https://anid.cl/concursos/",
         "country": "Chile",
@@ -62,6 +62,52 @@ PR1 = {
 </table></main></body></html>""",
         "titles": ("Programa Innova PYME 2027", "Startup Perú 8va Gen"),
     },
+    "idb-calls-proposals": {
+        "url": "https://www.iadb.org/en/how-we-can-work-together/calls-proposals",
+        "country": "International",
+        "entity": "IDB",
+        # Empty open section; eval/closed cards still yield candidates (spec).
+        "html": """<html><body><main>
+<section class="open-calls"><h2>Open</h2><p>No open calls</p></section>
+<article class="card views-row">
+  <h3><a href="https://www.iadb.org/en/call/climate-innovation-challenge-2027">
+    Climate Innovation Challenge 2027</a></h3>
+  <p>Status: Under evaluation</p>
+  <p>Deadline: 15 March 2027</p>
+</article>
+<div class="card">
+  <h2><a href="https://www.iadb.org/en/prize/social-impact-prize-2026">
+    Social Impact Prize 2026</a></h2>
+  <p>Status: Closed</p>
+  <p>Closing: 1 December 2026</p>
+</div>
+</main></body></html>""",
+        "titles": (
+            "Climate Innovation Challenge 2027",
+            "Social Impact Prize 2026",
+        ),
+    },
+    "fulbright-colombia": {
+        "url": "https://fulbright.edu.co/",
+        "country": "Colombia",
+        "entity": "Fulbright Colombia",
+        "html": """<html><body><main>
+<div class="card elementor-post">
+  <h3><a href="https://fulbright.edu.co/convocatoria/beca-investigacion-2027/">
+    Beca de Investigación Fulbright 2027</a></h3>
+  <p>Cierre: 30 de abril de 2027</p>
+</div>
+<article class="program">
+  <h2><a href="https://fulbright.edu.co/program/foreign-student-program/">
+    Foreign Student Program</a></h2>
+  <p>Convocatoria Abierta — Deadline: 15 May 2027</p>
+</article>
+</main></body></html>""",
+        "titles": (
+            "Beca de Investigación Fulbright 2027",
+            "Foreign Student Program",
+        ),
+    },
 }
 
 
@@ -82,9 +128,9 @@ def _seed_config(key: str) -> dict:
     raise AssertionError(f"connector_config missing for {key}")
 
 
-@pytest.mark.parametrize("key", list(PR1))
+@pytest.mark.parametrize("key", list(BATCH1))
 def test_connector_for_returns_configurable_html(key: str):
-    meta = PR1[key]
+    meta = BATCH1[key]
     connector = connector_for(
         key,
         meta["url"],
@@ -98,9 +144,9 @@ def test_connector_for_returns_configurable_html(key: str):
 
 
 @pytest.mark.asyncio
-@pytest.mark.parametrize("key", list(PR1))
+@pytest.mark.parametrize("key", list(BATCH1))
 async def test_parse_fixture_yields_candidates(key: str, monkeypatch: pytest.MonkeyPatch):
-    meta = PR1[key]
+    meta = BATCH1[key]
     mock = AsyncMock(return_value=(meta["url"], meta["html"], "text/html"))
     monkeypatch.setattr("app.connectors.common.fetch_httpx_text", mock)
     connector = ConfigurableHtmlConnector(
@@ -121,7 +167,7 @@ async def test_parse_fixture_yields_candidates(key: str, monkeypatch: pytest.Mon
 
 @pytest.mark.asyncio
 async def test_anid_empty_listing_returns_empty(monkeypatch: pytest.MonkeyPatch):
-    url = PR1["anid-concursos"]["url"]
+    url = BATCH1["anid-concursos"]["url"]
     empty = "<html><body><p>Sin concursos</p></body></html>"
     mock = AsyncMock(return_value=(url, empty, "text/html"))
     monkeypatch.setattr("app.connectors.common.fetch_httpx_text", mock)
@@ -134,3 +180,26 @@ async def test_anid_empty_listing_returns_empty(monkeypatch: pytest.MonkeyPatch)
     )
     candidates = await connector.parse(await connector.fetch())
     assert candidates == []
+
+
+@pytest.mark.asyncio
+async def test_idb_empty_open_still_parses_eval_closed(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """Seasonal empty open section must still extract eval/closed cards."""
+    meta = BATCH1["idb-calls-proposals"]
+    mock = AsyncMock(return_value=(meta["url"], meta["html"], "text/html"))
+    monkeypatch.setattr("app.connectors.common.fetch_httpx_text", mock)
+    connector = ConfigurableHtmlConnector(
+        "idb-calls-proposals",
+        meta["url"],
+        _seed_config("idb-calls-proposals"),
+        entity_name=meta["entity"],
+        default_country=meta["country"],
+    )
+    candidates = await connector.parse(await connector.fetch())
+    assert len(candidates) >= 1
+    titles = {c.title for c in candidates}
+    assert "Climate Innovation Challenge 2027" in titles or (
+        "Social Impact Prize 2026" in titles
+    )
