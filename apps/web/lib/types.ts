@@ -146,7 +146,12 @@ export type Alert = {
   scheduled_at: string | null;
   sent_at: string | null;
   created_at: string;
+  faculty_id?: string | null;
 };
+
+export type Faculty = { id: string; key: string; name: string; slug: string; color: string; icon: string; description: string };
+export type InstitutionalAxis = { id: string; key: string; label: string; description: string };
+export type FacultyProfile = { id: string; faculty_id: string; axis_id: string; description: string; threshold: number; color: string; version: number; source_url: string | null };
 
 export type AuditLog = {
   id: string;
