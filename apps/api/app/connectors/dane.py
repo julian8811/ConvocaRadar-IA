@@ -11,10 +11,12 @@ class DaneConnector(GenericHtmlConnector):
 
     async def parse(self, raw: RawSourceResult):
         candidates = await super().parse(raw)
+        # Drop nav noise and clearly archival titles (2010–2022 only).
+        # Years 2023+ must remain so current convocatorias are not silenced.
         return [
             c
             for c in candidates
             if c.title
             and not c.title.lower().startswith(("inicio", "home", "dane -"))
-            and not any(str(year) in c.title for year in range(2010, 2026))
+            and not any(str(year) in c.title for year in range(2010, 2023))
         ]

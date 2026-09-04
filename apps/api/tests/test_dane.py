@@ -2,7 +2,7 @@
 
 DANE extends GenericHtmlConnector with parse-time noise filtering:
 titles starting with "inicio", "home", "dane -" or containing years
-2010–2025 are excluded.
+2010–2022 are excluded (archival); 2023+ remains.
 """
 
 from __future__ import annotations
@@ -59,7 +59,7 @@ class TestFetchAndParse:
     @pytest.mark.asyncio
     async def test_parse_filters_noise_titles(self, connector_factory):
         """DANE-specific: titles starting with 'inicio', 'home', or
-        'dane -', and titles containing years 2010-2025, are removed."""
+        'dane -', and titles containing years 2010-2022, are removed."""
         connector, mocks = connector_factory(
             "dane-convocatorias",
             base_url="https://www.dane.gov.co/convocatorias",
