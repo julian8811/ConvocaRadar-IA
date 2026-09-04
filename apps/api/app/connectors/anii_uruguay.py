@@ -8,7 +8,7 @@ from urllib.parse import urljoin, urlparse
 from selectolax.parser import HTMLParser
 
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
-from app.connectors.common import BROWSER_UA, clean_text, fetch_httpx_text, parse_date_text
+from app.connectors.common import BROWSER_UA, clean_text, fetch_httpx_text, parse_date_text, thin_fill_candidates
 
 
 ANII_CATEGORY_URLS = (
@@ -137,7 +137,7 @@ class AniiUruguayConnector:
                         language="es",
                     )
                 )
-        return candidates[:200]
+        return thin_fill_candidates(candidates[:200])
 
     async def validate(self, candidate: OpportunityCandidate) -> ValidationResult:
         host = urlparse(candidate.official_url).hostname or ""

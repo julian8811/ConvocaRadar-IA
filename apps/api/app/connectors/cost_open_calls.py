@@ -6,7 +6,7 @@ import re
 from datetime import datetime
 
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
-from app.connectors.common import clean_text, fetch_httpx_text, parse_date_text
+from app.connectors.common import clean_text, fetch_httpx_text, parse_date_text, thin_fill_candidates
 from app.connectors.registry import register
 
 COST_API_URL = "https://www.cost.eu/wp-json/wp/v2/pages"
@@ -92,7 +92,7 @@ class CostOpenCallsConnector:
                     close_date=close_date,
                 )
             )
-        return candidates[:30]
+        return thin_fill_candidates(candidates[:30])
 
     async def validate(self, candidate: OpportunityCandidate) -> ValidationResult:
         if not candidate.title or not candidate.official_url:

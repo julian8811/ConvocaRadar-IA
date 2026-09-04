@@ -11,7 +11,7 @@ from __future__ import annotations
 from xml.etree import ElementTree
 
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
-from app.connectors.common import enrich_candidates_batch, fetch_httpx_text
+from app.connectors.common import enrich_candidates_batch, fetch_httpx_text, thin_fill_candidates
 from app.connectors.registry import register
 
 UNIANDES_SITEMAP_URL = "https://www.uniandes.edu.co/sitemap.xml"
@@ -151,8 +151,8 @@ class UniandesConnector:
         if candidates and not self._skip_enrichment:
             enriched = await enrich_candidates_batch(candidates)
             if enriched:
-                return enriched
-        return candidates
+                return thin_fill_candidates(enriched)
+        return thin_fill_candidates(candidates)
 
     async def validate(self, candidate: OpportunityCandidate) -> ValidationResult:
         if not candidate.title.strip():

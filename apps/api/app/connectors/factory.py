@@ -44,6 +44,7 @@ from app.connectors.erc_calls import ErcCallsConnector  # noqa: F401
 from app.connectors.cost_open_calls import CostOpenCallsConnector  # noqa: F401
 from app.connectors.caricom import CaricomConnector  # noqa: F401
 from app.connectors.ascun import AscunConnector  # noqa: F401
+from app.connectors.world_bank import WorldBankConnector  # noqa: F401 — @register side effect
 
 
 WORDPRESS_GRANT_SOURCE_KEYS = {

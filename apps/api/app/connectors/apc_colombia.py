@@ -6,7 +6,7 @@ from urllib.parse import urljoin, urlparse
 from selectolax.parser import HTMLParser
 
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
-from app.connectors.common import clean_text, fetch_httpx_text, normalize_text, parse_date_text
+from app.connectors.common import clean_text, fetch_httpx_text, normalize_text, parse_date_text, thin_fill_candidates
 from app.connectors.registry import register
 
 
@@ -146,8 +146,7 @@ class ApcColombiaConnector:
         else:
             date_match = re.search(r"(\d{2}/\d{2}/\d{4}|\d{4}-\d{2}-\d{2})", container_text)
             open_date = parse_date_text(date_match.group(1) if date_match else container_text)
-        if _is_closed_text(title):
-            return None
+        # Emit closed titles; soft-pass + reconcile own status.
         return OpportunityCandidate(
             title=title[:180],
             entity="APC Colombia",
@@ -186,7 +185,7 @@ class ApcColombiaConnector:
                     candidates.append(candidate)
 
         if candidates:
-            return candidates[:150]
+            return thin_fill_candidates(candidates[:150])
 
         for page in pages:
             page_url = str(page["url"])
@@ -204,8 +203,7 @@ class ApcColombiaConnector:
                 }:
                     continue
                 seen.add(official_url)
-                if _is_closed_text(title):
-                    continue
+                # Emit closed titles; soft-pass + reconcile own status.
                 candidates.append(
                     OpportunityCandidate(
                         title=title[:180],
@@ -220,7 +218,7 @@ class ApcColombiaConnector:
                         language="es",
                     )
                 )
-        return candidates[:100]
+        return thin_fill_candidates(candidates[:100])
 
     async def validate(self, candidate: OpportunityCandidate) -> ValidationResult:
         if not candidate.title or not candidate.official_url:

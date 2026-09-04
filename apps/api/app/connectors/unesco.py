@@ -9,7 +9,7 @@ from urllib.parse import unquote
 from selectolax.parser import HTMLParser
 
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
-from app.connectors.common import clean_text, fetch_httpx_text, parse_date_text
+from app.connectors.common import clean_text, fetch_httpx_text, parse_date_text, thin_fill_candidates
 
 
 UNESCO_HOSTS = {"unesco.org", "www.unesco.org"}
@@ -120,7 +120,7 @@ class UNESCOConnector:
                     )
                 )
 
-        return candidates[:25]
+        return thin_fill_candidates(candidates[:25])
 
     async def validate(self, candidate: OpportunityCandidate) -> ValidationResult:
         if not candidate.title or not candidate.official_url:

@@ -38,12 +38,19 @@ def _eval_dates():
             else: _,cd=extract_dates(text); tp+=1 if cd else (fn:=fn+1)
     prec=tp/(tp+fp)*100 if tp+fp else 100; rec=tp/(tp+fn)*100 if tp+fn else 100
     return {"precision":round(prec,1),"recall":round(rec,1),"tp":tp,"fp":fp,"fn":fn,"total":100}
-def _load_opps():
+def _coverage_limit(check: int | None) -> int:
+    """Sample size for coverage queries. --check N only; never the 18% gate."""
+    if isinstance(check, int) and check > 0:
+        return check
+    return 5000
+
+
+def _load_opps(check: int | None = None):
     try:
         from app.db.session import SessionLocal; from app.models import Opportunity
         db=SessionLocal()
         try:
-            rows=db.query(Opportunity).limit(5000).all()
+            rows=db.query(Opportunity).limit(_coverage_limit(check)).all()
             res=[{"source_id":getattr(r,"source_id",None) or "unknown","funding":r.funding_amount_value is not None,"close":r.close_date is not None,"open":getattr(r,"open_date",None) is not None} for r in rows]
             db.close(); return res if res else None
         except Exception: 
@@ -59,10 +66,17 @@ def _coverage(opps):
     for src,items in by.items():
         n=len(items); per[src]={"total":n,"funding_pct":round(sum(1 for x in items if x["funding"])/n*100,1),"close_pct":round(sum(1 for x in items if x["close"])/n*100,1),"open_pct":round(sum(1 for x in items if x["open"])/n*100,1)}
     return {"funding":round(fund/total*100,1),"close":round(close/total*100,1),"open":round(openc/total*100,1),"total":total,"per_source":per}
-def main():
+def build_arg_parser():
     p=argparse.ArgumentParser(description="eval_extraction 022 P2")
-    p.add_argument("--threshold",type=float,default=THRESHOLD); p.add_argument("--check",type=int,default=None); p.add_argument("--per-source",action="store_true"); p.add_argument("--json-out",type=str,default=None); p.add_argument("--previous",type=str,default=None); p.add_argument("--strict",action="store_true",help="enforce DB coverage gate")
-    a=p.parse_args(); fe=_eval_funding(); de=_eval_dates(); opps=_load_opps()
+    p.add_argument("--threshold",type=float,default=THRESHOLD)
+    p.add_argument("--check",type=int,default=None,help="coverage sample size only (not 18% gate)")
+    p.add_argument("--per-source",action="store_true")
+    p.add_argument("--json-out",type=str,default=None)
+    p.add_argument("--previous",type=str,default=None)
+    p.add_argument("--strict",action="store_true",help="enforce DB coverage gate")
+    return p
+def main():
+    a=build_arg_parser().parse_args(); fe=_eval_funding(); de=_eval_dates(); opps=_load_opps(check=a.check)
     if opps is None: print("[eval] DB unavailable — golden-only.",file=sys.stderr); cov={"funding":None,"close":None,"open":None,"total":0,"per_source":{}}; avail=False
     else: cov=_coverage(opps); avail=True
     rep={"golden_funding":fe,"golden_dates":de,"coverage":cov,"threshold":a.threshold}

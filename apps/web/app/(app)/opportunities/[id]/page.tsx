@@ -19,6 +19,7 @@ import type { ElementType, FormEvent } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { toast } from "sonner";
 
+import { OpportunityNarrativeFields } from "@/components/opportunities/OpportunityNarrativeFields";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
@@ -195,7 +196,8 @@ export default function OpportunityDetailPage() {
           </div>
           <h1 className="max-w-4xl text-3xl font-semibold tracking-tight text-slate-950 dark:text-white">{decodeVisibleText(item.title, "Convocatoria sin título")}</h1>
           <p className="mt-2 text-sm text-slate-600 dark:text-slate-400">
-            {item.entity} · {item.country} · {item.source_id ? "Fuente verificada" : "Sin fuente"} · Cierre:{" "}
+            {item.entity} · {item.country} · {item.source_id ? "Fuente verificada" : "Sin fuente"} · Apertura:{" "}
+            {item.open_date ? new Date(item.open_date).toLocaleDateString("es-CO") : "Sin fecha"} · Cierre:{" "}
             {item.close_date ? new Date(item.close_date).toLocaleDateString("es-CO") : "Sin fecha"}
           </p>
         </div>
@@ -240,6 +242,14 @@ export default function OpportunityDetailPage() {
               {decodeVisibleText(item.summary, "Sin resumen disponible.")}
             </CardContent>
           </Card>
+
+          <OpportunityNarrativeFields
+            description={item.description ?? ""}
+            open_date={item.open_date}
+            eligible_applicants={item.eligible_applicants ?? []}
+            evaluation_criteria={item.evaluation_criteria ?? []}
+            restrictions={item.restrictions ?? []}
+          />
 
           <InfoList title="Requisitos" icon={FileCheck} items={item.requirements} empty="No se han identificado requisitos." />
           <InfoList title="Documentos requeridos" icon={FileCheck} items={item.documents_required} empty="No se han identificado documentos." />
@@ -292,6 +302,10 @@ export default function OpportunityDetailPage() {
             </CardHeader>
             <CardContent className="space-y-3 pt-5 text-sm">
               <KeyValue label="Monto" value={formatFunding(item.funding_amount_value, item.funding_amount_currency, item.funding_amount_raw)} />
+              <KeyValue
+                label="Apertura"
+                value={item.open_date ? new Date(item.open_date).toLocaleDateString("es-CO") : "Sin fecha"}
+              />
               <KeyValue label="Estado interno" value={workflowLabels[item.user_status] ?? item.user_status} />
               <KeyValue label="Temas" value={item.topics.join(", ") || "Sin temas"} />
               <KeyValue label="Región" value={item.region ?? "Sin región"} />

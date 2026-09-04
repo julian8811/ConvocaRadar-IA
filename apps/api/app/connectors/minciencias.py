@@ -14,6 +14,7 @@ from app.connectors.common import (
     fetch_httpx_text,
     launch_chromium,
     normalize_text,
+    thin_fill_candidates,
 )
 from app.connectors.registry import register
 
@@ -167,8 +168,7 @@ class MincienciasConnector:
             summary = title
         if not _is_candidate_text(title):
             return None
-        if _is_closed_text(title):
-            return None
+        # Emit closed titles; soft-pass + reconcile own status.
         return OpportunityCandidate(
             title=title[:180],
             entity="Minciencias",
@@ -203,7 +203,7 @@ class MincienciasConnector:
                     candidates.append(candidate)
 
         if candidates:
-            return candidates[:200]
+            return thin_fill_candidates(candidates[:200])
 
         for page in pages:
             page_url = page["url"]
@@ -223,8 +223,7 @@ class MincienciasConnector:
                     continue
                 seen.add(official_url)
                 text = _clean(link.parent.text() if link.parent else title)
-                if _is_closed_text(title):
-                    continue
+                # Emit closed titles; soft-pass + reconcile own status.
                 candidates.append(
                     OpportunityCandidate(
                         title=title[:180],
@@ -242,7 +241,7 @@ class MincienciasConnector:
                         language="es",
                     )
                 )
-        return candidates[:200]
+        return thin_fill_candidates(candidates[:200])
 
     async def validate(self, candidate: OpportunityCandidate) -> ValidationResult:
         if not candidate.title or not candidate.official_url:

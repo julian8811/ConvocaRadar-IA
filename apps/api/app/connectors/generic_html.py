@@ -369,8 +369,7 @@ class GenericHtmlConnector:
                 summary = str(item.get("summary") or item.get("description") or title).strip()
                 close_date = self._candidate_close_date(item, summary)
                 raw_text = summary[:2500]
-                if self._is_closed(title, summary, raw_text, close_date):
-                    continue
+                # Emit closed/past-deadline rows; soft-pass + reconcile own status.
                 candidates.append(
                     OpportunityCandidate(
                         title=title[:180],
@@ -408,8 +407,7 @@ class GenericHtmlConnector:
                 summary = str(item.get("description") or item.get("summary") or title).strip()
                 close_date = self._candidate_close_date(item, summary)
                 raw_text = summary[:2500]
-                if self._is_closed(title, summary, raw_text, close_date):
-                    continue
+                # Emit closed/past-deadline rows; soft-pass + reconcile own status.
                 candidates.append(
                     OpportunityCandidate(
                         title=title[:180],
@@ -532,8 +530,8 @@ class GenericHtmlConnector:
                     continue
                 candidates_seen.add(official_url)
                 close_date = extract_close_date(text)
-                if self._is_closed(title, text, text[:2500], close_date):
-                    continue
+                # Emit closed/past-deadline rows; soft-pass + reconcile own status.
+                card_html = container.html if isinstance(getattr(container, "html", None), str) else None
                 candidates.append(
                     OpportunityCandidate(
                         title=title[:180],
@@ -544,6 +542,7 @@ class GenericHtmlConnector:
                         raw_text=text[:2500],
                         confidence_score=0.55,
                         close_date=close_date,
+                        snippet_html=card_html,
                     )
                 )
         if not candidates:
@@ -611,8 +610,7 @@ class GenericHtmlConnector:
                         continue
                     candidates_seen.add(official_url)
                     close_date = extract_close_date(text)
-                    if self._is_closed(text, text, text[:2500], close_date):
-                        continue
+                    # Emit closed/past-deadline rows; soft-pass + reconcile own status.
                     candidates.append(
                         OpportunityCandidate(
                             title=text[:180],

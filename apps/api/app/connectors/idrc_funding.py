@@ -7,7 +7,7 @@ from urllib.parse import urljoin, urlparse
 from selectolax.parser import HTMLParser
 
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
-from app.connectors.common import BROWSER_UA, clean_text, fetch_httpx_text
+from app.connectors.common import BROWSER_UA, clean_text, fetch_httpx_text, thin_fill_candidates
 
 
 IDRC_FUNDING_URL = "https://idrc-crdi.ca/en/funding"
@@ -89,7 +89,7 @@ class IdrcFundingConnector:
                     confidence_score=0.76,
                 )
             )
-        return candidates[:40]
+        return thin_fill_candidates(candidates[:40])
 
     async def validate(self, candidate: OpportunityCandidate) -> ValidationResult:
         host = urlparse(candidate.official_url).hostname or ""

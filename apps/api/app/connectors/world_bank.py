@@ -9,14 +9,22 @@ from __future__ import annotations
 import json
 from datetime import datetime
 
+from selectolax.parser import HTMLParser
+
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
-from app.connectors.common import fetch_httpx_text
+from app.connectors.common import (
+    clean_text,
+    fetch_httpx_text,
+    is_safe_candidate_snippet,
+    thin_fill_candidates,
+)
 from app.connectors.registry import register
 
 WORLD_BANK_API_URL = "https://search.worldbank.org/api/v2/procnotices"
 WORLD_BANK_DETAIL_URL = (
     "https://projects.worldbank.org/en/projects-operations/procurement-detail/{id}"
 )
+_NOTICE_TEXT_CAP = 3000
 
 
 def _parse_wb_date(value: str | None) -> datetime | None:
@@ -27,6 +35,33 @@ def _parse_wb_date(value: str | None) -> datetime | None:
         return datetime.strptime(value[:10], "%Y-%m-%d")
     except ValueError:
         return None
+
+
+def _strip_notice_html(notice_text: str) -> str:
+    """Strip HTML tags from notice_text for description/raw_text."""
+    if not notice_text:
+        return ""
+    if "<" in notice_text:
+        return clean_text(HTMLParser(notice_text).text())
+    return clean_text(notice_text)
+
+
+def _topic_values(item: dict) -> list[str]:
+    topics: list[str] = []
+    for key in ("project_id", "bid_reference_no", "procurement_method_code"):
+        value = str(item.get(key) or "").strip()
+        if value and value not in topics:
+            topics.append(value)
+    return topics
+
+
+def _category_values(item: dict) -> list[str]:
+    categories: list[str] = []
+    for key in ("notice_type", "procurement_group", "procurement_method_name"):
+        value = str(item.get(key) or "").strip()
+        if value and value not in categories:
+            categories.append(value)
+    return categories
 
 
 @register("world-bank-procurement")
@@ -59,7 +94,6 @@ class WorldBankConnector:
 
         procnotices = payload.get("procnotices") or {}
         candidates: list[OpportunityCandidate] = []
-        now = datetime.now()
 
         for item_id, item in procnotices.items():
             bid_description = str(item.get("bid_description") or "").strip()
@@ -69,20 +103,22 @@ class WorldBankConnector:
             title = bid_description[:180]
             notice_id = str(item.get("id") or item_id).strip()
 
-            # Parse close date and filter out closed opportunities
-            close_date = _parse_wb_date(item.get("submission_date"))
-            if close_date and close_date < now:
-                continue
+            # Prefer submission_deadline_date; fall back to submission_date.
+            close_date = _parse_wb_date(item.get("submission_deadline_date")) or _parse_wb_date(
+                item.get("submission_date")
+            )
+            open_date = _parse_wb_date(item.get("noticedate"))
 
             official_url = WORLD_BANK_DETAIL_URL.format(id=notice_id)
             country = str(item.get("project_ctry_name") or "International").strip()
-            notice_type = str(item.get("notice_type") or "").strip()
             project_name = str(item.get("project_name") or "").strip()
             notice_text = str(item.get("notice_text") or "").strip()
+            stripped = _strip_notice_html(notice_text)[:_NOTICE_TEXT_CAP] if notice_text else ""
 
-            categories = ["procurement"]
-            if notice_type:
-                categories.append(notice_type)
+            snippet_html: str | None = None
+            if notice_text and "<" in notice_text:
+                if is_safe_candidate_snippet(notice_text, official_url):
+                    snippet_html = notice_text
 
             candidates.append(
                 OpportunityCandidate(
@@ -91,17 +127,19 @@ class WorldBankConnector:
                     country=country,
                     official_url=official_url,
                     summary=project_name or title,
-                    categories=categories,
-                    topics=["world-bank-procurement"],
-                    raw_text=notice_text[:3000]
-                    if notice_text
-                    else json.dumps(item, ensure_ascii=False),
+                    description=stripped,
+                    categories=_category_values(item),
+                    topics=_topic_values(item),
+                    raw_text=stripped,
                     confidence_score=0.85,
+                    open_date=open_date,
                     close_date=close_date,
+                    external_id=notice_id or None,
+                    snippet_html=snippet_html,
                 )
             )
 
-        return candidates
+        return thin_fill_candidates(candidates)
 
     async def validate(self, candidate: OpportunityCandidate) -> ValidationResult:
         if not candidate.title:

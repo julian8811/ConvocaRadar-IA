@@ -9,7 +9,7 @@ from urllib.parse import urljoin
 from selectolax.parser import HTMLParser
 
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
-from app.connectors.common import clean_text, fetch_httpx_text, normalize_text
+from app.connectors.common import clean_text, fetch_httpx_text, normalize_text, thin_fill_candidates
 
 
 @register("unwomen-innovate")
@@ -135,24 +135,26 @@ class UnwomenInnovateConnector:
                 title, href = self._title_from_container(container)
                 text = (container.text() or "").strip()
                 candidate = self._candidate(title, href, text, raw.url)
-                if not candidate or candidate.official_url in seen or self._is_closed(candidate):
+                # Emit closed/past-deadline rows; soft-pass + reconcile own status.
+                if not candidate or candidate.official_url in seen:
                     continue
                 seen.add(candidate.official_url)
                 candidates.append(candidate)
 
         if candidates:
-            return candidates[:40]
+            return thin_fill_candidates(candidates[:40])
 
         for link in tree.css("a[href]"):
             title = clean_text(link.text())
             href = link.attributes.get("href") or ""
             text = clean_text(link.parent.text() if link.parent else title)
             candidate = self._candidate(title, href, text, raw.url)
-            if not candidate or candidate.official_url in seen or self._is_closed(candidate):
+            # Emit closed/past-deadline rows; soft-pass + reconcile own status.
+            if not candidate or candidate.official_url in seen:
                 continue
             seen.add(candidate.official_url)
             candidates.append(candidate)
-        return candidates[:40]
+        return thin_fill_candidates(candidates[:40])
 
     async def validate(self, candidate: OpportunityCandidate) -> ValidationResult:
         if not candidate.title or not candidate.official_url:

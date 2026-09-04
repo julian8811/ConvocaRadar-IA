@@ -5,7 +5,7 @@ from datetime import UTC, datetime
 from urllib.parse import quote_plus
 
 from app.core.config import get_settings
-from app.connectors.common import fetch_httpx_text
+from app.connectors.common import fetch_httpx_text, thin_fill_candidates
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
 
 
@@ -162,7 +162,7 @@ class HorizonSediaConnector:
                     close_date=close_date,
                 )
             )
-        return candidates[:80]
+        return thin_fill_candidates(candidates[:80])
 
     async def validate(self, candidate: OpportunityCandidate) -> ValidationResult:
         return ValidationResult(ok=bool(candidate.title and candidate.official_url))

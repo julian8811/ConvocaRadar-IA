@@ -45,6 +45,8 @@ class OpportunityCandidate:
     application_url: str | None = None
     region: str | None = None
     external_id: str | None = None
+    # Ephemeral candidate-scoped HTML for runner fill — never list-page raw.content.
+    snippet_html: str | None = None
 
 
 @dataclass

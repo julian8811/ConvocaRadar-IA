@@ -7,7 +7,7 @@ from urllib.parse import urljoin
 from selectolax.parser import HTMLParser
 
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
-from app.connectors.common import clean_text, fetch_httpx_text
+from app.connectors.common import clean_text, fetch_httpx_text, thin_fill_candidates
 from app.connectors.registry import register
 
 CARICOM_TENDERS_URL = "https://caricom.org/tenders/"
@@ -84,7 +84,7 @@ class CaricomConnector:
                         confidence_score=0.45,
                     )
                 )
-        return candidates[:30]
+        return thin_fill_candidates(candidates[:30])
 
     async def validate(self, candidate: OpportunityCandidate) -> ValidationResult:
         if not candidate.title or not candidate.official_url:

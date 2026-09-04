@@ -3,7 +3,7 @@ import re
 from datetime import datetime
 from html import unescape
 
-from app.connectors.common import fetch_httpx_text, is_shell_response, maybe_retry_shell_with_pw
+from app.connectors.common import fetch_httpx_text, is_shell_response, maybe_retry_shell_with_pw, thin_fill_candidates
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
 
 
@@ -190,7 +190,7 @@ class SimplerGrantsConnector:
                     funding_amount_raw=" - ".join(amount_parts) if amount_parts else None,
                 )
             )
-        return candidates[:50]
+        return thin_fill_candidates(candidates[:50])
 
     async def validate(self, candidate: OpportunityCandidate) -> ValidationResult:
         if not candidate.title or not candidate.official_url:

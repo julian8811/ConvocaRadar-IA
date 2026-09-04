@@ -8,7 +8,7 @@ from urllib.parse import urljoin, urlparse
 from selectolax.parser import HTMLParser
 
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
-from app.connectors.common import clean_text, fetch_httpx_text, parse_date_text
+from app.connectors.common import clean_text, fetch_httpx_text, parse_date_text, thin_fill_candidates
 
 
 UNDEF_URL = "https://www.un.org/democracyfund/en/apply-for-funding"
@@ -91,7 +91,7 @@ class UNDEFConnector:
                 candidates.append(candidate)
 
         if candidates:
-            return candidates[:30]
+            return thin_fill_candidates(candidates[:30])
 
         page_text = re.sub(r"\s+", " ", tree.text() or "").strip()
         heading = tree.css_first("h1, h2, h3")
@@ -99,7 +99,7 @@ class UNDEFConnector:
         if title.lower() in STOP_TITLES:
             title = "UNDEF funding call"
         if any(keyword in f"{title} {page_text}".lower() for keyword in TITLE_KEYWORDS):
-            return [
+            return thin_fill_candidates([
                 OpportunityCandidate(
                     title=title[:180],
                     entity="United Nations Democracy Fund",
@@ -113,7 +113,7 @@ class UNDEFConnector:
                     language="en",
                     close_date=parse_date_text(page_text),
                 )
-            ]
+            ])
         return []
 
     async def validate(self, candidate: OpportunityCandidate) -> ValidationResult:
