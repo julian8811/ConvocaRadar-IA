@@ -94,6 +94,23 @@ class Settings(BaseSettings):
     faculty_match_enabled: bool = True
     axis_match_threshold: float = 0.35
     llm_classification_enabled: bool = False
+    faculty_thresholds: str = ""  # e.g. "F1:0.40,F4:0.32" reversible per-faculty override
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def faculty_threshold_map(self) -> dict[str, float]:
+        out: dict[str, float] = {}
+        if self.faculty_thresholds:
+            for part in self.faculty_thresholds.split(","):
+                if ":" not in part:
+                    continue
+                k, v = part.split(":", 1)
+                k = k.strip().upper()
+                try:
+                    out[k] = float(v.strip())
+                except ValueError:
+                    continue
+        return out
 
     @field_validator("jwt_secret", "internal_api_key", mode="after")
     @classmethod
