@@ -90,6 +90,10 @@ class Settings(BaseSettings):
     extraction_batch_enabled: bool = False
     extraction_spa_retry: bool = False
     throttle_max_per_day: int = 150
+    # ── faculty match flags (PR1) ─────────────────────────────────────
+    faculty_match_enabled: bool = True
+    axis_match_threshold: float = 0.35
+    llm_classification_enabled: bool = False
 
     @field_validator("jwt_secret", "internal_api_key", mode="after")
     @classmethod
