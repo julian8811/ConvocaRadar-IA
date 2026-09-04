@@ -1,11 +1,13 @@
-"""Cosine matching service for faculty profiles (PR1: cosine-only, threshold 0.35)."""
+"""Hybrid faculty matching: P1 cosine gating + P2 LLM rerank (T6)."""
 from __future__ import annotations
+
+import hashlib
 
 import structlog
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
-from app.core.ai import build_embedding, cosine_similarity
+from app.core.ai import build_embedding, classify_faculty_llm, cosine_similarity
 from app.core.config import get_settings
 from app.models import Faculty, FacultyProfile, InstitutionalAxis, Opportunity, OpportunityAxisMatch, OpportunityEmbedding
 
@@ -58,16 +60,60 @@ async def match_opportunity(db: Session, opportunity_id: str) -> list[Opportunit
         opp_vec = await build_embedding(text)
 
     threshold_global = settings.axis_match_threshold
+    faculty_overrides = getattr(settings, "faculty_threshold_map", {})
 
-    results: list[OpportunityAxisMatch] = []
+    # Collect gated candidates (P1)
+    candidates: list[tuple[FacultyProfile, float, float]] = []
     for profile in profiles:
         if not profile.embedding:
             continue
         score = cosine_similarity(opp_vec, list(profile.embedding))
-        thr = profile.threshold if profile.threshold is not None else threshold_global
+        # per-faculty override (T9 tuning F1 0.40 / F4 0.32) > profile.threshold > global
+        thr = faculty_overrides.get(profile.faculty_id) if profile.faculty_id in faculty_overrides else (profile.threshold if profile.threshold is not None else threshold_global)
         if score < thr:
             continue
-        # Idempotent upsert by (org, opp, faculty)
+        candidates.append((profile, score, thr))
+
+    # P2 LLM rerank gating: only if candidates exist and flag enabled
+    llm_result: dict | None = None
+    if candidates and getattr(settings, "llm_classification_enabled", False):
+        try:
+            llm_result = await classify_faculty_llm(text)
+        except Exception:
+            llm_result = None
+        # Validate strict enum already done inside classify; None means fallback
+
+    results: list[OpportunityAxisMatch] = []
+    for profile, score, thr in candidates:
+        # Determine llm_score for this profile: if llm_result faculty matches profile, use its score
+        llm_score: float | None = None
+        extra_reasons: list[str] = []
+        if llm_result is not None:
+            # If llm_result faculty matches this profile's faculty, apply; otherwise still apply generic?
+            # Strict: only apply if hallucinated faculty not in enum already filtered; reuse score for matching faculty
+            if llm_result.get("faculty") == profile.faculty_id or llm_result.get("faculty") in {p[0].faculty_id for p in candidates}:
+                # Check faculty match or fallback to first candidate faculty
+                if llm_result.get("faculty") == profile.faculty_id:
+                    llm_score = float(llm_result["llm_score"])
+                    extra_reasons = list(llm_result.get("reasons") or [])
+                else:
+                    # LLM suggests different faculty than this profile; don't apply to this profile
+                    llm_score = None
+            else:
+                llm_score = None
+            # If llm_result faculty not matching any candidate, we still could apply to closest? For simplicity, apply only on exact match
+            # If no exact match, llm_score stays None -> fallback
+        # Weighting: 0.5/0.5 when llm_score present else 1.0*emb
+        if llm_score is not None:
+            final = round(0.5 * score + 0.5 * llm_score, 4)
+        else:
+            final = score
+
+        reasons = [f"cosine {score:.3f} >= threshold {thr:.2f} for axis {profile.axis_id}"]
+        if llm_score is not None:
+            reasons.append(f"llm {llm_score:.3f} for faculty {profile.faculty_id}")
+            reasons.extend(extra_reasons)
+
         existing = db.scalar(
             select(OpportunityAxisMatch).where(
                 OpportunityAxisMatch.organization_id == org_id,
@@ -75,17 +121,14 @@ async def match_opportunity(db: Session, opportunity_id: str) -> list[Opportunit
                 OpportunityAxisMatch.faculty_id == profile.faculty_id,
             )
         )
-        reasons = [f"cosine {score:.3f} >= threshold {thr:.2f} for axis {profile.axis_id}"]
         if existing:
-            # If verified_by set, don't overwrite faculty/axis
             if existing.verified_by:
                 existing.embedding_score = score
-                # keep faculty/axis as verified
                 results.append(existing)
                 continue
             existing.embedding_score = score
-            existing.final_score = score  # PR1: final = embedding only
-            existing.llm_score = None
+            existing.llm_score = llm_score
+            existing.final_score = final
             existing.reasons = reasons
             existing.axis_id = profile.axis_id
             results.append(existing)
@@ -96,15 +139,29 @@ async def match_opportunity(db: Session, opportunity_id: str) -> list[Opportunit
                 faculty_id=profile.faculty_id,
                 axis_id=profile.axis_id,
                 embedding_score=score,
-                llm_score=None,
-                final_score=score,
+                llm_score=llm_score,
+                final_score=final,
                 reasons=reasons,
             )
             db.add(obj)
             results.append(obj)
 
     db.flush()
-    logger.info("faculty_match_completed", opportunity_id=opp.id, matches=len(results))
+    # Metrics: try to record
+    try:
+        from app.core.metrics import record_match
+
+        for r in results:
+            record_match(r.final_score, r.llm_score is not None)
+    except Exception:
+        pass
+    logger.info(
+        "faculty_match_completed",
+        opportunity_id=opp.id,
+        matches=len(results),
+        llm_enabled=getattr(settings, "llm_classification_enabled", False),
+        llm_hit=llm_result is not None,
+    )
     return results
 
 
