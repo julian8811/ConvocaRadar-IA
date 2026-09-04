@@ -7,6 +7,7 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { ErrorState, LoadingState } from "@/components/ui/state";
 import { API_URL, api } from "@/lib/api";
+import { ProfileEditor } from "@/components/faculty/ProfileEditor";
 import type { Organization, OrganizationProfile } from "@/lib/types";
 
 function OrgInfo({ org, profile }: { org: Organization; profile: OrganizationProfile }) {
@@ -98,6 +99,7 @@ export default function SettingsPage() {
           );
         })}
       </div>
+      <ProfileEditor />
     </section>
   );
 }
