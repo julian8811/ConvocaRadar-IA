@@ -136,8 +136,6 @@ class TestParse:
         )
         assert c1.summary == "Education Infrastructure Project"
         assert "Invitation for Bids" in c1.categories
-        assert "procurement" in c1.categories
-        assert c1.topics == ["world-bank-procurement"]
         assert c1.close_date is not None
 
         # Second candidate
@@ -265,6 +263,117 @@ class TestValidate:
         result = await connector.validate(candidate)
         assert result.ok is False
         assert "official url" in result.reason.lower()
+
+
+# ── Rich field map (PR4) ───────────────────────────────────────────────────
+
+
+def _rich_notice(*, past_deadline: bool = False) -> dict:
+    now = datetime.now()
+    future = (now + timedelta(days=45)).strftime("%Y-%m-%d")
+    past = (now - timedelta(days=5)).strftime("%Y-%m-%d")
+    deadline = past if past_deadline else future
+    return {
+        "id": "OP00123456",
+        "bid_description": "Consulting Services for Climate Adaptation",
+        "notice_type": "Invitation for Bids",
+        "noticedate": f"{future}T00:00:00",
+        "submission_deadline_date": f"{deadline}T23:59:59",
+        "submission_date": f"{future}T12:00:00",
+        "project_name": "Climate Resilience Project",
+        "project_ctry_name": "Kenya",
+        "project_id": "P123456",
+        "bid_reference_no": "WB-KE-2026-01",
+        "procurement_group": "Consulting Services",
+        "procurement_method_code": "QCBS",
+        "procurement_method_name": "Quality And Cost-Based Selection",
+        "notice_text": "<p>Full notice body with <b>eligibility</b> details.</p>",
+        "notice_status": "Published",
+    }
+
+
+class TestRichFieldMap:
+    @pytest.mark.asyncio
+    async def test_parse_maps_rich_procnotice_fields(self, connector):
+        notice = _rich_notice()
+        raw = RawSourceResult(
+            source_key="world-bank-procurement",
+            url="http://example.com",
+            content=json.dumps({"total": 1, "rows": 1, "procnotices": {"OP00123456": notice}}),
+            content_type="application/json",
+        )
+
+        candidates = await connector.parse(raw)
+        assert len(candidates) == 1
+        c = candidates[0]
+
+        assert c.external_id == "OP00123456"
+        assert c.title == "Consulting Services for Climate Adaptation"
+        assert c.summary == "Climate Resilience Project"
+        assert c.country == "Kenya"
+        assert "eligibility" in (c.description or "").lower() or "eligibility" in c.raw_text.lower()
+        assert "<p>" not in (c.description or "")
+        assert "<p>" not in c.raw_text
+        assert c.snippet_html is not None
+        assert "<p>" in c.snippet_html
+        assert c.open_date is not None
+        assert c.open_date.strftime("%Y-%m-%d") == notice["noticedate"][:10]
+        assert c.close_date is not None
+        assert c.close_date.strftime("%Y-%m-%d") == notice["submission_deadline_date"][:10]
+        assert "Invitation for Bids" in c.categories
+        assert "Consulting Services" in c.categories
+        assert "Quality And Cost-Based Selection" in c.categories
+        assert "P123456" in c.topics
+        assert "WB-KE-2026-01" in c.topics
+        assert "QCBS" in c.topics
+        assert (
+            c.official_url
+            == "https://projects.worldbank.org/en/projects-operations/procurement-detail/OP00123456"
+        )
+
+    @pytest.mark.asyncio
+    async def test_parse_leaves_absent_optional_fields_unset(self, connector):
+        minimal = {
+            "id": "OP-MIN",
+            "bid_description": "Minimal notice only",
+            "submission_date": (datetime.now() + timedelta(days=10)).strftime("%Y-%m-%dT23:59:59"),
+        }
+        raw = RawSourceResult(
+            source_key="world-bank-procurement",
+            url="http://example.com",
+            content=json.dumps({"procnotices": {"OP-MIN": minimal}}),
+            content_type="application/json",
+        )
+
+        candidates = await connector.parse(raw)
+        assert len(candidates) == 1
+        c = candidates[0]
+        assert c.external_id == "OP-MIN"
+        assert c.title == "Minimal notice only"
+        assert c.summary == "Minimal notice only"
+        assert c.open_date is None
+        assert c.snippet_html is None
+        # No notice_text → no HTML body; thin_fill may copy summary into description.
+        assert "<" not in (c.description or "")
+        assert c.description in ("", c.summary)
+        assert c.close_date is not None
+
+    @pytest.mark.asyncio
+    async def test_parse_emits_past_deadline_with_deadline_date_preferred(self, connector):
+        notice = _rich_notice(past_deadline=True)
+        raw = RawSourceResult(
+            source_key="world-bank-procurement",
+            url="http://example.com",
+            content=json.dumps({"procnotices": {notice["id"]: notice}}),
+            content_type="application/json",
+        )
+
+        candidates = await connector.parse(raw)
+        assert len(candidates) == 1
+        past = candidates[0]
+        assert past.close_date is not None
+        assert past.close_date < datetime.now()
+        assert past.close_date.strftime("%Y-%m-%d") == notice["submission_deadline_date"][:10]
 
 
 # ── Registration tests ────────────────────────────────────────────────────
