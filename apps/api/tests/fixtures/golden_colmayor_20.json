@@ -1,0 +1,26 @@
+{
+  "version": 1,
+  "description": "Golden 20 oportunidades VT para tuning per-faculty thresholds hacia >=80% precision",
+  "items": [
+    {"id": "g1", "title": "Convocatoria Turismo sostenible PBOT y gestion catastral", "entity": "MinVivienda", "expected": [{"faculty": "F1", "axis": "extension"}, {"faculty": "F2", "axis": "extension"}]},
+    {"id": "g2", "title": "Biotecnologia vegetal y control biologico agropecuario", "entity": "MinCiencias", "expected": [{"faculty": "F3", "axis": "investigacion"}]},
+    {"id": "g3", "title": "Movilidad academica internacional para ingenieria ambiental", "entity": "ICETEX", "expected": [{"faculty": "F2", "axis": "internacionalizacion"}]},
+    {"id": "g4", "title": "Seguridad alimentaria y salud comunitaria territorial", "entity": "FAO", "expected": [{"faculty": "F4", "axis": "extension"}, {"faculty": "F3", "axis": "bienestar"}]},
+    {"id": "g5", "title": "Emprendimiento gastronomico y CEITTO innovacion", "entity": "SENA", "expected": [{"faculty": "F1", "axis": "innovacion"}]},
+    {"id": "g6", "title": "Gestion del riesgo de desastres y construccion sostenible", "entity": "UNGRD", "expected": [{"faculty": "F2", "axis": "extension"}]},
+    {"id": "g7", "title": "Microbiologia clinica y banco de sangre hematologia", "entity": "MinSalud", "expected": [{"faculty": "F3", "axis": "docencia"}]},
+    {"id": "g8", "title": "Planeacion territorial prospectiva y PBOT desarrollo local", "entity": "DNP", "expected": [{"faculty": "F4", "axis": "investigacion"}]},
+    {"id": "g9", "title": "Comunicacion social y gestion comunitaria medios", "entity": "MinTIC", "expected": [{"faculty": "F4", "axis": "docencia"}]},
+    {"id": "g10", "title": "Innovacion fab lab y sistemas de informacion geografica", "entity": "Ruta N", "expected": [{"faculty": "F2", "axis": "innovacion"}]},
+    {"id": "g11", "title": "Investigacion en Biociencias microbiologia y biotecnologia", "entity": "MinCiencias", "expected": [{"faculty": "F3", "axis": "investigacion"}]},
+    {"id": "g12", "title": "Bienestar institucional arte cultura deporte inclusion", "entity": "ColMayor", "expected": [{"faculty": "F4", "axis": "bienestar"}, {"faculty": "F3", "axis": "bienestar"}]},
+    {"id": "g13", "title": "Internacionalizacion curriculo movilidad y alianzas", "entity": "ICETEX", "expected": [{"faculty": "F1", "axis": "internacionalizacion"}]},
+    {"id": "g14", "title": "Gestion ambiental habitat sostenible y ordenamiento", "entity": "MinAmbiente", "expected": [{"faculty": "F2", "axis": "investigacion"}]},
+    {"id": "g15", "title": "Docencia gastronomia y reposteria servicios gastronomicos", "entity": "ColMayor", "expected": [{"faculty": "F1", "axis": "docencia"}]},
+    {"id": "g16", "title": "Desarrollo territorial y gestion comunitaria participativa", "entity": "DPS", "expected": [{"faculty": "F4", "axis": "extension"}]},
+    {"id": "g17", "title": "Bacteriologia laboratorio clinico y biotecnologia bioeconomia", "entity": "MinSalud", "expected": [{"faculty": "F3", "axis": "docencia"}]},
+    {"id": "g18", "title": "Turismo gastronomico internacional y guiansa turistica", "entity": "Fontur", "expected": [{"faculty": "F1", "axis": "internacionalizacion"}]},
+    {"id": "g19", "title": "Catastro multipropósito y planeacion urbana virtual", "entity": "IGAC", "expected": [{"faculty": "F2", "axis": "docencia"}]},
+    {"id": "g20", "title": "Innovacion academica educacion superior MIPG calidad", "entity": "MEN", "expected": [{"faculty": "F4", "axis": "docencia"}, {"faculty": "F2", "axis": "innovacion"}]}
+  ]
+}
