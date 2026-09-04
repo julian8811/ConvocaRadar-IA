@@ -265,8 +265,7 @@ class ConfigurableHtmlConnector:
             summary = str(item.get("description") or item.get("summary") or title).strip()
             close_date = self._candidate_close_date(item, summary)
             raw_text = summary[:2500]
-            if self._is_closed(title, summary, raw_text, close_date):
-                continue
+            # Emit closed/past-deadline rows; soft-pass + reconcile own status.
             candidates.append(
                 common.fill_candidate_from_content(
                     OpportunityCandidate(
@@ -495,9 +494,10 @@ class ConfigurableHtmlConnector:
         # ── Close date ────────────────────────────────────────────────
         close_date = common.extract_close_date(text)
 
-        # ── Closed check ──────────────────────────────────────────────
-        if self._is_closed(title, text, text[:2500], close_date):
-            return None
+        # Emit closed/past-deadline rows; soft-pass + reconcile own status.
+        card_html = (
+            container.html if isinstance(getattr(container, "html", None), str) else None
+        )
 
         return common.fill_candidate_from_content(
             OpportunityCandidate(
@@ -509,8 +509,9 @@ class ConfigurableHtmlConnector:
                 raw_text=text[:2500],
                 confidence_score=0.55,
                 close_date=close_date,
+                snippet_html=card_html,
             ),
-            html=getattr(container, "html", None) if isinstance(getattr(container, "html", None), str) else None,
+            html=card_html,
             text=_container_text(container) or text,
             page_url=link,
         )

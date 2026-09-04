@@ -7,7 +7,7 @@ from playwright.async_api import async_playwright
 from selectolax.parser import HTMLParser, Node
 
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
-from app.connectors.common import clean_text, fetch_httpx_text, launch_chromium, parse_date_text
+from app.connectors.common import clean_text, fetch_httpx_text, launch_chromium, parse_date_text, thin_fill_candidates
 from app.connectors.registry import register
 
 
@@ -127,16 +127,7 @@ class InnpulsaConnector:
         requirements = self._unique([target_audience, purpose]) or [
             "Revisar la convocatoria oficial"
         ]
-        status_lower = status.lower()
-        if status_lower in {
-            "closed",
-            "cerrada",
-            "cerrado",
-            "archived",
-            "finalizada",
-            "finished",
-        } or _is_past(parse_date_text(str(item.get("end_date") or ""))):
-            return None
+        # Emit closed/past-deadline API rows; soft-pass + reconcile own status.
         return OpportunityCandidate(
             title=title[:180],
             entity="iNNpulsa Colombia",
@@ -270,8 +261,7 @@ class InnpulsaConnector:
         summary = text.replace(title, "", 1).strip(" -")
         date = parse_date_text(text)
         money = _extract_money(text)
-        if _is_closed_text(text) or _is_past(date):
-            return None
+        # Emit closed/past-deadline cards; soft-pass + reconcile own status.
         if title.lower() in {"conoce mas", "ver detalles", "postulate", "postulate ahora"}:
             for separator in ("Conoce mas", "Ver detalles", "Postulate", "Postulate ahora"):
                 if separator in text:
@@ -318,7 +308,7 @@ class InnpulsaConnector:
                 seen.add(candidate.official_url)
                 candidates.append(candidate)
             if candidates:
-                return candidates[:200]
+                return thin_fill_candidates(candidates[:200])
 
         browser_cards = raw.metadata.get("cards") or []
         if browser_cards:
@@ -346,7 +336,7 @@ class InnpulsaConnector:
                     )
                 )
             if candidates:
-                return candidates[:100]
+                return thin_fill_candidates(candidates[:100])
 
         tree = HTMLParser(raw.content)
         candidates: list[OpportunityCandidate] = []
@@ -371,7 +361,7 @@ class InnpulsaConnector:
                 continue
             seen.add(candidate.official_url)
             candidates.append(candidate)
-        return candidates[:100]
+        return thin_fill_candidates(candidates[:100])
 
     async def validate(self, candidate: OpportunityCandidate) -> ValidationResult:
         if not candidate.title or not candidate.official_url:

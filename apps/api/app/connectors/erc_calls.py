@@ -57,7 +57,7 @@ class ErcCallsConnector:
     async def fetch(self) -> RawSourceResult:
         from app.core.config import get_settings
 
-        from app.connectors.common import fetch_httpx_text
+        from app.connectors.common import fetch_httpx_text, thin_fill_candidates
 
         settings = get_settings()
         api_key = settings.sedia_api_key or "SEDIA"
@@ -144,7 +144,7 @@ class ErcCallsConnector:
                     close_date=close_date,
                 )
             )
-        return candidates[:50]
+        return thin_fill_candidates(candidates[:50])
 
     async def validate(self, candidate: OpportunityCandidate) -> ValidationResult:
         if not candidate.title or not candidate.official_url:

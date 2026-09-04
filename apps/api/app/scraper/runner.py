@@ -98,16 +98,20 @@ async def _scrape_candidates(
             candidates = fallback_candidates
     if stats is not None:
         stats["candidates_parsed"] = len(candidates)
-    from app.connectors.common import fill_candidate_from_content
+    from app.connectors.common import fill_candidate_from_content, is_safe_candidate_snippet
 
     opportunities: list[OpportunityCreate] = []
     noise_rejected = 0
     validation_rejected = 0
     validation_reasons: list[str] = []
     for candidate in candidates:
+        # Candidate-scoped snippet only — never blind list-page raw.content.
+        snippet = candidate.snippet_html
+        html = snippet if is_safe_candidate_snippet(snippet, candidate.official_url) else None
         candidate = fill_candidate_from_content(
             candidate,
             text=candidate.raw_text or candidate.summary,
+            html=html,
             page_url=candidate.official_url,
         )
         if is_noise_payload(candidate.title, candidate.summary, candidate.raw_text):

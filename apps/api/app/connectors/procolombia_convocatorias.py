@@ -8,7 +8,7 @@ from urllib.parse import urljoin, urlparse
 from selectolax.parser import HTMLParser
 
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
-from app.connectors.common import BROWSER_UA, clean_text, fetch_httpx_text
+from app.connectors.common import BROWSER_UA, clean_text, fetch_httpx_text, thin_fill_candidates
 
 
 PROCOLOMBIA_SITEMAP_URL = "https://www.procolombia.co/sitemap.xml"
@@ -258,7 +258,7 @@ class ProcolombiaConvocatoriasConnector:
                 seen.add(candidate.official_url)
                 candidates.append(candidate)
 
-        return candidates[:100]
+        return thin_fill_candidates(candidates[:100])
 
     async def validate(self, candidate: OpportunityCandidate) -> ValidationResult:
         host = urlparse(candidate.official_url).hostname or ""

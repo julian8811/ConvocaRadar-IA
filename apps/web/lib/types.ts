@@ -18,8 +18,11 @@ export type Opportunity = {
   official_url: string | null;
   application_url: string | null;
   language: string;
+  eligible_applicants: string[];
   requirements: string[];
   documents_required: string[];
+  evaluation_criteria: string[];
+  restrictions: string[];
   risk_flags: string[];
   user_status: string;
   is_favorite: boolean;

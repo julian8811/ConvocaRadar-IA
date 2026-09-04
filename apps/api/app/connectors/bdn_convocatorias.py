@@ -5,7 +5,7 @@ from app.connectors.registry import register
 import json
 from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 
-from app.connectors.common import fetch_httpx_text, parse_date_text
+from app.connectors.common import fetch_httpx_text, parse_date_text, thin_fill_candidates
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
 
 
@@ -118,7 +118,7 @@ class BdnConvocatoriasConnector:
                     close_date=close_date,
                 )
             )
-        return candidates[:150]
+        return thin_fill_candidates(candidates[:150])
 
     async def validate(self, candidate: OpportunityCandidate) -> ValidationResult:
         return ValidationResult(

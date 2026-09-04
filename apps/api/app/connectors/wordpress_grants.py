@@ -8,7 +8,7 @@ from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 from app.core.config import get_settings
 from app.core.http_client import http_client
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
-from app.connectors.common import clean_text, is_allowed_host, parse_date_text
+from app.connectors.common import clean_text, is_allowed_host, parse_date_text, thin_fill_candidates
 
 
 def _clean(value: str | None) -> str:
@@ -174,7 +174,7 @@ class WordPressGrantsConnector:
                     close_date=close_date,
                 )
             )
-        return candidates[:200]
+        return thin_fill_candidates(candidates[:200])
 
     async def validate(self, candidate: OpportunityCandidate) -> ValidationResult:
         if not candidate.title or not candidate.official_url:

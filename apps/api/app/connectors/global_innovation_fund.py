@@ -7,7 +7,7 @@ from urllib.parse import urljoin, urlparse
 from selectolax.parser import HTMLParser
 
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
-from app.connectors.common import BROWSER_UA, clean_text, fetch_httpx_text
+from app.connectors.common import BROWSER_UA, clean_text, fetch_httpx_text, thin_fill_candidates
 
 
 GIF_APPLY_URL = "https://www.globalinnovation.fund/apply-for-funding/"
@@ -100,7 +100,7 @@ class GlobalInnovationFundConnector:
                     language="en",
                 )
             )
-        return candidates[:20]
+        return thin_fill_candidates(candidates[:20])
 
     async def validate(self, candidate: OpportunityCandidate) -> ValidationResult:
         host = urlparse(candidate.official_url).hostname or ""

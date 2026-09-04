@@ -12,7 +12,7 @@ except ImportError:
     HAS_PYPDF = False
 
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
-from app.connectors.common import fetch_httpx_bytes, normalize_text
+from app.connectors.common import fetch_httpx_bytes, normalize_text, thin_fill_candidates
 
 
 COUNTRY_RULES: list[tuple[str, str]] = [
@@ -233,8 +233,8 @@ class PdfConnector:
                 )
             )
         if candidates:
-            return candidates[:12]
-        return [
+            return thin_fill_candidates(candidates[:12])
+        return thin_fill_candidates([
             OpportunityCandidate(
                 title=normalized[:180],
                 entity=self.source_key.replace("-", " ").title(),
@@ -248,7 +248,7 @@ class PdfConnector:
                 close_date=_extract_date(normalized),
                 funding_amount_raw=_extract_amount(normalized),
             )
-        ]
+        ])
 
     async def validate(self, candidate: OpportunityCandidate) -> ValidationResult:
         if not candidate.title or not candidate.official_url:

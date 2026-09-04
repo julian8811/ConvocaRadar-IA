@@ -19,7 +19,7 @@ from app.connectors.base import (
     RawSourceResult,
     ValidationResult,
 )
-from app.connectors.common import fetch_httpx_text
+from app.connectors.common import fetch_httpx_text, thin_fill_candidates
 from app.connectors.registry import register
 
 logger = structlog.get_logger(__name__)
@@ -341,7 +341,7 @@ class DevelopmentAidConnector:
 
         if not unseen:
             logger.info("parse_no_new_urls", total=len(urls))
-            return candidates
+            return thin_fill_candidates(candidates)
 
         logger.info("parse_start", unseen_count=len(unseen), total=len(urls))
 
@@ -385,7 +385,7 @@ class DevelopmentAidConnector:
             candidates=len(candidates),
             processed_total=len(self._processed_urls),
         )
-        return candidates
+        return thin_fill_candidates(candidates)
 
     # ── validate() ─────────────────────────────────────────────────────
 
