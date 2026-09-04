@@ -57,6 +57,17 @@ _WEAK_TITLES = frozenset(
         "here",
         "click here",
         "read more",
+        "conoce más",
+        "conoce mas",
+        "más información",
+        "mas informacion",
+        "más información aquí",
+        "términos de referencia",
+        "terminos de referencia",
+        "ver noticia",
+        "ver todas",
+        "continúa leyendo",
+        "continua leyendo",
         "ver detalles",
         "see more",
         "details",
@@ -72,13 +83,18 @@ def _is_weak_title(title: str | None) -> bool:
 
 
 def _title_from_url(link: str) -> str | None:
-    from urllib.parse import urlparse
+    from urllib.parse import unquote, urlparse
 
     slug = urlparse(link).path.rstrip("/").rsplit("/", 1)[-1]
     if not slug or slug in {"en", "es", "de", "fr", "index.html", "index"}:
         return None
     if "?" in slug:
         slug = slug.split("?", 1)[0]
+    slug = unquote(slug)
+    for ext in (".pdf", ".docx", ".doc", ".xlsx", ".pptx", ".html", ".htm"):
+        if slug.lower().endswith(ext):
+            slug = slug[: -len(ext)]
+            break
     cleaned = slug.replace("-", " ").replace("_", " ").strip()
     if len(cleaned) < 4:
         return None
