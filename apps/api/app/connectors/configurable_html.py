@@ -41,6 +41,71 @@ DEEP_FETCH_LIMIT = 25
 DETAIL_PAGE_TIMEOUT = 15
 PAGINATION_MAX_PAGES = 10
 
+_WEAK_TITLES = frozenset(
+    {
+        "learn more",
+        "leer más",
+        "leer mas",
+        "ver más",
+        "ver mas",
+        "más",
+        "mas",
+        "more",
+        "explore",
+        "aquí",
+        "aqui",
+        "here",
+        "click here",
+        "read more",
+        "ver detalles",
+        "see more",
+        "details",
+    }
+)
+
+
+def _is_weak_title(title: str | None) -> bool:
+    if not title:
+        return True
+    normalized = " ".join(title.lower().split())
+    return normalized in _WEAK_TITLES or len(normalized) < 4
+
+
+def _title_from_url(link: str) -> str | None:
+    from urllib.parse import urlparse
+
+    slug = urlparse(link).path.rstrip("/").rsplit("/", 1)[-1]
+    if not slug or slug in {"en", "es", "de", "fr", "index.html", "index"}:
+        return None
+    if "?" in slug:
+        slug = slug.split("?", 1)[0]
+    cleaned = slug.replace("-", " ").replace("_", " ").strip()
+    if len(cleaned) < 4:
+        return None
+    return cleaned.title()
+
+
+def _recover_weak_title(title: str | None, container: Any, link: str) -> str | None:
+    """Replace CTA-only titles with parent text or URL slug."""
+    if not _is_weak_title(title):
+        return title
+    full = common.clean_text(_container_text(container))
+    if full:
+        lowered = full.lower()
+        for weak in sorted(_WEAK_TITLES, key=len, reverse=True):
+            if lowered.endswith(weak):
+                full = full[: -len(weak)].strip(" -:|")
+                lowered = full.lower()
+                break
+        # Prefer first sentence / clause when the card dumps body copy.
+        for sep in (". ", "!", "?"):
+            if sep in full and len(full.split(sep, 1)[0]) >= 8:
+                full = full.split(sep, 1)[0].strip()
+                break
+        if full and not _is_weak_title(full) and len(full) >= 8:
+            return full[:180]
+    return _title_from_url(link) or title
+
 
 def _detail_limit() -> int:
     try:
@@ -506,6 +571,18 @@ class ConfigurableHtmlConnector:
         self._selector_diagnostics["link_selector"] = link_selector_used
         if not link:
             return None
+
+        recovered = _recover_weak_title(title, container, link)
+        if recovered:
+            title = recovered
+            if _is_weak_title(title_selector_used or "") or title_selector_used in {
+                None,
+                "a",
+                ":self",
+            }:
+                self._selector_diagnostics["title_selector"] = (
+                    title_selector_used or ":recovered"
+                )
 
         # Deduplicate
         if link in seen_urls:
