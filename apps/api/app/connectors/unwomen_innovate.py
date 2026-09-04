@@ -135,7 +135,8 @@ class UnwomenInnovateConnector:
                 title, href = self._title_from_container(container)
                 text = (container.text() or "").strip()
                 candidate = self._candidate(title, href, text, raw.url)
-                if not candidate or candidate.official_url in seen or self._is_closed(candidate):
+                # Emit closed/past-deadline rows; soft-pass + reconcile own status.
+                if not candidate or candidate.official_url in seen:
                     continue
                 seen.add(candidate.official_url)
                 candidates.append(candidate)
@@ -148,7 +149,8 @@ class UnwomenInnovateConnector:
             href = link.attributes.get("href") or ""
             text = clean_text(link.parent.text() if link.parent else title)
             candidate = self._candidate(title, href, text, raw.url)
-            if not candidate or candidate.official_url in seen or self._is_closed(candidate):
+            # Emit closed/past-deadline rows; soft-pass + reconcile own status.
+            if not candidate or candidate.official_url in seen:
                 continue
             seen.add(candidate.official_url)
             candidates.append(candidate)

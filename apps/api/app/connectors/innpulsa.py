@@ -127,16 +127,7 @@ class InnpulsaConnector:
         requirements = self._unique([target_audience, purpose]) or [
             "Revisar la convocatoria oficial"
         ]
-        status_lower = status.lower()
-        if status_lower in {
-            "closed",
-            "cerrada",
-            "cerrado",
-            "archived",
-            "finalizada",
-            "finished",
-        } or _is_past(parse_date_text(str(item.get("end_date") or ""))):
-            return None
+        # Emit closed/past-deadline API rows; soft-pass + reconcile own status.
         return OpportunityCandidate(
             title=title[:180],
             entity="iNNpulsa Colombia",
@@ -270,8 +261,7 @@ class InnpulsaConnector:
         summary = text.replace(title, "", 1).strip(" -")
         date = parse_date_text(text)
         money = _extract_money(text)
-        if _is_closed_text(text) or _is_past(date):
-            return None
+        # Emit closed/past-deadline cards; soft-pass + reconcile own status.
         if title.lower() in {"conoce mas", "ver detalles", "postulate", "postulate ahora"}:
             for separator in ("Conoce mas", "Ver detalles", "Postulate", "Postulate ahora"):
                 if separator in text:

@@ -147,7 +147,7 @@ class TestParse:
         assert "Request for Proposals" in c2.categories
 
     @pytest.mark.asyncio
-    async def test_parse_filters_out_past_dates(self, connector):
+    async def test_parse_emits_past_dates_with_close_date(self, connector):
         raw = RawSourceResult(
             source_key="world-bank-procurement",
             url="http://example.com",
@@ -157,10 +157,12 @@ class TestParse:
 
         candidates = await connector.parse(raw)
 
-        # WB-003 (past date) should be filtered out
         titles = [c.title for c in candidates]
-        assert "Expired Road Construction" not in titles
-        assert len(candidates) == 2
+        assert "Expired Road Construction" in titles
+        assert len(candidates) == 3
+        past = next(c for c in candidates if c.title == "Expired Road Construction")
+        assert past.close_date is not None
+        assert past.close_date < datetime.now()
 
     @pytest.mark.asyncio
     async def test_parse_handles_empty_response(self, connector):

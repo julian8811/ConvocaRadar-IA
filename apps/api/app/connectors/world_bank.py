@@ -59,7 +59,6 @@ class WorldBankConnector:
 
         procnotices = payload.get("procnotices") or {}
         candidates: list[OpportunityCandidate] = []
-        now = datetime.now()
 
         for item_id, item in procnotices.items():
             bid_description = str(item.get("bid_description") or "").strip()
@@ -69,10 +68,8 @@ class WorldBankConnector:
             title = bid_description[:180]
             notice_id = str(item.get("id") or item_id).strip()
 
-            # Parse close date and filter out closed opportunities
+            # Emit past-deadline notices with close_date; soft-pass + reconcile own status.
             close_date = _parse_wb_date(item.get("submission_date"))
-            if close_date and close_date < now:
-                continue
 
             official_url = WORLD_BANK_DETAIL_URL.format(id=notice_id)
             country = str(item.get("project_ctry_name") or "International").strip()

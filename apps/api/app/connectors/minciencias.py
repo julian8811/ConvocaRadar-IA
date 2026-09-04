@@ -167,8 +167,7 @@ class MincienciasConnector:
             summary = title
         if not _is_candidate_text(title):
             return None
-        if _is_closed_text(title):
-            return None
+        # Emit closed titles; soft-pass + reconcile own status.
         return OpportunityCandidate(
             title=title[:180],
             entity="Minciencias",
@@ -223,8 +222,7 @@ class MincienciasConnector:
                     continue
                 seen.add(official_url)
                 text = _clean(link.parent.text() if link.parent else title)
-                if _is_closed_text(title):
-                    continue
+                # Emit closed titles; soft-pass + reconcile own status.
                 candidates.append(
                     OpportunityCandidate(
                         title=title[:180],

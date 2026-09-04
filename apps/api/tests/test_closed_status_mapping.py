@@ -11,6 +11,8 @@ from __future__ import annotations
 
 from datetime import UTC, datetime, timedelta
 
+import pytest
+
 from app.connectors.common import looks_closed_text
 from app.services.opportunity import inferred_opportunity_status, opportunity_status
 from app.services.search import build_opportunity_query
@@ -101,3 +103,83 @@ def test_closed_status_filter_includes_past_close_dates() -> None:
     stmt = build_opportunity_query("org-1", status="closed")
     compiled = stmt.compile()
     assert "close_date" in str(compiled).lower()
+
+
+@pytest.mark.asyncio
+async def test_generic_validate_still_rejects_closed_for_soft_pass() -> None:
+    """Parse may emit closed rows; validate must still signal closed for soft-pass."""
+    from app.connectors.base import OpportunityCandidate
+    from app.connectors.generic_html import GenericHtmlConnector
+
+    candidate = OpportunityCandidate(
+        title="Convocatoria de innovación cerrada",
+        entity="Test",
+        country="Colombia",
+        official_url="https://example.gov.co/cerrada",
+        summary="Estado: Cerrada. Ya no acepta postulaciones.",
+        raw_text="Estado: Cerrada. Ya no acepta postulaciones.",
+        confidence_score=0.7,
+        close_date=datetime(2024, 1, 15),
+    )
+    result = await GenericHtmlConnector("test", "https://example.gov.co").validate(candidate)
+    assert result.ok is False
+    reason = (result.reason or "").lower()
+    assert "closed" in reason or "cerrad" in reason
+
+
+@pytest.mark.asyncio
+async def test_configurable_validate_still_rejects_closed_for_soft_pass() -> None:
+    from app.connectors.base import OpportunityCandidate
+    from app.connectors.configurable_html import ConfigurableHtmlConnector
+
+    candidate = OpportunityCandidate(
+        title="Grant Closed Call",
+        entity="Test",
+        country="Colombia",
+        official_url="https://example.gov.co/closed",
+        summary="Applications closed",
+        raw_text="Applications closed",
+        confidence_score=0.6,
+        close_date=datetime.now(UTC).replace(tzinfo=None) - timedelta(days=5),
+    )
+    connector = ConfigurableHtmlConnector(
+        "test",
+        "https://example.gov.co",
+        {
+            "list_selectors": [".card"],
+            "title_selectors": ["h2 a"],
+            "link_selectors": ["a[href]"],
+            "content_selectors": [".content"],
+            "date_labels": ["Cierre:"],
+        },
+    )
+    result = await connector.validate(candidate)
+    assert result.ok is False
+    reason = (result.reason or "").lower()
+    assert "closed" in reason or "cerrad" in reason
+
+
+def test_reconcile_deadline_status_owns_closed_badge() -> None:
+    """UI closed badge remains owned by reconcile, not parse drop."""
+    from app.schemas.opportunity import OpportunityRead
+
+    now = datetime(2026, 9, 3, 12, 0, 0)
+    item = OpportunityRead.model_validate(
+        {
+            "id": "opp-closed-emit",
+            "organization_id": None,
+            "slug": "closed-emit",
+            "title": "Convocatoria emitida cerrada",
+            "entity": "Minciencias",
+            "country": "Colombia",
+            "status": "open",
+            "close_date": datetime(2024, 6, 1),
+            "summary": "Estado: Cerrada",
+            "user_status": "review",
+            "is_favorite": False,
+            "first_seen_at": now,
+            "last_seen_at": now,
+            "created_at": now,
+        }
+    )
+    assert item.status == "closed"

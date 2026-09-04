@@ -146,8 +146,7 @@ class ApcColombiaConnector:
         else:
             date_match = re.search(r"(\d{2}/\d{2}/\d{4}|\d{4}-\d{2}-\d{2})", container_text)
             open_date = parse_date_text(date_match.group(1) if date_match else container_text)
-        if _is_closed_text(title):
-            return None
+        # Emit closed titles; soft-pass + reconcile own status.
         return OpportunityCandidate(
             title=title[:180],
             entity="APC Colombia",
@@ -204,8 +203,7 @@ class ApcColombiaConnector:
                 }:
                     continue
                 seen.add(official_url)
-                if _is_closed_text(title):
-                    continue
+                # Emit closed titles; soft-pass + reconcile own status.
                 candidates.append(
                     OpportunityCandidate(
                         title=title[:180],
