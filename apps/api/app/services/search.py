@@ -56,6 +56,9 @@ def build_opportunity_query(
     max_amount: float | None = None,
     exclude_closed: bool = True,
     exclude_no_url: bool = False,
+    faculty: str | None = None,
+    axis: str | None = None,
+    min_match_score: float | None = None,
 ) -> Select[tuple[Opportunity]]:
     """Build a SELECT query for opportunities with the given filters.
 
@@ -159,6 +162,22 @@ def build_opportunity_query(
             OpportunityScore.organization_id == organization_id,
             OpportunityScore.priority == priority,
         )
+    if faculty or axis or min_match_score is not None:
+        from app.models import Faculty, InstitutionalAxis, OpportunityAxisMatch
+        stmt = stmt.join(OpportunityAxisMatch, OpportunityAxisMatch.opportunity_id == Opportunity.id)
+        stmt = stmt.where(OpportunityAxisMatch.organization_id == organization_id)
+        if faculty:
+            fac = None
+            # need to resolve via subquery; join Faculty for filtering
+            stmt = stmt.join(Faculty, Faculty.id == OpportunityAxisMatch.faculty_id).where(
+                (Faculty.key == faculty) | (Faculty.slug == faculty) | (Faculty.id == faculty)
+            )
+        if axis:
+            stmt = stmt.join(InstitutionalAxis, InstitutionalAxis.id == OpportunityAxisMatch.axis_id).where(
+                (InstitutionalAxis.key == axis) | (InstitutionalAxis.id == axis)
+            )
+        if min_match_score is not None:
+            stmt = stmt.where(OpportunityAxisMatch.final_score >= min_match_score)
     stmt = stmt.where(
         ~Opportunity.title.ilike("%color:%"),
         ~Opportunity.title.ilike("%background-color:%"),
