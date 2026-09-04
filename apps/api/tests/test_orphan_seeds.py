@@ -1,9 +1,10 @@
-"""Orphan seed wiring + factory World Bank registration (PR4 / 025 / 028).
+"""Orphan seed wiring + factory World Bank registration (PR4 / 025 / 028 / 029).
 
 Factory must side-effect-import world_bank so ``connector_for`` resolves the
 registered class without the caller importing the connector module first.
-Four orphan source definitions remain with ``enabled=False`` (WB + DevelopmentAid
-were enabled in 028).
+
+As of 029, the former orphan specialized seeds are enabled again. This module
+keeps World Bank factory checks and asserts the reactivated keys stay enabled.
 """
 
 from __future__ import annotations
@@ -11,14 +12,14 @@ from __future__ import annotations
 import ast
 from pathlib import Path
 
-ORPHAN_KEYS = (
+REACTIVATED_FORMER_ORPHANS = (
     "innovamos-fid",
     "innovamos-global-innovation-fund",
     "finep-brasil",
     "dane-convocatorias",
 )
 
-ORPHAN_URLS = {
+REACTIVATED_URLS = {
     "innovamos-fid": "https://www.innovamos.gov.co/convocatorias",
     "innovamos-global-innovation-fund": "https://www.innovamos.gov.co/convocatorias",
     "finep-brasil": "https://www.finep.gov.br/oportunidades",
@@ -70,12 +71,12 @@ def test_factory_source_imports_world_bank_for_register_side_effect():
     assert "WorldBankConnector" in source
 
 
-def test_orphan_seed_definitions_exist_disabled_with_expected_urls():
+def test_former_orphan_seeds_are_enabled_with_expected_urls():
     defs = _seed_definitions_by_key()
-    for key in ORPHAN_KEYS:
-        assert key in defs, f"missing orphan seed definition: {key}"
+    for key in REACTIVATED_FORMER_ORPHANS:
+        assert key in defs, f"missing seed definition: {key}"
         definition = defs[key]
-        assert definition.get("enabled") is False, f"{key} must be enabled=False"
-        assert definition["base_url"] == ORPHAN_URLS[key], f"{key} base_url mismatch"
+        assert definition.get("enabled", True) is True, f"{key} must be enabled=true"
+        assert definition["base_url"] == REACTIVATED_URLS[key], f"{key} base_url mismatch"
         assert definition["source_type"] in {"api", "html"}
         assert definition.get("allowed_domains"), f"{key} needs allowed_domains"

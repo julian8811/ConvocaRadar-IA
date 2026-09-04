@@ -65,13 +65,6 @@ CONFIG_FIELDS = (
     "date_labels",
 )
 
-REMAINING_ORPHANS = (
-    "innovamos-fid",
-    "innovamos-global-innovation-fund",
-    "finep-brasil",
-    "dane-convocatorias",
-)
-
 
 def _seed_definition_list() -> list[dict]:
     seed_path = Path(__file__).resolve().parents[1] / "app" / "db" / "seed.py"
@@ -124,11 +117,17 @@ def test_new_keys_present_enabled_with_config():
         assert parsed.link_selectors
 
 
-def test_remaining_orphans_still_disabled():
+def test_former_orphans_now_enabled():
+    """029 reactivated innovamos/finep/dane — they must not stay disabled."""
     defs = _seed_definitions_by_key()
-    for key in REMAINING_ORPHANS:
+    for key in (
+        "innovamos-fid",
+        "innovamos-global-innovation-fund",
+        "finep-brasil",
+        "dane-convocatorias",
+    ):
         assert key in defs
-        assert defs[key].get("enabled") is False
+        assert defs[key].get("enabled", True) is True
 
 
 def test_factory_resolves_enabled_specialized_and_new_html():

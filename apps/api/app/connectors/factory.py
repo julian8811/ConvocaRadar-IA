@@ -146,6 +146,13 @@ def connector_for(
     # the standard ``cls(base_url, **kwargs)`` registry pattern doesn't
     # fit.  They *are* registered for introspection but must be constructed
     # explicitly here during the gradual migration.
+    if source_key in {"innovamos-fid", "innovamos-global-innovation-fund"}:
+        return InnovamosConnector(source_key, base_url or "")
+    if source_key == "innpulsa-colombia-startup":
+        # Same API surface as ``innpulsa``; distinct source_key for catalog identity.
+        connector = InnpulsaConnector(base_url or "")
+        connector.source_key = source_key
+        return connector
     if source_key == "finep-brasil":
         return FinepConnector(
             source_key,
