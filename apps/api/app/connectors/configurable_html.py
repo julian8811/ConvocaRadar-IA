@@ -94,6 +94,9 @@ class HtmlConnectorConfig:
     connector's HTTP requests. Useful for sites that block bot User-Agents
     (e.g. CloudFront WAF)."""
 
+    browser_fallback: bool = False
+    """If True, re-fetch with Playwright when httpx returns a tiny HTML shell."""
+
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "HtmlConnectorConfig":
         """Parse and validate a config *dict* (e.g. from JSON API payload).
@@ -147,6 +150,7 @@ class HtmlConnectorConfig:
             pagination=pagination,
             detail_enrichment=bool(raw.get("detail_enrichment", False)),
             user_agent=raw.get("user_agent"),
+            browser_fallback=bool(raw.get("browser_fallback", False)),
         )
 
     @classmethod
@@ -230,6 +234,20 @@ class ConfigurableHtmlConnector:
             self.base_url,
             **kwargs,
         )
+        # Cookie/bot shells often return tiny HTML with 200; opt-in browser render.
+        if self.config.browser_fallback and len(content or "") < 1500:
+            try:
+                final_url, rendered, content_type = await common.render_page_html(
+                    self.base_url,
+                    user_agent=self.config.user_agent,
+                    wait_until="domcontentloaded",
+                    timeout_ms=45000,
+                    post_wait_ms=800,
+                )
+                if rendered and len(rendered) > len(content or ""):
+                    content = rendered
+            except Exception:
+                pass
         return RawSourceResult(
             source_key=self.source_key,
             url=final_url,
@@ -460,6 +478,11 @@ class ConfigurableHtmlConnector:
                     title = text
                     title_selector_used = selector
                     break
+        # List selector may match the <a> itself (no descendant title node).
+        if not title and getattr(container, "tag", None) == "a":
+            title = common.clean_text(container.text()) or None
+            if title:
+                title_selector_used = ":self"
         self._selector_diagnostics["title_selector"] = title_selector_used
         if not title:
             return None
@@ -475,6 +498,11 @@ class ConfigurableHtmlConnector:
                     link = urljoin(base_url, href)
                     link_selector_used = selector
                     break
+        if not link and getattr(container, "tag", None) == "a":
+            href = container.attributes.get("href")
+            if href:
+                link = urljoin(base_url, href)
+                link_selector_used = ":self"
         self._selector_diagnostics["link_selector"] = link_selector_used
         if not link:
             return None
