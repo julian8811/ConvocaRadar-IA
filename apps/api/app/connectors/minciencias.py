@@ -14,6 +14,7 @@ from app.connectors.common import (
     fetch_httpx_text,
     launch_chromium,
     normalize_text,
+    thin_fill_candidates,
 )
 from app.connectors.registry import register
 
@@ -202,7 +203,7 @@ class MincienciasConnector:
                     candidates.append(candidate)
 
         if candidates:
-            return candidates[:200]
+            return thin_fill_candidates(candidates[:200])
 
         for page in pages:
             page_url = page["url"]
@@ -240,7 +241,7 @@ class MincienciasConnector:
                         language="es",
                     )
                 )
-        return candidates[:200]
+        return thin_fill_candidates(candidates[:200])
 
     async def validate(self, candidate: OpportunityCandidate) -> ValidationResult:
         if not candidate.title or not candidate.official_url:

@@ -10,7 +10,7 @@ import json
 from datetime import datetime
 
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
-from app.connectors.common import fetch_httpx_text
+from app.connectors.common import fetch_httpx_text, thin_fill_candidates
 from app.connectors.registry import register
 
 WORLD_BANK_API_URL = "https://search.worldbank.org/api/v2/procnotices"
@@ -98,7 +98,7 @@ class WorldBankConnector:
                 )
             )
 
-        return candidates
+        return thin_fill_candidates(candidates)
 
     async def validate(self, candidate: OpportunityCandidate) -> ValidationResult:
         if not candidate.title:

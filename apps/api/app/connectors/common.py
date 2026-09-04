@@ -1670,6 +1670,21 @@ def fill_candidate_from_content(
     return apply_extracted_fields(candidate, extracted)
 
 
+def thin_fill_candidate(candidate: OpportunityCandidate) -> OpportunityCandidate:
+    """Post-construct text-only fill for specialized connectors (never list html=)."""
+    text = candidate.raw_text or candidate.summary or None
+    return fill_candidate_from_content(
+        candidate,
+        text=text,
+        page_url=candidate.official_url,
+    )
+
+
+def thin_fill_candidates(candidates: list[OpportunityCandidate]) -> list[OpportunityCandidate]:
+    """Apply :func:`thin_fill_candidate` to each item in a parse result list."""
+    return [thin_fill_candidate(candidate) for candidate in candidates]
+
+
 def unique_links(links: list[str]) -> list[str]:
     seen: set[str] = set()
     result: list[str] = []

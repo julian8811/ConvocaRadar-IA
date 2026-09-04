@@ -7,7 +7,7 @@ from urllib.parse import urljoin, urlparse
 from selectolax.parser import HTMLParser
 
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
-from app.connectors.common import clean_text, extract_close_date, fetch_httpx_text, parse_date_text
+from app.connectors.common import clean_text, extract_close_date, fetch_httpx_text, parse_date_text, thin_fill_candidates
 
 
 UKRI_HOSTS = {"ukri.org", "www.ukri.org"}
@@ -112,7 +112,7 @@ class UKRIConnector:
                     )
                 )
 
-        return candidates[:40]
+        return thin_fill_candidates(candidates[:40])
 
     async def validate(self, candidate: OpportunityCandidate) -> ValidationResult:
         if not candidate.title or not candidate.official_url:

@@ -11,7 +11,7 @@ from selectolax.parser import HTMLParser
 
 from app.core.config import get_settings
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
-from app.connectors.common import BROWSER_UA, clean_text, fetch_httpx_text, render_page_html
+from app.connectors.common import BROWSER_UA, clean_text, fetch_httpx_text, render_page_html, thin_fill_candidates
 
 
 TITLE_KEYWORDS = (
@@ -308,7 +308,7 @@ class InnovamosConnector:
         if _content_is_rendered(raw.content):
             candidate = self._candidate_from_rendered_page(raw)
             if candidate:
-                return [candidate]
+                return thin_fill_candidates([candidate])
 
         tree = HTMLParser(raw.content)
         candidates: list[OpportunityCandidate] = []
@@ -331,7 +331,7 @@ class InnovamosConnector:
                 candidates.append(candidate)
 
         if candidates:
-            return candidates[:40]
+            return thin_fill_candidates(candidates[:40])
 
         title_node = tree.css_first("h1, h2, h3, title")
         page_title = clean_text(title_node.text() if title_node else "")
@@ -340,7 +340,7 @@ class InnovamosConnector:
         if title.lower() in STOP_TITLES:
             title = self._source_entity()
         if any(keyword in f"{title} {page_text}".lower() for keyword in TITLE_KEYWORDS):
-            return [
+            return thin_fill_candidates([
                 OpportunityCandidate(
                     title=title[:180],
                     entity=self._source_entity(),
@@ -354,7 +354,7 @@ class InnovamosConnector:
                     language="es",
                     open_date=_extract_date(page_text),
                 )
-            ]
+            ])
         return []
 
     async def validate(self, candidate: OpportunityCandidate) -> ValidationResult:

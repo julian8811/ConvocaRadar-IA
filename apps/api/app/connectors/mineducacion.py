@@ -8,7 +8,7 @@ from urllib.parse import urljoin, urlparse
 from selectolax.parser import HTMLParser, Node
 
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
-from app.connectors.common import clean_text, fetch_httpx_text, normalize_text, parse_date_text
+from app.connectors.common import clean_text, fetch_httpx_text, normalize_text, parse_date_text, thin_fill_candidates
 
 
 MINEDUCACION_URL = "https://www.mineducacion.gov.co/portal/micrositios-institucionales/Cooperacion-Internacional/Becas-convocatorias-y-premios-de-cooperacion-internacional/420940:Becas-y-convocatorias"
@@ -131,7 +131,7 @@ class MineducacionConnector:
                     continue
                 seen.add(candidate.official_url)
                 candidates.append(candidate)
-        return candidates[:150]
+        return thin_fill_candidates(candidates[:150])
 
     async def validate(self, candidate: OpportunityCandidate) -> ValidationResult:
         if not candidate.title or not candidate.official_url:

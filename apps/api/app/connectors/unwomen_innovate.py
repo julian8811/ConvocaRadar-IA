@@ -9,7 +9,7 @@ from urllib.parse import urljoin
 from selectolax.parser import HTMLParser
 
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
-from app.connectors.common import clean_text, fetch_httpx_text, normalize_text
+from app.connectors.common import clean_text, fetch_httpx_text, normalize_text, thin_fill_candidates
 
 
 @register("unwomen-innovate")
@@ -142,7 +142,7 @@ class UnwomenInnovateConnector:
                 candidates.append(candidate)
 
         if candidates:
-            return candidates[:40]
+            return thin_fill_candidates(candidates[:40])
 
         for link in tree.css("a[href]"):
             title = clean_text(link.text())
@@ -154,7 +154,7 @@ class UnwomenInnovateConnector:
                 continue
             seen.add(candidate.official_url)
             candidates.append(candidate)
-        return candidates[:40]
+        return thin_fill_candidates(candidates[:40])
 
     async def validate(self, candidate: OpportunityCandidate) -> ValidationResult:
         if not candidate.title or not candidate.official_url:

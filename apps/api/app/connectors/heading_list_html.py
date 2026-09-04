@@ -12,6 +12,7 @@ from app.connectors.common import (
     fetch_httpx_text,
     looks_like_noise_text,
     parse_date_text,
+    thin_fill_candidates,
 )
 
 
@@ -124,7 +125,7 @@ class HeadingListHtmlConnector:
                     close_date=close_date,
                 )
             )
-        return candidates[:40]
+        return thin_fill_candidates(candidates[:40])
 
     async def validate(self, candidate: OpportunityCandidate) -> ValidationResult:
         host = urlparse(candidate.official_url).hostname or ""

@@ -8,7 +8,7 @@ from datetime import UTC, datetime
 from urllib.parse import urljoin
 
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
-from app.connectors.common import BROWSER_UA, clean_text, fetch_httpx_text, parse_date_text
+from app.connectors.common import BROWSER_UA, clean_text, fetch_httpx_text, parse_date_text, thin_fill_candidates
 
 
 MINCIT_PORTAL_BASE = "https://convocatoriasturismo.mincit.gov.co"
@@ -114,7 +114,7 @@ class MincitConvocatoriasConnector:
         return candidates
 
     async def parse(self, raw: RawSourceResult) -> list[OpportunityCandidate]:
-        return self._parse_blocks(raw.content)[:150]
+        return thin_fill_candidates(self._parse_blocks(raw.content)[:150])
 
     async def validate(self, candidate: OpportunityCandidate) -> ValidationResult:
         return ValidationResult(

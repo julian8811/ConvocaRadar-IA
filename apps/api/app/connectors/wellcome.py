@@ -9,7 +9,7 @@ from datetime import UTC, datetime
 from urllib.parse import urljoin
 
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
-from app.connectors.common import BROWSER_UA, clean_text, fetch_httpx_text, parse_date_text
+from app.connectors.common import BROWSER_UA, clean_text, fetch_httpx_text, parse_date_text, thin_fill_candidates
 
 
 WELLCOME_BASE_URL = "https://wellcome.org/research-funding/schemes"
@@ -126,7 +126,7 @@ class WellcomeConnector:
                     close_date=close_date,
                 )
             )
-        return candidates[:50]
+        return thin_fill_candidates(candidates[:50])
 
     async def validate(self, candidate: OpportunityCandidate) -> ValidationResult:
         return ValidationResult(

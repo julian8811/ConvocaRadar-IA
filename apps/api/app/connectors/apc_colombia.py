@@ -6,7 +6,7 @@ from urllib.parse import urljoin, urlparse
 from selectolax.parser import HTMLParser
 
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
-from app.connectors.common import clean_text, fetch_httpx_text, normalize_text, parse_date_text
+from app.connectors.common import clean_text, fetch_httpx_text, normalize_text, parse_date_text, thin_fill_candidates
 from app.connectors.registry import register
 
 
@@ -185,7 +185,7 @@ class ApcColombiaConnector:
                     candidates.append(candidate)
 
         if candidates:
-            return candidates[:150]
+            return thin_fill_candidates(candidates[:150])
 
         for page in pages:
             page_url = str(page["url"])
@@ -218,7 +218,7 @@ class ApcColombiaConnector:
                         language="es",
                     )
                 )
-        return candidates[:100]
+        return thin_fill_candidates(candidates[:100])
 
     async def validate(self, candidate: OpportunityCandidate) -> ValidationResult:
         if not candidate.title or not candidate.official_url:
