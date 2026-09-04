@@ -1610,6 +1610,54 @@ def apply_extracted_fields(
     return replace(candidate, **updates) if updates else candidate
 
 
+_SNIPPET_MAX_LEN = 50_000
+_SNIPPET_DOC_MARKERS = ("<html", "<body", "<!doctype")
+_SNIPPET_CARD_SELECTOR = "article, .card, .views-row"
+
+
+def is_safe_candidate_snippet(html: str | None, official_url: str | None = None) -> bool:
+    """Return True when ``html`` is a candidate-scoped fragment safe for structured fill.
+
+    Rejects empty/oversized input, full documents, and multi-card list shells.
+    RSS/API description HTML and World Bank notice fragments pass when they
+    satisfy those checks. ``official_url`` is accepted for callers that want
+    path affinity but is not required for text-only description snippets.
+    """
+    if not html or not isinstance(html, str):
+        return False
+    if len(html) > _SNIPPET_MAX_LEN:
+        return False
+    lowered = html.lower()
+    if any(marker in lowered for marker in _SNIPPET_DOC_MARKERS):
+        return False
+    try:
+        from urllib.parse import urlparse
+
+        from selectolax.parser import HTMLParser
+
+        tree = HTMLParser(html)
+        card_nodes = tree.css(_SNIPPET_CARD_SELECTOR)
+        # Union selectors can match the same element twice (e.g. article.card).
+        unique_cards = {node.html for node in card_nodes if getattr(node, "html", None)}
+        if len(unique_cards) > 1:
+            return False
+        distinct_paths: set[str] = set()
+        for anchor in tree.css("a[href]"):
+            href = (anchor.attributes.get("href") or "").strip()
+            if not href.startswith(("http://", "https://")):
+                continue
+            path = urlparse(href).path.rstrip("/") or "/"
+            distinct_paths.add(path)
+            if len(distinct_paths) > 3:
+                return False
+    except Exception:
+        return False
+    # official_url reserved for affinity checks by callers; fragments without
+    # matching links (RSS/WB notice text) remain eligible after shell checks.
+    _ = official_url
+    return True
+
+
 def fill_candidate_from_content(
     candidate: OpportunityCandidate,
     *,
