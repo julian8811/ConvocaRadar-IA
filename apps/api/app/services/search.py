@@ -178,6 +178,7 @@ def build_opportunity_query(
             )
         if min_match_score is not None:
             stmt = stmt.where(OpportunityAxisMatch.final_score >= min_match_score)
+        stmt = stmt.distinct()
     stmt = stmt.where(
         ~Opportunity.title.ilike("%color:%"),
         ~Opportunity.title.ilike("%background-color:%"),
