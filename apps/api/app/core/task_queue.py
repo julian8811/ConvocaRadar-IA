@@ -17,6 +17,38 @@ import structlog
 logger = structlog.get_logger(__name__)
 
 
+def enqueue_faculty_match(opportunity_ids: list[str]) -> str | None:
+    """Enqueue faculty_match task — inline fallback if arq not configured."""
+    try:
+        # Try inline execution via worker task
+        import asyncio
+
+        from app.db.session import SessionLocal
+        from app.worker import faculty_match_task
+
+        async def _run():
+            db = SessionLocal()
+            try:
+                await faculty_match_task(db, opportunity_ids)
+                db.commit()
+            except Exception as exc:
+                db.rollback()
+                logger.exception("faculty_match_inline_failed", error=str(exc))
+            finally:
+                db.close()
+
+        try:
+            loop = asyncio.get_running_loop()
+            loop.create_task(_run())
+        except RuntimeError:
+            asyncio.run(_run())
+        logger.info("faculty_match_enqueued", ids=opportunity_ids, mode="inline")
+        return "inline"
+    except Exception as exc:
+        logger.exception("faculty_match_enqueue_failed", error=str(exc))
+        return None
+
+
 def enqueue_seed_default_sources(organization_id: str) -> str | None:
     """Seed default sources inline (no Celery broker available).
 

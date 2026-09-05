@@ -16,6 +16,7 @@ import Link from "next/link";
 import { HealthZone } from "@/components/dashboard/HealthZone";
 import { PipelineZone } from "@/components/dashboard/PipelineZone";
 import { TriageZone } from "@/components/dashboard/TriageZone";
+import { FacultyMatrix } from "@/components/faculty/FacultyMatrix";
 
 export default function DashboardPage() {
   return (
@@ -53,6 +54,7 @@ export default function DashboardPage() {
       <TriageZone />
       <PipelineZone />
       <HealthZone />
+      <FacultyMatrix />
     </section>
   );
 }

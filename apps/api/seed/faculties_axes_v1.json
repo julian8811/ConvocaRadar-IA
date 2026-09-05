@@ -1,0 +1,85 @@
+{
+  "version": 1,
+  "source_urls": [
+    "https://www.colmayor.edu.co/",
+    "https://www.colmayor.edu.co/programas/",
+    "https://www.colmayor.edu.co/institucional/micolmayor/mision-y-vision/",
+    "https://www.colmayor.edu.co/institucional/micolmayor/proyecto-educativo-pei/",
+    "https://www.colmayor.edu.co/investigacion/",
+    "https://www.colmayor.edu.co/extension/",
+    "https://www.colmayor.edu.co/internacionalizacion/",
+    "https://www.colmayor.edu.co/bienestar/"
+  ],
+  "faculties": [
+    {
+      "key": "F1",
+      "name": "Facultad de Administracion",
+      "slug": "administracion",
+      "color": "#0e7490",
+      "icon": "briefcase",
+      "description": "Turismo, gastronomia, ingenieria comercial, gestion empresarial y desarrollo organizacional.",
+      "groups": ["CONEXIA"]
+    },
+    {
+      "key": "F2",
+      "name": "Facultad de Arquitectura e Ingenieria",
+      "slug": "arquitectura-ingenieria",
+      "color": "#7c3aed",
+      "icon": "building",
+      "description": "Arquitectura, construcciones civiles, ingenieria ambiental, gestion catastral y habitat sostenible.",
+      "groups": ["Ambiente, Habitat y Sostenibilidad"]
+    },
+    {
+      "key": "F3",
+      "name": "Facultad de Ciencias de la Salud",
+      "slug": "ciencias-salud",
+      "color": "#059669",
+      "icon": "heart-pulse",
+      "description": "Bacteriologia, biotecnologia, seguridad y salud en el trabajo, microbiologia clinica.",
+      "groups": ["Biociencias", "Unidad de Fitosanidad y Control Biologico"]
+    },
+    {
+      "key": "F4",
+      "name": "Facultad de Ciencias Sociales y Educacion",
+      "slug": "ciencias-sociales-educacion",
+      "color": "#d97706",
+      "icon": "users",
+      "description": "Planeacion y desarrollo social, comunicacion, gestion comunitaria y desarrollo territorial.",
+      "groups": ["Desarrollo Local y Gestion Territorial", "Plan D+E", "Innovacion Academica en Educ Superior"]
+    }
+  ],
+  "axes": [
+    {"key": "docencia", "label": "Docencia", "description": "Formacion pregrado, tecnologia, posgrado, virtualidad y ciencias basicas."},
+    {"key": "investigacion", "label": "Investigacion", "description": "Grupos, semilleros, proyectos, revista Sinergia, FabLab y CEMBIO."},
+    {"key": "extension", "label": "Extension y Proyeccion Social", "description": "13 areas: ambiental, socioeconomico, PBOT, catastro, riesgo, turismo, CTel, salud comunitaria."},
+    {"key": "internacionalizacion", "label": "Internacionalizacion", "description": "Movilidad academica, curriculo internacional, alianzas, redes de cooperacion."},
+    {"key": "bienestar", "label": "Bienestar Institucional", "description": "Arte, cultura, deporte, salud, desarrollo humano, inclusion y diversidad."},
+    {"key": "innovacion", "label": "Innovacion y Emprendimiento", "description": "CEITTO, FabLab, transferencia, emprendimiento gastronomico y bioinsumos."}
+  ],
+  "profiles": [
+    {"faculty": "F1", "axis": "docencia", "threshold": 0.35, "description": "F1 Administracion x Docencia: formacion en gestion turistica, gastronomica y comercial."},
+    {"faculty": "F1", "axis": "investigacion", "threshold": 0.35, "description": "F1 Administracion x Investigacion: CONEXIA turismo, gastronomia y organizaciones."},
+    {"faculty": "F1", "axis": "extension", "threshold": 0.35, "description": "F1 Administracion x Extension: proyeccion turistica y gastronomica territorial."},
+    {"faculty": "F1", "axis": "internacionalizacion", "threshold": 0.35, "description": "F1 Administracion x Internacionalizacion: movilidad turistica e idiomas."},
+    {"faculty": "F1", "axis": "bienestar", "threshold": 0.35, "description": "F1 Administracion x Bienestar: bienestar en servicios gastronomicos."},
+    {"faculty": "F1", "axis": "innovacion", "threshold": 0.35, "description": "F1 Administracion x Innovacion: emprendimiento gastronomico y turistico CEITTO."},
+    {"faculty": "F2", "axis": "docencia", "threshold": 0.35, "description": "F2 Arquitectura e Ingenieria x Docencia: delineante, gestion catastral y ambiental."},
+    {"faculty": "F2", "axis": "investigacion", "threshold": 0.35, "description": "F2 Arquitectura e Ingenieria x Investigacion: Ambiente Habitat y Sostenibilidad."},
+    {"faculty": "F2", "axis": "extension", "threshold": 0.35, "description": "F2 Arquitectura e Ingenieria x Extension: PBOT, catastro, riesgo y construccion sostenible."},
+    {"faculty": "F2", "axis": "internacionalizacion", "threshold": 0.35, "description": "F2 Arquitectura e Ingenieria x Internacionalizacion: movilidad en ingenieria y arquitectura."},
+    {"faculty": "F2", "axis": "bienestar", "threshold": 0.35, "description": "F2 Arquitectura e Ingenieria x Bienestar: habitat saludable y sostenible."},
+    {"faculty": "F2", "axis": "innovacion", "threshold": 0.35, "description": "F2 Arquitectura e Ingenieria x Innovacion: FabLab, construccion sostenible y SIG."},
+    {"faculty": "F3", "axis": "docencia", "threshold": 0.35, "description": "F3 Salud x Docencia: bacteriologia, biotecnologia, SST, microbiologia clinica."},
+    {"faculty": "F3", "axis": "investigacion", "threshold": 0.35, "description": "F3 Salud x Investigacion: Biociencias y UFCB biotecnologia agropecuaria."},
+    {"faculty": "F3", "axis": "extension", "threshold": 0.35, "description": "F3 Salud x Extension: salud comunitaria y seguridad alimentaria."},
+    {"faculty": "F3", "axis": "internacionalizacion", "threshold": 0.35, "description": "F3 Salud x Internacionalizacion: movilidad en salud y biotecnologia."},
+    {"faculty": "F3", "axis": "bienestar", "threshold": 0.35, "description": "F3 Salud x Bienestar: salud, desarrollo humano e inclusion."},
+    {"faculty": "F3", "axis": "innovacion", "threshold": 0.35, "description": "F3 Salud x Innovacion: UFCB bioinsumos, control biologico, transferencia."},
+    {"faculty": "F4", "axis": "docencia", "threshold": 0.35, "description": "F4 Sociales y Educacion x Docencia: planeacion, comunicacion, gestion comunitaria."},
+    {"faculty": "F4", "axis": "investigacion", "threshold": 0.35, "description": "F4 Sociales y Educacion x Investigacion: Desarrollo Territorial y Plan D+E."},
+    {"faculty": "F4", "axis": "extension", "threshold": 0.35, "description": "F4 Sociales y Educacion x Extension: gestion comunitaria, alimentacion, PBOT."},
+    {"faculty": "F4", "axis": "internacionalizacion", "threshold": 0.35, "description": "F4 Sociales y Educacion x Internacionalizacion: movilidad en ciencias sociales."},
+    {"faculty": "F4", "axis": "bienestar", "threshold": 0.35, "description": "F4 Sociales y Educacion x Bienestar: inclusion intercultural y diversidad."},
+    {"faculty": "F4", "axis": "innovacion", "threshold": 0.35, "description": "F4 Sociales y Educacion x Innovacion: innovacion social, territorio."}
+  ]
+}

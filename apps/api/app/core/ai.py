@@ -812,6 +812,171 @@ def cosine_similarity(left: list[float], right: list[float]) -> float:
     return round(dot / (left_norm * right_norm), 4)
 
 
+FACULTY_ENUM = {"F1", "F2", "F3", "F4"}
+AXIS_ENUM = {"docencia", "investigacion", "extension", "internacionalizacion", "bienestar", "innovacion"}
+
+# ── Faculty LLM rerank LRU cache (T6) ─────────────────────────────────────
+_FACULTY_LLM_CACHE: dict[str, dict] = {}
+_FACULTY_LLM_ORDER: list[str] = []
+
+
+def _faculty_llm_cache_key(text: str) -> str:
+    return hashlib.sha256(text[:8000].encode("utf-8")).hexdigest()
+
+
+def clear_faculty_llm_cache() -> None:
+    _FACULTY_LLM_CACHE.clear()
+    _FACULTY_LLM_ORDER.clear()
+
+
+def _faculty_llm_cache_get(key: str) -> dict | None:
+    hit = _FACULTY_LLM_CACHE.get(key)
+    if hit is not None:
+        try:
+            _FACULTY_LLM_ORDER.remove(key)
+        except ValueError:
+            pass
+        _FACULTY_LLM_ORDER.append(key)
+    return hit
+
+
+def _faculty_llm_cache_set(key: str, value: dict) -> None:
+    from app.core.config import get_settings as _gs2
+
+    try:
+        max_size = 256
+        _ = _gs2()
+    except Exception:
+        pass
+    if key in _FACULTY_LLM_CACHE:
+        try:
+            _FACULTY_LLM_ORDER.remove(key)
+        except ValueError:
+            pass
+    _FACULTY_LLM_CACHE[key] = value
+    _FACULTY_LLM_ORDER.append(key)
+    while len(_FACULTY_LLM_ORDER) > 256:
+        oldest = _FACULTY_LLM_ORDER.pop(0)
+        _FACULTY_LLM_CACHE.pop(oldest, None)
+
+
+# Pydantic validation for strict enum rerank (T6)
+try:
+    from pydantic import BaseModel, field_validator
+
+    class FacultyLLMResult(BaseModel):
+        faculty: str
+        axis: str
+        llm_score: float
+        reasons: list[str]
+
+        @field_validator("faculty")
+        @classmethod
+        def _valid_faculty(cls, v: str) -> str:
+            if v not in FACULTY_ENUM:
+                raise ValueError(f"faculty must be one of {FACULTY_ENUM}")
+            return v
+
+        @field_validator("axis")
+        @classmethod
+        def _valid_axis(cls, v: str) -> str:
+            if v not in AXIS_ENUM:
+                raise ValueError(f"axis must be one of {AXIS_ENUM}")
+            return v
+
+        @field_validator("llm_score")
+        @classmethod
+        def _valid_score(cls, v: float) -> float:
+            fv = float(v)
+            if not 0 <= fv <= 1:
+                raise ValueError("llm_score must be 0..1")
+            return round(fv, 4)
+
+except Exception:  # pragma: no cover
+    FacultyLLMResult = None  # type: ignore
+
+
+async def _call_faculty_llm(text: str) -> dict | None:
+    settings = get_settings()
+    provider = effective_llm_provider(settings.llm_provider)
+    if provider == "local" or not settings.llm_api_key:
+        return None
+    allowed_faculties = ", ".join(sorted(FACULTY_ENUM))
+    allowed_axes = ", ".join(sorted(AXIS_ENUM))
+    system_prompt = (
+        "Eres un clasificador estricto de convocatorias para la Institucion Universitaria Colegio Mayor de Antioquia. "
+        f"Facultades permitidas (enum cerrado): {allowed_faculties}. "
+        f"Ejes permitidos (enum cerrado): {allowed_axes}. "
+        "Devuelve EXCLUSIVAMENTE JSON valido con claves: faculty, axis, llm_score (0..1), reasons (lista de strings). "
+        "No inventes valores fuera del enum. Si la convocatoria no encaja claramente, usa el mejor enum con llm_score bajo y explica. "
+        f"prompt_version={PROMPT_VERSION} strict-enum-v4"
+    )
+    payload = {
+        "model": settings.chat_model or settings.llm_model,
+        "messages": [
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": text[:8000]},
+        ],
+        "temperature": 0.1,
+        "max_tokens": 512,
+        "response_format": {"type": "json_object"},
+    }
+    client = await http_client()
+    response = await client.post(
+        f"{settings.llm_api_base.rstrip('/')}/chat/completions",
+        headers={"Authorization": f"Bearer {settings.llm_api_key}", "Content-Type": "application/json"},
+        json=payload,
+        timeout=settings.llm_timeout_seconds,
+    )
+    response.raise_for_status()
+    data = response.json()
+    content = (((data.get("choices") or [{}])[0]).get("message") or {}).get("content")
+    if not content:
+        return None
+    if isinstance(content, dict):
+        return content
+    if isinstance(content, str):
+        try:
+            return json.loads(content)
+        except json.JSONDecodeError:
+            start = content.find("{")
+            if start >= 0:
+                try:
+                    parsed, _ = json.JSONDecoder().raw_decode(content[start:])
+                    if isinstance(parsed, dict):
+                        return parsed
+                except json.JSONDecodeError:
+                    pass
+    return None
+
+
+async def classify_faculty_llm(text: str) -> dict | None:
+    """Classify opportunity text into faculty/axis with strict enum validation and LRU cache."""
+    if not text or not text.strip():
+        return None
+    key = _faculty_llm_cache_key(text)
+    cached = _faculty_llm_cache_get(key)
+    if cached is not None:
+        return cached
+    raw = await _call_faculty_llm(text)
+    if raw is None:
+        return None
+    # Validate strict enum
+    if FacultyLLMResult is not None:
+        try:
+            validated = FacultyLLMResult.model_validate(raw)
+            result = validated.model_dump()
+        except ValidationError:
+            return None
+    else:
+        # Fallback manual validation
+        if raw.get("faculty") not in FACULTY_ENUM or raw.get("axis") not in AXIS_ENUM:
+            return None
+        result = raw
+    _faculty_llm_cache_set(key, result)
+    return result
+
+
 def compose_embedding_text(
     title: str,
     summary: str,
