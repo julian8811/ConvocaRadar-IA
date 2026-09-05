@@ -75,10 +75,39 @@ def count_pending_alerts(
 
 @router.get("/alerts", response_model=list[AlertRead])
 def list_alerts(
+    faculty: str | None = None,
     organization: Organization = Depends(get_current_organization),
     db: Session = Depends(get_db),
 ) -> list[Alert]:
-    return list(db.scalars(select(Alert).where(Alert.organization_id == organization.id).order_by(Alert.created_at.desc())))
+    stmt = select(Alert).where(Alert.organization_id == organization.id)
+    if faculty:
+        from app.models import Faculty
+        fac = db.scalar(select(Faculty).where((Faculty.key == faculty) | (Faculty.slug == faculty) | (Faculty.id == faculty)))
+        if fac:
+            stmt = stmt.where(Alert.faculty_id == fac.id)
+        else:
+            return []
+    return list(db.scalars(stmt.order_by(Alert.created_at.desc())))
+
+
+@router.delete("/alerts")
+def bulk_delete_alerts(
+    organization: Organization = Depends(get_current_organization),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict[str, int]:
+    import structlog
+    logger = structlog.get_logger(__name__)
+    count = db.scalar(select(func.count(Alert.id)).where(Alert.organization_id == organization.id)) or 0
+    # Delete all alerts for org
+    alerts = list(db.scalars(select(Alert).where(Alert.organization_id == organization.id)))
+    for a in alerts:
+        db.delete(a)
+    db.flush()
+    audit(db, "bulk_delete_alerts", "alert", user, None, metadata={"deleted_count": int(count)})
+    db.commit()
+    logger.info("bulk_delete_alerts", organization_id=organization.id, deleted_count=count)
+    return {"deleted_count": count}
 
 
 @router.post("/alerts", response_model=AlertRead)

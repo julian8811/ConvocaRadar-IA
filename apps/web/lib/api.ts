@@ -3,7 +3,10 @@ import type {
   Alert,
   AuditLog,
   DashboardSummary,
+  Faculty,
+  FacultyProfile,
   HealthRead,
+  InstitutionalAxis,
   Opportunity,
   OpportunityDocument,
   OpportunityList,
@@ -301,7 +304,10 @@ export const api = {
     request<Report>("/reports", { method: "POST", body: JSON.stringify(payload) }, 60_000),
   regenerateReport: (id: string) => request<Report>(`/reports/${id}/regenerate`, { method: "POST" }, 60_000),
   deleteReport: (id: string) => request(`/reports/${id}`, { method: "DELETE" }),
-  alerts: () => request<Alert[]>("/alerts"),
+  alerts: (faculty?: string) => {
+    const qs = faculty ? `?faculty=${encodeURIComponent(faculty)}` : "";
+    return request<Alert[]>(`/alerts${qs}`);
+  },
   alertsCount: () => request<{pending: number}>("/alerts/count"),
   createAlert: (payload: Record<string, unknown>) =>
     request<Alert>("/alerts", { method: "POST", body: JSON.stringify(payload) }),
@@ -310,8 +316,15 @@ export const api = {
     request<Alert>(`/alerts/${id}`, { method: "PATCH", body: JSON.stringify(payload) }),
   sendAlert: (id: string) => request<Alert>(`/alerts/${id}/send`, { method: "POST" }),
   deleteAlert: (id: string) => request(`/alerts/${id}`, { method: "DELETE" }),
+  deleteAllAlerts: () => request<{ deleted_count: number }>("/alerts", { method: "DELETE" }),
   testAlert: (recipient: string) =>
     request<Alert>("/alerts/test", { method: "POST", body: JSON.stringify({ recipient }) }),
+  faculties: () => request<{ faculties: Faculty[] }>("/faculties"),
+  axes: () => request<{ axes: InstitutionalAxis[] }>("/axes"),
+  facultyProfiles: () => request<FacultyProfile[]>("/faculty-profiles"),
+  facultyMatrix: () => request<{ cells: { faculty_id: string; axis_id: string; count: number }[]; total: number }>("/faculties/matrix"),
+  updateFacultyProfile: (id: string, payload: Record<string, unknown>) => request<FacultyProfile>(`/faculty-profiles/${id}`, { method: "PUT", body: JSON.stringify(payload) }),
+  recomputeMatches: (id: string) => request<{ updated: number }>(`/opportunities/${id}/matches/recompute`, { method: "POST" }),
   auditLogs: () => request<AuditLog[]>("/admin/audit-logs"),
   sourceRunsOverview: () => request<SourceRunOverview[]>("/admin/source-runs"),
   adminMetrics: () => request<AdminMetrics>("/admin/metrics"),

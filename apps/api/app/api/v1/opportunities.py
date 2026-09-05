@@ -97,6 +97,9 @@ def list_opportunities(
     close_date_to: str | None = None,
     min_amount: float | None = None,
     max_amount: float | None = None,
+    faculty: str | None = None,
+    axis: str | None = None,
+    min_match_score: float | None = None,
     page: int = Query(default=1, ge=1),
     page_size: int = Query(default=25, ge=1, le=100),
     include_closed: bool = Query(
@@ -120,6 +123,9 @@ def list_opportunities(
         close_date_to=close_date_to,
         min_amount=min_amount,
         max_amount=max_amount,
+        faculty=faculty,
+        axis=axis,
+        min_match_score=min_match_score,
         exclude_closed=not include_closed,
         exclude_no_url=not include_no_url,
     )
@@ -299,6 +305,21 @@ async def reanalyze_single_opportunity(
     db.commit()
     db.refresh(opportunity)
     return opportunity
+
+
+@router.post("/opportunities/{opportunity_id}/matches/recompute")
+async def recompute_matches(
+    opportunity_id: str,
+    organization: Organization = Depends(get_current_organization),
+    user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+) -> dict[str, int]:
+    from app.services.matching import match_opportunity
+    _get_opportunity_for_org(db, opportunity_id, organization)
+    matches = await match_opportunity(db, opportunity_id)
+    audit(db, "recompute_matches", "opportunity", user, opportunity_id)
+    db.commit()
+    return {"updated": len(matches)}
 
 
 @router.post("/opportunities/reanalyze-all")

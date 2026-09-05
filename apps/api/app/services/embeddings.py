@@ -259,6 +259,17 @@ class EmbeddingBatchService:
                     )
                 )
                 created += 1
+        # Async hook: faculty_match after embeddings persisted (T7)
+        try:
+            from app.core.config import get_settings
+
+            if get_settings().faculty_match_enabled:
+                opp_ids = [o.id for o in opportunities]
+                from app.core.task_queue import enqueue_faculty_match
+
+                enqueue_faculty_match(opp_ids)
+        except Exception:
+            pass
         return {"processed": len(opportunities), "created": created, "updated": updated}
 
 

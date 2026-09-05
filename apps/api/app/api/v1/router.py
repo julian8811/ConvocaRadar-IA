@@ -7,6 +7,7 @@ from app.api.v1 import (
     alerts,
     auth,
     dashboard,
+    faculties,
     internal,
     opportunities,
     ops,
@@ -34,6 +35,7 @@ api_router.include_router(
 )
 api_router.include_router(reports.router, tags=["reports"], dependencies=[Depends(verify_csrf)])
 api_router.include_router(alerts.router, tags=["alerts"], dependencies=[Depends(verify_csrf)])
+api_router.include_router(faculties.router, tags=["faculties"], dependencies=[Depends(verify_csrf)])
 api_router.include_router(ai.router, tags=["ai"], dependencies=[Depends(verify_csrf)])
 api_router.include_router(admin.router, tags=["admin"], dependencies=[Depends(verify_csrf)])
 api_router.include_router(ops.router, tags=["ops"], dependencies=[Depends(verify_csrf)])
