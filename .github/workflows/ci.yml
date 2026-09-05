@@ -10,13 +10,13 @@ jobs:
   check-secrets:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: bash scripts/check-secrets.sh
 
   hadolint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: hadolint/hadolint-action@v3.1.0
         with:
           dockerfile: apps/api/Dockerfile
@@ -29,7 +29,7 @@ jobs:
   compose-lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: docker compose config > /dev/null
         env:
           POSTGRES_PASSWORD: ci-dummy-postgres-password-0123456789abcdef
@@ -39,7 +39,7 @@ jobs:
   prod-asserts:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: |
           echo "Validating prod overlay: docker compose -f docker-compose.yml -f docker-compose.prod.yml config"
           POSTGRES_PASSWORD=ci-dummy-postgres-password-0123456789abcdef \
@@ -65,7 +65,7 @@ jobs:
       run:
         working-directory: apps/api
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -81,7 +81,7 @@ jobs:
       run:
         working-directory: apps/api
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -100,7 +100,7 @@ jobs:
   frontend:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v4
         with:
           version: 10.7.0
@@ -123,7 +123,7 @@ jobs:
       MINIO_ROOT_PASSWORD: ci-dummy-minio-root-password-0123456789abcdef
       INTERNAL_API_KEY: ci-dummy-internal-api-key-0123456789abcdef
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: docker compose build api
       - run: docker compose up -d postgres minio
       - run: sleep 10 && docker compose up -d api
