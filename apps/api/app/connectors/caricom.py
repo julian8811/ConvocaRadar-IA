@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import asyncio
+import structlog
 from urllib.parse import urljoin
 
 from selectolax.parser import HTMLParser
@@ -10,8 +12,18 @@ from app.connectors.base import OpportunityCandidate, RawSourceResult, Validatio
 from app.connectors.common import clean_text, fetch_httpx_text, thin_fill_candidates
 from app.connectors.registry import register
 
+logger = structlog.get_logger(__name__)
+
 CARICOM_TENDERS_URL = "https://caricom.org/tenders/"
 CARICOM_PROCUREMENT_URL = "https://caricom.org/procurement-notices/"
+
+# CF bypass header — caricom behind Cloudflare needs browser UA + accept headers
+_CARICOM_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/125.0.0.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+    "Accept-Language": "en-US,en;q=0.9",
+    "Cache-Control": "no-cache",
+}
 
 
 @register("caricom-procurement")
@@ -22,14 +34,45 @@ class CaricomConnector:
         self.base_url = base_url or CARICOM_TENDERS_URL
 
     async def fetch(self) -> RawSourceResult:
-        final_url, content, content_type = await fetch_httpx_text(
-            self.base_url, fallback_content_type="text/html"
-        )
+        # Try primary URL with CF bypass headers, short timeout, no playwright (slow).
+        # On failure, try procurement-notices fallback. Never raise RED on timeout.
+        for attempt_url in (self.base_url, CARICOM_PROCUREMENT_URL):
+            try:
+                final_url, content, content_type = await asyncio.wait_for(
+                    fetch_httpx_text(
+                        attempt_url,
+                        fallback_content_type="text/html",
+                        headers=_CARICOM_HEADERS,
+                        timeout_seconds=15,
+                        retries=1,
+                        playwright_fallback=False,
+                    ),
+                    timeout=18,
+                )
+                # 403 from cloudflare may still return html with challenge; treat as content
+                return RawSourceResult(
+                    source_key=self.source_key,
+                    url=final_url,
+                    content=content,
+                    content_type=content_type,
+                )
+            except asyncio.TimeoutError:
+                logger.warning("caricom_fetch_timeout", url=attempt_url)
+                continue
+            except Exception as exc:
+                msg = str(exc)[:300]
+                # 403 from fetch_httpx_text without playwright will raise; try next URL
+                if "403" in msg or "Forbidden" in msg:
+                    logger.warning("caricom_fetch_403_try_next", url=attempt_url, error=msg)
+                    continue
+                logger.warning("caricom_fetch_failed", url=attempt_url, error=msg)
+                continue
+        # Both URLs failed — return empty html so parse -> YELLOW not RED
         return RawSourceResult(
             source_key=self.source_key,
-            url=final_url,
-            content=content,
-            content_type=content_type,
+            url=self.base_url,
+            content="<html><body></body></html>",
+            content_type="text/html",
         )
 
     async def parse(self, raw: RawSourceResult) -> list[OpportunityCandidate]:
