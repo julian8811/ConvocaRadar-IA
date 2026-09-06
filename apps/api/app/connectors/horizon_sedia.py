@@ -90,15 +90,25 @@ class HorizonSediaConnector:
                 "sort": ["contentDate:desc"],
                 "filters": [{"field": "kind", "values": ["call-for-proposals"]}],
             }
-            final_url, content, _ = await fetch_httpx_text(
-                HORIZON_SEARCH_URL,
-                method="POST",
-                payload=payload,
-                fallback_content_type="application/json",
-            )
-            payload = json.loads(content)
-            for item in payload.get("results") or []:
+            try:
+                final_url, content, _ = await fetch_httpx_text(
+                    HORIZON_SEARCH_URL,
+                    method="POST",
+                    payload=payload,
+                    fallback_content_type="application/json",
+                )
+            except Exception:
+                continue
+            try:
+                decoded = json.loads(content)
+            except (json.JSONDecodeError, TypeError):
+                continue
+            for item in decoded.get("results") or []:
+                if not isinstance(item, dict):
+                    continue
                 metadata = item.get("metadata") or {}
+                if not isinstance(metadata, dict):
+                    metadata = {}
                 identifier = _clean(
                     _first_text(metadata.get("identifier"))
                     or _first_text(metadata.get("callIdentifier"))

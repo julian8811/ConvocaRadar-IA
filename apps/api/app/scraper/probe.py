@@ -17,7 +17,6 @@ from sqlalchemy import select
 
 from app.connectors.factory import connector_for
 from app.models import Source
-from app.scraper.domain_budget import get_domain_budget
 
 
 # ---------------------------------------------------------------------------
@@ -102,6 +101,19 @@ class ProbeReport:
 
 _PROBE_TIMEOUT = 30  # seconds per source (was 15, increased for slow sites)
 
+# Per-source timeout overrides (slow JS-heavy sites, d003 fix-probe-yellow-red)
+_PROBE_TIMEOUT_OVERRIDES: dict[str, int] = {
+    "minciencias": 45,
+    "findeter-convocatorias": 45,
+    "findeter": 45,  # legacy key alias
+    "caricom-procurement": 45,
+    "agencia-id-argentina": 45,
+}
+
+
+def _probe_timeout_for(source_key: str) -> int:
+    return _PROBE_TIMEOUT_OVERRIDES.get(source_key, _PROBE_TIMEOUT)
+
 
 async def _probe_one_source(
     source: Source,
@@ -125,16 +137,17 @@ async def _probe_one_source(
             connector_config=source.connector_config,
         )
 
+        timeout = _probe_timeout_for(source_key)
         # Fetch with timeout
         raw = await asyncio.wait_for(
             connector.fetch(),
-            timeout=_PROBE_TIMEOUT,
+            timeout=timeout,
         )
 
         # Parse with timeout
         candidates = await asyncio.wait_for(
             connector.parse(raw),
-            timeout=_PROBE_TIMEOUT,
+            timeout=timeout,
         )
 
         elapsed = time.monotonic() - start
@@ -157,11 +170,12 @@ async def _probe_one_source(
 
     except asyncio.TimeoutError:
         elapsed = time.monotonic() - start
+        timeout = _probe_timeout_for(source_key)
         return ProbeResult(
             source_key=source_key,
             status="RED",
             candidates_count=None,
-            error_message=f"Probe timed out after {_PROBE_TIMEOUT}s",
+            error_message=f"Probe timed out after {timeout}s",
             elapsed_seconds=round(elapsed, 3),
         )
     except Exception as exc:
@@ -179,14 +193,17 @@ async def _probe_with_budget(
     source: Source,
     semaphore: asyncio.Semaphore,
 ) -> ProbeResult:
-    """Acquire semaphore + domain budget slot, then probe the source."""
+    """Acquire semaphore then probe the source.
+
+    Domain budget is NOT acquired here — fetch_httpx_text / connector
+    layer owns the domain slot. Acquiring here caused a double-budget
+    deadlock for max_concurrent:1 domains (probe held 1/1, fetch then
+    failed to acquire and raised 'Domain budget exhausted'). Production
+    runner (runner.py) never acquires at this layer either.
+    Fix: d003 remove probe-level domain budget acquire.
+    """
     async with semaphore:
-        budget = get_domain_budget()
-        budget.acquire(source.base_url)
-        try:
-            return await _probe_one_source(source)
-        finally:
-            budget.release(source.base_url)
+        return await _probe_one_source(source)
 
 
 async def run_probe(
