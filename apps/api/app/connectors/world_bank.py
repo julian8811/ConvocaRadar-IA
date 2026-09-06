@@ -85,17 +85,35 @@ class WorldBankConnector:
         )
 
     async def parse(self, raw: RawSourceResult) -> list[OpportunityCandidate]:
-        if not raw.content.lstrip().startswith("{"):
+        stripped = (raw.content or "").lstrip()
+        if not stripped or stripped[0] not in "{[":
             return []
         try:
             payload = json.loads(raw.content)
         except json.JSONDecodeError:
             return []
+        # Some WB responses wrap payload as list with dict element
+        if isinstance(payload, list):
+            payload = payload[0] if payload and isinstance(payload[0], dict) else {}
 
-        procnotices = payload.get("procnotices") or {}
+        procnotices = payload.get("procnotices") if isinstance(payload, dict) else None
+        procnotices = procnotices or {}
+        # API may return dict {id: item} or list [item, ...] — handle both
+        if isinstance(procnotices, list):
+            iterable = enumerate(procnotices)
+            # normalize: list entries have no explicit id key; use index fallback
+            def _iter_list():
+                for idx, entry in enumerate(procnotices):
+                    if isinstance(entry, dict):
+                        yield str(entry.get("id") or idx), entry
+            items_iter = _iter_list()
+        elif isinstance(procnotices, dict):
+            items_iter = procnotices.items()
+        else:
+            items_iter = []
         candidates: list[OpportunityCandidate] = []
 
-        for item_id, item in procnotices.items():
+        for item_id, item in items_iter:
             bid_description = str(item.get("bid_description") or "").strip()
             if not bid_description:
                 continue
