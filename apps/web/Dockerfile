@@ -1,4 +1,4 @@
-﻿# syntax=docker/dockerfile:1.7
+# syntax=docker/dockerfile:1.7
 # ── Stage 1: install deps + build the Next.js app ────────────────────────────
 # The repo is a pnpm workspace (root package.json pins pnpm@10.7.0 via
 # packageManager; the single shared lockfile lives at the repo root, matching
@@ -18,11 +18,15 @@ COPY pnpm-workspace.yaml pnpm-lock.yaml ./
 COPY apps/web/package.json ./apps/web/package.json
 RUN pnpm install --frozen-lockfile --ignore-scripts
 
-# NEXT_PUBLIC_* vars are embedded at build time by Next.js, not at runtime.
-# Default to the Docker-network URL (used by SSR rewrites); override via
-# docker-compose build args for local dev where the browser needs localhost.
-ARG NEXT_PUBLIC_API_URL=http://api:8000/api/v1
-ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+# NEXT_PUBLIC_* vars are embedded at build time by Next.js. Keep these as
+# explicit build args so a production image cannot accidentally inherit the
+# development auth behaviour or a Docker-only API hostname in the browser.
+ARG NEXT_PUBLIC_API_URL=http://localhost:8002/api/v1
+ARG NEXT_PUBLIC_ENV=production
+ARG NEXT_PUBLIC_ENABLE_WAKE_RETRIES=true
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL} \
+    NEXT_PUBLIC_ENV=${NEXT_PUBLIC_ENV} \
+    NEXT_PUBLIC_ENABLE_WAKE_RETRIES=${NEXT_PUBLIC_ENABLE_WAKE_RETRIES}
 
 COPY apps/web/ ./apps/web/
 RUN pnpm --filter @convocaradar/web run build
