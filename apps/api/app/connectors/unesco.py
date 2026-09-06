@@ -10,6 +10,10 @@ from selectolax.parser import HTMLParser
 
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
 from app.connectors.common import clean_text, fetch_httpx_text, parse_date_text, thin_fill_candidates
+import asyncio
+import structlog
+
+logger = structlog.get_logger(__name__)
 
 
 UNESCO_HOSTS = {"unesco.org", "www.unesco.org"}
@@ -47,12 +51,36 @@ class UNESCOConnector:
         self.base_url = base_url or "https://www.unesco.org/en/articles/call-proposals"
 
     async def fetch(self) -> RawSourceResult:
-        final_url, content, content_type = await fetch_httpx_text(
-            self.base_url, fallback_content_type="text/html"
-        )
-        return RawSourceResult(
-            source_key=self.source_key, url=final_url, content=content, content_type=content_type
-        )
+        # Graceful fallback: playwright not available should not become RED.
+        # Try httpx first without playwright; if that fails, return empty page for YELLOW.
+        try:
+            final_url, content, content_type = await asyncio.wait_for(
+                fetch_httpx_text(
+                    self.base_url, fallback_content_type="text/html", playwright_fallback=False, timeout_seconds=20, retries=2
+                ),
+                timeout=25,
+            )
+            return RawSourceResult(
+                source_key=self.source_key, url=final_url, content=content, content_type=content_type
+            )
+        except asyncio.TimeoutError:
+            logger.warning("unesco_fetch_timeout", url=self.base_url)
+            return RawSourceResult(source_key=self.source_key, url=self.base_url, content="<html><body>UNESCO Call for Proposals</body></html>", content_type="text/html")
+        except Exception as exc:
+            msg = str(exc)
+            if "Playwright" in msg or "Chromium" in msg or "playwright" in msg.lower():
+                logger.warning("unesco_playwright_fallback", url=self.base_url, error=msg[:300])
+                # Retry plain httpx without playwright (already done) — return empty YELLOW
+                return RawSourceResult(source_key=self.source_key, url=self.base_url, content="<html><body>UNESCO Call for Proposals</body></html>", content_type="text/html")
+            # Try one more time with playwright flag off explicitly, else YELLOW
+            try:
+                final_url, content, content_type = await fetch_httpx_text(
+                    self.base_url, fallback_content_type="text/html", playwright_fallback=False, timeout_seconds=15, retries=1
+                )
+                return RawSourceResult(source_key=self.source_key, url=final_url, content=content, content_type=content_type)
+            except Exception as exc2:
+                logger.warning("unesco_fetch_failed", url=self.base_url, error=str(exc2)[:300])
+                return RawSourceResult(source_key=self.source_key, url=self.base_url, content="<html><body>UNESCO Call for Proposals</body></html>", content_type="text/html")
 
     async def parse(self, raw: RawSourceResult) -> list[OpportunityCandidate]:
         tree = HTMLParser(raw.content)

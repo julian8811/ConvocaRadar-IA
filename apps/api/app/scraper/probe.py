@@ -104,9 +104,11 @@ _PROBE_TIMEOUT = 30  # seconds per source (was 15, increased for slow sites)
 # Per-source timeout overrides (slow JS-heavy sites, d003 fix-probe-yellow-red)
 _PROBE_TIMEOUT_OVERRIDES: dict[str, int] = {
     "minciencias": 45,
-    "findeter-convocatorias": 45,
-    "findeter": 45,  # legacy key alias
-    "caricom-procurement": 45,
+    "findeter-convocatorias": 60,
+    "findeter": 60,  # legacy key alias
+    "caricom-procurement": 60,
+    "caricom": 60,
+    "unesco-call-for-proposals": 60,
     "agencia-id-argentina": 45,
 }
 
