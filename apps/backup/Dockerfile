@@ -4,6 +4,8 @@ FROM postgres:16-alpine
 ARG SUPERCRONIC_VERSION=v0.2.33
 ARG SUPERCRONIC_SHA1=71b0d58cc53f6bd72cf2f293e09e294b79c666d8
 
+SHELL ["/bin/ash", "-o", "pipefail", "-c"]
+
 # Bake the scheduler into the image instead of downloading executable code on
 # every container start. The checksum is pinned to the upstream amd64 release
 # used by the university VM deployment.
