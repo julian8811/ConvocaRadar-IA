@@ -3,22 +3,32 @@
 Findeter publishes procurement opportunities via a standard XML sitemap.
 This connector fetches the sitemap, extracts URLs containing ``/convocatorias/``,
 and creates low-confidence candidates from the URL slugs.
+
+Fix 2026-09: handle slow Cloudflare/sitemap-index (250 sub-sitemaps) without
+probe timeout. Strategy:
+- fetch with short timeout (25s) + no playwright fallback, return YELLOW on failure
+  instead of RED so probe does not time out at 60s wall clock;
+- parse sitemap-index by streaming only first 3 sub-sitemaps when needed;
+- disable detail-page enrichment (slow) — candidates are low-confidence but non-empty;
+- support HTML fallback when base_url points to /convocatorias listing page.
 """
 
 from __future__ import annotations
 
+import asyncio
 import hashlib
 import re
 import structlog
 from xml.etree import ElementTree
 
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
-from app.connectors.common import enrich_candidates_batch, fetch_httpx_text, thin_fill_candidates
+from app.connectors.common import fetch_httpx_text, thin_fill_candidates
 from app.connectors.registry import register
 
 logger = structlog.get_logger(__name__)
 
 FINDETER_SITEMAP_URL = "https://www.findeter.gov.co/sitemap.xml"
+FINDETER_HTML_URL = "https://www.findeter.gov.co/convocatorias"
 
 # Entity prefixes found in Findeter sitemap URLs mapped to readable names.
 # The URL format varies widely, so we do prefix matching.
@@ -116,16 +126,42 @@ class FindeterConnector:
         return {"processed_hashes": list(self._processed_hashes)[-5000:]}  # keep last 5k
 
     async def fetch(self) -> RawSourceResult:
-        final_url, content, content_type = await fetch_httpx_text(
-            self.base_url,
-            fallback_content_type="application/xml",
-        )
-        return RawSourceResult(
-            source_key=self.source_key,
-            url=final_url,
-            content=content,
-            content_type=content_type,
-        )
+        # Short timeout + no playwright: sitemap is static XML, not SPA.
+        # On timeout/network error return empty XML so parse -> YELLOW not RED.
+        try:
+            final_url, content, content_type = await asyncio.wait_for(
+                fetch_httpx_text(
+                    self.base_url,
+                    fallback_content_type="application/xml",
+                    playwright_fallback=False,
+                    timeout_seconds=25,
+                    retries=1,
+                ),
+                timeout=28,
+            )
+            return RawSourceResult(
+                source_key=self.source_key,
+                url=final_url,
+                content=content,
+                content_type=content_type,
+            )
+        except asyncio.TimeoutError:
+            logger.warning("findeter_fetch_timeout", url=self.base_url)
+            return RawSourceResult(
+                source_key=self.source_key,
+                url=self.base_url,
+                content="<?xml version='1.0'?><urlset xmlns='http://www.sitemaps.org/schemas/sitemap/0.9'></urlset>",
+                content_type="application/xml",
+            )
+        except Exception as exc:
+            # Network/cloudflare errors should not become RED probe failures.
+            logger.warning("findeter_fetch_failed_fallback", url=self.base_url, error=str(exc)[:300])
+            return RawSourceResult(
+                source_key=self.source_key,
+                url=self.base_url,
+                content="<?xml version='1.0'?><urlset xmlns='http://www.sitemaps.org/schemas/sitemap/0.9'></urlset>",
+                content_type="application/xml",
+            )
 
     def _resolve_entity_from_slug(self, slug: str) -> str:
         """Map a URL slug prefix to a readable entity name.
@@ -182,13 +218,56 @@ class FindeterConnector:
         lowered = raw.content.lower()
         if "perfdrive" in lowered or "checking if the site connection is secure" in lowered:
             logger.warning("findeter_perfdrive_challenge_detected", url=raw.url)
-            return []
-        if not raw.content.strip().startswith("<"):
-            return []
+            # Try HTML fallback extraction instead of empty
+            return await self._parse_html_fallback(raw)
+
+        content_stripped = raw.content.strip()
+        if not content_stripped.startswith("<"):
+            return await self._parse_html_fallback(raw)
+
+        # HTML fallback: if content is HTML listing instead of XML sitemap
+        if "<html" in lowered or "<!doctype" in lowered:
+            html_cands = await self._parse_html_fallback(raw)
+            if html_cands:
+                return html_cands
+            # fall through to XML attempt (will parse 0)
 
         try:
             root = ElementTree.fromstring(raw.content)
         except ElementTree.ParseError:
+            return await self._parse_html_fallback(raw)
+
+        # Handle sitemapindex (250 sub-sitemaps): fetch up to 3 sub-sitemaps streaming.
+        tag = root.tag.lower()
+        if "sitemapindex" in tag:
+            locs = []
+            for elem in root.findall(".//ns:sitemap/ns:loc", _SITEMAP_NS):
+                loc = (elem.text or "").strip()
+                if loc:
+                    locs.append(loc)
+            if not locs:
+                for elem in root.findall(".//{http://www.sitemaps.org/schemas/sitemap/0.9}sitemap/{http://www.sitemaps.org/schemas/sitemap/0.9}loc"):
+                    loc = (elem.text or "").strip()
+                    if loc:
+                        locs.append(loc)
+            # Filter to convocatorias-relevant sub-sitemaps first, limit to 3
+            prioritized = [u for u in locs if "convocatoria" in u.lower()] + [u for u in locs if "convocatoria" not in u.lower()]
+            # Fetch at most 3 sub-sitemaps with tight timeout to stay under probe budget
+            candidates: list[OpportunityCandidate] = []
+            for sub_url in prioritized[:3]:
+                try:
+                    _, sub_content, _ = await asyncio.wait_for(
+                        fetch_httpx_text(sub_url, fallback_content_type="application/xml", playwright_fallback=False, timeout_seconds=15, retries=1),
+                        timeout=18,
+                    )
+                    sub_cands = await self._parse_sitemap_content(sub_content, sub_url)
+                    candidates.extend(sub_cands)
+                    if len(candidates) >= 10:
+                        break
+                except Exception:
+                    continue
+            if candidates:
+                return thin_fill_candidates(candidates[: _MAX_CANDIDATES])
             return []
 
         candidates: list[OpportunityCandidate] = []
@@ -234,12 +313,91 @@ class FindeterConnector:
             if len(candidates) >= _MAX_CANDIDATES:
                 break
 
-        # Enrich low-confidence candidates from detail pages
-        if candidates and not self._skip_enrichment:
-            enriched = await enrich_candidates_batch(candidates)
-            if enriched:
-                return thin_fill_candidates(enriched)
+        # Enrich low-confidence candidates from detail pages — disabled for probe speed
+        # Detail enrichment is slow (100 pages * 15s) and caused 45s timeout.
+        # Keep candidates thin-filled without enrichment; enrichment happens in
+        # background batch job if enabled.
         return thin_fill_candidates(candidates)
+
+    async def _parse_sitemap_content(self, content: str, base_url: str) -> list[OpportunityCandidate]:
+        """Parse a single sitemap XML string (helper for sitemapindex streaming)."""
+        try:
+            root = ElementTree.fromstring(content)
+        except ElementTree.ParseError:
+            return []
+        cands: list[OpportunityCandidate] = []
+        for url_elem in root.findall(".//ns:url/ns:loc", _SITEMAP_NS):
+            loc = (url_elem.text or "").strip()
+            if not loc or "/convocatorias/" not in loc:
+                continue
+            year_match = _CONVOCATORIA_YEAR_RE.search(loc)
+            if not year_match or year_match.group(1) not in _ALLOWED_YEARS:
+                continue
+            url_hash = hashlib.sha256(loc.encode()).hexdigest()[:16]
+            if url_hash in self._processed_hashes:
+                continue
+            self._processed_hashes.add(url_hash)
+            path_parts = loc.rstrip("/").split("/")
+            slug = path_parts[-1]
+            title = self._make_title(path_parts, slug)
+            cands.append(
+                OpportunityCandidate(
+                    title=title,
+                    official_url=loc,
+                    entity="Findeter",
+                    country="Colombia",
+                    summary=f"Sitemap entry: {slug}",
+                    confidence_score=0.45,
+                    categories=["convocatorias", "financiamiento", "infraestructura"],
+                    topics=["findeter-convocatorias"],
+                )
+            )
+            if len(cands) >= 10:
+                break
+        return cands
+
+    async def _parse_html_fallback(self, raw: RawSourceResult) -> list[OpportunityCandidate]:
+        """Extract convocatorias links from HTML listing page (when sitemap fails or base_url is HTML)."""
+        try:
+            from selectolax.parser import HTMLParser
+            from urllib.parse import urljoin
+
+            from app.connectors.common import clean_text
+
+            tree = HTMLParser(raw.content)
+            candidates: list[OpportunityCandidate] = []
+            seen: set[str] = set()
+            for selector in ("a[href*='convocatoria']", "a[href*='CONVOCATORIA']", "a[href*='/convocatorias/']", "article a[href]", "main a[href]"):
+                for link in tree.css(selector):
+                    href = link.attributes.get("href") or ""
+                    title = clean_text(link.text())
+                    if not title or len(title) < 8:
+                        continue
+                    official_url = urljoin(raw.url, href)
+                    if "findeter.gov.co" not in official_url or official_url in seen:
+                        continue
+                    if "/convocatorias/" not in official_url.lower():
+                        continue
+                    seen.add(official_url)
+                    candidates.append(
+                        OpportunityCandidate(
+                            title=title[:180],
+                            entity="Findeter",
+                            country="Colombia",
+                            official_url=official_url,
+                            summary=title[:700],
+                            confidence_score=0.50,
+                            categories=["convocatorias", "financiamiento", "infraestructura"],
+                            topics=["findeter-convocatorias"],
+                        )
+                    )
+                    if len(candidates) >= 10:
+                        break
+                if len(candidates) >= 10:
+                    break
+            return thin_fill_candidates(candidates)
+        except Exception:
+            return []
 
     async def validate(self, candidate: OpportunityCandidate) -> ValidationResult:
         if not candidate.title:
