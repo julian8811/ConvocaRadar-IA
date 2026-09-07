@@ -38,6 +38,19 @@ jobs:
               """    existing = db.scalar(\n        select(Opportunity).where(\n            _organization_opportunity_scope(organization_id),\n            Opportunity.slug == slug,\n            Opportunity.entity == data.entity,\n            Opportunity.close_date == data.close_date,\n        )\n    )\n""",
           )
 
+          # Task.organization_id is nullable. Shared/bootstrap sources have no
+          # tenant yet, so persisting an invented all-zero UUID violates the FK.
+          replace_once(
+              "apps/api/app/scraper/runner.py",
+              '    org_id = organization_id or source.organization_id or "00000000-0000-0000-0000-000000000000"\n',
+              '    org_id = organization_id or source.organization_id\n',
+          )
+          bootstrap_test = Path("apps/api/tests/test_scraper_runner_task_org.py")
+          bootstrap_test.write_text(
+              '''"""Regression guards for bootstrap/shared-source task ownership."""\n\nfrom __future__ import annotations\n\nimport ast\nfrom pathlib import Path\n\n\nAPI_DIR = Path(__file__).resolve().parents[1]\nRUNNER = API_DIR / "app" / "scraper" / "runner.py"\n\n\ndef _setup_run_source() -> str:\n    tree = ast.parse(RUNNER.read_text(encoding="utf-8"))\n    for node in ast.walk(tree):\n        if isinstance(node, ast.FunctionDef) and node.name == "_setup_run":\n            return ast.unparse(node)\n    raise AssertionError("_setup_run() not found")\n\n\ndef test_shared_source_task_uses_nullable_organization_not_sentinel() -> None:\n    source = _setup_run_source()\n    assert "00000000-0000-0000-0000-000000000000" not in source\n    assert "organization_id or source.organization_id" in source\n''',
+              encoding="utf-8",
+          )
+
           # 0016 used try/except around SQL inside Alembic's transaction. On
           # PostgreSQL a failed CREATE INDEX poisons the transaction even when
           # Python catches the exception. faculty_profiles.embedding is JSON in
@@ -91,8 +104,10 @@ jobs:
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
           git add apps/api/app/services/opportunity.py \
+                  apps/api/app/scraper/runner.py \
                   apps/api/migrations/versions/0016_faculty_match_ivfflat.py \
                   apps/api/tests/test_migrations_chain.py \
-                  apps/api/tests/test_scraper_fixes.py
-          git commit -m "fix: close remaining PR29 backend and migration failures"
+                  apps/api/tests/test_scraper_fixes.py \
+                  apps/api/tests/test_scraper_runner_task_org.py
+          git commit -m "fix: make bootstrap task ownership FK-safe"
           git push origin HEAD:chore/server-readiness-20260906
