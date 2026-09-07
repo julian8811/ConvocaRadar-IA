@@ -3,7 +3,9 @@
 Revision 0008 historically resized an embeddings table that existed on older
 installations. Fresh installations create that table later in revision 0011,
 so 0008 must explicitly tolerate the table being absent while the graph stays
-linear through the current 0016 head.
+linear through the current 0016 head. Revision 0013 is the first identifier
+that exceeds Alembic's historical VARCHAR(32) metadata default, so it must
+widen that column before Alembic records the new revision on PostgreSQL.
 """
 
 from __future__ import annotations
@@ -95,3 +97,13 @@ def test_0011_upgrade_downgrade_are_idempotency_guarded() -> None:
     assert "information_schema.tables" in marker_helper
     assert "_marker_present(bind)" in down
     assert "DROP TABLE IF EXISTS opportunity_embeddings" in down
+
+
+def test_0013_widens_alembic_version_column_before_long_revision_id() -> None:
+    path = MIGRATIONS_DIR / "0013_reclassify_experimental_frequency.py"
+    source = path.read_text(encoding="utf-8")
+    up = _function_body(path, "upgrade")
+
+    assert len("0013_reclassify_experimental_frequency") > 32
+    assert 'conn.dialect.name == "postgresql"' in up
+    assert "ALTER TABLE alembic_version ALTER COLUMN version_num TYPE VARCHAR(64)" in source
