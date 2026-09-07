@@ -1,155 +1,200 @@
 # Restore Runbook — ConvocaRadar PostgreSQL backups
 
-Audience: operator on call for the ConvocaRadar compose stack. This document
-explains why the backup pipeline was rebuilt (July 2026 empty-backup incident),
-how the nightly cycle works, how to run a manual cycle, and how to restore.
+Audience: operador de ConvocaRadar en la VM universitaria.
 
-## 1. Incident root cause (why dumps were ~20 bytes)
+Este runbook describe backup, verificación y restauración para el stack de producción definido por `docker-compose.server.yml`. PostgreSQL **no publica un puerto en el host**; todas las operaciones se ejecutan dentro de la red Docker mediante `docker compose exec`.
 
-Between **2026-07-22 and this fix**, every scheduled backup produced a valid but
-**empty** `.sql.gz` (~20 bytes). The last real backup is dated **2026-07-21**.
+## 1. Contexto y contrato de seguridad
 
-Root cause chain, reproduced mechanically against the committed script:
+En julio de 2026 se detectaron backups gzip válidos pero vacíos (~20 bytes). La causa fue una combinación de autenticación ausente para `pg_dump` y un pipeline sin `pipefail`, que permitía que `gzip` ocultara el fallo de `pg_dump`.
 
-1. `scripts/backup-loop.sh` invoked `pg_dump -h postgres -U "$POSTGRES_USER"`
-   with **no password mechanism anywhere in the stack** — no `PGPASSWORD`, no
-   `.pgpass`. Against a password-protected server, pg_dump fails authentication
-   and writes nothing to stdout.
-2. The script ran under `/bin/sh` with `set -eu` only. POSIX shells have no
-   `pipefail`, so the pipeline `pg_dump | gzip > file` reported the exit status
-   of its **last** command: `gzip` succeeded compressing the empty stream.
-3. `gzip -t` passed, because the archive *is* valid gzip — of zero bytes.
+La implementación actual evita esa clase de error:
 
-Reproduction (stubbed `pg_dump` that prints the auth error to stderr, exits 1):
+1. `pg_dump` escribe primero un SQL temporal y su código de salida se comprueba directamente.
+2. El SQL se comprime solo después de un dump exitoso.
+3. Se rechazan archivos demasiado pequeños.
+4. Se ejecuta `gzip -t`.
+5. El archivo se publica mediante `mv` atómico.
+6. `verify_latest_backup.sh` comprueba integridad y marcadores de esquema.
+7. El ciclo exitoso termina con un marcador `PASS`.
 
-```console
-$ PATH="…:$PATH" sh -ec 'pg_dump -h postgres -U convocaradar -d convocaradar | gzip > old-pattern.sql.gz'
-pg_dump: error: fe_sendauth: no password supplied
-$ echo $?            # pipeline status under set -e, no pipefail
-0
-$ wc -c < old-pattern.sql.gz
-20
-$ gzip -t old-pattern.sql.gz && echo PASSES   # old gate accepts it
-PASSES
+Nunca se debe considerar válido un backup solo porque `gzip -t` pasa.
+
+## 2. Variables operativas
+
+Desde el checkout de producción:
+
+```bash
+cd /home/ubuntu/apps/convocaradar
+COMPOSE='docker compose -p convocaradar --env-file .env -f docker-compose.server.yml'
 ```
 
-Secondary trap, documented so it stays dead: never pass a `DATABASE_URL`-style
-URI to `pg_dump`. The app's `postgresql+psycopg://` scheme is SQLAlchemy
-driver syntax; libpq rejects it outright. Credentials travel as discrete vars
-(`PGHOST`, `PGPORT`, `POSTGRES_USER`, `POSTGRES_DB`, bridged `PGPASSWORD`).
+No imprimas `.env` ni exportes secretos al historial de shell. El contenedor `backup` recibe las credenciales PostgreSQL desde Compose.
 
-## 2. Backup architecture after the fix
+Los backups viven en el volumen Docker `convocaradar_backups-data` y la retención se controla con `BACKUP_RETENTION_DAYS` (14 días por defecto).
 
-| Piece | Location | Role |
-|---|---|---|
-| Cycle script | `scripts/backup-cycle.sh` | One dump → validate → publish → verify → prune cycle |
-| Schedule | `scripts/crontab-backup` | supercronic entry: daily at **03:30 UTC** |
-| Sidecar service | `docker-compose.yml` → `backup:` | `postgres:16-alpine`, restart unless-stopped, runs supercronic as PID 1 |
-| Verification | `scripts/verify_latest_backup.sh` | Newest-archive integrity + schema-marker check |
-| Retention | `BACKUP_RETENTION_DAYS` (default **14**) | Older `convocaradar-*.sql.gz` pruned each cycle |
+## 3. Backup manual obligatorio antes de actualizar
 
-The sidecar image must be `postgres:16-alpine`: the `pg_dump` client major
-version has to match the server major version. The stack's database is pg16.
+Ejecuta:
 
-Cycle stages, all inside `backup-cycle.sh`:
-
-1. Dump plain SQL directly to a staging file (no pipeline — keeps pg_dump's
-   exit status observable where POSIX sh lacks `pipefail`).
-2. Compress the staged dump with `gzip`.
-3. Size gate: reject archives < 100 bytes (the gzip-of-empty signature).
-4. Integrity gate: `gzip -t`.
-5. Atomic `mv` into `BACKUP_DIR`; readers never see partial archives.
-6. Prune archives older than the retention window.
-7. Run `verify_latest_backup.sh` **in-cycle** against the newest archive.
-
-Failure contract: any failed stage exits non-zero with an actionable log line;
-success ends with a `[backup-cycle] … PASS:` marker. Nothing is published
-unless all gates passed. The retained long-run alternative
-`scripts/backup-loop.sh` received the same auth and portability repairs.
-
-Portability note: size uses `wc -c` and latest-file selection uses
-`ls -t | head -1`. The previous GNU-only forms (`stat -c%s`,
-`find -printf '%T@'`) crash on busybox/alpine and macOS/BSD — verified by
-running the scripts with a restricted `PATH` lacking those tools (valid backup
-went from exit 127 to verified OK).
-
-## 3. Running a manual cycle
-
-Against the compose stack (from the host):
-
-```console
-$ docker compose exec backup /scripts/backup-cycle.sh
+```bash
+$COMPOSE exec -T backup /scripts/backup-cycle.sh
+$COMPOSE exec -T backup /scripts/verify_latest_backup.sh /backups
+$COMPOSE logs --tail=50 backup
 ```
 
-Against any reachable PostgreSQL from a machine with the client installed:
+El primer comando debe terminar en código 0 y registrar un mensaje similar a:
 
-```console
-$ PGHOST=127.0.0.1 PGPORT=5432 POSTGRES_USER=convocaradar \
-  POSTGRES_DB=convocaradar POSTGRES_PASSWORD=… BACKUP_DIR=/backups \
-  scripts/backup-cycle.sh
-[backup-cycle] 2026-08-24T01:47:57Z starting pg_dump of convocaradar@127.0.0.1:5544
-[backup-cycle] 2026-08-24T01:47:57Z published …/convocaradar-20260824T014757Z.sql.gz (1191 bytes)
-Backup integrity verified: …/convocaradar-20260824T014757Z.sql.gz (1191 bytes)
-[backup-cycle] 2026-08-24T01:47:57Z PASS: backup + verify completed for cycle 20260824T014757Z
+```text
+[backup-cycle] ... PASS: backup + verify completed ...
 ```
 
-Scheduled output lands in container logs: `docker compose logs backup`.
+No continúes con una actualización si el ciclo o la verificación fallan.
 
-## 4. Restore procedure
+Para confirmar que existe un archivo publicado sin extraerlo del volumen:
 
-1. List candidates and pick the archive to restore (newest first):
+```bash
+$COMPOSE exec -T backup sh -c 'ls -lh -t /backups/convocaradar-*.sql.gz | head'
+```
 
-   ```console
-   $ ls -lt /var/lib/docker/volumes/convocaradar_backups-data/_data/
+## 4. Restauración segura en una base scratch
+
+La regla es: **restaurar y validar primero en `scratch_restore`; nunca restaurar directamente sobre la base viva como primer paso**.
+
+### 4.1 Seleccionar el backup más reciente
+
+```bash
+latest="$($COMPOSE exec -T backup sh -c 'ls -t /backups/convocaradar-*.sql.gz | head -n 1' | tr -d '\r')"
+test -n "$latest" || { echo 'ERROR: no backup found'; exit 1; }
+printf 'Backup seleccionado: %s\n' "$latest"
+```
+
+### 4.2 Recrear la base scratch
+
+Esto solo modifica `scratch_restore`; no toca `convocaradar`:
+
+```bash
+$COMPOSE exec -T postgres dropdb --if-exists -U convocaradar scratch_restore
+$COMPOSE exec -T postgres createdb -U convocaradar scratch_restore
+```
+
+### 4.3 Restaurar dentro de la red Docker
+
+```bash
+$COMPOSE exec -T backup sh -c "gzip -dc '$latest'" \
+  | $COMPOSE exec -T postgres \
+      psql -v ON_ERROR_STOP=1 -U convocaradar -d scratch_restore
+```
+
+No uses `127.0.0.1:5434` ni publiques temporalmente PostgreSQL para restaurar. El Compose de producción mantiene PostgreSQL privado.
+
+## 5. Verificación del restore
+
+Compara la revisión Alembic:
+
+```bash
+source_revision="$($COMPOSE exec -T postgres psql -U convocaradar -d convocaradar -tAc 'SELECT version_num FROM alembic_version' | tr -d '\r')"
+restored_revision="$($COMPOSE exec -T postgres psql -U convocaradar -d scratch_restore -tAc 'SELECT version_num FROM alembic_version' | tr -d '\r')"
+printf 'source=%s restored=%s\n' "$source_revision" "$restored_revision"
+test "$source_revision" = "$restored_revision"
+```
+
+Compara el número de tablas y confirma una tabla esencial:
+
+```bash
+source_tables="$($COMPOSE exec -T postgres psql -U convocaradar -d convocaradar -tAc "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public'" | tr -d '\r')"
+restored_tables="$($COMPOSE exec -T postgres psql -U convocaradar -d scratch_restore -tAc "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public'" | tr -d '\r')"
+printf 'source_tables=%s restored_tables=%s\n' "$source_tables" "$restored_tables"
+test "$source_tables" = "$restored_tables"
+test "$($COMPOSE exec -T postgres psql -U convocaradar -d scratch_restore -tAc "SELECT to_regclass('public.opportunities') IS NOT NULL" | tr -d '\r')" = 't'
+```
+
+Cuando existan datos reales, añade verificaciones funcionales apropiadas (por ejemplo recuentos de oportunidades, usuarios u otras entidades críticas) antes de considerar utilizable el restore.
+
+## 6. Promoción de un restore a producción
+
+Promover un restore es una operación de recuperación, no una actualización rutinaria. Hazlo solo si la base viva debe recuperarse desde backup.
+
+1. Registra el commit activo:
+
+   ```bash
+   git rev-parse HEAD
    ```
 
-2. Create an empty scratch database — restore into scratch first, never
-   straight over the live database:
+2. Si la base viva aún es legible, intenta un backup manual adicional y conserva su resultado.
+3. Valida `scratch_restore` con la sección anterior.
+4. Detén los servicios que pueden escribir, dejando PostgreSQL disponible:
 
-   ```console
-   $ createdb -h 127.0.0.1 -p 5434 -U convocaradar scratch_restore
+   ```bash
+   $COMPOSE stop web worker api backup
    ```
 
-3. Restore (plain-SQL archives are streamed straight into psql):
+5. Antes de sustituir la base viva, confirma que no quedan conexiones de aplicación:
 
-   ```console
-   $ gunzip -c convocaradar-TIMESTAMP.sql.gz \
-       | psql -h 127.0.0.1 -p 5434 -U convocaradar -d scratch_restore
+   ```bash
+   $COMPOSE exec -T postgres psql -U convocaradar -d postgres -tAc \
+     "SELECT count(*) FROM pg_stat_activity WHERE datname='convocaradar' AND pid <> pg_backend_pid();"
    ```
 
-4. Sanity checks before promoting the restore:
+6. La sustitución de `convocaradar` es destructiva. Solo después de tener un `scratch_restore` validado y un backup conservado, recrea la base viva y carga el mismo archivo aprobado:
 
-   ```sql
-   SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public';
-   SELECT count(*) FROM opportunities;
+   ```bash
+   $COMPOSE exec -T postgres dropdb -U convocaradar convocaradar
+   $COMPOSE exec -T postgres createdb -U convocaradar convocaradar
+   $COMPOSE exec -T backup sh -c "gzip -dc '$latest'" \
+     | $COMPOSE exec -T postgres \
+         psql -v ON_ERROR_STOP=1 -U convocaradar -d convocaradar
    ```
 
-5. To promote: point the app at the restored database or swap roles/databases,
-   then re-run one backup cycle against the promoted instance.
+7. Verifica Alembic y tablas nuevamente en la base viva y luego levanta la aplicación:
 
-## 5. Executed-once evidence (2026-08-24)
+   ```bash
+   $COMPOSE up -d api
+   $COMPOSE up -d worker backup web
+   $COMPOSE ps
+   curl -fsS http://127.0.0.1:3001/api/v1/health/live && echo
+   ```
 
-Executed end-to-end on a disposable local PostgreSQL 16 cluster (trust auth,
-port 5544), exercising the exact committed scripts:
+8. Ejecuta un nuevo ciclo de backup después de la recuperación.
 
-* Source state created via psql: table `opportunities`, **rows = 50**.
-* `backup-cycle.sh` against the cluster: published
-  `convocaradar-20260824T014757Z.sql.gz` (**1191 bytes**), in-cycle verify
-  passed, exit code **0**, `PASS` marker logged.
-* Restored the archive into `scratch_restore` via step 3 above.
-* Post-restore sanity: **tables = 1**, **rows = 50**, `max(score) = 75.0`
-  (matches source data exactly).
+Si cualquier comprobación previa falla, **no borres la base viva**.
 
-Stubbed failure-path proofs recorded for the same committed script (fake
-`pg_dump` on `PATH`): auth-fail dump, mid-dump failure, tiny archive, failing
-in-cycle verification, and missing `POSTGRES_PASSWORD` each exited non-zero,
-published nothing, and left no temp files behind.
+## 7. Evidencia automatizada vigente
 
-## 6. Known deferrals
+El job `server-smoke` del CI reproduce el flujo de producción con `docker-compose.server.yml` y valida automáticamente:
 
-* Container-level compose proof (`docker compose up backup`, supercronic boot,
-  scheduled-fire observation) requires a Docker daemon; none exists in this
-  environment. Delegated to CI (which starts services explicitly and can add
-  `docker compose up -d backup`) or to ops during first production rollout.
-* Restore timings/volumes above reflect a 1-table fixture; production-scale
-  restore duration should be measured during the next drill.
+- PostgreSQL y MinIO saludables;
+- persistencia del volumen PostgreSQL después de recrear el contenedor;
+- arranque de API, worker, backup y web;
+- migración limpia hasta `alembic head`;
+- backup real y `verify_latest_backup.sh`;
+- restauración del backup más reciente en `scratch_restore`;
+- igualdad de revisión Alembic y cantidad de tablas entre origen y restauración;
+- existencia de la tabla `opportunities` en la restauración;
+- limpieza del stack efímero al terminar.
+
+El procedimiento de las secciones 4 y 5 se mantiene deliberadamente alineado con ese gate de CI.
+
+## 8. Programación y retención
+
+El contenedor `backup` ejecuta Supercronic con `scripts/crontab-backup`. La programación normal es diaria a las 03:30 UTC y la retención predeterminada es 14 días.
+
+Revisar estado y logs:
+
+```bash
+$COMPOSE ps backup
+$COMPOSE logs --tail=100 backup
+```
+
+## 9. Checklist de recuperación
+
+- [ ] Commit activo registrado.
+- [ ] Backup seleccionado existe y pasa `verify_latest_backup.sh`.
+- [ ] Restore a `scratch_restore` termina sin errores.
+- [ ] Revisión Alembic coincide.
+- [ ] Conteo de tablas coincide.
+- [ ] `opportunities` existe en scratch.
+- [ ] Se realizaron comprobaciones de datos críticos.
+- [ ] Servicios escritores detenidos antes de cualquier sustitución de la base viva.
+- [ ] La base viva no se elimina si falla alguna comprobación previa.
+- [ ] Después de recuperar, API/web están saludables y se genera un nuevo backup.
