@@ -53,18 +53,23 @@ def client() -> TestClient:
         if org:
             seed_default_sources(db, org, force=True)
             db.commit()
-        if org and not db.scalar(select(User).where(User.email == "admin@convocaradar.io")):
+        if org:
             from app.core.security import hash_password
 
-            db.add(
-                User(
+            user = db.scalar(select(User).where(User.email == "admin@convocaradar.io"))
+            if user is None:
+                user = User(
                     email="admin@convocaradar.io",
                     name="Admin ConvocaRadar",
                     password_hash=hash_password("ConvocaRadarLocal123!"),
                     role=Role.admin.value,
                     organization_id=org.id,
                 )
-            )
+                db.add(user)
+            else:
+                user.organization_id = org.id
+                user.role = Role.admin.value
+                user.password_hash = hash_password("ConvocaRadarLocal123!")
             db.commit()
     finally:
         db.close()
