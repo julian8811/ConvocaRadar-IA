@@ -51,19 +51,17 @@ jobs:
               encoding="utf-8",
           )
 
-          # 0016 used try/except around SQL inside Alembic's transaction. On
-          # PostgreSQL a failed CREATE INDEX poisons the transaction even when
-          # Python catches the exception. faculty_profiles.embedding is JSON in
-          # 0015, so IVFFLAT is only valid if an installation has explicitly
-          # migrated that column to pgvector.
+          # 0016 must never swallow PostgreSQL statement errors inside Alembic's
+          # transaction. 0015 stores embedding as JSON, so IVFFLAT is only valid
+          # for installations where that column was explicitly migrated to vector.
           migration = Path("apps/api/migrations/versions/0016_faculty_match_ivfflat.py")
           migration.write_text(
               '''"""Add IVFFLAT index for faculty profile embeddings when pgvector-backed (W2).\n\nRevision ID: 0016_faculty_match_ivfflat\nRevises: 0015_faculty_match\n"""\nfrom alembic import op\nfrom sqlalchemy import text\n\nrevision = "0016_faculty_match_ivfflat"\ndown_revision = "0015_faculty_match"\nbranch_labels = None\ndepends_on = None\n\n\ndef _embedding_is_vector() -> bool:\n    bind = op.get_bind()\n    if bind.dialect.name != "postgresql":\n        return False\n    type_name = bind.scalar(\n        text(\n            """\n            SELECT format_type(a.atttypid, a.atttypmod)\n            FROM pg_attribute AS a\n            JOIN pg_class AS c ON c.oid = a.attrelid\n            JOIN pg_namespace AS n ON n.oid = c.relnamespace\n            WHERE c.relname = 'faculty_profiles'\n              AND a.attname = 'embedding'\n              AND a.attnum > 0\n              AND NOT a.attisdropped\n              AND n.nspname = current_schema()\n            """\n        )\n    )\n    return bool(type_name and str(type_name).lower().startswith("vector"))\n\n\ndef upgrade() -> None:\n    if not _embedding_is_vector():\n        return\n    op.execute("CREATE EXTENSION IF NOT EXISTS vector")\n    op.execute(\n        "CREATE INDEX IF NOT EXISTS ix_faculty_profiles_embedding_ivfflat "\n        "ON faculty_profiles USING ivfflat (embedding vector_cosine_ops) WITH (lists = 10)"\n    )\n\n\ndef downgrade() -> None:\n    bind = op.get_bind()\n    if bind.dialect.name == "postgresql":\n        op.execute("DROP INDEX IF EXISTS ix_faculty_profiles_embedding_ivfflat")\n''',
               encoding="utf-8",
           )
 
-          # ast.unparse normalizes string literals to single quotes; assert the
-          # semantics rather than a formatter-specific quote style.
+          # ast.unparse normalizes string literals to single quotes; assert
+          # semantics rather than formatter-specific quoting.
           replace_once(
               "apps/api/tests/test_migrations_chain.py",
               "    assert 'conn.dialect.name == \"postgresql\"' in up\n",
@@ -76,9 +74,8 @@ jobs:
               text_value += '''\n\ndef test_0016_does_not_swallow_postgres_transaction_errors() -> None:\n    path = MIGRATIONS_DIR / "0016_faculty_match_ivfflat.py"\n    up = _function_body(path, "upgrade")\n    helper = _function_body(path, "_embedding_is_vector")\n\n    assert "try:" not in up\n    assert "format_type" in helper\n    assert "startswith('vector')" in helper\n'''
               tests.write_text(text_value, encoding="utf-8")
 
-          # The facade re-exports the function, but its globals live in
-          # app.services.connectors. Patch dependencies at their lookup site so
-          # module reloads elsewhere in the suite cannot leave a stale Settings cache.
+          # Patch dependencies at their lookup site so module reloads elsewhere
+          # in the suite cannot leave a stale Settings cache.
           scraper_test = Path("apps/api/tests/test_scraper_fixes.py")
           text_value = scraper_test.read_text(encoding="utf-8")
           if '"app.services.connectors.get_settings"' not in text_value:
@@ -94,6 +91,16 @@ jobs:
           )
           scraper_test.write_text(text_value, encoding="utf-8")
 
+          # The API integration helper is reused across the module. A constant
+          # external_id makes the close_days=3 alert fixture silently reuse the
+          # earlier close_days=30 opportunity because production correctly keeps
+          # an existing deadline. Give every synthetic helper call its own ID.
+          replace_once(
+              "apps/api/tests/test_api.py",
+              '                external_id="fixture-grants-2026",\n',
+              '                external_id=f"fixture-grants-2026-{datetime.now(UTC).timestamp()}",\n',
+          )
+
       - name: Commit repair patch
         shell: bash
         run: |
@@ -108,6 +115,7 @@ jobs:
                   apps/api/migrations/versions/0016_faculty_match_ivfflat.py \
                   apps/api/tests/test_migrations_chain.py \
                   apps/api/tests/test_scraper_fixes.py \
-                  apps/api/tests/test_scraper_runner_task_org.py
-          git commit -m "fix: make bootstrap task ownership FK-safe"
+                  apps/api/tests/test_scraper_runner_task_org.py \
+                  apps/api/tests/test_api.py
+          git commit -m "test: make API opportunity fixtures hermetic"
           git push origin HEAD:chore/server-readiness-20260906
