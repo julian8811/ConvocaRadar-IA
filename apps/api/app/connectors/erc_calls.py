@@ -6,6 +6,7 @@ import json
 from datetime import datetime
 
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
+from app.connectors.common import thin_fill_candidates
 from app.connectors.registry import register
 
 ERC_TOPIC_URL = "https://ec.europa.eu/info/funding-tenders/opportunities/portal/screen/opportunities/topic-details/{identifier}"
@@ -57,7 +58,7 @@ class ErcCallsConnector:
     async def fetch(self) -> RawSourceResult:
         from app.core.config import get_settings
 
-        from app.connectors.common import fetch_httpx_text, thin_fill_candidates
+        from app.connectors.common import fetch_httpx_text
 
         settings = get_settings()
         api_key = settings.sedia_api_key or "SEDIA"
@@ -104,15 +105,12 @@ class ErcCallsConnector:
             summary = _clean(
                 _first_text(item.get("shortDescription")) or _clean(item.get("description", ""))
             )
-            # Relaxed filter: check title, summary, identifier, and keywords for ERC signals.
             title_lower = title.lower()
             summary_lower = summary.lower()
             identifier_lower = identifier.lower()
             combined = f"{title_lower} {summary_lower} {identifier_lower}"
-            if not any(term.lower() in combined for term in ERC_TERMS):
-                # Keep if result pool small (already filtered server-side) — avoid dropping valid erc variants.
-                if len(results) > 10:
-                    continue
+            if not any(term.lower() in combined for term in ERC_TERMS) and len(results) > 10:
+                continue
             categories = ["grants", "research", "european research council"]
             if "starting" in title_lower:
                 categories.append("starting grant")
