@@ -21,6 +21,8 @@ from selectolax.parser import HTMLParser
 from app.connectors import common
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
 
+logger = logging.getLogger(__name__)
+
 def _container_text(container: Any) -> str:
     """Visible text with newlines preserved so labelled sections still parse."""
     try:

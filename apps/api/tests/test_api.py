@@ -18,7 +18,7 @@ Path("test_convocaradar.db").unlink(missing_ok=True)
 from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy import select  # noqa: E402
 
-from app.db.seed import seed  # noqa: E402
+from app.db.seed import seed, seed_default_sources  # noqa: E402
 from app.db.session import SessionLocal  # noqa: E402
 from app.core.ai import embedding_model_version  # noqa: E402
 import app.main as app_main  # noqa: E402
@@ -50,6 +50,9 @@ def client() -> TestClient:
     db = SessionLocal()
     try:
         org = db.scalar(select(Organization).where(Organization.slug == "convocaradar-local"))
+        if org:
+            seed_default_sources(db, org, force=True)
+            db.commit()
         if org and not db.scalar(select(User).where(User.email == "admin@convocaradar.io")):
             from app.core.security import hash_password
 
