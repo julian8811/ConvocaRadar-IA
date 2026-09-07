@@ -76,32 +76,41 @@ def _jitter_for_source(source: Source) -> timedelta:
 
 
 def source_due_for_scraping(source: Source, *, now: datetime | None = None) -> bool:
+    """Return whether a source has reached its configured scrape cadence.
+
+    The scheduler wakes every 30 minutes, so frequency must be evaluated from
+    ``last_run_at`` rather than treating hourly/daily sources as due on every
+    scheduler tick. A deterministic per-source jitter spreads work across
+    scheduler cycles, and heavily failing sources receive additional backoff.
+    """
     current = now or datetime.now(UTC).replace(tzinfo=None)
     frequency = (source.scraping_frequency or "daily").lower()
-    if frequency in {"hourly", "every_hour", "daily", "every_day"}:
-        # Daily/hourly always due — health-aware backoff only if heavily failing
-        fails = int(getattr(source, "consecutive_empty_runs", 0) or 0)
-        if fails >= 5 and source.last_run_at:
-            # Back off heavily failing daily: require at least 6h since last run
-            elapsed = current - source.last_run_at
-            backoff = timedelta(hours=min(24, 4 * fails))
-            jitter = _jitter_for_source(source)
-            return elapsed >= backoff + jitter
-        return True
     if not source.last_run_at:
         return True
+
     elapsed = current - source.last_run_at
     jitter = _jitter_for_source(source)
     fails = int(getattr(source, "consecutive_empty_runs", 0) or 0)
+
+    if frequency in {"hourly", "every_hour"}:
+        cadence = timedelta(hours=1)
+    elif frequency in {"daily", "every_day"}:
+        cadence = timedelta(days=1)
+    elif frequency in {"weekly", "every_week"}:
+        cadence = timedelta(days=7)
+    elif frequency in {"monthly", "every_month"}:
+        cadence = timedelta(days=28)
+    else:
+        cadence = timedelta(days=1)
+
     backoff = timedelta(0)
-    if fails:
-        # Up to 24h extra backoff, 6h per failure
+    if frequency in {"hourly", "every_hour", "daily", "every_day"}:
+        if fails >= 5:
+            backoff = timedelta(hours=min(24, 4 * fails))
+    elif fails:
         backoff = timedelta(hours=min(24, fails * 6))
-    if frequency in {"weekly", "every_week"}:
-        return elapsed >= timedelta(days=7) + backoff + jitter
-    if frequency in {"monthly", "every_month"}:
-        return elapsed >= timedelta(days=28) + backoff + jitter
-    return elapsed >= timedelta(days=1) + backoff + jitter
+
+    return elapsed >= cadence + backoff + jitter
 
 
 async def _scrape_source_candidates(
