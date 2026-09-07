@@ -18,13 +18,18 @@ let nextConfig: NextConfig = {
       },
     ],
   },
-  // Proxy /api/v1 requests to the internal API service so both SSR and
-  // client-side calls work without exposing the Docker hostname.
+  // Browser traffic can use a same-origin public URL such as /api/v1, while
+  // the Next.js server always proxies to the private Docker-network endpoint.
+  // Keeping the two concerns separate prevents Docker hostnames from leaking
+  // into the client bundle and avoids localhost assumptions inside containers.
   async rewrites() {
+    const internalApiUrl =
+      process.env.INTERNAL_API_URL?.replace(/\/$/, "") || "http://api:8000/api/v1";
+
     return [
       {
         source: "/api/v1/:path*",
-        destination: `${process.env.NEXT_PUBLIC_API_URL || "http://api:8000/api/v1"}/:path*`,
+        destination: `${internalApiUrl}/:path*`,
       },
     ];
   },

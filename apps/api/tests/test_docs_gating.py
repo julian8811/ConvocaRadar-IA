@@ -15,24 +15,25 @@ import pytest
 from fastapi.testclient import TestClient
 
 DOCS_PATHS = ("/docs", "/redoc", "/openapi.json")
+PRODUCTION_TEST_DATABASE_URL = (
+    "postgresql+psycopg://convocaradar:test-password@postgres:5432/convocaradar"
+)
 
 
 @pytest.fixture
 def app_for_env(monkeypatch: pytest.MonkeyPatch):
-    """Rebuild ``app.main`` with ``APP_ENV`` set to the requested value.
-
-    The FastAPI instance is constructed at import time from settings read
-    once, so switching environments requires clearing the ``lru_cache``
-    on ``get_settings`` and reloading the module. The teardown reloads
-    once more with the environment restored so every other test keeps
-    seeing the default development app.
-    """
-    import app.main as app_main  # noqa: F401  (import kept for reload symmetry)
+    """Rebuild ``app.main`` with settings valid for the requested environment."""
+    import app.main as app_main
 
     from app.core.config import get_settings
 
     def _build(app_env: str) -> TestClient:
         monkeypatch.setenv("APP_ENV", app_env)
+        if app_env == "production":
+            # Config correctly rejects SQLite in production. These tests only
+            # exercise route construction/gating, so use a valid PostgreSQL URL
+            # without opening a database connection.
+            monkeypatch.setenv("DATABASE_URL", PRODUCTION_TEST_DATABASE_URL)
         get_settings.cache_clear()
         return TestClient(importlib.reload(app_main).app)
 

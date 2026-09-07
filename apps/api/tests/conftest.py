@@ -45,6 +45,12 @@ os.environ["BOOTSTRAP_SOURCES_ON_STARTUP"] = "false"
 # explicitly here so tests do not fork Celery children.
 os.environ["DISABLE_INPROCESS_CELERY"] = "1"
 
+_REQUIRED_TEST_SECRETS = {
+    "JWT_SECRET": "a" * 64,
+    "RESET_TOKEN_SECRET": "b" * 64,
+    "INTERNAL_API_KEY": "a" * 64,
+}
+
 # A previous pytest process may leave the disposable SQLite file behind.
 # Remove it before importing the app so repeated local/CI runs remain
 # deterministic and registration tests never collide with stale users.
@@ -58,9 +64,20 @@ from app.core.rate_limit import email_login_limiter  # noqa: E402
 
 @pytest.fixture(autouse=True)
 def _reset_rate_limit_bucket() -> None:
-    """Clear the in-memory rate limit bucket before every test."""
+    """Reset shared state and restore mandatory test secrets for every test.
+
+    A handful of security/config tests intentionally remove JWT_SECRET or
+    INTERNAL_API_KEY to assert fail-closed behaviour. Some of those tests use
+    direct ``os.environ`` mutation rather than ``monkeypatch``, so without this
+    reset the missing values leak into all later tests and create large,
+    order-dependent failure cascades. Production validation remains unchanged;
+    these are test-only deterministic defaults.
+    """
     from app.connectors import common as connector_common
     from app.core.config import get_settings
+
+    for key, value in _REQUIRED_TEST_SECRETS.items():
+        os.environ.setdefault(key, value)
 
     get_settings.cache_clear()
     if connector_common._DOMAIN_BUDGET is not None:

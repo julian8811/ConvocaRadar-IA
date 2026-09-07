@@ -720,21 +720,28 @@ async def create_opportunity(
         return await _update_and_score(db, duplicate, data, normalized_title, score_org_id)
 
     if data.source_id and data.official_url:
-        existing = db.scalar(
-            select(Opportunity).where(
-                Opportunity.source_id == data.source_id,
-                Opportunity.official_url == data.official_url,
+        url_conditions = [
+            Opportunity.source_id == data.source_id,
+            Opportunity.official_url == data.official_url,
+            or_(
+                Opportunity.organization_id == organization_id,
+                Opportunity.organization_id.is_(None),
+            ),
+        ]
+        if data.external_id:
+            url_conditions.append(
                 or_(
-                    Opportunity.organization_id == organization_id,
-                    Opportunity.organization_id.is_(None),
-                ),
+                    Opportunity.external_id.is_(None),
+                    Opportunity.external_id == data.external_id,
+                )
             )
-        )
+        existing = db.scalar(select(Opportunity).where(*url_conditions))
         if existing:
             return await _update_and_score(db, existing, data, normalized_title, score_org_id)
 
     existing = db.scalar(
         select(Opportunity).where(
+            _organization_opportunity_scope(organization_id),
             Opportunity.slug == slug,
             Opportunity.entity == data.entity,
             Opportunity.close_date == data.close_date,

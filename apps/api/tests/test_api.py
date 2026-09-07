@@ -18,7 +18,7 @@ Path("test_convocaradar.db").unlink(missing_ok=True)
 from fastapi.testclient import TestClient  # noqa: E402
 from sqlalchemy import select  # noqa: E402
 
-from app.db.seed import seed  # noqa: E402
+from app.db.seed import seed, seed_default_sources  # noqa: E402
 from app.db.session import SessionLocal  # noqa: E402
 from app.core.ai import embedding_model_version  # noqa: E402
 import app.main as app_main  # noqa: E402
@@ -50,18 +50,26 @@ def client() -> TestClient:
     db = SessionLocal()
     try:
         org = db.scalar(select(Organization).where(Organization.slug == "convocaradar-local"))
-        if org and not db.scalar(select(User).where(User.email == "admin@convocaradar.io")):
+        if org:
+            seed_default_sources(db, org, force=True)
+            db.commit()
+        if org:
             from app.core.security import hash_password
 
-            db.add(
-                User(
+            user = db.scalar(select(User).where(User.email == "admin@convocaradar.io"))
+            if user is None:
+                user = User(
                     email="admin@convocaradar.io",
                     name="Admin ConvocaRadar",
                     password_hash=hash_password("ConvocaRadarLocal123!"),
                     role=Role.admin.value,
                     organization_id=org.id,
                 )
-            )
+                db.add(user)
+            else:
+                user.organization_id = org.id
+                user.role = Role.admin.value
+                user.password_hash = hash_password("ConvocaRadarLocal123!")
             db.commit()
     finally:
         db.close()
@@ -90,7 +98,7 @@ async def create_fixture_opportunity(*, close_days: int = 30) -> str:
             db,
             OpportunityCreate(
                 source_id=source.id,
-                external_id="fixture-grants-2026",
+                external_id=f"fixture-grants-2026-{datetime.now(UTC).timestamp()}",
                 title="Convocatoria piloto de cooperacion 2026",
                 entity="Grants.gov",
                 country="United States",

@@ -1,159 +1,268 @@
-# Deploy en Servidor Universitario — ConvocaRadar IA
+# Deploy en servidor universitario — ConvocaRadar IA
 
-Guía self-hosted con Docker Compose. El stack ya está listo: `docker-compose.yml`
-levanta **postgres + pgvector, minio, api, worker, backup y web**.
+Esta guía es la ruta oficial para la VM de la universidad. Producción usa
+`docker-compose.server.yml`, un Compose **autónomo** que no hereda puertos ni
+ajustes del entorno de desarrollo.
 
-## 1. Requisitos del servidor
+## Arquitectura de producción
 
-- Ubuntu 22.04+ o similar (VM de la universidad)
-- Docker Engine ≥ 24 + Compose v2 (`docker compose version`)
-- 2 vCPU / 4 GB RAM mínimo, 20 GB disco
-- Puertos 80/443 abiertos (o el que asigne la universidad) + acceso SSH
-- Dominio o subdominio (ej: `convocaradar.universidad.edu.co`) — opcional pero recomendado
+```text
+Internet
+   │
+   ▼
+Nginx :80/:443
+   │
+   ▼
+127.0.0.1:3001 ── web (Next.js)
+                     │
+                     └── /api/v1/* → api:8000
+                                        │
+                              ┌─────────┴─────────┐
+                              ▼                   ▼
+                         postgres:5432       minio:9000
+                              ▲
+                              │
+                         worker / backup
+```
 
-## 2. Preparar el repo en el servidor
+Solo `web` publica un puerto en el host y está ligado a loopback. PostgreSQL,
+MinIO, API, worker y backup permanecen accesibles únicamente en la red Docker.
+
+## 1. Requisitos
+
+- Ubuntu 22.04+.
+- Docker Engine 24+ y Docker Compose v2.
+- Git y Nginx.
+- Recomendado: 4 vCPU, 8 GB RAM y 30 GB libres. Mínimo práctico: 2 vCPU / 4 GB.
+- Puertos externos 80/443; SSH restringido por la infraestructura institucional.
+- Subdominio institucional para TLS.
+
+Comprobar antes de continuar:
 
 ```bash
-git clone https://github.com/julian8811/ConvocaRadar-IA.git
-cd ConvocaRadar-IA
+docker --version
+docker compose version
+git --version
+free -h
+df -h /
+```
 
-cp .env.example .env
-# Editar .env — ver sección 3 (todos los valores change-me deben cambiarse)
+## 2. Instalar el repositorio
+
+La ubicación recomendada, para mantenerlo separado de CEITTO, es:
+
+```bash
+sudo mkdir -p /home/ubuntu/apps
+sudo chown -R ubuntu:ubuntu /home/ubuntu/apps
+cd /home/ubuntu/apps
+
+git clone https://github.com/julian8811/ConvocaRadar-IA.git convocaradar
+cd convocaradar
+```
+
+Antes del despliegue final, usar exclusivamente el commit/tag aprobado en
+GitHub. No desplegar una rama de trabajo sin CI verde.
+
+## 3. Crear el entorno de producción
+
+```bash
+cp .env.production.example .env
+chmod 600 .env
 nano .env
 ```
 
-> `.env` nunca se commitea. Está en `.gitignore`. Usá `.env.example` y
-> `.env.production.example` como plantillas.
-
-## 3. Variables mínimas (producción universitaria)
-
-En `.env` completar **al menos**:
-
-```ini
-POSTGRES_PASSWORD=<generar con: openssl rand -base64 24>
-MINIO_ROOT_PASSWORD=<generar con: openssl rand -base64 24>
-JWT_SECRET=<openssl rand -base64 48>
-INTERNAL_API_KEY=<openssl rand -base64 48>
-RESET_TOKEN_SECRET=<openssl rand -base64 48>
-
-# URLs públicas (ajustar al dominio real)
-FRONTEND_URL=https://convocaradar.universidad.edu.co
-BACKEND_URL=https://convocaradar.universidad.edu.co
-NEXT_PUBLIC_API_URL=https://convocaradar.universidad.edu.co/api/v1
-```
-
-Opcionales pero recomendados:
-
-```ini
-SENTRY_DSN=https://...@sentry.io/...
-LLM_PROVIDER=cloudflare  # o local / openai según credenciales
-# Si LLM_PROVIDER != local:
-LLM_API_KEY=...
-# Email (Resend o SMTP universidad/Outlook):
-RESEND_API_KEY=...
-# o SMTP_HOST/SMTP_USER/SMTP_PASSWORD si usan servidor de correo interno
-```
-
-Validación: `bash scripts/check-secrets.sh` debe pasar sin errores antes de levantar.
-
-## 4. Levantar el stack
+Generar secretos **en el servidor**, nunca en el repositorio ni en el chat:
 
 ```bash
-# Build + up (usa el Dockerfile de api y web, contexto = raíz del repo)
-docker compose build --pull
-docker compose up -d postgres minio
-sleep 10
-docker compose up -d api worker web backup
-
-# Ver estado
-docker compose ps
-docker compose logs -f --tail=100 api
-curl -fsS http://localhost:8002/api/v1/health/live && echo "API OK"
-curl -fsS http://localhost:3002/ | head
+openssl rand -base64 24   # POSTGRES_PASSWORD
+openssl rand -base64 24   # MINIO_ROOT_PASSWORD
+openssl rand -base64 48   # JWT_SECRET
+openssl rand -base64 48   # INTERNAL_API_KEY
+openssl rand -base64 48   # RESET_TOKEN_SECRET
 ```
 
-URLs por defecto:
-- API: `http://<servidor>:8002` → `/api/v1/health/live`
-- Web: `http://<servidor>:3002`
-- MinIO consola: `http://<servidor>:9005`
+Valores mínimos a sustituir en `.env`:
 
-## 5. Reverse proxy + TLS (recomendado)
+```ini
+POSTGRES_PASSWORD=<secreto>
+MINIO_ROOT_PASSWORD=<secreto>
+JWT_SECRET=<secreto>
+INTERNAL_API_KEY=<secreto>
+RESET_TOKEN_SECRET=<secreto>
 
-No exponer los puertos 8002/3002 directamente. Usar Nginx/Caddy/Traefik delante:
+FRONTEND_URL=https://<SUBDOMINIO_INSTITUCIONAL>
+BACKEND_URL=https://<SUBDOMINIO_INSTITUCIONAL>
+NEXT_PUBLIC_API_URL=/api/v1
+NEXT_PUBLIC_ENV=production
+WEB_PORT=3001
+```
 
-**Ejemplo Nginx** (ajustar `server_name`):
+Si se habilita correo, usar una cuenta institucional/de servicio y completar
+SMTP o Resend. No almacenar una contraseña personal en Git.
+
+## 4. Preflight obligatorio
+
+```bash
+cd /home/ubuntu/apps/convocaradar
+
+bash scripts/check-secrets.sh
+
+docker compose \
+  -p convocaradar \
+  --env-file .env \
+  -f docker-compose.server.yml \
+  config >/tmp/convocaradar-server-config.yml
+
+grep -nE '5434|9004|9005|8002' /tmp/convocaradar-server-config.yml && \
+  echo 'ERROR: se encontró un puerto interno publicado' || true
+```
+
+El Compose de servidor debe publicar únicamente `127.0.0.1:3001 -> 3000` para
+el servicio `web`.
+
+## 5. Build y arranque
+
+```bash
+cd /home/ubuntu/apps/convocaradar
+
+COMPOSE='docker compose -p convocaradar --env-file .env -f docker-compose.server.yml'
+
+$COMPOSE build --pull
+$COMPOSE up -d postgres minio
+$COMPOSE up -d api
+$COMPOSE up -d worker backup web
+$COMPOSE ps
+```
+
+No se ejecuta una migración manual adicional: el contenedor `api` ejecuta
+`alembic upgrade head` antes de iniciar Uvicorn. Worker y web esperan a que API
+esté saludable.
+
+Comprobar desde la VM:
+
+```bash
+curl -fsS http://127.0.0.1:3001/ >/dev/null && echo 'WEB OK'
+curl -fsS http://127.0.0.1:3001/api/v1/health/live && echo
+
+docker compose -p convocaradar --env-file .env -f docker-compose.server.yml ps
+```
+
+## 6. Nginx
+
+Como `/api/v1` lo resuelve internamente Next.js, Nginx solo necesita un
+upstream en loopback:
 
 ```nginx
 server {
     listen 80;
-    server_name convocaradar.universidad.edu.co;
-    location /api/ { proxy_pass http://127.0.0.1:8002; }
-    location / { proxy_pass http://127.0.0.1:3002; }
+    server_name <SUBDOMINIO_INSTITUCIONAL>;
+
+    client_max_body_size 12m;
+
+    location / {
+        proxy_pass http://127.0.0.1:3001;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection "upgrade";
+    }
 }
-# Luego: certbot --nginx -d convocaradar.universidad.edu.co
 ```
 
-Alternativa simple: `caddy reverse-proxy --from convocaradar.universidad.edu.co --to localhost:3002`
-
-## 6. Crear usuario admin
+Validar antes de recargar:
 
 ```bash
-docker compose exec api convocaradar-seed-admin \
-  --email admin@universidad.edu.co \
-  --password-env INTERNAL_API_KEY
-# O con password directo (cambiar luego):
-# docker compose exec api python -m app.db.seed_admin --email admin@... --password '...'
+sudo nginx -t
+sudo systemctl reload nginx
 ```
 
-## 7. Backups
+TLS debe instalarse con el mecanismo autorizado por la universidad (certificado
+institucional o Certbot si la infraestructura lo permite).
 
-El servicio `backup` ya está configurado (pg_dump 03:30 UTC diario, retención 14 días):
+## 7. Verificación funcional
+
+Después de Nginx/TLS:
 
 ```bash
-docker compose logs backup
-docker compose exec backup /scripts/backup-cycle.sh   # manual
-ls -lh $(docker volume inspect convocaradar_backups-data --format '{{.Mountpoint}}')
+curl -fsS https://<SUBDOMINIO_INSTITUCIONAL>/api/v1/health/live && echo
 ```
 
-Restore: ver `docs/restore-runbook.md` (paso a paso con scratch DB).
+Además comprobar manualmente:
 
-## 8. Actualizar (deploy de nueva versión)
+1. Carga de la página y login.
+2. Listado y detalle de convocatorias.
+3. Fuentes y última actualización.
+4. Ejecución del worker sin reinicios continuos.
+5. Subida/lectura de un documento en MinIO si esa función está habilitada.
+6. Flujo de correo/restablecimiento solo si SMTP/Resend está configurado.
+
+Logs útiles sin mostrar secretos:
 
 ```bash
-git pull origin main
-docker compose build api web
-docker compose up -d api worker web
-docker compose exec api alembic upgrade head
-docker compose ps
-curl -fsS http://localhost:8002/api/v1/health/live
+COMPOSE='docker compose -p convocaradar --env-file .env -f docker-compose.server.yml'
+$COMPOSE logs --tail=100 api
+$COMPOSE logs --tail=100 worker
+$COMPOSE logs --tail=100 web
 ```
 
-Para la rama de desarrollo actual:
+## 8. Backups
+
+El contenedor `backup` incluye `pg_dump` 16 y Supercronic dentro de la imagen;
+no descarga ejecutables cada vez que inicia. Ejecuta el ciclo diario definido en
+`scripts/crontab-backup` y conserva por defecto 14 días.
+
+Backup manual antes de cada actualización:
 
 ```bash
-git fetch origin
-git checkout 023-scraper-funding-p95
-git pull
-# mismo build/up
+COMPOSE='docker compose -p convocaradar --env-file .env -f docker-compose.server.yml'
+$COMPOSE exec backup /scripts/backup-cycle.sh
+$COMPOSE logs --tail=50 backup
 ```
 
-## 9. Qué NO subir al servidor
+No actualizar producción si el backup manual no termina con `PASS`.
+Restauración: `docs/restore-runbook.md`.
 
-- `.env` (generar en el servidor)
-- `convocaradar.db` / `*.db` (solo dev local)
-- `node_modules/`, `.next/`, `.venv/`, `.coverage`
-- `backups/*.sql.gz` (se generan en el servidor)
+## 9. Actualización segura
 
-Todo eso ya está en `.gitignore`.
+Antes de actualizar, registrar el commit activo y crear backup:
 
-## 10. Checklist antes de entregar
-
-- [ ] `bash scripts/check-secrets.sh` sin hallazgos
-- [ ] `.env` con 5 secretos ≥32 chars y URLs reales
-- [ ] `docker compose ps` — 6 servicios healthy/running
-- [ ] `curl /api/v1/health/live` OK y `/` de web responde
-- [ ] Login admin funciona, fuentes se listan (93 seeds)
-- [ ] Backup manual OK (`backup-cycle.sh` → PASS)
-- [ ] Dominio + TLS funcionando (si aplica)
-- [ ] `CONTRIBUTING.md` y `DEPLOYMENT.md` al día
+```bash
+cd /home/ubuntu/apps/convocaradar
+git rev-parse HEAD
+COMPOSE='docker compose -p convocaradar --env-file .env -f docker-compose.server.yml'
+$COMPOSE exec backup /scripts/backup-cycle.sh
 ```
+
+Luego:
+
+```bash
+git fetch --tags origin
+git checkout <TAG_O_COMMIT_APROBADO>
+$COMPOSE build --pull api worker web backup
+$COMPOSE up -d api
+$COMPOSE up -d worker backup web
+$COMPOSE ps
+curl -fsS http://127.0.0.1:3001/api/v1/health/live && echo
+```
+
+Si el nuevo contenedor no queda saludable, volver al commit anterior y
+reconstruir la aplicación. Si la migración cambió datos/esquema de forma no
+compatible, seguir el runbook de restauración en vez de improvisar un downgrade.
+
+## 10. Checklist de entrega
+
+- [ ] CI del commit/tag aprobado completamente verde.
+- [ ] `.env` con permisos `600` y sin placeholders.
+- [ ] Solo `127.0.0.1:3001` publicado por el stack.
+- [ ] PostgreSQL, MinIO y API sin puertos del host.
+- [ ] Todos los contenedores `running`; los que tienen healthcheck, `healthy`.
+- [ ] Web y `/api/v1/health/live` responden desde loopback.
+- [ ] Nginx `nginx -t` correcto y TLS operativo.
+- [ ] Login y flujo principal verificados.
+- [ ] Worker estable y sin bucle de reinicio.
+- [ ] Backup manual termina en `PASS`.
+- [ ] Restauración documentada y backup conservado antes de cada release.
+- [ ] Commit/tag de producción registrado para rollback.
