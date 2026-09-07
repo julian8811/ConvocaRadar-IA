@@ -24,7 +24,6 @@ FONDECYT_CONFIG: dict = {
     "detail_enrichment": False,
 }
 
-# Sample HTML mimicking the JetEngine listing structure
 SAMPLE_HTML = """<html><body>
 <div data-elementor-type="archive">
 <div class="jet-listing-grid__item jet-listing-dynamic-post-31077">
@@ -35,9 +34,7 @@ SAMPLE_HTML = """<html><body>
     <div class="jet-listing-dynamic-field__content">Inicio: 3 de julio, 2027</div>
     <div class="jet-listing-dynamic-field__content">Cierre: 14 de agosto, 2027 - 13:00</div>
     <div class="jet-listing-dynamic-field__content">Fecha estimada de fallo: noviembre 2027</div>
-    <a class="jet-listing-dynamic-link__link" href="https://anid.cl/concursos/concurso-fondo-quimal-2026/">
-        <span>Ver más</span>
-    </a>
+    <a class="jet-listing-dynamic-link__link" href="https://anid.cl/concursos/concurso-fondo-quimal-2026/"><span>Ver más</span></a>
 </div>
 <div class="jet-listing-grid__item jet-listing-dynamic-post-31078">
     <div class="jet-engine-listing-overlay-wrap">
@@ -46,31 +43,23 @@ SAMPLE_HTML = """<html><body>
     <h3 class="elementor-heading-title">Concurso Asignación de Tiempo de Buque Oceanográfico 2027</h3>
     <div class="jet-listing-dynamic-field__content">Inicio: 25 de junio, 2027</div>
     <div class="jet-listing-dynamic-field__content">Cierre: 29 de julio, 2027 - 13:00</div>
-    <a class="jet-listing-dynamic-link__link" href="https://anid.cl/concursos/concurso-asignacion-de-tiempo-de-buque-oceanografico-2/">
-        <span>Ver más</span>
-    </a>
+    <a class="jet-listing-dynamic-link__link" href="https://anid.cl/concursos/concurso-asignacion-de-tiempo-de-buque-oceanografico-2/"><span>Ver más</span></a>
 </div>
 <div class="jet-listing-grid__item jet-listing-dynamic-post-31079">
     <h3 class="elementor-heading-title">Closed Call Already Expired</h3>
     <div class="jet-listing-dynamic-field__content">Inicio: 10 enero, 2025</div>
     <div class="jet-listing-dynamic-field__content">Cierre: 28 febrero, 2025</div>
-    <a class="jet-listing-dynamic-link__link" href="https://anid.cl/concursos/closed-call-expired/">
-        <span>Ver más</span>
-    </a>
+    <a class="jet-listing-dynamic-link__link" href="https://anid.cl/concursos/closed-call-expired/"><span>Ver más</span></a>
 </div>
 </div>
 </body></html>"""
 
 EMPTY_HTML = "<html><body><p>No contests found</p></body></html>"
-
 GARBAGE_HTML = "this is not valid html at all {{{"
 
 
 class TestFondecytConnectorConfig:
-    """The FONDECYT connector_config is valid and creates a connector."""
-
     def test_config_is_valid(self):
-        """FONDECYT config dict parses correctly into HtmlConnectorConfig."""
         from app.connectors.configurable_html import HtmlConnectorConfig
 
         config = HtmlConnectorConfig.from_dict(FONDECYT_CONFIG)
@@ -80,7 +69,6 @@ class TestFondecytConnectorConfig:
         assert "Cierre:" in config.date_labels
 
     def test_connector_for_returns_configurable_html(self):
-        """connector_for with FONDECYT source key and config returns ConfigurableHtmlConnector."""
         from app.connectors.factory import connector_for
 
         connector = connector_for(
@@ -96,101 +84,64 @@ class TestFondecytConnectorConfig:
 
 
 class TestFondecytParse:
-    """Parse the mocked FONDECYT HTML and verify candidate extraction."""
-
     @pytest.mark.asyncio
     async def test_fetch_and_parse_yields_candidates(self, monkeypatch):
-        """Happy path: at least 2 candidates from sample HTML."""
         mock = AsyncMock(return_value=(FONDECYT_URL, SAMPLE_HTML, "text/html"))
         monkeypatch.setattr("app.connectors.common.fetch_httpx_text", mock)
-
         connector = ConfigurableHtmlConnector(
-            FONDECYT_KEY,
-            FONDECYT_URL,
-            FONDECYT_CONFIG,
-            entity_name="FONDECYT",
-            default_country="Chile",
+            FONDECYT_KEY, FONDECYT_URL, FONDECYT_CONFIG,
+            entity_name="FONDECYT", default_country="Chile",
         )
-        raw = await connector.fetch()
-        candidates = await connector.parse(raw)
-
-        assert len(candidates) >= 2
+        candidates = await connector.parse(await connector.fetch())
         titles = {c.title for c in candidates}
         assert "Concurso Fondo QUIMAL 2027" in titles
         assert "Concurso Asignación de Tiempo de Buque Oceanográfico 2027" in titles
 
     @pytest.mark.asyncio
-    async def test_fetch_and_parse_skips_closed(self, monkeypatch):
-        """Convocatorias with past close dates are filtered out."""
+    async def test_fetch_and_parse_emits_closed_for_status_reconciliation(self, monkeypatch):
+        """Past calls survive parse; validate/reconcile owns closed status."""
         mock = AsyncMock(return_value=(FONDECYT_URL, SAMPLE_HTML, "text/html"))
         monkeypatch.setattr("app.connectors.common.fetch_httpx_text", mock)
-
         connector = ConfigurableHtmlConnector(
-            FONDECYT_KEY,
-            FONDECYT_URL,
-            FONDECYT_CONFIG,
-            entity_name="FONDECYT",
-            default_country="Chile",
+            FONDECYT_KEY, FONDECYT_URL, FONDECYT_CONFIG,
+            entity_name="FONDECYT", default_country="Chile",
         )
-        raw = await connector.fetch()
-        candidates = await connector.parse(raw)
-
-        titles = {c.title for c in candidates}
-        assert "Closed Call Already Expired" not in titles
+        candidates = await connector.parse(await connector.fetch())
+        closed = next(c for c in candidates if c.title == "Closed Call Already Expired")
+        assert closed.close_date is not None
+        validation = await connector.validate(closed)
+        assert validation.ok is False
 
     @pytest.mark.asyncio
     async def test_empty_html_returns_empty_list(self, monkeypatch):
-        """When the page has no .jet-listing-grid__item, parse returns []."""
         mock = AsyncMock(return_value=(FONDECYT_URL, EMPTY_HTML, "text/html"))
         monkeypatch.setattr("app.connectors.common.fetch_httpx_text", mock)
-
         connector = ConfigurableHtmlConnector(
-            FONDECYT_KEY,
-            FONDECYT_URL,
-            FONDECYT_CONFIG,
-            entity_name="FONDECYT",
-            default_country="Chile",
+            FONDECYT_KEY, FONDECYT_URL, FONDECYT_CONFIG,
+            entity_name="FONDECYT", default_country="Chile",
         )
-        raw = await connector.fetch()
-        candidates = await connector.parse(raw)
-        assert candidates == []
+        assert await connector.parse(await connector.fetch()) == []
 
     @pytest.mark.asyncio
     async def test_garbage_html_does_not_raise(self, monkeypatch):
-        """Malformed HTML should not cause parse() to raise."""
         mock = AsyncMock(return_value=(FONDECYT_URL, GARBAGE_HTML, "text/html"))
         monkeypatch.setattr("app.connectors.common.fetch_httpx_text", mock)
-
         connector = ConfigurableHtmlConnector(
-            FONDECYT_KEY,
-            FONDECYT_URL,
-            FONDECYT_CONFIG,
-            entity_name="FONDECYT",
-            default_country="Chile",
+            FONDECYT_KEY, FONDECYT_URL, FONDECYT_CONFIG,
+            entity_name="FONDECYT", default_country="Chile",
         )
-        raw = await connector.fetch()
-        try:
-            candidates = await connector.parse(raw)
-            assert isinstance(candidates, list)
-        except Exception as exc:
-            pytest.fail(f"parse() raised on garbage data: {exc}")
+        candidates = await connector.parse(await connector.fetch())
+        assert isinstance(candidates, list)
 
     @pytest.mark.asyncio
     async def test_selectors_diagnostics_tracked(self, monkeypatch):
-        """After parse, selector_diagnostics shows which selectors matched."""
         mock = AsyncMock(return_value=(FONDECYT_URL, SAMPLE_HTML, "text/html"))
         monkeypatch.setattr("app.connectors.common.fetch_httpx_text", mock)
-
         connector = ConfigurableHtmlConnector(
-            FONDECYT_KEY,
-            FONDECYT_URL,
-            FONDECYT_CONFIG,
-            entity_name="FONDECYT",
-            default_country="Chile",
+            FONDECYT_KEY, FONDECYT_URL, FONDECYT_CONFIG,
+            entity_name="FONDECYT", default_country="Chile",
         )
-        raw = await connector.fetch()
-        await connector.parse(raw)
-
+        await connector.parse(await connector.fetch())
         diag = connector.selector_diagnostics
         assert diag["list_selector"] == ".jet-listing-grid__item"
         assert diag["title_selector"] == "h3"
