@@ -161,3 +161,104 @@ jobs:
       - run: docker compose up -d postgres minio
       - run: sleep 10 && docker compose up -d api
       - run: sleep 15 && curl -sf http://localhost:8002/api/v1/health/live
+
+  server-smoke:
+    runs-on: ubuntu-latest
+    env:
+      COMPOSE_PROJECT_NAME: convocaradar-ci
+      COMPOSE_FILE: docker-compose.server.yml
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare production-like non-secret environment
+        run: |
+          cp .env.production.example .env
+          sed -i 's|^POSTGRES_PASSWORD=.*|POSTGRES_PASSWORD=T7nQ4mK9xV2pL8rC5hJ6sW3zD1fG|' .env
+          sed -i 's|^DATABASE_URL=.*|DATABASE_URL=postgresql+psycopg://convocaradar:T7nQ4mK9xV2pL8rC5hJ6sW3zD1fG@postgres:5432/convocaradar|' .env
+          sed -i 's|^MINIO_ROOT_PASSWORD=.*|MINIO_ROOT_PASSWORD=R8vD3kN6qW1mX9tL4pH7cJ2sF5zG|' .env
+          sed -i 's|^S3_SECRET_KEY=.*|S3_SECRET_KEY=R8vD3kN6qW1mX9tL4pH7cJ2sF5zG|' .env
+          sed -i 's|^JWT_SECRET=.*|JWT_SECRET=Q4mZ8rT2vK7pD5nX1cH9sL6wF3jN8bR5|' .env
+          sed -i 's|^INTERNAL_API_KEY=.*|INTERNAL_API_KEY=V9xK3mQ7dT1pR8nL5cJ2sH6wF4zN7bD9|' .env
+          sed -i 's|^RESET_TOKEN_SECRET=.*|RESET_TOKEN_SECRET=N6rW2pT8xK4mD9vL1cH7sQ5jF3zG|' .env
+          sed -i 's|^BOOTSTRAP_SOURCES_ON_STARTUP=.*|BOOTSTRAP_SOURCES_ON_STARTUP=false|' .env
+          sed -i 's|^WEB_PORT=.*|WEB_PORT=3001|' .env
+          docker compose --env-file .env config > /dev/null
+
+      - name: Start stateful services and wait for health
+        run: |
+          docker compose --env-file .env up -d postgres minio
+          for service in postgres minio; do
+            cid="$(docker compose --env-file .env ps -q "$service")"
+            for attempt in $(seq 1 40); do
+              status="$(docker inspect --format='{{.State.Health.Status}}' "$cid")"
+              [ "$status" = healthy ] && break
+              [ "$attempt" -eq 40 ] && { docker compose --env-file .env logs "$service"; exit 1; }
+              sleep 2
+            done
+          done
+
+      - name: Prove PostgreSQL volume survives container recreation
+        run: |
+          docker compose --env-file .env exec -T postgres \
+            psql -v ON_ERROR_STOP=1 -U convocaradar -d convocaradar \
+            -c 'CREATE TABLE ci_persistence_probe (id integer PRIMARY KEY); INSERT INTO ci_persistence_probe VALUES (1);'
+          docker compose --env-file .env up -d --force-recreate postgres
+          cid="$(docker compose --env-file .env ps -q postgres)"
+          for attempt in $(seq 1 40); do
+            status="$(docker inspect --format='{{.State.Health.Status}}' "$cid")"
+            [ "$status" = healthy ] && break
+            [ "$attempt" -eq 40 ] && { docker compose --env-file .env logs postgres; exit 1; }
+            sleep 2
+          done
+          test "$(docker compose --env-file .env exec -T postgres psql -U convocaradar -d convocaradar -tAc 'SELECT count(*) FROM ci_persistence_probe WHERE id = 1' | tr -d '\r')" = "1"
+          docker compose --env-file .env exec -T postgres psql -v ON_ERROR_STOP=1 -U convocaradar -d convocaradar -c 'DROP TABLE ci_persistence_probe;'
+
+      - name: Start production application stack
+        run: |
+          docker compose --env-file .env up -d --build api worker backup web
+          for service in api worker web; do
+            cid="$(docker compose --env-file .env ps -q "$service")"
+            for attempt in $(seq 1 60); do
+              status="$(docker inspect --format='{{.State.Health.Status}}' "$cid")"
+              [ "$status" = healthy ] && break
+              [ "$attempt" -eq 60 ] && { docker compose --env-file .env logs "$service"; exit 1; }
+              sleep 3
+            done
+          done
+          curl -fsS http://127.0.0.1:3001/ > /dev/null
+
+      - name: Prove clean Alembic migration reached head
+        run: |
+          docker compose --env-file .env exec -T api alembic current | tee /tmp/alembic-current.txt
+          grep -q '(head)' /tmp/alembic-current.txt
+          test "$(docker compose --env-file .env exec -T postgres psql -U convocaradar -d convocaradar -tAc "SELECT to_regclass('public.opportunities') IS NOT NULL" | tr -d '\r')" = "t"
+
+      - name: Execute and verify real backup cycle
+        run: |
+          docker compose --env-file .env exec -T backup /scripts/backup-cycle.sh
+          docker compose --env-file .env exec -T backup /scripts/verify_latest_backup.sh /backups
+          docker compose --env-file .env exec -T backup sh -c 'test -n "$(ls -t /backups/convocaradar-*.sql.gz 2>/dev/null | head -n 1)"'
+
+      - name: Restore newest backup into scratch database and compare schema
+        run: |
+          latest="$(docker compose --env-file .env exec -T backup sh -c 'ls -t /backups/convocaradar-*.sql.gz | head -n 1' | tr -d '\r')"
+          test -n "$latest"
+          docker compose --env-file .env exec -T postgres createdb -U convocaradar scratch_restore
+          docker compose --env-file .env exec -T backup sh -c "gzip -dc '$latest'" \
+            | docker compose --env-file .env exec -T postgres \
+                psql -v ON_ERROR_STOP=1 -U convocaradar -d scratch_restore
+          source_revision="$(docker compose --env-file .env exec -T postgres psql -U convocaradar -d convocaradar -tAc 'SELECT version_num FROM alembic_version' | tr -d '\r')"
+          restored_revision="$(docker compose --env-file .env exec -T postgres psql -U convocaradar -d scratch_restore -tAc 'SELECT version_num FROM alembic_version' | tr -d '\r')"
+          test "$source_revision" = "$restored_revision"
+          source_tables="$(docker compose --env-file .env exec -T postgres psql -U convocaradar -d convocaradar -tAc "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public'" | tr -d '\r')"
+          restored_tables="$(docker compose --env-file .env exec -T postgres psql -U convocaradar -d scratch_restore -tAc "SELECT count(*) FROM information_schema.tables WHERE table_schema = 'public'" | tr -d '\r')"
+          test "$source_tables" = "$restored_tables"
+          test "$(docker compose --env-file .env exec -T postgres psql -U convocaradar -d scratch_restore -tAc "SELECT to_regclass('public.opportunities') IS NOT NULL" | tr -d '\r')" = "t"
+
+      - name: Dump logs on failure
+        if: failure()
+        run: docker compose --env-file .env logs --no-color
+
+      - name: Remove disposable smoke stack
+        if: always()
+        run: docker compose --env-file .env down -v --remove-orphans
