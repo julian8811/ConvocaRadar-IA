@@ -98,7 +98,7 @@ async def create_fixture_opportunity(*, close_days: int = 30) -> str:
             db,
             OpportunityCreate(
                 source_id=source.id,
-                external_id="fixture-grants-2026",
+                external_id=f"fixture-grants-2026-{datetime.now(UTC).timestamp()}",
                 title="Convocatoria piloto de cooperacion 2026",
                 entity="Grants.gov",
                 country="United States",
