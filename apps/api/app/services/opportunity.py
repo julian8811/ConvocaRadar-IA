@@ -735,6 +735,7 @@ async def create_opportunity(
 
     existing = db.scalar(
         select(Opportunity).where(
+            _organization_opportunity_scope(organization_id),
             Opportunity.slug == slug,
             Opportunity.entity == data.entity,
             Opportunity.close_date == data.close_date,

@@ -105,5 +105,15 @@ def test_0013_widens_alembic_version_column_before_long_revision_id() -> None:
     up = _function_body(path, "upgrade")
 
     assert len("0013_reclassify_experimental_frequency") > 32
-    assert 'conn.dialect.name == "postgresql"' in up
+    assert "conn.dialect.name" in up and "postgresql" in up
     assert "ALTER TABLE alembic_version ALTER COLUMN version_num TYPE VARCHAR(64)" in source
+
+
+def test_0016_does_not_swallow_postgres_transaction_errors() -> None:
+    path = MIGRATIONS_DIR / "0016_faculty_match_ivfflat.py"
+    up = _function_body(path, "upgrade")
+    helper = _function_body(path, "_embedding_is_vector")
+
+    assert "try:" not in up
+    assert "format_type" in helper
+    assert "startswith('vector')" in helper

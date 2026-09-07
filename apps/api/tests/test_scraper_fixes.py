@@ -130,8 +130,15 @@ class TestScrapeSourceTimeout:
         from app.core.config import get_settings
         from app.services import _scrape_source_candidates_with_timeout
 
-        monkeypatch.setenv("PER_CONNECTOR_TIMEOUT_SECONDS", "30")
-        monkeypatch.setenv("SCRAPING_MAX_SOURCE_SECONDS", "300")
+        from types import SimpleNamespace
+
+        monkeypatch.setattr(
+            "app.services.connectors.get_settings",
+            lambda: SimpleNamespace(
+                per_connector_timeout_seconds=30,
+                scraping_max_source_seconds=300,
+            ),
+        )
         get_settings.cache_clear()
         try:
 
@@ -148,7 +155,7 @@ class TestScrapeSourceTimeout:
                     awaitable.close()
                 return None
 
-            with patch("app.services._scrape_source_candidates", AsyncMock()):
+            with patch("app.services.connectors._scrape_source_candidates", AsyncMock()):
                 with patch("asyncio.wait_for", side_effect=fake_wait_for) as mock_wait:
                     try:
                         await _scrape_source_candidates_with_timeout(mock_source)
