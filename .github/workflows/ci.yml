@@ -177,8 +177,8 @@ jobs:
           sed -i 's|^DATABASE_URL=.*|DATABASE_URL=postgresql+psycopg://convocaradar:T7nQ4mK9xV2pL8rC5hJ6sW3zD1fG@postgres:5432/convocaradar|' .env
           sed -i 's|^MINIO_ROOT_PASSWORD=.*|MINIO_ROOT_PASSWORD=R8vD3kN6qW1mX9tL4pH7cJ2sF5zG|' .env
           sed -i 's|^S3_SECRET_KEY=.*|S3_SECRET_KEY=R8vD3kN6qW1mX9tL4pH7cJ2sF5zG|' .env
-          sed -i 's|^JWT_SECRET=.*|JWT_SECRET=Q4mZ8rT2vK7pD5nX1cH9sL6wF3jN|' .env
-          sed -i 's|^INTERNAL_API_KEY=.*|INTERNAL_API_KEY=V9xK3mQ7dT1pR8nL5cJ2sH6wF4zN|' .env
+          sed -i 's|^JWT_SECRET=.*|JWT_SECRET=Q4mZ8rT2vK7pD5nX1cH9sL6wF3jN8bR5|' .env
+          sed -i 's|^INTERNAL_API_KEY=.*|INTERNAL_API_KEY=V9xK3mQ7dT1pR8nL5cJ2sH6wF4zN7bD9|' .env
           sed -i 's|^RESET_TOKEN_SECRET=.*|RESET_TOKEN_SECRET=N6rW2pT8xK4mD9vL1cH7sQ5jF3zG|' .env
           sed -i 's|^BOOTSTRAP_SOURCES_ON_STARTUP=.*|BOOTSTRAP_SOURCES_ON_STARTUP=false|' .env
           sed -i 's|^WEB_PORT=.*|WEB_PORT=3001|' .env
