@@ -8,7 +8,7 @@ from __future__ import annotations
 import re
 from datetime import UTC, datetime
 
-from sqlalchemy import ColumnElement, Date, Select, and_, cast, func as sa_func, or_, select
+from sqlalchemy import ColumnElement, Select, and_, func as sa_func, or_, select
 from sqlalchemy.orm import Session
 
 from app.core.ai import build_embedding, cosine_similarity
@@ -63,11 +63,16 @@ def build_opportunity_query(
     """Build a SELECT query for opportunities with the given filters.
 
     By default, excludes:
-    - Opportunities with ``close_date`` in the past (closed by deadline,
-      regardless of stored status) — unless ``exclude_closed=False`` or
-      ``status`` is explicitly provided.
+    - Opportunities with ``close_date`` in a previous calendar day (closed by
+      deadline, regardless of stored status) — unless ``exclude_closed=False``
+      or ``status`` is explicitly provided.
     - Opportunities without an ``official_url`` (no link to view the
       convocatoria) — unless ``exclude_no_url=False``.
+
+    Calendar-day comparisons use a naive UTC midnight boundary instead of a
+    SQL ``CAST(... AS DATE)``. That keeps identical semantics on PostgreSQL and
+    SQLite; SQLite's DATE cast can coerce ISO datetimes to a numeric year and
+    incorrectly filter every dated opportunity.
     """
     from app.models import OpportunityScore
 
@@ -78,12 +83,14 @@ def build_opportunity_query(
         stmt = stmt.where(Opportunity.country == country)
     if category:
         stmt = stmt.where(Opportunity.categories.contains([category]))
-    today = datetime.now(UTC).date()
-    close_day = cast(Opportunity.close_date, Date)
+
+    today_start = datetime.now(UTC).replace(
+        hour=0, minute=0, second=0, microsecond=0, tzinfo=None
+    )
     if status == OpportunityStatus.open.value:
         stmt = stmt.where(
             or_(
-                close_day >= today,
+                Opportunity.close_date >= today_start,
                 and_(
                     Opportunity.close_date.is_(None),
                     Opportunity.status.in_(
@@ -99,21 +106,27 @@ def build_opportunity_query(
     elif status == OpportunityStatus.closing_soon.value:
         stmt = stmt.where(
             Opportunity.status == OpportunityStatus.closing_soon.value,
-            or_(Opportunity.close_date.is_(None), close_day >= today),
+            or_(Opportunity.close_date.is_(None), Opportunity.close_date >= today_start),
         )
     elif status == OpportunityStatus.closed.value:
         stmt = stmt.where(
             or_(
                 Opportunity.status == OpportunityStatus.closed.value,
-                and_(Opportunity.close_date.is_not(None), close_day < today),
+                and_(
+                    Opportunity.close_date.is_not(None),
+                    Opportunity.close_date < today_start,
+                ),
             )
         )
     elif status:
         stmt = stmt.where(Opportunity.status == status)
     elif exclude_closed:
-        # Filter by close_date regardless of stored status so opportunities
-        # whose deadline passed since the last scrape are hidden immediately.
-        stmt = stmt.where(or_(Opportunity.close_date.is_(None), close_day >= today))
+        # Filter by the calendar-day boundary regardless of stored status so
+        # opportunities whose deadline passed on a previous day disappear
+        # immediately, while opportunities closing at any time today remain.
+        stmt = stmt.where(
+            or_(Opportunity.close_date.is_(None), Opportunity.close_date >= today_start)
+        )
     if exclude_no_url:
         stmt = stmt.where(Opportunity.official_url.is_not(None), Opportunity.official_url != "")
     if source_id:
@@ -164,6 +177,7 @@ def build_opportunity_query(
         )
     if faculty or axis or min_match_score is not None:
         from app.models import Faculty, InstitutionalAxis, OpportunityAxisMatch
+
         stmt = stmt.join(OpportunityAxisMatch, OpportunityAxisMatch.opportunity_id == Opportunity.id)
         stmt = stmt.where(OpportunityAxisMatch.organization_id == organization_id)
         if faculty:

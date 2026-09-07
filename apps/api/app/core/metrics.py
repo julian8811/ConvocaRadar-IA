@@ -1,7 +1,6 @@
 """Metrics for faculty matching (T9)."""
 from __future__ import annotations
 
-import time
 from collections import Counter
 
 _counters: Counter = Counter()
@@ -12,6 +11,8 @@ _p1_latency: list[float] = []
 
 
 def record_match(final_score: float, llm_hit: bool) -> None:
+    global _llm_hits, _llm_total
+
     _counters["matching_count"] += 1
     _scores.append(final_score)
     _llm_total += 1
@@ -28,7 +29,6 @@ def record_p1_latency(ms: float) -> None:
 def get_metrics() -> dict:
     avg = sum(_scores) / len(_scores) if _scores else 0.0
     fallback_rate = (_counters["llm_fallback"] / _llm_total) if _llm_total else 0.0
-    # p95 for latency if needed
     return {
         "matching_count": _counters["matching_count"],
         "avg_final_score": round(avg, 4),
@@ -39,9 +39,10 @@ def get_metrics() -> dict:
 
 
 def reset_metrics() -> None:
+    global _llm_hits, _llm_total
+
     _counters.clear()
     _scores.clear()
-    global _llm_hits, _llm_total
     _llm_hits = 0
     _llm_total = 0
     _p1_latency.clear()

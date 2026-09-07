@@ -2,6 +2,11 @@
 
 Revision ID: 0013_reclassify_experimental_frequency
 Revises: 0012_fix_sena_allowed_domains
+
+Alembic creates ``alembic_version.version_num`` as VARCHAR(32) by default.
+This repository started using revision identifiers longer than 32 characters
+at 0013, so a fresh PostgreSQL database must widen the metadata column before
+Alembic records this revision as current.
 """
 
 from alembic import op
@@ -15,8 +20,11 @@ depends_on = None
 
 def upgrade() -> None:
     conn = op.get_bind()
-    # Move experimental tier (and tier IS NULL legacy rows) from daily to weekly
-    # Allowlist + manual override win: skip if key in allowlist or connector_config has manual_frequency
+    if conn.dialect.name == "postgresql":
+        conn.execute(text("ALTER TABLE alembic_version ALTER COLUMN version_num TYPE VARCHAR(64)"))
+
+    # Move experimental tier (and tier IS NULL legacy rows) from daily to weekly.
+    # Allowlist + manual override win: skip if key in allowlist or connector_config has manual_frequency.
     conn.execute(
         text(
             """
@@ -34,7 +42,8 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     conn = op.get_bind()
-    # Revert: experimental weekly back to daily (best-effort)
+    # Keep version_num widened: later revisions also exceed Alembic's historical
+    # 32-character default and shrinking the metadata column would be unsafe.
     conn.execute(
         text(
             """

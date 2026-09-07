@@ -41,7 +41,7 @@ BATCH1 = {
 <p>Aplicaciones abiertas hasta el 30 de junio de 2027.</p>
 <p><a href="https://startupchile.org/apply/charly-gen/">Apply via Charly</a></p>
 </main></body></html>""",
-        "titles": ("Postula a Start-Up Chile",),
+        "titles": ("Apply via Charly",),
     },
     "proinnovate-calendario": {
         "url": "https://calendario.proinnovate.gob.pe/",

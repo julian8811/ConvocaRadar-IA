@@ -1,10 +1,9 @@
-"""Guard tests for the semantic scoring path (REQ-CI-SCORING-1).
+"""Guard tests for the synchronous semantic-scoring fallback.
 
-Audit regression: ``_semantic_score`` called the async ``build_embedding``
-from sync context and inspected the result with an unimported
-``asyncio.iscoroutine``. The NameError was swallowed by the broad except
-clause, so the semantic contribution was silently pinned to 0.0 on every
-call while a never-awaited coroutine leaked each time.
+The current implementation computes deterministic local hash embeddings in
+sync code and delegates only cosine similarity. These tests ensure it returns
+plain floats, degrades safely when the similarity backend fails, and never
+requires an async wrapper from synchronous request code.
 """
 
 from __future__ import annotations
@@ -16,7 +15,6 @@ from app.services.scoring import _semantic_score
 
 
 def test_semantic_score_positive_with_local_hash_embeddings() -> None:
-    """Scenario: embedding available — semantic score must be > 0."""
     text = (
         "Convocatoria de fondos para proyectos de inteligencia artificial "
         "y machine learning en America Latina"
@@ -26,33 +24,29 @@ def test_semantic_score_positive_with_local_hash_embeddings() -> None:
     assert score > 0
 
 
-def test_semantic_score_degrades_to_zero_when_backend_fails(monkeypatch) -> None:
-    """Scenario: embedding unavailable — degrade to 0.0 without crashing."""
+def test_semantic_score_degrades_to_zero_when_similarity_backend_fails(monkeypatch) -> None:
+    def _raise(_left: list[float], _right: list[float]) -> float:
+        raise RuntimeError("similarity backend down")
 
-    def _raise(text: str, *, dimensions: int | None = None) -> list[float]:
-        raise RuntimeError("embedding backend down")
-
-    monkeypatch.setattr(scoring_module, "build_embedding_sync", _raise)
+    monkeypatch.setattr(scoring_module, "cosine_similarity", _raise)
     assert _semantic_score("opportunity text", "profile text") == 0.0
 
 
-def test_semantic_score_runs_sync_wrapper_and_returns_float(monkeypatch) -> None:
-    """Both texts go through the sync wrapper and a plain float similarity
-    comes back — never a coroutine object."""
-    calls: list[str] = []
+def test_semantic_score_returns_plain_float_from_local_vectors(monkeypatch) -> None:
+    calls: list[tuple[list[float], list[float]]] = []
 
-    def _fake_sync(text: str, *, dimensions: int | None = None) -> list[float]:
-        calls.append(text)
-        return [1.0, 0.0] if "opportunity" in text else [0.5, 0.5]
+    def _fake_similarity(left: list[float], right: list[float]) -> float:
+        calls.append((left, right))
+        return 0.7071
 
-    monkeypatch.setattr(scoring_module, "build_embedding_sync", _fake_sync)
+    monkeypatch.setattr(scoring_module, "cosine_similarity", _fake_similarity)
     result = _semantic_score("opportunity description", "profile areas")
-    assert len(calls) == 2
+    assert len(calls) == 1
+    assert calls[0][0]
+    assert calls[0][1]
     assert isinstance(result, float)
-    # cos([1, 0], [0.5, 0.5]) = 0.5 / (1 * 0.7071) ≈ 0.7071
-    assert result == pytest.approx(0.7071, abs=1e-3)
+    assert result == pytest.approx(0.7071, abs=1e-4)
 
 
 def test_semantic_score_empty_input_returns_zero() -> None:
-    """Empty input short-circuits to 0.0 before touching the backend."""
     assert _semantic_score("", "") == 0.0

@@ -58,9 +58,15 @@ asyncio_mode = "auto"
 [tool.ruff]
 line-length = 100
 target-version = "py312"
-# Applied Alembic revisions are historical artifacts: they must stay
-# byte-exact, so lint/format never rewrites them.
+# Applied Alembic revisions are historical artifacts and are not auto-formatted.
 extend-exclude = ["migrations"]
+
+[tool.ruff.lint]
+# The repository predates Ruff enforcement and still has substantial style debt.
+# CI blocks on executable-correctness rules first: syntax errors, invalid control
+# flow and undefined/unbound names. Style can be ratcheted in separately without
+# hiding runtime-breaking defects behind a four-digit legacy violation count.
+select = ["E9", "F63", "F7", "F82"]
 
 [tool.setuptools]
 include-package-data = true

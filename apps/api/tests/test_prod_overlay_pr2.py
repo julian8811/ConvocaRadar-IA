@@ -382,4 +382,4 @@ def test_ci_prod_asserts_runs_compose_config():
     assert CI_YML.is_file(), "ci.yml missing"
     text = CI_YML.read_text()
     assert "docker compose" in text and "config" in text, "ci must run 'docker compose config' for prod asserts"
-    assert "docker-compose.prod.yml" in text or "compose.prod" in text, "ci prod asserts must use -f docker-compose.prod.yml"
+    assert "docker-compose.server.yml" in text, "ci prod asserts must validate the autonomous university server compose"

@@ -25,12 +25,27 @@ jobs:
         with:
           dockerfile: apps/web/Dockerfile
           config: .hadolint.yaml
+      - uses: hadolint/hadolint-action@v3.1.0
+        with:
+          dockerfile: apps/backup/Dockerfile
+          config: .hadolint.yaml
 
   compose-lint:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: docker compose config > /dev/null
+      - name: Validate development compose
+        run: |
+          cp .env.example .env
+          docker compose config > /dev/null
+        env:
+          POSTGRES_PASSWORD: ci-dummy-postgres-password-0123456789abcdef
+          MINIO_ROOT_PASSWORD: ci-dummy-minio-root-password-0123456789abcdef
+          INTERNAL_API_KEY: ci-dummy-internal-api-key-0123456789abcdef
+      - name: Validate university server compose
+        run: |
+          cp .env.production.example .env
+          docker compose -p convocaradar --env-file .env -f docker-compose.server.yml config > /dev/null
         env:
           POSTGRES_PASSWORD: ci-dummy-postgres-password-0123456789abcdef
           MINIO_ROOT_PASSWORD: ci-dummy-minio-root-password-0123456789abcdef
@@ -40,20 +55,44 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - run: |
-          echo "Validating prod overlay: docker compose -f docker-compose.yml -f docker-compose.prod.yml config"
-          POSTGRES_PASSWORD=ci-dummy-postgres-password-0123456789abcdef \
-          MINIO_ROOT_PASSWORD=ci-dummy-minio-root-password-0123456789abcdef \
-          INTERNAL_API_KEY=ci-dummy-internal-api-key-0123456789abcdef \
-          docker compose -f docker-compose.yml -f docker-compose.prod.yml config > /tmp/prod-config.yml
-          echo "Checking port isolation — 5434:5432 must NOT appear in prod config"
-          if grep -q "5434:5432" /tmp/prod-config.yml; then echo "FAIL: prod config still exposes 5434:5432" >&2; exit 1; fi
-          if grep -q "9004:9000" /tmp/prod-config.yml; then echo "FAIL: prod config still exposes 9004:9000" >&2; exit 1; fi
-          echo "Checking hardening present"
-          grep -q "cap_drop" /tmp/prod-config.yml || (echo "FAIL: cap_drop missing in prod config" >&2; exit 1)
-          grep -q "no-new-privileges" /tmp/prod-config.yml || (echo "FAIL: no-new-privileges missing" >&2; exit 1)
-          grep -q "read_only" /tmp/prod-config.yml || (echo "FAIL: read_only missing in prod config" >&2; exit 1)
-          echo "prod-asserts PASS"
+      - name: Assert university server isolation and hardening
+        run: |
+          cp .env.production.example .env
+          docker compose -p convocaradar --env-file .env -f docker-compose.server.yml config --format json > /tmp/server-config.json
+          python - <<'PY'
+          import json
+          from pathlib import Path
+
+          config = json.loads(Path("/tmp/server-config.json").read_text())
+          services = config["services"]
+
+          internal_services = ("postgres", "minio", "api", "worker", "backup")
+          for name in internal_services:
+              ports = services[name].get("ports") or []
+              assert not ports, f"{name} must not publish host ports in server compose: {ports}"
+
+          web_ports = services["web"].get("ports") or []
+          assert len(web_ports) == 1, f"web must publish exactly one port: {web_ports}"
+          port = web_ports[0]
+          assert str(port.get("target")) == "3000", port
+          assert str(port.get("published")) == "3001", port
+          assert port.get("host_ip") == "127.0.0.1", port
+
+          for name in ("api", "worker", "backup", "web"):
+              svc = services[name]
+              assert svc.get("read_only") is True, f"{name}: read_only missing"
+              assert "ALL" in (svc.get("cap_drop") or []), f"{name}: cap_drop ALL missing"
+              assert any("no-new-privileges" in item for item in (svc.get("security_opt") or [])), (
+                  f"{name}: no-new-privileges missing"
+              )
+              assert svc.get("restart") in ("unless-stopped", "always"), f"{name}: restart policy missing"
+
+          assert services["api"]["depends_on"]["postgres"]["condition"] == "service_healthy"
+          assert services["api"]["depends_on"]["minio"]["condition"] == "service_healthy"
+          assert services["worker"]["depends_on"]["api"]["condition"] == "service_healthy"
+          assert services["backup"]["depends_on"]["postgres"]["condition"] == "service_healthy"
+          print("server production assertions PASS")
+          PY
         env:
           POSTGRES_PASSWORD: ci-dummy-postgres-password-0123456789abcdef
           MINIO_ROOT_PASSWORD: ci-dummy-minio-root-password-0123456789abcdef
@@ -71,9 +110,8 @@ jobs:
           python-version: "3.12"
           cache: "pip"
       - run: pip install -e ".[dev]"
-      - run: pip install ruff
-      - run: ruff check .
-      - run: ruff format --check .
+      - name: Ruff executable-correctness gate
+        run: ruff check .
 
   test:
     runs-on: ubuntu-latest
@@ -92,11 +130,6 @@ jobs:
           JWT_SECRET: aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa
           INTERNAL_API_KEY: bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb
 
-  # Frontend gate: lint, type-check, and unit tests. e2e (Playwright) is
-  # run separately so a long-running browser job does not block PR feedback.
-  # The workspace is pnpm-managed (pnpm-workspace.yaml + root lockfile);
-  # install runs from the repo root so --frozen-lockfile validates the
-  # single shared lockfile.
   frontend:
     runs-on: ubuntu-latest
     steps:
@@ -116,17 +149,15 @@ jobs:
 
   docker:
     runs-on: ubuntu-latest
-    # docker-compose.yml hard-fails via ${VAR:?must be set}; provide dummy
-    # values so the smoke stack can come up on a fresh checkout.
     env:
       POSTGRES_PASSWORD: ci-dummy-postgres-password-0123456789abcdef
       MINIO_ROOT_PASSWORD: ci-dummy-minio-root-password-0123456789abcdef
       INTERNAL_API_KEY: ci-dummy-internal-api-key-0123456789abcdef
     steps:
       - uses: actions/checkout@v4
+      - name: Prepare non-secret smoke environment
+        run: cp .env.example .env
       - run: docker compose build api
       - run: docker compose up -d postgres minio
       - run: sleep 10 && docker compose up -d api
-      # Compose maps the api service 8002:8000; /api/v1/health/live matches
-      # the container's own healthcheck path.
       - run: sleep 15 && curl -sf http://localhost:8002/api/v1/health/live

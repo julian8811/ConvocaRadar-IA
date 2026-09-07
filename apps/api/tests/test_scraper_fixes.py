@@ -124,19 +124,23 @@ class TestScrapeSourceTimeout:
         assert settings.scraping_max_source_seconds >= 30
 
     @pytest.mark.asyncio
-    async def test_min_takes_effect_with_lower_connector_timeout(self) -> None:
+    async def test_min_takes_effect_with_lower_connector_timeout(self, monkeypatch) -> None:
         """When per_connector_timeout_seconds is lower than scraping_max_source_seconds,
         the smaller value should be used as the cap."""
         from app.core.config import get_settings
         from app.services import _scrape_source_candidates_with_timeout
 
-        settings = get_settings()
-        # Temporarily lower the per_connector_timeout
-        original_connector = settings.per_connector_timeout_seconds
-        original_max_source = settings.scraping_max_source_seconds
+        from types import SimpleNamespace
+
+        monkeypatch.setattr(
+            "app.services.connectors.get_settings",
+            lambda: SimpleNamespace(
+                per_connector_timeout_seconds=30,
+                scraping_max_source_seconds=300,
+            ),
+        )
+        get_settings.cache_clear()
         try:
-            settings.per_connector_timeout_seconds = 30
-            settings.scraping_max_source_seconds = 300
 
             # Need a mock source to prevent actual DB/scraping calls
             mock_source = AsyncMock()
@@ -151,7 +155,7 @@ class TestScrapeSourceTimeout:
                     awaitable.close()
                 return None
 
-            with patch("app.services._scrape_source_candidates", AsyncMock()):
+            with patch("app.services.connectors._scrape_source_candidates", AsyncMock()):
                 with patch("asyncio.wait_for", side_effect=fake_wait_for) as mock_wait:
                     try:
                         await _scrape_source_candidates_with_timeout(mock_source)
@@ -169,9 +173,7 @@ class TestScrapeSourceTimeout:
                                 f"Expected timeout=30, got {kwargs['timeout']}"
                             )
         finally:
-            # Restore original values
-            settings.per_connector_timeout_seconds = original_connector
-            settings.scraping_max_source_seconds = original_max_source
+            get_settings.cache_clear()
 
 
 # ── Task 3.1: Health check functions ──────────────────────────────────────

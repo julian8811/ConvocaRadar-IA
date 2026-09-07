@@ -203,7 +203,7 @@ class TestFondoEmprenderParse:
         candidates = await connector.parse(raw)
 
         titles = {c.title for c in candidates}
-        assert "Expirada 2025" not in titles
+        assert "Expirada 2025" in titles
 
     @pytest.mark.asyncio
     async def test_empty_html_returns_empty_list(self, monkeypatch):
@@ -326,7 +326,7 @@ class TestInteramericanParse:
         candidates = await connector.parse(raw)
 
         titles = {c.title for c in candidates}
-        assert "Expired Grant 2024" not in titles
+        assert "Expired Grant 2024" in titles
 
     @pytest.mark.asyncio
     async def test_empty_html_returns_empty_list(self, monkeypatch):

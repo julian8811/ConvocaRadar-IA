@@ -75,6 +75,6 @@ class TestUniandesSeedDefinition:
                 break
 
         assert findeter is not None, "findeter-convocatorias source was not created"
-        assert findeter.source_type == "api", (
-            f"Expected source_type='api', got: {findeter.source_type}"
+        assert findeter.source_type == "html", (
+            f"Expected source_type='html' after the resilient sitemap/HTML fallback, got: {findeter.source_type}"
         )

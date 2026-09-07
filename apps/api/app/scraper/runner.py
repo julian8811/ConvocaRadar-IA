@@ -288,7 +288,7 @@ def _setup_run(db, source: Source, organization_id: str | None) -> tuple[SourceR
     source.last_run_at = started_at
     db.add(run)
     db.flush()
-    org_id = organization_id or source.organization_id or "00000000-0000-0000-0000-000000000000"
+    org_id = organization_id or source.organization_id
     task = Task(
         organization_id=org_id,
         source_run_id=run.id,

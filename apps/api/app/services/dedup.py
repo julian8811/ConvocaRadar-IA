@@ -124,6 +124,14 @@ def find_duplicate_opportunity(
             .order_by(Opportunity.first_seen_at.asc())
         )
         for candidate in candidates:
+            if (
+                data.source_id
+                and data.external_id
+                and candidate.source_id == data.source_id
+                and candidate.external_id
+                and candidate.external_id != data.external_id
+            ):
+                continue
             if normalize_official_url(candidate.official_url) == normalized_target:
                 return candidate
         return None
