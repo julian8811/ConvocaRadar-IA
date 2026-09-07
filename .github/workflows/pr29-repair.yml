@@ -15,7 +15,7 @@ jobs:
       - uses: actions/checkout@v4
         with:
           ref: chore/server-readiness-20260906
-      - name: Apply deterministic fixes to legacy large files
+      - name: Apply remaining deterministic fixes
         shell: python
         run: |
           from pathlib import Path
@@ -30,93 +30,57 @@ jobs:
                   raise SystemExit(f"{path}: expected exactly one match, got {count}")
               p.write_text(text.replace(old, new, 1), encoding="utf-8")
 
+          # Multi-tenant isolation: the final slug fallback must obey the same
+          # organization/shared scope as every other deduplication path.
           replace_once(
-              "apps/api/app/connectors/configurable_html.py",
-              "from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult\n\ndef _container_text",
-              "from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult\n\nlogger = logging.getLogger(__name__)\n\ndef _container_text",
+              "apps/api/app/services/opportunity.py",
+              """    existing = db.scalar(\n        select(Opportunity).where(\n            Opportunity.slug == slug,\n            Opportunity.entity == data.entity,\n            Opportunity.close_date == data.close_date,\n        )\n    )\n""",
+              """    existing = db.scalar(\n        select(Opportunity).where(\n            _organization_opportunity_scope(organization_id),\n            Opportunity.slug == slug,\n            Opportunity.entity == data.entity,\n            Opportunity.close_date == data.close_date,\n        )\n    )\n""",
           )
 
-          for path in ("apps/api/tests/test_api.py", "apps/api/tests/test_opportunity_serialization.py"):
-              replace_once(
-                  path,
-                  "from app.db.seed import seed  # noqa: E402",
-                  "from app.db.seed import seed, seed_default_sources  # noqa: E402",
-              )
-              replace_once(
-                  path,
-                  "org = db.scalar(select(Organization).where(Organization.slug == \"convocaradar-local\"))\n        if org and not db.scalar",
-                  "org = db.scalar(select(Organization).where(Organization.slug == \"convocaradar-local\"))\n        if org:\n            seed_default_sources(db, org, force=True)\n            db.commit()\n        if org and not db.scalar",
-              )
-
-          # Shared SQLite means the same admin email may already belong to an
-          # organization created by another test module. Reclaim it explicitly.
-          replace_once(
-              "apps/api/tests/test_api.py",
-              """        if org and not db.scalar(select(User).where(User.email == \"admin@convocaradar.io\")):\n            from app.core.security import hash_password\n\n            db.add(\n                User(\n                    email=\"admin@convocaradar.io\",\n                    name=\"Admin ConvocaRadar\",\n                    password_hash=hash_password(\"ConvocaRadarLocal123!\"),\n                    role=Role.admin.value,\n                    organization_id=org.id,\n                )\n            )\n            db.commit()\n""",
-              """        if org:\n            from app.core.security import hash_password\n\n            user = db.scalar(select(User).where(User.email == \"admin@convocaradar.io\"))\n            if user is None:\n                user = User(\n                    email=\"admin@convocaradar.io\",\n                    name=\"Admin ConvocaRadar\",\n                    password_hash=hash_password(\"ConvocaRadarLocal123!\"),\n                    role=Role.admin.value,\n                    organization_id=org.id,\n                )\n                db.add(user)\n            else:\n                user.organization_id = org.id\n                user.role = Role.admin.value\n                user.password_hash = hash_password(\"ConvocaRadarLocal123!\")\n            db.commit()\n""",
+          # 0016 used try/except around SQL inside Alembic's transaction. On
+          # PostgreSQL a failed CREATE INDEX poisons the transaction even when
+          # Python catches the exception. faculty_profiles.embedding is JSON in
+          # 0015, so IVFFLAT is only valid if an installation has explicitly
+          # migrated that column to pgvector.
+          migration = Path("apps/api/migrations/versions/0016_faculty_match_ivfflat.py")
+          migration.write_text(
+              '''"""Add IVFFLAT index for faculty profile embeddings when pgvector-backed (W2).\n\nRevision ID: 0016_faculty_match_ivfflat\nRevises: 0015_faculty_match\n"""\nfrom alembic import op\nfrom sqlalchemy import text\n\nrevision = "0016_faculty_match_ivfflat"\ndown_revision = "0015_faculty_match"\nbranch_labels = None\ndepends_on = None\n\n\ndef _embedding_is_vector() -> bool:\n    bind = op.get_bind()\n    if bind.dialect.name != "postgresql":\n        return False\n    type_name = bind.scalar(\n        text(\n            """\n            SELECT format_type(a.atttypid, a.atttypmod)\n            FROM pg_attribute AS a\n            JOIN pg_class AS c ON c.oid = a.attrelid\n            JOIN pg_namespace AS n ON n.oid = c.relnamespace\n            WHERE c.relname = 'faculty_profiles'\n              AND a.attname = 'embedding'\n              AND a.attnum > 0\n              AND NOT a.attisdropped\n              AND n.nspname = current_schema()\n            """\n        )\n    )\n    return bool(type_name and str(type_name).lower().startswith("vector"))\n\n\ndef upgrade() -> None:\n    if not _embedding_is_vector():\n        return\n    op.execute("CREATE EXTENSION IF NOT EXISTS vector")\n    op.execute(\n        "CREATE INDEX IF NOT EXISTS ix_faculty_profiles_embedding_ivfflat "\n        "ON faculty_profiles USING ivfflat (embedding vector_cosine_ops) WITH (lists = 10)"\n    )\n\n\ndef downgrade() -> None:\n    bind = op.get_bind()\n    if bind.dialect.name == "postgresql":\n        op.execute("DROP INDEX IF EXISTS ix_faculty_profiles_embedding_ivfflat")\n''',
+              encoding="utf-8",
           )
 
+          # ast.unparse normalizes string literals to single quotes; assert the
+          # semantics rather than a formatter-specific quote style.
           replace_once(
-              "apps/api/tests/test_opportunity_serialization.py",
-              """        if org and not db.scalar(select(User).where(User.email == \"admin@convocaradar.io\")):\n            db.add(\n                User(\n                    email=\"admin@convocaradar.io\",\n                    name=\"Admin ConvocaRadar\",\n                    password_hash=hash_password(\"ConvocaRadarLocal123!\"),\n                    role=Role.admin.value,\n                    organization_id=org.id,\n                )\n            )\n            db.commit()\n""",
-              """        if org:\n            user = db.scalar(select(User).where(User.email == \"admin@convocaradar.io\"))\n            if user is None:\n                user = User(\n                    email=\"admin@convocaradar.io\",\n                    name=\"Admin ConvocaRadar\",\n                    password_hash=hash_password(\"ConvocaRadarLocal123!\"),\n                    role=Role.admin.value,\n                    organization_id=org.id,\n                )\n                db.add(user)\n            else:\n                user.organization_id = org.id\n                user.role = Role.admin.value\n                user.password_hash = hash_password(\"ConvocaRadarLocal123!\")\n            db.commit()\n""",
+              "apps/api/tests/test_migrations_chain.py",
+              "    assert 'conn.dialect.name == \"postgresql\"' in up\n",
+              "    assert \"conn.dialect.name\" in up and \"postgresql\" in up\n",
           )
+          tests = Path("apps/api/tests/test_migrations_chain.py")
+          text_value = tests.read_text(encoding="utf-8")
+          marker = "def test_0016_does_not_swallow_postgres_transaction_errors()"
+          if marker not in text_value:
+              text_value += '''\n\ndef test_0016_does_not_swallow_postgres_transaction_errors() -> None:\n    path = MIGRATIONS_DIR / "0016_faculty_match_ivfflat.py"\n    up = _function_body(path, "upgrade")\n    helper = _function_body(path, "_embedding_is_vector")\n\n    assert "try:" not in up\n    assert "format_type" in helper\n    assert "startswith('vector')" in helper\n'''
+              tests.write_text(text_value, encoding="utf-8")
 
-          replace_once(
-              "apps/api/tests/test_dashboard_health.py",
-              """        if org and not db.scalar(select(User).where(User.email == \"admin@convocaradar.io\")):\n            db.add(\n                User(\n                    email=\"admin@convocaradar.io\",\n                    name=\"Admin ConvocaRadar\",\n                    password_hash=hash_password(\"ConvocaRadarLocal123!\"),\n                    role=Role.admin.value,\n                    organization_id=org.id,\n                )\n            )\n            db.commit()\n""",
-              """        if org:\n            user = db.scalar(select(User).where(User.email == \"admin@convocaradar.io\"))\n            if user is None:\n                user = User(\n                    email=\"admin@convocaradar.io\",\n                    name=\"Admin ConvocaRadar\",\n                    password_hash=hash_password(\"ConvocaRadarLocal123!\"),\n                    role=Role.admin.value,\n                    organization_id=org.id,\n                )\n                db.add(user)\n            else:\n                user.organization_id = org.id\n                user.role = Role.admin.value\n                user.password_hash = hash_password(\"ConvocaRadarLocal123!\")\n            db.commit()\n""",
+          # The facade re-exports the function, but its globals live in
+          # app.services.connectors. Patch dependencies at their lookup site so
+          # module reloads elsewhere in the suite cannot leave a stale Settings cache.
+          scraper_test = Path("apps/api/tests/test_scraper_fixes.py")
+          text_value = scraper_test.read_text(encoding="utf-8")
+          if '"app.services.connectors.get_settings"' not in text_value:
+              needle = '''        monkeypatch.setenv("PER_CONNECTOR_TIMEOUT_SECONDS", "30")\n        monkeypatch.setenv("SCRAPING_MAX_SOURCE_SECONDS", "300")\n        get_settings.cache_clear()\n        try:\n'''
+              replacement = '''        from types import SimpleNamespace\n\n        monkeypatch.setattr(\n            "app.services.connectors.get_settings",\n            lambda: SimpleNamespace(\n                per_connector_timeout_seconds=30,\n                scraping_max_source_seconds=300,\n            ),\n        )\n        get_settings.cache_clear()\n        try:\n'''
+              if needle not in text_value:
+                  raise SystemExit("test_scraper_fixes.py: timeout settings block not found")
+              text_value = text_value.replace(needle, replacement, 1)
+          text_value = text_value.replace(
+              'with patch("app.services._scrape_source_candidates", AsyncMock()):',
+              'with patch("app.services.connectors._scrape_source_candidates", AsyncMock()):',
+              1,
           )
+          scraper_test.write_text(text_value, encoding="utf-8")
 
-          # Batch-1 uses the concrete apply anchor as the first matching card;
-          # the parser correctly surfaces that actionable title.
-          replace_once(
-              "apps/api/tests/test_026_batch1_parse.py",
-              '"titles": ("Postula a Start-Up Chile",),',
-              '"titles": ("Apply via Charly",),',
-          )
-
-          # Closed rows intentionally survive parse so runner validation/status
-          # reconciliation can close existing opportunities instead of losing them.
-          replace_once(
-              "apps/api/tests/test_fondo_emprender_interamerican.py",
-              'assert "Expirada 2025" not in titles',
-              'assert "Expirada 2025" in titles',
-          )
-          replace_once(
-              "apps/api/tests/test_fondo_emprender_interamerican.py",
-              'assert "Expired Grant 2024" not in titles',
-              'assert "Expired Grant 2024" in titles',
-          )
-
-          # Change Settings through its supported environment/cache boundary;
-          # mutating one cached Settings instance is order-sensitive in the suite.
-          replace_once(
-              "apps/api/tests/test_scraper_fixes.py",
-              """    async def test_min_takes_effect_with_lower_connector_timeout(self) -> None:\n        \"\"\"When per_connector_timeout_seconds is lower than scraping_max_source_seconds,\n        the smaller value should be used as the cap.\"\"\"\n        from app.core.config import get_settings\n        from app.services import _scrape_source_candidates_with_timeout\n\n        settings = get_settings()\n        # Temporarily lower the per_connector_timeout\n        original_connector = settings.per_connector_timeout_seconds\n        original_max_source = settings.scraping_max_source_seconds\n        try:\n            settings.per_connector_timeout_seconds = 30\n            settings.scraping_max_source_seconds = 300\n""",
-              """    async def test_min_takes_effect_with_lower_connector_timeout(self, monkeypatch) -> None:\n        \"\"\"When per_connector_timeout_seconds is lower than scraping_max_source_seconds,\n        the smaller value should be used as the cap.\"\"\"\n        from app.core.config import get_settings\n        from app.services import _scrape_source_candidates_with_timeout\n\n        monkeypatch.setenv(\"PER_CONNECTOR_TIMEOUT_SECONDS\", \"30\")\n        monkeypatch.setenv(\"SCRAPING_MAX_SOURCE_SECONDS\", \"300\")\n        get_settings.cache_clear()\n        try:\n""",
-          )
-          replace_once(
-              "apps/api/tests/test_scraper_fixes.py",
-              """        finally:\n            # Restore original values\n            settings.per_connector_timeout_seconds = original_connector\n            settings.scraping_max_source_seconds = original_max_source\n""",
-              """        finally:\n            get_settings.cache_clear()\n""",
-          )
-
-          p = Path("apps/api/tests/test_prod_overlay_pr2.py")
-          text = p.read_text(encoding="utf-8")
-          text = text.replace(
-              'assert "docker-compose.prod.yml" in text or "compose.prod" in text, "ci prod asserts must use -f docker-compose.prod.yml"',
-              'assert "docker-compose.server.yml" in text, "ci prod asserts must validate the autonomous university server compose"',
-          )
-          p.write_text(text, encoding="utf-8")
-
-          p = Path("apps/api/tests/test_uniandes.py")
-          text = p.read_text(encoding="utf-8")
-          text = text.replace(
-              'assert findeter.source_type == "api", (\n            f"Expected source_type=\'api\', got: {findeter.source_type}"\n        )',
-              'assert findeter.source_type == "html", (\n            f"Expected source_type=\'html\' after the resilient sitemap/HTML fallback, got: {findeter.source_type}"\n        )',
-          )
-          p.write_text(text, encoding="utf-8")
       - name: Commit repair patch
         shell: bash
         run: |
@@ -126,14 +90,9 @@ jobs:
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add apps/api/app/connectors/configurable_html.py \
-                  apps/api/tests/test_api.py \
-                  apps/api/tests/test_opportunity_serialization.py \
-                  apps/api/tests/test_dashboard_health.py \
-                  apps/api/tests/test_026_batch1_parse.py \
-                  apps/api/tests/test_fondo_emprender_interamerican.py \
-                  apps/api/tests/test_scraper_fixes.py \
-                  apps/api/tests/test_prod_overlay_pr2.py \
-                  apps/api/tests/test_uniandes.py
-          git commit -m "fix(ci): make shared regression fixtures order-independent"
+          git add apps/api/app/services/opportunity.py \
+                  apps/api/migrations/versions/0016_faculty_match_ivfflat.py \
+                  apps/api/tests/test_migrations_chain.py \
+                  apps/api/tests/test_scraper_fixes.py
+          git commit -m "fix: close remaining PR29 backend and migration failures"
           git push origin HEAD:chore/server-readiness-20260906
