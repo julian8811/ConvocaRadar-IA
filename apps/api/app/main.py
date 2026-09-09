@@ -478,6 +478,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         settings.frontend_url,
+        "https://ecosistema.colmayor.edu.co",
+        "http://10.3.1.128:3001",
         "https://convocaradar-web.vercel.app",
         "http://localhost:3000",
         "http://127.0.0.1:3000",

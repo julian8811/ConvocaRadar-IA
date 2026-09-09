@@ -122,7 +122,8 @@
         # Embedded by Next.js at build time for client-side fetch().
         # localhost:8002 = the host-mapped API port (browser-accessible).
         # Server-side (SSR) calls go through the Next.js rewrite → http://api:8000.
-        NEXT_PUBLIC_API_URL: http://localhost:8002/api/v1
+        NEXT_PUBLIC_API_URL: /api/v1
+        NEXT_PUBLIC_ENABLE_WAKE_RETRIES: "false"
     ports:
       # Host port configurable via WEB_PORT (default 3002) to avoid collision
       # with other projects that occupy 3000 (e.g. CEITTO on 3000).

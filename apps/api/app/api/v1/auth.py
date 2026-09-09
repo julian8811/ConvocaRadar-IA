@@ -1,4 +1,5 @@
 from datetime import UTC, datetime
+import os
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -86,25 +87,31 @@ def _set_token_cookie(response: Response, token: str) -> None:
     clients. SameSite=None (with Secure=True) allows the cookie to be sent on
     cross-origin fetch calls from the frontend (Vercel) to the API (Render).
     """
+    cookie_secure = os.getenv("AUTH_COOKIE_SECURE", "true").lower() == "true"
+    cookie_samesite = "none" if cookie_secure else "lax"
+
     response.set_cookie(
         key=TOKEN_COOKIE_NAME,
         value=token,
         max_age=TOKEN_COOKIE_MAX_AGE_SECONDS,
         httponly=True,
-        secure=True,
-        samesite="none",
+        secure=cookie_secure,
+        samesite=cookie_samesite,
         path="/",
     )
 
 
 def _clear_token_cookie(response: Response) -> None:
     """Delete the JWT cookie on logout."""
+    cookie_secure = os.getenv("AUTH_COOKIE_SECURE", "true").lower() == "true"
+    cookie_samesite = "none" if cookie_secure else "lax"
+
     response.delete_cookie(
         key=TOKEN_COOKIE_NAME,
         path="/",
         httponly=True,
-        secure=True,
-        samesite="none",
+        secure=cookie_secure,
+        samesite=cookie_samesite,
     )
 
 
