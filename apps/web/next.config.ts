@@ -2,6 +2,7 @@ import type { NextConfig } from "next";
 import path from "node:path";
 
 let nextConfig: NextConfig = {
+  basePath: "/observatorio",
   // Standalone output: produces a self-contained server at .next/standalone with
   // only the deps the app actually needs, ideal for slim Docker images.
   output: "standalone",

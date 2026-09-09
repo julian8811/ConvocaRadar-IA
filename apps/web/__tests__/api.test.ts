@@ -460,7 +460,7 @@ describe("PR 3 — 401 discrimination by request path", () => {
         "Sesión expirada. Redirigiendo al inicio de sesión.",
       );
       // handleUnauthorized MUST have redirected to /login.
-      expect(replaceSpy).toHaveBeenCalledWith("/login");
+      expect(replaceSpy).toHaveBeenCalledWith("/observatorio/login");
     } finally {
       window.location.replace = originalReplace;
     }

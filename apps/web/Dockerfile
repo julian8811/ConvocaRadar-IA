@@ -62,6 +62,6 @@ USER nextjs
 EXPOSE 3000
 
 HEALTHCHECK --interval=30s --timeout=10s --start-period=30s --retries=3 \
-    CMD node -e "fetch('http://localhost:3000/').then(r => process.exit(r.status < 500 ? 0 : 1)).catch(() => process.exit(1))"
+    CMD node -e "fetch('http://localhost:3000/observatorio/').then(r => process.exit(r.status < 500 ? 0 : 1)).catch(() => process.exit(1))"
 
 CMD ["node", "server.js"]

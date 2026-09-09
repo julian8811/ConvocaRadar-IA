@@ -69,14 +69,14 @@ def _password_changed_at_epoch(user: User) -> int:
 def _password_reset_url(token: str) -> str:
     """Build the user-facing reset URL the endpoint logs at info level.
 
-    Centralized so the frontend route (``/reset?token=...``) and the
-    backend stay in sync — the design §"reset_version" links the two.
+    Centralized so the frontend route (``/reset-password?token=...``) and
+    the backend stay in sync — the design §"reset_version" links the two.
     """
     from app.core.config import get_settings
 
     settings = get_settings()
     base = settings.frontend_url.rstrip("/")
-    return f"{base}/reset?token={token}"
+    return f"{base}/reset-password?token={token}"
 
 
 def _set_token_cookie(response: Response, token: str) -> None:
@@ -89,6 +89,7 @@ def _set_token_cookie(response: Response, token: str) -> None:
     """
     cookie_secure = os.getenv("AUTH_COOKIE_SECURE", "true").lower() == "true"
     cookie_samesite = "none" if cookie_secure else "lax"
+    cookie_path = os.getenv("AUTH_COOKIE_PATH", "/")
 
     response.set_cookie(
         key=TOKEN_COOKIE_NAME,
@@ -97,7 +98,7 @@ def _set_token_cookie(response: Response, token: str) -> None:
         httponly=True,
         secure=cookie_secure,
         samesite=cookie_samesite,
-        path="/",
+        path=cookie_path,
     )
 
 
@@ -105,10 +106,11 @@ def _clear_token_cookie(response: Response) -> None:
     """Delete the JWT cookie on logout."""
     cookie_secure = os.getenv("AUTH_COOKIE_SECURE", "true").lower() == "true"
     cookie_samesite = "none" if cookie_secure else "lax"
+    cookie_path = os.getenv("AUTH_COOKIE_PATH", "/")
 
     response.delete_cookie(
         key=TOKEN_COOKIE_NAME,
-        path="/",
+        path=cookie_path,
         httponly=True,
         secure=cookie_secure,
         samesite=cookie_samesite,
