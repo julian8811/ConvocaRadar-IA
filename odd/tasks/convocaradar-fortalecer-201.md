@@ -56,8 +56,14 @@ del centro de datos (boletines, portal evidencias) ni sostener los KPIs
       Sin migraciones; locks/pause/budgets/timeout intactos; reversible. Checks:
       writer 103 passed + ruff 0; spot-check padre 103 passed. Con `sweep_overrun`
       en prod se decide el sharding estructural con datos. Ruta: delegada.
-- [ ] **T4 (P1 calidad)** Cuarentena visible en `/sources` + métricas por cohorte
-      (≥30/mes, precisión ≥85%). Checks: tests dedup/scoring.
+- [x] **T4 (P1 calidad)** Cuarentena + cohortes ✅ commit `5c42f56` (writer delegado;
+      `services/quarantine.py` nuevo, taxonomía ruido/duplicado/validacion/url_muerta/
+      sin_fecha/idioma/error sobre `SourceRun.logs` SIN migración; `GET
+      /sources/{id}/quarantine`; `get_cohort_breakdown()` 7d/30d por tier aditivo en
+      `/dashboard/health`; 10 tests). Checks: writer 233+10 passed + ruff 0;
+      spot-check padre 233 passed. Nota de tamaño: 762 inserciones superan la
+      heurística 400 — se justifica: subsistema cuarentena + endpoint + schemas +
+      tests van juntos o no van; thresholds/cadencia/metrics intactos. Ruta: delegada.
 - [ ] **T5 (P1 ia)** Gateway IA comercial (Gemini + Codex, fallback local) con caché y
       cuotas por org; trazabilidad costo/latencia. Checks: tests `ai_*`.
 - [ ] **T6 (P1 respaldo)** Copia off-site/S3 del backup + `verify` robusto si cron cae;
