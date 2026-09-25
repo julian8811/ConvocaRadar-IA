@@ -43,9 +43,12 @@ del centro de datos (boletines, portal evidencias) ni sostener los KPIs
       `next.config.ts:25-34`). Checks: `grep -c '"key":'` = 201; sin refs stale
       fuera de este doc; `pytest -k "seed or source"` → 206 passed; ruff exit 0.
       Ruta: inline (fixes mecánicos).
-- [ ] **T2 (P0 ops)** Exponer en `/metrics`: `due_queue_depth`, `sweep_lag_seconds`,
-      `pending_alerts` (desde `SourceRun`, persistente ante reinicios). Checks:
-      tests de `scraper/metrics.py` + endpoint.
+- [x] **T2 (P0 ops)** Gauges en `/metrics` ✅ commit `1d9f304` (writer delegado;
+      `compute_sweep_gauges`: due_queue_depth, sweep_lag_seconds, pending_alerts
+      desde DB; `/metrics` degradado 503 con snapshot in-memory si cae la DB;
+      `test_metrics_sweep.py` 9 tests). Checks: writer 81 passed + 9 passed + ruff 0;
+      spot-check padre 81 passed. Nota: `/metrics` con DB caída pasa de 500 a 503
+      (Prometheus lo ve como scrape fallido, `up==0` lo cubre). Ruta: delegada.
 - [ ] **T3 (P0 perf)** Sharding del sweep por tier (loops separados hourly/daily/weekly)
       o concurrencia configurable; evitar inanición con 201 fuentes en tick 30 min.
       Checks: `test_scraping_schedule_cadence` + nuevo test de sharding.
