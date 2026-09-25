@@ -808,7 +808,9 @@ async def build_embedding(text: str, *, dimensions: int | None = None) -> list[f
 
 
 def build_embedding_sync(text: str, *, dimensions: int | None = None) -> list[float]:
-    return asyncio.run(build_embedding(text, dimensions=dimensions))
+    from app.core.http_client import closing_per_loop_client
+
+    return asyncio.run(closing_per_loop_client(build_embedding(text, dimensions=dimensions)))
 
 
 def cosine_similarity(left: list[float], right: list[float]) -> float:

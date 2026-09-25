@@ -19,6 +19,8 @@ from __future__ import annotations
 
 import asyncio
 import threading
+from collections.abc import Awaitable
+from typing import TypeVar
 
 import httpx
 
@@ -30,6 +32,8 @@ _async_client: httpx.AsyncClient | None = None
 _async_client_loop_id: int | None = None
 _async_client_loop: asyncio.AbstractEventLoop | None = None
 _secondary_clients: dict[int, httpx.AsyncClient] = {}
+
+T = TypeVar("T")
 
 
 def _build_async_client() -> httpx.AsyncClient:
@@ -142,6 +146,20 @@ async def close_per_loop_client() -> None:
             await client.aclose()
         except Exception:
             pass
+
+
+async def closing_per_loop_client(coro: Awaitable[T]) -> T:
+    """Await ``coro`` and then release this loop's per-loop client.
+
+    Wrap every coroutine handed to ``asyncio.run()`` / ``run_until_complete()``
+    on a short-lived loop: an unreleased per-loop client stays referenced in
+    ``_secondary_clients`` forever and its keep-alive sockets pile up in
+    CLOSE_WAIT until the process hits its file-descriptor limit.
+    """
+    try:
+        return await coro
+    finally:
+        await close_per_loop_client()
 
 
 async def close_async_client() -> None:

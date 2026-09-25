@@ -42,12 +42,14 @@ def _run_source_via_dispatcher(source_id: str, org_id: str):
     """
     import asyncio
 
+    from app.core.http_client import closing_per_loop_client
+
     worker_db = SessionLocal()
     try:
         source = worker_db.get(Source, source_id)
         if source is None:
             raise LookupError(f"Source {source_id} no longer exists")
-        run = asyncio.run(dispatcher_run_source(worker_db, source, org_id))
+        run = asyncio.run(closing_per_loop_client(dispatcher_run_source(worker_db, source, org_id)))
         worker_db.commit()
         return run
     except Exception:
