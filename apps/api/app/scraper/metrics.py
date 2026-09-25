@@ -7,7 +7,10 @@ and emitted via structlog per-source spans.
 from __future__ import annotations
 
 import threading
+from datetime import UTC, datetime
+
 import structlog
+from sqlalchemy.orm import Session
 
 _struct = structlog.get_logger(__name__)
 
@@ -29,6 +32,9 @@ _per_source_extraction: dict[str, dict[str, int]] = {}  # source -> {total, fund
 _counter_throttled: int = 0
 _gauge_burst_utilization: dict[str, float] = {}
 _gauge_delay_for_wait: float = 0.0
+# ── T3 (fortalecer-201): sweep cycle timing (in-memory, same spirit as T2) ─
+# ``None`` until the first scheduler tick completes in this process.
+_sweep_duration_seconds: float | None = None
 
 
 def record_scrape(*, source_key: str, duration_s: float, items_found: int, status: str, health_score: int | None = None) -> None:
@@ -95,6 +101,33 @@ def record_throttled(*, source_key: str = "unknown", delay_s: float = 0.0) -> No
             _gauge_burst_utilization[source_key] = round(min(_counter_throttled / 150 * 100, 100), 1)
 
 
+def record_sweep_start() -> float:
+    """Mark the start of a scheduler sweep tick (monotonic clock)."""
+    import time
+
+    return time.monotonic()
+
+
+def record_sweep_end(started_monotonic: float) -> float:
+    """Record how long a sweep tick took; returns duration in seconds."""
+    import time
+
+    global _sweep_duration_seconds
+    duration = max(0.0, time.monotonic() - started_monotonic)
+    with _lock:
+        _sweep_duration_seconds = round(duration, 3)
+    return _sweep_duration_seconds
+
+
+def sweep_overrun(*, interval_seconds: float) -> int:
+    """1 when the last sweep cycle outlasted its tick interval, else 0."""
+    with _lock:
+        duration = _sweep_duration_seconds
+    if duration is None:
+        return 0
+    return 1 if duration > interval_seconds else 0
+
+
 def snapshot() -> dict:
     with _lock:
         hist = list(_histogram)
@@ -117,6 +150,7 @@ def snapshot() -> dict:
             "throttled_count": _counter_throttled,
             "burst_utilization": dict(_gauge_burst_utilization),
             "delay_for_wait": _gauge_delay_for_wait,
+            "sweep_duration_seconds": _sweep_duration_seconds,
         }
 
 
@@ -153,3 +187,63 @@ def reset() -> None:
         _counter_throttled = 0
         _gauge_delay_for_wait = 0.0
         _gauge_burst_utilization.clear()
+        global _sweep_duration_seconds
+        _sweep_duration_seconds = None
+
+
+def compute_sweep_gauges(db: Session, *, now: datetime | None = None) -> dict[str, int | None]:
+    """DB-backed sweep gauges — persistent across process restarts.
+
+    Unlike the in-memory counters above (which reset on every deploy),
+    these three gauges are recomputed from the database on each call:
+
+    - ``due_queue_depth``: ``enabled`` and not ``auto_paused`` sources for
+      which :func:`app.services.connectors.source_due_for_scraping` is true
+      right now. Sources are evaluated in Python (same helper the scheduler
+      uses) because cadence + jitter + backoff cannot be expressed in SQL.
+    - ``sweep_lag_seconds``: age in seconds of the most recent finished
+      ``SourceRun`` (``finished_at`` set — success/degraded/failed all
+      count as "the sweep ran"). ``None`` when no run ever finished.
+    - ``pending_alerts``: ``Alert`` rows with ``status == "pending"`` —
+      the same definition ``send_pending_alerts`` consumes.
+
+    No new tables or migrations: reuses ``sources``, ``source_runs`` and
+    ``alerts``. Raises ``sqlalchemy.exc.SQLAlchemyError`` when the DB is
+    unreachable so callers (``GET /metrics``) can degrade explicitly.
+    """
+    from sqlalchemy import func, select
+
+    # Lazy imports: app.services.connectors pulls config/models at module
+    # level; keep this module import-light (same pattern as dashboard.py).
+    from app.models import Alert, Source, SourceRun
+    from app.services.connectors import source_due_for_scraping
+
+    current = now or datetime.now(UTC).replace(tzinfo=None)
+
+    enabled_sources = list(
+        db.scalars(
+            select(Source).where(
+                Source.enabled.is_(True),
+                Source.auto_paused.isnot(True),
+            )
+        )
+    )
+    due = sum(1 for source in enabled_sources if source_due_for_scraping(source, now=current))
+
+    last_finished = db.scalar(
+        select(func.max(SourceRun.finished_at)).where(SourceRun.finished_at.isnot(None))
+    )
+    lag: int | None = None
+    if last_finished is not None:
+        finished = last_finished
+        if finished.tzinfo is not None:
+            # Runner stores naive UTC; normalize aware values defensively.
+            finished = finished.astimezone(UTC).replace(tzinfo=None)
+        lag = max(0, int((current - finished).total_seconds()))
+
+    pending = db.scalar(select(func.count(Alert.id)).where(Alert.status == "pending")) or 0
+    return {
+        "due_queue_depth": due,
+        "sweep_lag_seconds": lag,
+        "pending_alerts": int(pending),
+    }

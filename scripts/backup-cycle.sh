@@ -72,4 +72,40 @@ find "$backup_dir" -maxdepth 1 -type f -name 'convocaradar-*.sql.gz' \
 # cycle that produces a bad backup must fail loudly, not wait for restore day.
 "$verify_script" "$backup_dir"
 
-log "PASS: backup + verify completed for cycle $timestamp"
+# Stage 3 (best-effort, T6): off-site copy to S3/MinIO. This stage NEVER fails
+# the local cycle: the archive above is already published + verified, and the
+# schedule, gates, and 14-day local retention are untouched. Outcomes:
+# uploaded | uploaded-with-warnings | skipped | degraded (all WARN-logged).
+offsite_script="${OFFSITE_SCRIPT:-$(dirname -- "$0")/backup_offsite.py}"
+offsite_status="skipped"
+offsite_mode="${BACKUP_S3_ENABLED:-auto}"
+if [ "$offsite_mode" = "false" ]; then
+  log "off-site S3 copy disabled (BACKUP_S3_ENABLED=false)"
+elif ! command -v python3 >/dev/null 2>&1 || [ ! -f "$offsite_script" ]; then
+  if [ "$offsite_mode" = "true" ]; then
+    offsite_status="degraded"
+    log "WARN: off-site S3 copy degraded (BACKUP_S3_ENABLED=true but python3/helper missing); local backup $target remains valid"
+  else
+    log "off-site S3 copy skipped (needs python3 + backup_offsite.py)"
+  fi
+elif python3 "$offsite_script" upload "$target"; then
+  offsite_status="uploaded"
+  python3 "$offsite_script" ensure-lifecycle || {
+    offsite_status="uploaded-with-warnings"
+    log "WARN: off-site lifecycle declaration failed; local backup $target remains valid"
+  }
+  python3 "$offsite_script" prune || {
+    offsite_status="uploaded-with-warnings"
+    log "WARN: off-site retention prune failed; local backup $target remains valid"
+  }
+else
+  rc=$?
+  if [ "$rc" -eq 2 ]; then
+    log "off-site S3 copy skipped by helper (S3 not configured, BACKUP_S3_ENABLED=$offsite_mode)"
+  else
+    offsite_status="degraded"
+    log "WARN: off-site S3 copy degraded (rc=$rc); local backup $target remains valid"
+  fi
+fi
+
+log "PASS: backup + verify completed for cycle $timestamp (off-site: $offsite_status)"

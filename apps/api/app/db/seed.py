@@ -4232,7 +4232,7 @@ def seed() -> None:
                 )
             )
 
-        # Create all 123 sources WITHOUT an organization_id (unowned).
+        # Create all 201 sources WITHOUT an organization_id (unowned).
         # This allows ANY org to claim them when they register, via the
         # query (organization_id IS NULL) in the sources endpoint and
         # the seed_default_sources claim logic in enqueue_seed_default_sources.

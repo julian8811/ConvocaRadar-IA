@@ -126,3 +126,22 @@ class ConnectorProbeRequest(BaseModel):
     source_key: str
     base_url: str | None = None
     source_type: str | None = None
+
+
+class QuarantineItem(BaseModel):
+    """A single discarded candidate with its discard reason (T4)."""
+
+    run_id: str
+    reason: str
+    title: str = ""
+    url: str | None = None
+    detail: str | None = None
+    created_at: str | None = None
+
+
+class QuarantineRead(BaseModel):
+    """Quarantine listing for a source — newest run first."""
+
+    source_id: str
+    total: int
+    items: list[QuarantineItem] = Field(default_factory=list)

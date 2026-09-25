@@ -28,6 +28,7 @@ from app.services import (
     get_category_distribution,
     get_closing_soon,
     get_closing_soon_7d,
+    get_cohort_breakdown,
     get_country_breakdown,
     get_data_coverage,
     get_funding_ranges,
@@ -46,7 +47,7 @@ from app.services import (
 router = APIRouter()
 
 # ── Simple in-memory cache for /dashboard/health ──────────────────────
-# The background source sweep (123 sources on free tier) saturates the
+# The background source sweep (201 sources) saturates the
 # DB and makes the health endpoint take >12s, which kills the frontend's
 # AbortController. A 60s TTL module-level dict serves as a lightweight
 # cache so subsequent calls within the window return instantly.
@@ -304,6 +305,9 @@ def get_dashboard_health(
         contrib = _safe_call(get_source_contribution, db, org.id)
         timeline = _safe_call(get_opportunities_timeline, db, org.id)
         cat_dist = _safe_call(get_category_distribution, db, org.id)
+        # T4: per-tier cohort counts ride along additively; _safe_call keeps
+        # the health lane resilient (empty list when the query fails).
+        cohort = _safe_call(get_cohort_breakdown, db, org.id)
         payload = HealthRead(
             kpis=kpis,
             status_breakdown=status_bd,
@@ -318,6 +322,7 @@ def get_dashboard_health(
             source_contribution=contrib,
             opportunities_timeline=timeline,
             category_distribution=cat_dist,
+            cohort_breakdown=cohort,
         )
         _health_cache[cache_key] = (now_time, payload)
         return payload

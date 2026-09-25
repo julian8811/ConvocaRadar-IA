@@ -267,7 +267,7 @@ export const api = {
   // clients that still depend on the legacy shape.
   dashboardTriage: () => request<TriageRead>("/dashboard/triage"),
   dashboardPipeline: () => request<PipelineRead>("/dashboard/pipeline"),
-  // Health endpoint can be slow during background sweeps (123 sources).
+  // Health endpoint can be slow during background sweeps (201 sources).
   // Use a 45s timeout instead of the default 12s.
   dashboardHealth: () => request<HealthRead>("/dashboard/health", {}, 45_000),
   dashboardSummary: () => request<DashboardSummary>("/dashboard/summary"),

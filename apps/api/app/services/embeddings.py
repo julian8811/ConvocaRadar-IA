@@ -112,22 +112,32 @@ def opportunity_reanalysis_text(db: Session, opportunity: Opportunity) -> str:
 async def upsert_opportunity_embedding(
     db: Session, opportunity: Opportunity
 ) -> OpportunityEmbedding:
-    """Create or update the embedding for an opportunity."""
+    """Create or update the embedding for an opportunity.
+
+    T5 (fortalecer-201): resuelve el vector vía gateway ordenado
+    (``app.core.ai_gateway`` — Gemini → remoto genérico → hash-local, con
+    caché, cuotas por org y trazas). Scoring/enriquecimiento intactos: el
+    vector local es bit a bit el mismo algoritmo de antes.
+    """
+    from app.core.ai_gateway import embed_texts
+
     source_text = opportunity_embedding_text(opportunity)
-    vector = await build_embedding(source_text)
+    result = await embed_texts([source_text], organization_id=opportunity.organization_id)
+    vector = result.vectors[0]
+    model_version = result.model_version
     existing = _get_opportunity_embedding(db, opportunity.id)
     if existing:
         existing.organization_id = opportunity.organization_id
         existing.source_text = source_text
         existing.embedding = vector
-        existing.model_version = embedding_model_version()
+        existing.model_version = model_version
         return existing
     embedding = OpportunityEmbedding(
         opportunity_id=opportunity.id,
         organization_id=opportunity.organization_id,
         source_text=source_text,
         embedding=vector,
-        model_version=embedding_model_version(),
+        model_version=model_version,
     )
     db.add(embedding)
     return embedding
@@ -236,8 +246,16 @@ class EmbeddingBatchService:
     ) -> dict[str, int]:
         if not opportunities:
             return {"processed": 0, "created": 0, "updated": 0}
+        from app.core.ai_gateway import embed_texts
+
         texts = [opportunity_embedding_text(o) for o in opportunities]
-        vectors = await build_embeddings_batch(texts)
+        # Cuota por org solo si el lote es de una sola org; mixto → sin
+        # cuota (documentado en ai_gateway) pero con caché y trazas igual.
+        org_ids = {o.organization_id for o in opportunities}
+        common_org = next(iter(org_ids)) if len(org_ids) == 1 else None
+        result = await embed_texts(texts, organization_id=common_org)
+        vectors = result.vectors
+        model_version = result.model_version
         created = 0
         updated = 0
         for opp, vec, txt in zip(opportunities, vectors, texts):
@@ -246,7 +264,7 @@ class EmbeddingBatchService:
                 existing.organization_id = opp.organization_id
                 existing.source_text = txt
                 existing.embedding = vec
-                existing.model_version = embedding_model_version()
+                existing.model_version = model_version
                 updated += 1
             else:
                 db.add(
@@ -255,7 +273,7 @@ class EmbeddingBatchService:
                         organization_id=opp.organization_id,
                         source_text=txt,
                         embedding=vec,
-                        model_version=embedding_model_version(),
+                        model_version=model_version,
                     )
                 )
                 created += 1

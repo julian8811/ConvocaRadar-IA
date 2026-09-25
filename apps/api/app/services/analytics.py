@@ -21,6 +21,7 @@ from sqlalchemy.orm import Session
 
 from app.models import Opportunity, OpportunityScore, Source
 from app.schemas import DashboardBreakdownItem
+from app.schemas.dashboard import CohortBreakdownItem
 
 # ── Functions extracted to opportunity.py ────────────────────────────────────
 from app.services.opportunity import (
@@ -463,3 +464,55 @@ def get_category_distribution(db: Session, organization_id: str) -> list[Dashboa
                     counter[translated] += 1
     items = counter.most_common(12)
     return [DashboardBreakdownItem(name=cat, total=count) for cat, count in items]
+
+
+# ── Cohort breakdown by source tier (T4 fortalecer-201) ─────────────────────
+
+
+COHORT_TIERS: tuple[str, ...] = ("strategic", "complementary", "experimental")
+
+COHORT_PERIODS_DAYS: tuple[int, ...] = (7, 30)
+
+
+def get_cohort_breakdown(
+    db: Session,
+    organization_id: str,
+    *,
+    periods_days: tuple[int, ...] = COHORT_PERIODS_DAYS,
+) -> list[CohortBreakdownItem]:
+    """New opportunities per source tier over trailing windows.
+
+    Counts ``Opportunity`` rows visible to the org whose ``created_at`` falls
+    in the last N days, grouped by the owning source's ``tier``. Sources
+    without a tier bucket under ``"unclassified"`` so the per-cohort rows
+    always add up to the global total.
+
+    Plain ``>=`` datetime comparisons only — SQLite-safe (unlike the
+    ``date_trunc`` timeline). Additive: no existing query or shape changes.
+    """
+    scope = or_(
+        Opportunity.organization_id == organization_id,
+        Opportunity.organization_id.is_(None),
+    )
+    now = datetime.now(UTC).replace(tzinfo=None)
+    items: list[CohortBreakdownItem] = []
+    for days in periods_days:
+        cutoff = now - timedelta(days=days)
+        rows = db.execute(
+            select(Source.tier, func.count())
+            .join(Opportunity, Opportunity.source_id == Source.id)
+            .where(scope, Opportunity.created_at >= cutoff)
+            .group_by(Source.tier)
+        ).all()
+        counts: dict[str, int] = {}
+        for tier, total in rows:
+            counts[tier if tier else "unclassified"] = int(total)
+        for tier in (*COHORT_TIERS, "unclassified"):
+            items.append(
+                CohortBreakdownItem(
+                    tier=tier,
+                    period_days=days,
+                    new_opportunities=counts.get(tier, 0),
+                )
+            )
+    return items

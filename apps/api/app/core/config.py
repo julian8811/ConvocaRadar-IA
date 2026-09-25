@@ -1,6 +1,7 @@
 ﻿import logging
 
 from functools import lru_cache
+from typing import ClassVar
 
 from pydantic import Field, computed_field, field_validator, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
@@ -27,6 +28,24 @@ class Settings(BaseSettings):
     chat_model: str = "gpt-4.1-mini"
     embedding_model: str = ""
     embedding_dimensions: int = 1024
+    # ── T5 (fortalecer-201): AI gateway — Gemini primario, local fallback ──
+    # Orden: Gemini (si hay key) → remoto genérico compatible (Codex/OpenAI
+    # vía llm_* — solo si está configurado) → hash-local (siempre, sin key).
+    # Sin GEMINI_API_KEY el gateway opera en local (cero costo) sin romper nada.
+    # GEMINI_API_KEY es la vía primaria; como alias se acepta LLM_API_KEY
+    # cuando LLM_PROVIDER=gemini (resuelto en app.core.ai_gateway — no hay
+    # dos variables con el mismo rol).
+    gemini_api_key: str | None = None
+    gemini_api_base: str = "https://generativelanguage.googleapis.com/v1beta/openai"
+    gemini_embedding_model: str = "text-embedding-004"
+    # Cuotas de llamadas REMOTAS por organización (caché y fallback local no
+    # consumen cuota). Defaults conservadores de arranque — NO son política
+    # final; ajustar por env según gasto observado. <=0 = cuota deshabilitada.
+    ai_quota_embeddings_per_day: int = 500
+    ai_quota_embeddings_per_month: int = 10000
+    # Caché en memoria de embeddings (proceso local; se pierde al reiniciar).
+    ai_embedding_cache_size: int = 1024
+    ai_embedding_cache_ttl_seconds: int = 86400  # 24 h
     llm_timeout_seconds: int = 45
     bootstrap_sources_on_startup: bool = True
     bootstrap_sources_blocking: bool = False
@@ -39,6 +58,15 @@ class Settings(BaseSettings):
     scraping_timeout_seconds: int = 180
     scraping_max_source_seconds: int = 180
     scraping_max_concurrency: int = 6
+    # ── T3 (fortalecer-201): per-tier sweep concurrency (reversible) ──────
+    # Each tier gets its own semaphore; a shared global semaphore capped at
+    # min(6, scraping_max_concurrency) keeps total load ≤ today's. Env unset
+    # (None) → documented default 3/2/1 (sums to today's 6). Env set →
+    # explicit opt-in, clamped to [1, global cap] so a typo can't exceed prod
+    # load. Raising total load above 6 needs the min(6, …) cap change (code).
+    scraping_max_concurrency_strategic: int | None = None
+    scraping_max_concurrency_complementary: int | None = None
+    scraping_max_concurrency_experimental: int | None = None
     scraping_closing_soon_days: int = 10
     scraping_proxy_list: list[str] = Field(
         default_factory=list,
@@ -162,6 +190,38 @@ class Settings(BaseSettings):
     @property
     def bootstrap_source_key_list(self) -> list[str]:
         return [item.strip() for item in self.bootstrap_source_keys.split(",") if item.strip()]
+
+    # ── T3 helpers ──────────────────────────────────────────────────────
+    #: Documented per-tier defaults (sum == legacy single-pool 6).
+    TIER_CONCURRENCY_DEFAULTS: ClassVar[dict[str, int]] = {
+        "strategic": 3,
+        "complementary": 2,
+        "experimental": 1,
+    }
+
+    def global_concurrency_cap(self) -> int:
+        """Legacy total cap: min(6, SCRAPING_MAX_CONCURRENCY), at least 1."""
+        return max(1, min(6, int(self.scraping_max_concurrency)))
+
+    def tier_concurrency(self, tier: str | None) -> int:
+        """Effective semaphore size for one tier (T3, reversible).
+
+        Env override when set, else the 3/2/1 documented defaults.
+        Unknown/untiered tiers share the ``experimental`` budget (lowest
+        priority, still runs every tick — no starvation). Always clamped to
+        ``[1, global_concurrency_cap()]`` so new defaults can never exceed
+        today's prod load without an explicit opt-in.
+        """
+        key = (tier or "").strip().lower()
+        overrides = {
+            "strategic": self.scraping_max_concurrency_strategic,
+            "complementary": self.scraping_max_concurrency_complementary,
+            "experimental": self.scraping_max_concurrency_experimental,
+        }
+        raw = overrides.get(key, self.scraping_max_concurrency_experimental)
+        if raw is None:
+            raw = self.TIER_CONCURRENCY_DEFAULTS.get(key, self.TIER_CONCURRENCY_DEFAULTS["experimental"])
+        return max(1, min(int(raw), self.global_concurrency_cap()))
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
 

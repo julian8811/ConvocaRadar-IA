@@ -27,6 +27,8 @@ from app.schemas.org import (  # noqa: F401
 # ── source ──
 from app.schemas.source import (  # noqa: F401
     ConnectorProbeRequest,
+    QuarantineItem,
+    QuarantineRead,
     SourceBase,
     SourceCreate,
     SourceHealthRead,
@@ -53,6 +55,7 @@ from app.schemas.opportunity import (  # noqa: F401
 # ── dashboard ──
 from app.schemas.dashboard import (  # noqa: F401
     AdminMetricsRead,
+    CohortBreakdownItem,
     DashboardBreakdownItem,
     DashboardDataCoverage,
     DashboardOpportunityItem,
