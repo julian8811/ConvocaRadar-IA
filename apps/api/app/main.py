@@ -194,7 +194,19 @@ async def _run_periodic_source_sweep(interval_seconds: int | None = None) -> Non
                         for _s in due_sources:
                             _tier_buckets[tier_bucket(getattr(_s, "tier", None))].append(_s)
 
-                    async def _run_one(src, tier_sem) -> int:
+                    # The per-source sessions below update the same ``sources``
+                    # rows this session just locked (recovery, alert sending,
+                    # auto-reactivation). Holding this transaction open across
+                    # the gather deadlocks the sweep forever, so release it first.
+                    sweep_org_id = orgs[0].id
+                    tier_jobs = [
+                        (src.id, src.key or src.id, tier)
+                        for tier in ("strategic", "complementary", "experimental")
+                        for src in _tier_buckets.get(tier, [])
+                    ]
+                    db.commit()
+
+                    async def _run_one(src_id, src_key, tier_sem) -> int:
                         async with global_sem, tier_sem:
                             # Use a dedicated session per source to avoid
                             # concurrent use of the shared Session and to
@@ -203,10 +215,10 @@ async def _run_periodic_source_sweep(interval_seconds: int | None = None) -> Non
 
                             _db = _SessionLocal()
                             try:
-                                _fresh = _db.get(Source, src.id)
+                                _fresh = _db.get(Source, src_id)
                                 if _fresh is None:
                                     return 0
-                                result = await run_source(_db, _fresh, organization_id=orgs[0].id)
+                                result = await run_source(_db, _fresh, organization_id=sweep_org_id)
                                 if result is not None:
                                     _db.commit()
                                     return 1
@@ -216,7 +228,7 @@ async def _run_periodic_source_sweep(interval_seconds: int | None = None) -> Non
                                 _db.rollback()
                                 struct_logger.warning(
                                     "sweep_source_failed",
-                                    source=src.key or src.id,
+                                    source=src_key,
                                     error=str(exc),
                                 )
                                 return 0
@@ -228,9 +240,8 @@ async def _run_periodic_source_sweep(interval_seconds: int | None = None) -> Non
                         if due_sources:
                             # Strategic buckets first (priority order preserved).
                             coros = [
-                                _run_one(s, tier_sems[tier])
-                                for tier in ("strategic", "complementary", "experimental")
-                                for s in _tier_buckets.get(tier, [])
+                                _run_one(src_id, src_key, tier_sems[tier])
+                                for src_id, src_key, tier in tier_jobs
                             ]
                             results = await asyncio.gather(*coros, return_exceptions=False)
                             run_count = sum(results)
