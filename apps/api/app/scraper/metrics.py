@@ -7,7 +7,10 @@ and emitted via structlog per-source spans.
 from __future__ import annotations
 
 import threading
+from datetime import UTC, datetime
+
 import structlog
+from sqlalchemy.orm import Session
 
 _struct = structlog.get_logger(__name__)
 
@@ -153,3 +156,61 @@ def reset() -> None:
         _counter_throttled = 0
         _gauge_delay_for_wait = 0.0
         _gauge_burst_utilization.clear()
+
+
+def compute_sweep_gauges(db: Session, *, now: datetime | None = None) -> dict[str, int | None]:
+    """DB-backed sweep gauges — persistent across process restarts.
+
+    Unlike the in-memory counters above (which reset on every deploy),
+    these three gauges are recomputed from the database on each call:
+
+    - ``due_queue_depth``: ``enabled`` and not ``auto_paused`` sources for
+      which :func:`app.services.connectors.source_due_for_scraping` is true
+      right now. Sources are evaluated in Python (same helper the scheduler
+      uses) because cadence + jitter + backoff cannot be expressed in SQL.
+    - ``sweep_lag_seconds``: age in seconds of the most recent finished
+      ``SourceRun`` (``finished_at`` set — success/degraded/failed all
+      count as "the sweep ran"). ``None`` when no run ever finished.
+    - ``pending_alerts``: ``Alert`` rows with ``status == "pending"`` —
+      the same definition ``send_pending_alerts`` consumes.
+
+    No new tables or migrations: reuses ``sources``, ``source_runs`` and
+    ``alerts``. Raises ``sqlalchemy.exc.SQLAlchemyError`` when the DB is
+    unreachable so callers (``GET /metrics``) can degrade explicitly.
+    """
+    from sqlalchemy import func, select
+
+    # Lazy imports: app.services.connectors pulls config/models at module
+    # level; keep this module import-light (same pattern as dashboard.py).
+    from app.models import Alert, Source, SourceRun
+    from app.services.connectors import source_due_for_scraping
+
+    current = now or datetime.now(UTC).replace(tzinfo=None)
+
+    enabled_sources = list(
+        db.scalars(
+            select(Source).where(
+                Source.enabled.is_(True),
+                Source.auto_paused.isnot(True),
+            )
+        )
+    )
+    due = sum(1 for source in enabled_sources if source_due_for_scraping(source, now=current))
+
+    last_finished = db.scalar(
+        select(func.max(SourceRun.finished_at)).where(SourceRun.finished_at.isnot(None))
+    )
+    lag: int | None = None
+    if last_finished is not None:
+        finished = last_finished
+        if finished.tzinfo is not None:
+            # Runner stores naive UTC; normalize aware values defensively.
+            finished = finished.astimezone(UTC).replace(tzinfo=None)
+        lag = max(0, int((current - finished).total_seconds()))
+
+    pending = db.scalar(select(func.count(Alert.id)).where(Alert.status == "pending")) or 0
+    return {
+        "due_queue_depth": due,
+        "sweep_lag_seconds": lag,
+        "pending_alerts": int(pending),
+    }
