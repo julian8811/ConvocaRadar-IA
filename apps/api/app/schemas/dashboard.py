@@ -125,6 +125,22 @@ class PipelineRead(BaseModel):
     closing_soon: list[PipelineOpportunityItem]
 
 
+# ── Cohort (T4 fortalecer-201) ──
+
+
+class CohortBreakdownItem(BaseModel):
+    """New opportunities for one source tier over a trailing window.
+
+    Additive only: existing KPI shapes are untouched, this rides along
+    so the ≥30 convocatorias/mes goal can be read per cohort
+    (strategic / complementary / experimental).
+    """
+
+    tier: str
+    period_days: int
+    new_opportunities: int
+
+
 # ── Health ──
 
 
@@ -149,3 +165,4 @@ class HealthRead(BaseModel):
     source_contribution: list[DashboardBreakdownItem] = []
     opportunities_timeline: list[DashboardBreakdownItem] = []
     category_distribution: list[DashboardBreakdownItem] = []
+    cohort_breakdown: list[CohortBreakdownItem] = []
