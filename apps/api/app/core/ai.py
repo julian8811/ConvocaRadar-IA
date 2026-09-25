@@ -726,6 +726,28 @@ def tokenize_for_embedding(text: str) -> list[str]:
     return [token for token in re.findall(r"[a-z0-9]+", _normalize_for_rules(text)) if token]
 
 
+def build_local_hash_vector(text: str, dimensions: int) -> list[float]:
+    """Núcleo puro del embedding hash-local (sin red).
+
+    T5 (fortalecer-201): extraído sin cambios del branch local de
+    ``build_embedding`` para que el gateway (``app.core.ai_gateway``) reuse
+    exactamente el mismo algoritmo sin duplicarlo ni alterar su semántica.
+    """
+    vector = [0.0] * dimensions
+    tokens = tokenize_for_embedding(text)
+    if not tokens:
+        return vector
+    for token in tokens:
+        digest = hashlib.sha256(token.encode("utf-8")).digest()
+        bucket = int.from_bytes(digest[:4], "big") % dimensions
+        weight = 1.0 + min(len(token), 12) / 12.0
+        vector[bucket] += weight
+    norm = math.sqrt(sum(value * value for value in vector))
+    if norm == 0:
+        return vector
+    return [round(value / norm, 6) for value in vector]
+
+
 def embedding_model_version() -> str:
     settings = get_settings()
     provider = effective_llm_provider(settings.llm_provider)
@@ -782,19 +804,7 @@ async def build_embedding(text: str, *, dimensions: int | None = None) -> list[f
                 f"expected {target_dimensions}"
             )
         return result
-    vector = [0.0] * target_dimensions
-    tokens = tokenize_for_embedding(text)
-    if not tokens:
-        return vector
-    for token in tokens:
-        digest = hashlib.sha256(token.encode("utf-8")).digest()
-        bucket = int.from_bytes(digest[:4], "big") % target_dimensions
-        weight = 1.0 + min(len(token), 12) / 12.0
-        vector[bucket] += weight
-    norm = math.sqrt(sum(value * value for value in vector))
-    if norm == 0:
-        return vector
-    return [round(value / norm, 6) for value in vector]
+    return build_local_hash_vector(text, target_dimensions)
 
 
 def build_embedding_sync(text: str, *, dimensions: int | None = None) -> list[float]:
