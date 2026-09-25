@@ -93,8 +93,12 @@ del centro de datos (boletines, portal evidencias) ni sostener los KPIs
       e2e contra S3 falso (upload/latest/download/lifecycle/prune + verify
       s3→STALE con mtime remoto) OK. Sin verificar: build imagen backup,
       MinIO real, cron 03:30 en prod (sin Docker en este PC).
-- [ ] **T7 (P2 seg)** `BOOTSTRAP_SOURCES_ON_STARTUP=false` en server + rotación de
-      secretos documentada. Checks: `compose_and_env`, docs.
+- [x] **T7 (P2 seg)** Bootstrap off + rotación ✅ commit `1279f29` (inline; hallazgo:
+      `api` en `server.yml` no fijaba `BOOTSTRAP_SOURCES_ON_STARTUP` → heredaba
+      `true` y lanzaba sweep de bootstrap en cada boot; worker ya estaba en false.
+      Fijado en `api` + creado `docs/security/secret-rotation.md` que referenciaba
+      `check-secrets.sh:153` y no existía). Checks: yaml OK, ambos servicios en
+      false, `pytest -k "compose or env or deploy"` → 30 passed. Ruta: inline.
 
 ## Acceptance
 - F1 (T1-T3): inventario único 201, `/metrics` con las 3 gauges, sweep sin overrun
