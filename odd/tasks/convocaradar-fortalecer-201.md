@@ -74,8 +74,25 @@ del centro de datos (boletines, portal evidencias) ni sostener los KPIs
       306 passed. Nota de tamaño: ~869 inserciones, grueso es gateway + 10 tests;
       contadores de cuota en memoria (se reinician con el proceso — documentado).
       Ruta: delegada.
-- [ ] **T6 (P1 respaldo)** Copia off-site/S3 del backup + `verify` robusto si cron cae;
-      restore ensayado con runbook. Checks: scripts en `apps/backup/`.
+- [x] **T6 (P1 respaldo)** Copia off-site/S3 del backup + `verify` robusto si cron cae;
+      restore ensayado con runbook ✅ commit `244248e` (writer delegado).
+      Nuevo `scripts/backup_offsite.py` (stdlib: SigV4 path-style MinIO-first,
+      subcomandos upload/latest/download/prune/ensure-lifecycle; exit 0/1/2 =
+      ok/degraded/skipped); `backup-cycle.sh` suma Stage 3 best-effort tras el
+      verify local (horario, gates y retención 14d intactos; PASS informa
+      `off-site:`); `verify_latest_backup.sh` distingue `[STALE]` de
+      `[CORRUPT]` (integridad antes que frescura) y acepta `s3://bucket/prefix`
+      (download preserva mtime remoto vía header Last-Modified); Dockerfile
+      backup suma `python3` (sin pip); `server.yml` solo env nuevo (bucket
+      `BACKUP_S3_BUCKET|S3_BUCKET`, prefijo `backups`, retención off-site 30d
+      `BACKUP_S3_RETENTION_DAYS`, `BACKUP_S3_ENABLED=auto`); runbook §4.4
+      restore-desde-S3 + §8 retención + checklist; env documentado en ambos
+      `.env.*example`. Checks: `pytest -k "backup or restore or compose or
+      deploy"` → 48 passed; suite completa → 1588 passed; ruff 0; `bash -n`
+      OK en ambos scripts; matriz funcional local (PASS/STALE/CORRUPT×4) +
+      e2e contra S3 falso (upload/latest/download/lifecycle/prune + verify
+      s3→STALE con mtime remoto) OK. Sin verificar: build imagen backup,
+      MinIO real, cron 03:30 en prod (sin Docker en este PC).
 - [ ] **T7 (P2 seg)** `BOOTSTRAP_SOURCES_ON_STARTUP=false` en server + rotación de
       secretos documentada. Checks: `compose_and_env`, docs.
 
