@@ -64,8 +64,16 @@ del centro de datos (boletines, portal evidencias) ni sostener los KPIs
       spot-check padre 233 passed. Nota de tamaño: 762 inserciones superan la
       heurística 400 — se justifica: subsistema cuarentena + endpoint + schemas +
       tests van juntos o no van; thresholds/cadencia/metrics intactos. Ruta: delegada.
-- [ ] **T5 (P1 ia)** Gateway IA comercial (Gemini + Codex, fallback local) con caché y
-      cuotas por org; trazabilidad costo/latencia. Checks: tests `ai_*`.
+- [x] **T5 (P1 ia)** Gateway Gemini ✅ commit `eb3a15b` (writer delegado; decisión
+      usuario: primario Gemini). `core/ai_gateway.py` nuevo: Gemini (OpenAI-compat,
+      `text-embedding-004`) → remoto genérico → hash-local; env `GEMINI_API_KEY`
+      (+alias `LLM_API_KEY` con `LLM_PROVIDER=gemini`); caché LRU 1024/TTL 24h;
+      cuotas 500/día-10000/mes (arranque, no política final; excedida → degrada a
+      local); trazas structlog (no existe `AiReport` en este repo — verificado).
+      Sin migración. Checks: writer 306+232+79 passed + ruff 0; spot-check padre
+      306 passed. Nota de tamaño: ~869 inserciones, grueso es gateway + 10 tests;
+      contadores de cuota en memoria (se reinician con el proceso — documentado).
+      Ruta: delegada.
 - [ ] **T6 (P1 respaldo)** Copia off-site/S3 del backup + `verify` robusto si cron cae;
       restore ensayado con runbook. Checks: scripts en `apps/backup/`.
 - [ ] **T7 (P2 seg)** `BOOTSTRAP_SOURCES_ON_STARTUP=false` en server + rotación de
