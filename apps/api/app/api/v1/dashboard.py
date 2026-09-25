@@ -46,7 +46,7 @@ from app.services import (
 router = APIRouter()
 
 # ── Simple in-memory cache for /dashboard/health ──────────────────────
-# The background source sweep (123 sources on free tier) saturates the
+# The background source sweep (201 sources) saturates the
 # DB and makes the health endpoint take >12s, which kills the frontend's
 # AbortController. A 60s TTL module-level dict serves as a lightweight
 # cache so subsequent calls within the window return instantly.

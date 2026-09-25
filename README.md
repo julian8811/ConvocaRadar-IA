@@ -99,7 +99,7 @@ docker compose exec api convocaradar-seed-admin \
 - PostgreSQL 16 with pgvector extension
 - pgvector for AI-powered embedding similarity search
 - Full-text search via PostgreSQL FTS
-- Alembic for versioned schema migrations (10 migration files)
+- Alembic for versioned schema migrations (16 migration files)
 
 ### AI / Embeddings
 
@@ -179,7 +179,7 @@ apps/
 │   │   │
 │   │   ├── db/                       # Database layer
 │   │   │   ├── session.py            # SQLAlchemy engine + session factory
-│   │   │   ├── seed.py               # 93 source definitions (idempotent)
+│   │   │   ├── seed.py               # 201 source definitions (idempotent)
 │   │   │   ├── seed_admin.py         # CLI to bootstrap admin users
 │   │   │   ├── bootstrap.py          # Startup data initialization
 │   │   │   ├── migrate.py            # Idempotent migration runner
@@ -340,7 +340,7 @@ conn = get_connector("grants-gov", "https://api.example.com")
 
 ### Source ecosystem
 
-- **93 source keys** defined in `seed.py` across LatAm, US, Europe, and global orgs
+- **201 source keys** defined in `seed.py` across LatAm, US, Europe, and global orgs
 - **~50 connector modules** in `connectors/`
 - **36 registered connectors** via `@register`
 - Sources are tiered and auto-paused when consecutive empty runs exceed a threshold
