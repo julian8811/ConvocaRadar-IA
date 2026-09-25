@@ -49,9 +49,13 @@ del centro de datos (boletines, portal evidencias) ni sostener los KPIs
       `test_metrics_sweep.py` 9 tests). Checks: writer 81 passed + 9 passed + ruff 0;
       spot-check padre 81 passed. Nota: `/metrics` con DB caída pasa de 500 a 503
       (Prometheus lo ve como scrape fallido, `up==0` lo cubre). Ruta: delegada.
-- [ ] **T3 (P0 perf)** Sharding del sweep por tier (loops separados hourly/daily/weekly)
-      o concurrencia configurable; evitar inanición con 201 fuentes en tick 30 min.
-      Checks: `test_scraping_schedule_cadence` + nuevo test de sharding.
+- [x] **T3 (P0 perf)** Concurrencia por tier + medición ✅ commit `7282950` (writer
+      delegado; env `SCRAPING_MAX_CONCURRENCY_{STRATEGIC,COMPLEMENTARY,EXPERIMENTAL}`,
+      defaults 3/2/1 = pool 6 actual, clamp al cap global; semáforo global + por tier,
+      strategic-first; `sweep_duration_seconds` + `sweep_overrun` en `/metrics`).
+      Sin migraciones; locks/pause/budgets/timeout intactos; reversible. Checks:
+      writer 103 passed + ruff 0; spot-check padre 103 passed. Con `sweep_overrun`
+      en prod se decide el sharding estructural con datos. Ruta: delegada.
 - [ ] **T4 (P1 calidad)** Cuarentena visible en `/sources` + métricas por cohorte
       (≥30/mes, precisión ≥85%). Checks: tests dedup/scoring.
 - [ ] **T5 (P1 ia)** Gateway IA comercial (Gemini + Codex, fallback local) con caché y
