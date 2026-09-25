@@ -27,6 +27,11 @@ from app.services import (
     is_noise_payload,
     validate_source_url,
 )
+from app.services.quarantine import (
+    QUARANTINE_CAP_PER_RUN,
+    classify_validation_reason,
+    quarantine_entry,
+)
 from app.services.scoring import (
     should_auto_pause,
     update_consecutive_empty_runs,
@@ -104,6 +109,10 @@ async def _scrape_candidates(
     noise_rejected = 0
     validation_rejected = 0
     validation_reasons: list[str] = []
+    # T4 (fortalecer-201): quarantine — every discarded candidate is recorded
+    # with its reason instead of vanishing silently. Persisted into
+    # SourceRun.logs by run_source_inline (no new tables, no migration).
+    quarantine: list[dict[str, object]] = []
     for candidate in candidates:
         # Candidate-scoped snippet only — never blind list-page raw.content.
         snippet = candidate.snippet_html
@@ -116,6 +125,14 @@ async def _scrape_candidates(
         )
         if is_noise_payload(candidate.title, candidate.summary, candidate.raw_text):
             noise_rejected += 1
+            if len(quarantine) < QUARANTINE_CAP_PER_RUN:
+                quarantine.append(
+                    quarantine_entry(
+                        "ruido",
+                        candidate.title or "(sin titulo)",
+                        url=candidate.official_url,
+                    )
+                )
             continue
         validation = await connector.validate(candidate)
         if not validation.ok:
@@ -125,6 +142,15 @@ async def _scrape_candidates(
                 validation_rejected += 1
                 if len(validation_reasons) < 5:
                     validation_reasons.append(validation.reason or "sin razon")
+                if len(quarantine) < QUARANTINE_CAP_PER_RUN:
+                    quarantine.append(
+                        quarantine_entry(
+                            classify_validation_reason(validation.reason),
+                            candidate.title or "(sin titulo)",
+                            url=candidate.official_url,
+                            detail=validation.reason,
+                        )
+                    )
                 continue
         opportunities.append(
             OpportunityCreate(
@@ -168,6 +194,7 @@ async def _scrape_candidates(
         stats["validation_rejected"] = validation_rejected
         stats["validation_reasons"] = validation_reasons
         stats["opportunities_normalized"] = len(opportunities)
+        stats["quarantine"] = quarantine
     return opportunities
 
 
@@ -327,8 +354,23 @@ async def _persist_opportunities(
     created = 0
     updated = 0
     failed_items = 0
+
+    def _quarantine_count() -> int:
+        return sum(
+            1
+            for log in run.logs or []
+            if isinstance(log, dict) and log.get("level") == "quarantine"
+        )
+
+    def _record_quarantine(entry: dict[str, object]) -> None:
+        # Same cap as the scrape phase: quarantine is observability, it must
+        # never bloat the run row or slow the sweep.
+        if _quarantine_count() < QUARANTINE_CAP_PER_RUN:
+            run.logs = [*run.logs, entry]
+
     for opportunity_data in opportunities:
         try:
+            had_url = bool(opportunity_data.official_url)
             opportunity_result = create_opportunity(
                 db, opportunity_data, organization_id=organization_id
             )
@@ -340,16 +382,52 @@ async def _persist_opportunities(
             if opportunity.first_seen_at == opportunity.last_seen_at:
                 created += 1
             else:
+                # T4: merged duplicate — the candidate matched a known
+                # opportunity and was folded into it instead of creating
+                # a new row. Visible in GET /sources/{id}/quarantine.
                 updated += 1
+                _record_quarantine(
+                    quarantine_entry(
+                        "duplicado",
+                        getattr(opportunity_data, "title", "") or "(sin titulo)",
+                        url=getattr(opportunity_data, "official_url", None),
+                        detail=f"merged into opportunity {opportunity.id}",
+                    )
+                )
+            if had_url and not opportunity.official_url:
+                # T4: URL muerta — create_opportunity nulled an unreachable
+                # official_url instead of dropping the candidate.
+                _record_quarantine(
+                    quarantine_entry(
+                        "url_muerta",
+                        getattr(opportunity_data, "title", "") or "(sin titulo)",
+                        url=getattr(opportunity_data, "official_url", None),
+                        detail="official_url unreachable, stored as null",
+                    )
+                )
         except Exception as exc:
             failed_items += 1
+            message = str(exc)
             run.logs.append(
                 {
                     "level": "warning",
                     "message": "Candidate skipped during local persistence",
                     "title": getattr(opportunity_data, "title", ""),
-                    "error": str(exc),
+                    "error": message,
                 }
+            )
+            # T4: noise rejections raised by create_opportunity (post-enrichment)
+            # also land in quarantine with their reason.
+            reason = (
+                "ruido" if "noise" in message.lower() or "ruido" in message.lower() else "error"
+            )
+            _record_quarantine(
+                quarantine_entry(
+                    reason,
+                    getattr(opportunity_data, "title", "") or "(sin titulo)",
+                    url=getattr(opportunity_data, "official_url", None),
+                    detail=message[:200],
+                )
             )
     # Clear per-source bulk caches so next source starts fresh
     try:
@@ -499,6 +577,14 @@ async def run_source_inline(db, source: Source, organization_id: str | None = No
         opportunities = await _scrape_source_candidates_with_timeout(source, scrape_stats)
 
         _update_dom_hash(source, run, scrape_stats)
+        # T4: scrape-phase quarantine (ruido/validacion) joins the run logs
+        # here so _finalize_run's `*run.logs` spread carries it forward.
+        scrape_quarantine = scrape_stats.get("quarantine") or []
+        if scrape_quarantine:
+            run.logs = [
+                *run.logs,
+                *(entry for entry in scrape_quarantine if isinstance(entry, dict)),
+            ]
         items_parsed = scrape_stats.get("candidates_parsed")
         if isinstance(items_parsed, int):
             source.last_item_count = items_parsed

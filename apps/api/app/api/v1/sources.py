@@ -20,6 +20,8 @@ from app.db.seed import seed_default_sources
 from app.db.session import get_db, SessionLocal
 from app.models import Opportunity, Organization, Source, SourceRun, Task, User
 from app.schemas import SourceCreate, SourceHealthRead, SourceRead, SourceRunRead, SourceUpdate
+from app.schemas.source import QuarantineRead
+from app.services.quarantine import QUARANTINE_REASONS, extract_quarantine_items
 from app.scraper.dispatcher import run_source as dispatcher_run_source
 from app.services import audit, source_due_for_scraping, validate_source_url
 from app.services.scoring import (
@@ -671,6 +673,43 @@ def get_source_health(
 ) -> SourceHealthRead:
     source = _get_source_for_org(db, source_id, organization)
     return _source_health(db, source)
+
+
+@router.get("/sources/{source_id}/quarantine", response_model=QuarantineRead)
+def get_source_quarantine(
+    source_id: str,
+    reason: str | None = Query(
+        default=None,
+        description=f"Filter by discard reason: {', '.join(QUARANTINE_REASONS)}",
+    ),
+    limit_runs: int = Query(default=10, ge=1, le=50, description="Recent runs to scan"),
+    limit_items: int = Query(default=100, ge=1, le=500, description="Max items to return"),
+    organization: Organization = Depends(get_current_organization),
+    db: Session = Depends(get_db),
+) -> QuarantineRead:
+    """List candidates this source discarded, with reasons (T4 fortalecer-201).
+
+    Discards (noise, duplicates, dead URLs, validation rejects) are stored
+    as ``{"level": "quarantine"}`` entries in the existing ``SourceRun.logs``
+    JSON column — no new tables. Runs are scanned newest-first; ``total``
+    counts all matches while ``items`` is capped at ``limit_items``.
+    """
+    source = _get_source_for_org(db, source_id, organization)
+    if reason is not None and reason not in QUARANTINE_REASONS:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Unknown reason '{reason}'. Valid: {', '.join(QUARANTINE_REASONS)}",
+        )
+    runs = list(
+        db.scalars(
+            select(SourceRun)
+            .where(SourceRun.source_id == source.id)
+            .order_by(SourceRun.created_at.desc())
+            .limit(limit_runs)
+        )
+    )
+    total, items = extract_quarantine_items(runs, reason=reason, limit=limit_items)
+    return QuarantineRead(source_id=source.id, total=total, items=items)  # type: ignore[arg-type]
 
 
 @router.post("/sources/claim-defaults")

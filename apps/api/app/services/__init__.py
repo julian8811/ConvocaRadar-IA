@@ -115,10 +115,22 @@ from app.services.analytics import (  # noqa: F401
     backfill_funding_amounts,
     backfill_funding_amounts_ai,
     get_category_distribution,
+    get_cohort_breakdown,
     get_funding_ranges,
     get_opportunities_timeline,
     get_score_distribution,
     get_source_contribution,
+)
+
+# ── quarantine.py — visible quarantine for discarded candidates (T4) ─────────
+from app.services.quarantine import (  # noqa: F401
+    QUARANTINE_CAP_PER_RUN,
+    QUARANTINE_LEVEL,
+    QUARANTINE_REASONS,
+    classify_validation_reason,
+    extract_quarantine_items,
+    is_quarantine_log,
+    quarantine_entry,
 )
 
 # ── genai.py — GenAI batch operations and weekly digest ──────────────────────
