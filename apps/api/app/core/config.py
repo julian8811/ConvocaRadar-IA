@@ -28,6 +28,24 @@ class Settings(BaseSettings):
     chat_model: str = "gpt-4.1-mini"
     embedding_model: str = ""
     embedding_dimensions: int = 1024
+    # ── T5 (fortalecer-201): AI gateway — Gemini primario, local fallback ──
+    # Orden: Gemini (si hay key) → remoto genérico compatible (Codex/OpenAI
+    # vía llm_* — solo si está configurado) → hash-local (siempre, sin key).
+    # Sin GEMINI_API_KEY el gateway opera en local (cero costo) sin romper nada.
+    # GEMINI_API_KEY es la vía primaria; como alias se acepta LLM_API_KEY
+    # cuando LLM_PROVIDER=gemini (resuelto en app.core.ai_gateway — no hay
+    # dos variables con el mismo rol).
+    gemini_api_key: str | None = None
+    gemini_api_base: str = "https://generativelanguage.googleapis.com/v1beta/openai"
+    gemini_embedding_model: str = "text-embedding-004"
+    # Cuotas de llamadas REMOTAS por organización (caché y fallback local no
+    # consumen cuota). Defaults conservadores de arranque — NO son política
+    # final; ajustar por env según gasto observado. <=0 = cuota deshabilitada.
+    ai_quota_embeddings_per_day: int = 500
+    ai_quota_embeddings_per_month: int = 10000
+    # Caché en memoria de embeddings (proceso local; se pierde al reiniciar).
+    ai_embedding_cache_size: int = 1024
+    ai_embedding_cache_ttl_seconds: int = 86400  # 24 h
     llm_timeout_seconds: int = 45
     bootstrap_sources_on_startup: bool = True
     bootstrap_sources_blocking: bool = False
