@@ -610,47 +610,83 @@ def health_sources_summary() -> dict:
 
 @app.get("/metrics")
 def metrics() -> dict:
-    """Lightweight Prometheus-style metrics (structlog counters + histogram)."""
+    """Lightweight Prometheus-style metrics (structlog counters + histogram).
+
+    Besides the in-memory scrape counters, exposes three persistent sweep
+    gauges recomputed from the DB on every call (see
+    ``app.scraper.metrics.compute_sweep_gauges``): ``due_queue_depth``,
+    ``sweep_lag_seconds`` and ``pending_alerts``.
+
+    Degraded contract (same spirit as ``/api/v1/health/ready`` → 503):
+    when the database is unreachable the endpoint still responds with the
+    in-memory snapshot and ``None`` gauges instead of raising 500.
+    """
     from sqlalchemy import func, select
+    from sqlalchemy.exc import SQLAlchemyError
 
     from app.db.session import SessionLocal
     from app.models import SourceRun
 
-    db = SessionLocal()
     try:
-        total_runs = db.scalar(select(func.count(SourceRun.id))) or 0
-        success = db.scalar(select(func.count(SourceRun.id)).where(SourceRun.status == "success")) or 0
-        degraded = db.scalar(select(func.count(SourceRun.id)).where(SourceRun.status == "degraded")) or 0
-        failed = db.scalar(select(func.count(SourceRun.id)).where(SourceRun.status == "failed")) or 0
-        base = {"total_runs": total_runs, "success": success, "degraded": degraded, "failed": failed}
+        db = SessionLocal()
         try:
-            from app.scraper.metrics import snapshot
+            total_runs = db.scalar(select(func.count(SourceRun.id))) or 0
+            success = db.scalar(select(func.count(SourceRun.id)).where(SourceRun.status == "success")) or 0
+            degraded = db.scalar(select(func.count(SourceRun.id)).where(SourceRun.status == "degraded")) or 0
+            failed = db.scalar(select(func.count(SourceRun.id)).where(SourceRun.status == "failed")) or 0
+            base = {"total_runs": total_runs, "success": success, "degraded": degraded, "failed": failed}
+            from app.scraper.metrics import compute_sweep_gauges, snapshot
 
-            snap = snapshot()
-            base.update(
-                {
-                    "scrape_duration_p50": snap["scrape_duration_p50"],
-                    "scrape_duration_p95": snap["scrape_duration_p95"],
-                    "scrape_duration_avg": snap["scrape_duration_avg"],
-                    "scrape_duration_count": snap["scrape_duration_count"],
-                    "items_found_total": snap["items_found_total"],
-                    "scrapes_total": snap["scrapes_total"],
-                    "errors_total": snap["errors_total"],
-                    "health_gauges": snap["health_gauges"],
-                    "funding_coverage": snap.get("funding_coverage", {}),
-                    "close_coverage": snap.get("close_coverage", {}),
-                    "open_coverage": snap.get("open_coverage", {}),
-                    "funding_parsed_total": snap.get("funding_parsed_total", 0),
-                    "close_extracted_total": snap.get("close_extracted_total", 0),
-                    "open_extracted_total": snap.get("open_extracted_total", 0),
-                    "per_source_extraction": snap.get("per_source_extraction", {}),
-                }
-            )
-        except Exception:
-            pass
-        return base
-    finally:
-        db.close()
+            base.update(compute_sweep_gauges(db))
+            base["database"] = "reachable"
+            try:
+                snap = snapshot()
+                base.update(
+                    {
+                        "scrape_duration_p50": snap["scrape_duration_p50"],
+                        "scrape_duration_p95": snap["scrape_duration_p95"],
+                        "scrape_duration_avg": snap["scrape_duration_avg"],
+                        "scrape_duration_count": snap["scrape_duration_count"],
+                        "items_found_total": snap["items_found_total"],
+                        "scrapes_total": snap["scrapes_total"],
+                        "errors_total": snap["errors_total"],
+                        "health_gauges": snap["health_gauges"],
+                        "funding_coverage": snap.get("funding_coverage", {}),
+                        "close_coverage": snap.get("close_coverage", {}),
+                        "open_coverage": snap.get("open_coverage", {}),
+                        "funding_parsed_total": snap.get("funding_parsed_total", 0),
+                        "close_extracted_total": snap.get("close_extracted_total", 0),
+                        "open_extracted_total": snap.get("open_extracted_total", 0),
+                        "per_source_extraction": snap.get("per_source_extraction", {}),
+                    }
+                )
+            except Exception:
+                pass
+            return base
+        finally:
+            db.close()
+    except SQLAlchemyError as exc:
+        struct_logger.warning("metrics_db_unreachable", error=str(exc))
+        return JSONResponse(status_code=503, content=_degraded_metrics_snapshot())
+
+
+def _degraded_metrics_snapshot() -> dict:
+    """In-memory-only /metrics body for when the DB is unreachable (503)."""
+    try:
+        from app.scraper.metrics import snapshot
+
+        snap = snapshot()
+    except Exception:
+        snap = {}
+    body: dict = {
+        "status": "degraded",
+        "database": "unreachable",
+        "due_queue_depth": None,
+        "sweep_lag_seconds": None,
+        "pending_alerts": None,
+    }
+    body.update(snap)
+    return body
 
 
 app.include_router(api_router)
