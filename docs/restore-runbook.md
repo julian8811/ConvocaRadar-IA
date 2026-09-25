@@ -33,6 +33,13 @@ No imprimas `.env` ni exportes secretos al historial de shell. El contenedor `ba
 
 Los backups viven en el volumen Docker `convocaradar_backups-data` y la retención se controla con `BACKUP_RETENTION_DAYS` (14 días por defecto).
 
+Desde T6 cada ciclo publica además una copia off-site en S3/MinIO
+(`s3://<bucket>/<prefijo>/`, por defecto `s3://convocaradar/backups/`), con
+retención propia `BACKUP_S3_RETENTION_DAYS` (30 días por defecto) y controlada
+por `BACKUP_S3_ENABLED=auto|true|false` (`auto` = subir si S3 está
+configurado; cualquier fallo off-site queda como `degraded` en los logs y
+nunca rompe el ciclo local).
+
 ## 3. Backup manual obligatorio antes de actualizar
 
 Ejecuta:
@@ -50,6 +57,11 @@ El primer comando debe terminar en código 0 y registrar un mensaje similar a:
 ```
 
 No continúes con una actualización si el ciclo o la verificación fallan.
+
+El marcador final incluye el estado off-site, p. ej.
+`PASS: backup + verify completed for cycle … (off-site: uploaded)`. Un
+`off-site: degraded` no bloquea (el backup local sigue válido), pero obliga a
+revisar `S3_*`/`BACKUP_S3_*` antes del próximo ciclo.
 
 Para confirmar que existe un archivo publicado sin extraerlo del volumen:
 
@@ -87,6 +99,46 @@ $COMPOSE exec -T backup sh -c "gzip -dc '$latest'" \
 ```
 
 No uses `127.0.0.1:5434` ni publiques temporalmente PostgreSQL para restaurar. El Compose de producción mantiene PostgreSQL privado.
+
+### 4.4 Origen alternativo: bucket S3/MinIO (copia off-site)
+
+Úsalo cuando el volumen local se perdió, su último archivo está corrupto, o
+quieres validar que el respaldo sobrevive al servidor. La verificación
+distingue `[STALE]` (íntegro pero viejo: el cron cayó, el restore sigue
+siendo posible) de `[CORRUPT]` (inutilizable).
+
+```bash
+# 1. Verificar el off-site directamente (acepta volumen o bucket como fuente):
+$COMPOSE exec -T backup /scripts/verify_latest_backup.sh s3://convocaradar/backups
+
+# 2. Descargar la copia más reciente al contenedor backup:
+key="$($COMPOSE exec -T backup python3 /scripts/backup_offsite.py latest | tr -d '\r')"
+test -n "$key" || { echo 'ERROR: no backup in bucket'; exit 1; }
+printf 'Copia off-site seleccionada: %s\n' "$key"
+$COMPOSE exec -T backup python3 /scripts/backup_offsite.py download "$key" /tmp/restore.sql.gz
+
+# 3. Cargar a scratch con la misma exigencia que §4.2–§4.3:
+$COMPOSE exec -T postgres dropdb --if-exists -U convocaradar scratch_restore
+$COMPOSE exec -T postgres createdb -U convocaradar scratch_restore
+$COMPOSE exec -T backup sh -c 'gzip -dc /tmp/restore.sql.gz' \
+  | $COMPOSE exec -T postgres \
+      psql -v ON_ERROR_STOP=1 -U convocaradar -d scratch_restore
+```
+
+Desde §5 en adelante los checks son idénticos (`alembic_version` + conteo de
+tablas + `opportunities`): un restore off-site solo se promueve si pasa los
+mismos umbrales que uno local.
+
+Sin compose (máquina del operador con python3 y red al MinIO):
+
+```bash
+export S3_ENDPOINT_URL=http://<host-minio>:9000
+export S3_ACCESS_KEY=<minio-user> S3_SECRET_KEY=<minio-password>
+export S3_BUCKET=convocaradar BACKUP_S3_PREFIX=backups
+python3 scripts/backup_offsite.py latest
+bash scripts/verify_latest_backup.sh s3://convocaradar/backups
+python3 scripts/backup_offsite.py download backups/convocaradar-<ts>.sql.gz /tmp/restore.sql.gz
+```
 
 ## 5. Verificación del restore
 
@@ -179,6 +231,13 @@ El procedimiento de las secciones 4 y 5 se mantiene deliberadamente alineado con
 
 El contenedor `backup` ejecuta Supercronic con `scripts/crontab-backup`. La programación normal es diaria a las 03:30 UTC y la retención predeterminada es 14 días.
 
+Retención off-site (independiente): cada ciclo declara un lifecycle expiry de
+`BACKUP_S3_PREFIX/` a `BACKUP_S3_RETENTION_DAYS` (30 días por defecto) y purga
+las copias remotas más viejas. Ambas operaciones son best-effort: si MinIO no
+está reachable, el ciclo local sigue verde y el fallo queda como
+`WARN ... degraded` en los logs del contenedor `backup` (el marcador final
+`PASS` informa `off-site: uploaded|uploaded-with-warnings|skipped|degraded`).
+
 Revisar estado y logs:
 
 ```bash
@@ -189,7 +248,7 @@ $COMPOSE logs --tail=100 backup
 ## 9. Checklist de recuperación
 
 - [ ] Commit activo registrado.
-- [ ] Backup seleccionado existe y pasa `verify_latest_backup.sh`.
+- [ ] Backup seleccionado existe y pasa `verify_latest_backup.sh` (local o `s3://…`; `[STALE]` ≠ `[CORRUPT]`).
 - [ ] Restore a `scratch_restore` termina sin errores.
 - [ ] Revisión Alembic coincide.
 - [ ] Conteo de tablas coincide.
