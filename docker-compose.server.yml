@@ -58,6 +58,9 @@ services:
       S3_BUCKET: ${S3_BUCKET:-convocaradar}
       S3_REGION: ${S3_REGION:-auto}
       INTERNAL_API_KEY: ${INTERNAL_API_KEY:?must be set}
+      # No bootstrap scrape on api boot (config default is true): the worker owns
+      # the sweep and on-demand seeding lives at POST /api/v1/admin/bootstrap-data.
+      BOOTSTRAP_SOURCES_ON_STARTUP: "false"
       SCHEDULER_ENABLED: "false"
     healthcheck:
       test: ["CMD", "python", "-c", "import urllib.request; urllib.request.urlopen('http://localhost:8000/api/v1/health/live', timeout=5)"]
