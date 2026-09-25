@@ -41,7 +41,9 @@ def enqueue_faculty_match(opportunity_ids: list[str]) -> str | None:
             loop = asyncio.get_running_loop()
             loop.create_task(_run())
         except RuntimeError:
-            asyncio.run(_run())
+            from app.core.http_client import closing_per_loop_client
+
+            asyncio.run(closing_per_loop_client(_run()))
         logger.info("faculty_match_enqueued", ids=opportunity_ids, mode="inline")
         return "inline"
     except Exception as exc:
