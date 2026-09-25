@@ -32,6 +32,9 @@ _per_source_extraction: dict[str, dict[str, int]] = {}  # source -> {total, fund
 _counter_throttled: int = 0
 _gauge_burst_utilization: dict[str, float] = {}
 _gauge_delay_for_wait: float = 0.0
+# ── T3 (fortalecer-201): sweep cycle timing (in-memory, same spirit as T2) ─
+# ``None`` until the first scheduler tick completes in this process.
+_sweep_duration_seconds: float | None = None
 
 
 def record_scrape(*, source_key: str, duration_s: float, items_found: int, status: str, health_score: int | None = None) -> None:
@@ -98,6 +101,33 @@ def record_throttled(*, source_key: str = "unknown", delay_s: float = 0.0) -> No
             _gauge_burst_utilization[source_key] = round(min(_counter_throttled / 150 * 100, 100), 1)
 
 
+def record_sweep_start() -> float:
+    """Mark the start of a scheduler sweep tick (monotonic clock)."""
+    import time
+
+    return time.monotonic()
+
+
+def record_sweep_end(started_monotonic: float) -> float:
+    """Record how long a sweep tick took; returns duration in seconds."""
+    import time
+
+    global _sweep_duration_seconds
+    duration = max(0.0, time.monotonic() - started_monotonic)
+    with _lock:
+        _sweep_duration_seconds = round(duration, 3)
+    return _sweep_duration_seconds
+
+
+def sweep_overrun(*, interval_seconds: float) -> int:
+    """1 when the last sweep cycle outlasted its tick interval, else 0."""
+    with _lock:
+        duration = _sweep_duration_seconds
+    if duration is None:
+        return 0
+    return 1 if duration > interval_seconds else 0
+
+
 def snapshot() -> dict:
     with _lock:
         hist = list(_histogram)
@@ -120,6 +150,7 @@ def snapshot() -> dict:
             "throttled_count": _counter_throttled,
             "burst_utilization": dict(_gauge_burst_utilization),
             "delay_for_wait": _gauge_delay_for_wait,
+            "sweep_duration_seconds": _sweep_duration_seconds,
         }
 
 
@@ -156,6 +187,8 @@ def reset() -> None:
         _counter_throttled = 0
         _gauge_delay_for_wait = 0.0
         _gauge_burst_utilization.clear()
+        global _sweep_duration_seconds
+        _sweep_duration_seconds = None
 
 
 def compute_sweep_gauges(db: Session, *, now: datetime | None = None) -> dict[str, int | None]:
