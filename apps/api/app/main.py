@@ -168,18 +168,34 @@ async def _run_periodic_source_sweep(interval_seconds: int | None = None) -> Non
                     raw_due = [s for s in sources if source_due_for_scraping(s)]
                     # Priority-sorted queue: strategic first, then complementary/experimental
                     try:
-                        from app.scraper.priority_queue import build_priority_queue
+                        from app.scraper.priority_queue import build_priority_queue, partition_by_tier
 
                         _pq = build_priority_queue(raw_due)
                         due_sources = _pq.drain_ordered()
+                        _tier_buckets = partition_by_tier(due_sources)
                     except Exception:
                         due_sources = raw_due
-                    # Bounded concurrency: min(6, SCRAPING_MAX_CONCURRENCY), at least 1
-                    max_conc = max(1, min(6, int(scheduler_settings.scraping_max_concurrency)))
-                    sem = asyncio.Semaphore(max_conc)
+                        _tier_buckets = None
+                    # T3: per-tier concurrency + global cap. Bounded total:
+                    # min(6, SCRAPING_MAX_CONCURRENCY), at least 1 — same as
+                    # before; tiers only subdivide it (3/2/1 defaults).
+                    from app.scraper.metrics import record_sweep_end, record_sweep_start
 
-                    async def _run_one(src) -> int:
-                        async with sem:
+                    max_conc = scheduler_settings.global_concurrency_cap()
+                    global_sem = asyncio.Semaphore(max_conc)
+                    tier_sems = {
+                        tier: asyncio.Semaphore(scheduler_settings.tier_concurrency(tier))
+                        for tier in ("strategic", "complementary", "experimental")
+                    }
+                    if _tier_buckets is None:
+                        from app.scraper.priority_queue import tier_bucket
+
+                        _tier_buckets = {"strategic": [], "complementary": [], "experimental": []}
+                        for _s in due_sources:
+                            _tier_buckets[tier_bucket(getattr(_s, "tier", None))].append(_s)
+
+                    async def _run_one(src, tier_sem) -> int:
+                        async with global_sem, tier_sem:
                             # Use a dedicated session per source to avoid
                             # concurrent use of the shared Session and to
                             # keep advisory locks isolated per transaction.
@@ -207,22 +223,32 @@ async def _run_periodic_source_sweep(interval_seconds: int | None = None) -> Non
                             finally:
                                 _db.close()
 
-                    if due_sources:
-                        results = await asyncio.gather(
-                            *(_run_one(s) for s in due_sources), return_exceptions=False
-                        )
-                        run_count = sum(results)
-                    else:
-                        run_count = 0
+                    sweep_start = record_sweep_start()
                     try:
-                        db.commit()
-                    except Exception:
-                        db.rollback()
+                        if due_sources:
+                            # Strategic buckets first (priority order preserved).
+                            coros = [
+                                _run_one(s, tier_sems[tier])
+                                for tier in ("strategic", "complementary", "experimental")
+                                for s in _tier_buckets.get(tier, [])
+                            ]
+                            results = await asyncio.gather(*coros, return_exceptions=False)
+                            run_count = sum(results)
+                        else:
+                            run_count = 0
+                        try:
+                            db.commit()
+                        except Exception:
+                            db.rollback()
+                    finally:
+                        sweep_duration_s = record_sweep_end(sweep_start)
                     struct_logger.info(
                         "periodic_sweep_complete",
                         total=total,
                         due=run_count,
                         concurrency=max_conc,
+                        tier_concurrency={t: scheduler_settings.tier_concurrency(t) for t in tier_sems},
+                        sweep_duration_s=sweep_duration_s,
                     )
 
                     # Weekly digest. Fires at most once per process lifetime
@@ -610,47 +636,103 @@ def health_sources_summary() -> dict:
 
 @app.get("/metrics")
 def metrics() -> dict:
-    """Lightweight Prometheus-style metrics (structlog counters + histogram)."""
+    """Lightweight Prometheus-style metrics (structlog counters + histogram).
+
+    Besides the in-memory scrape counters, exposes three persistent sweep
+    gauges recomputed from the DB on every call (see
+    ``app.scraper.metrics.compute_sweep_gauges``): ``due_queue_depth``,
+    ``sweep_lag_seconds`` and ``pending_alerts`` — plus two in-memory T3
+    sweep-cycle gauges: ``sweep_duration_seconds`` (last tick duration,
+    ``None`` until the first tick completes in this process) and
+    ``sweep_overrun`` (1 when the last cycle outlasted
+    ``scheduler_interval_seconds``, else 0).
+
+    Degraded contract (same spirit as ``/api/v1/health/ready`` → 503):
+    when the database is unreachable the endpoint still responds with the
+    in-memory snapshot and ``None`` gauges instead of raising 500.
+    The T3 in-memory gauges survive degradation (they never needed the DB).
+    """
     from sqlalchemy import func, select
+    from sqlalchemy.exc import SQLAlchemyError
 
     from app.db.session import SessionLocal
     from app.models import SourceRun
 
-    db = SessionLocal()
     try:
-        total_runs = db.scalar(select(func.count(SourceRun.id))) or 0
-        success = db.scalar(select(func.count(SourceRun.id)).where(SourceRun.status == "success")) or 0
-        degraded = db.scalar(select(func.count(SourceRun.id)).where(SourceRun.status == "degraded")) or 0
-        failed = db.scalar(select(func.count(SourceRun.id)).where(SourceRun.status == "failed")) or 0
-        base = {"total_runs": total_runs, "success": success, "degraded": degraded, "failed": failed}
+        db = SessionLocal()
         try:
-            from app.scraper.metrics import snapshot
+            total_runs = db.scalar(select(func.count(SourceRun.id))) or 0
+            success = db.scalar(select(func.count(SourceRun.id)).where(SourceRun.status == "success")) or 0
+            degraded = db.scalar(select(func.count(SourceRun.id)).where(SourceRun.status == "degraded")) or 0
+            failed = db.scalar(select(func.count(SourceRun.id)).where(SourceRun.status == "failed")) or 0
+            base = {"total_runs": total_runs, "success": success, "degraded": degraded, "failed": failed}
+            from app.scraper.metrics import compute_sweep_gauges, snapshot, sweep_overrun
 
-            snap = snapshot()
-            base.update(
-                {
-                    "scrape_duration_p50": snap["scrape_duration_p50"],
-                    "scrape_duration_p95": snap["scrape_duration_p95"],
-                    "scrape_duration_avg": snap["scrape_duration_avg"],
-                    "scrape_duration_count": snap["scrape_duration_count"],
-                    "items_found_total": snap["items_found_total"],
-                    "scrapes_total": snap["scrapes_total"],
-                    "errors_total": snap["errors_total"],
-                    "health_gauges": snap["health_gauges"],
-                    "funding_coverage": snap.get("funding_coverage", {}),
-                    "close_coverage": snap.get("close_coverage", {}),
-                    "open_coverage": snap.get("open_coverage", {}),
-                    "funding_parsed_total": snap.get("funding_parsed_total", 0),
-                    "close_extracted_total": snap.get("close_extracted_total", 0),
-                    "open_extracted_total": snap.get("open_extracted_total", 0),
-                    "per_source_extraction": snap.get("per_source_extraction", {}),
-                }
+            base.update(compute_sweep_gauges(db))
+            base["database"] = "reachable"
+            base["sweep_duration_seconds"] = snapshot().get("sweep_duration_seconds")
+            base["sweep_overrun"] = sweep_overrun(
+                interval_seconds=settings.scheduler_interval_seconds
             )
-        except Exception:
-            pass
-        return base
-    finally:
-        db.close()
+            try:
+                snap = snapshot()
+                base.update(
+                    {
+                        "scrape_duration_p50": snap["scrape_duration_p50"],
+                        "scrape_duration_p95": snap["scrape_duration_p95"],
+                        "scrape_duration_avg": snap["scrape_duration_avg"],
+                        "scrape_duration_count": snap["scrape_duration_count"],
+                        "items_found_total": snap["items_found_total"],
+                        "scrapes_total": snap["scrapes_total"],
+                        "errors_total": snap["errors_total"],
+                        "health_gauges": snap["health_gauges"],
+                        "funding_coverage": snap.get("funding_coverage", {}),
+                        "close_coverage": snap.get("close_coverage", {}),
+                        "open_coverage": snap.get("open_coverage", {}),
+                        "funding_parsed_total": snap.get("funding_parsed_total", 0),
+                        "close_extracted_total": snap.get("close_extracted_total", 0),
+                        "open_extracted_total": snap.get("open_extracted_total", 0),
+                        "per_source_extraction": snap.get("per_source_extraction", {}),
+                    }
+                )
+            except Exception:
+                pass
+            return base
+        finally:
+            db.close()
+    except SQLAlchemyError as exc:
+        struct_logger.warning("metrics_db_unreachable", error=str(exc))
+        return JSONResponse(status_code=503, content=_degraded_metrics_snapshot())
+
+
+def _degraded_metrics_snapshot() -> dict:
+    """In-memory-only /metrics body for when the DB is unreachable (503)."""
+    try:
+        from app.scraper.metrics import snapshot
+
+        snap = snapshot()
+    except Exception:
+        snap = {}
+    body: dict = {
+        "status": "degraded",
+        "database": "unreachable",
+        "due_queue_depth": None,
+        "sweep_lag_seconds": None,
+        "pending_alerts": None,
+    }
+    body.update(snap)
+    # T3 gauges are in-memory: still meaningful on the degraded path.
+    if "sweep_duration_seconds" not in body:
+        body["sweep_duration_seconds"] = None
+    try:
+        from app.scraper.metrics import sweep_overrun
+
+        body["sweep_overrun"] = sweep_overrun(
+            interval_seconds=settings.scheduler_interval_seconds
+        )
+    except Exception:
+        body["sweep_overrun"] = 0
+    return body
 
 
 app.include_router(api_router)

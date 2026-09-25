@@ -1,12 +1,12 @@
 # Entrega Universidad — ConvocaRadar IA
 
 Checklist for evaluators to clone, configure, and run the production stack unaided
-via `docker compose -f docker-compose.yml -f docker-compose.prod.yml`.
+via `docker-compose.server.yml` (standalone, see `docs/deploy-universidad.md` as canonical).
 
 ## 1. Requisitos previos
 
 - Ubuntu 22.04+ (VM de la universidad) with Docker Engine ≥ 24 + Compose v2 (`docker compose version`)
-- 2 vCPU / 4 GB RAM, 20 GB disk
+- 4 vCPU / 8 GB RAM, 20 GB disk (server stack limits total ~5.5 GB: postgres 1g + api 1.5g + worker 1.5g + web 768m + minio 512m + backup 256m)
 - Ports 80/443 for reverse proxy (or university-assigned ports) + SSH
 - Domain or subdomain (e.g. `convocaradar.universidad.edu.co`) — optional but recommended
 - Git installed
@@ -50,48 +50,46 @@ NEXT_PUBLIC_API_URL=https://convocaradar.universidad.edu.co/api/v1
 
 Validate: `bash scripts/check-secrets.sh` must exit 0; `APP_ENV=production` with weak secrets will fail fast via `config.py` validators.
 
-## 3. Levantar producción — un solo comando (prod overlay)
+## 3. Levantar producción — compose autónomo del servidor
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.prod.yml build --pull
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
+docker compose -p convocaradar --env-file .env -f docker-compose.server.yml build --pull
+docker compose -p convocaradar --env-file .env -f docker-compose.server.yml up -d
 
 # Wait ~90s for health gates: postgres healthy → api healthy → worker/web/backup
-docker compose -f docker-compose.yml -f docker-compose.prod.yml ps
+docker compose -p convocaradar --env-file .env -f docker-compose.server.yml ps
 ```
 
-Production overlay differences (`docker-compose.prod.yml`):
-- Removes host ports `5434:5432` (postgres) and `9004:9000`/`9005:9001` (minio) — not exposed
-- Keeps `8002:8000` (api) and `${WEB_PORT:-3002}:3000` (web) publishable
-- Sets `depends_on: condition: service_healthy` for `api→postgres`, `worker→api`, `backup→postgres`
+Server stack properties (`docker-compose.server.yml`, standalone — no hereda dev):
+- No publica puertos salvo web en `127.0.0.1:${WEB_PORT:-3001}:3000`; api/postgres/minio solo en red interna
+- Sets `depends_on: condition: service_healthy` for `api→postgres+minio`, `worker→api`, `backup→postgres`
 - Adds `read_only: true` + `tmpfs` (`/tmp`), `cap_drop: [ALL]`, `security_opt: [no-new-privileges:true]`, `restart: unless-stopped`, CPU/memory limits
 
-Verify overlay is applied:
+Verify hardening is applied:
 
 ```bash
-docker compose -f docker-compose.yml -f docker-compose.prod.yml config | grep -v "5434:5432" && echo "prod port isolation OK"
-docker compose -f docker-compose.yml -f docker-compose.prod.yml config | grep -q "cap_drop" && echo "hardening present"
+docker compose -p convocaradar --env-file .env -f docker-compose.server.yml config | grep -q "cap_drop" && echo "hardening present"
 ```
 
 ## 4. Health URLs y verificación
 
 ```bash
-curl -fsS http://localhost:8002/api/v1/health/live && echo "API live OK"
-curl -fsS http://localhost:8002/api/v1/health/ready && echo "API ready OK (DB + migrations)"
-curl -fsS http://localhost:3002/ | head -n 20 && echo "Web OK"
+# Web (único puerto publicado por server.yml):
+curl -fsS http://localhost:3001/ | head -n 20 && echo "Web OK"
+# API live/ready corren dentro de la red interna (api no publica puerto):
+docker compose -p convocaradar --env-file .env -f docker-compose.server.yml exec api python -c "import urllib.request; print(urllib.request.urlopen('http://localhost:8000/api/v1/health/live', timeout=5).status)" && echo "API live OK"
 
 # All services healthy <90s:
-docker inspect --format='{{.State.Health.Status}}' $(docker compose ps -q postgres api) 2>/dev/null
+docker inspect --format='{{.State.Health.Status}}' $(docker compose -p convocaradar --env-file .env -f docker-compose.server.yml ps -q postgres api) 2>/dev/null
 ```
 
-Reverse proxy (Nginx) example — do not expose 8002/3002 directly:
+Reverse proxy (Nginx) example — solo web expone puerto (127.0.0.1:3001); `/api/` lo resuelve el propio web vía `INTERNAL_API_URL`:
 
 ```nginx
 server {
     listen 80;
     server_name convocaradar.universidad.edu.co;
-    location /api/ { proxy_pass http://127.0.0.1:8002; }
-    location / { proxy_pass http://127.0.0.1:3002; }
+    location / { proxy_pass http://127.0.0.1:3001; }
 }
 # certbot --nginx -d convocaradar.universidad.edu.co
 ```
@@ -99,6 +97,8 @@ server {
 ## 5. Backups y restore drill
 
 Nightly `backup` service runs `scripts/backup-cycle.sh` via `supercronic` at 03:30 UTC (see `scripts/crontab-backup`), retention `BACKUP_RETENTION_DAYS=14`.
+
+Off-site (T6, best-effort): each cycle also uploads the validated `.sql.gz` to MinIO (`s3://convocaradar/backups/`, own 30-day retention via `BACKUP_S3_RETENTION_DAYS`); S3 failures never fail the local cycle. Verify either source with `verify_latest_backup.sh <dir|s3://bucket/prefix>` (`[STALE]` ≠ `[CORRUPT]`); full S3 restore drill in `docs/restore-runbook.md` §4.4.
 
 ```bash
 # Verify latest backup is fresh (<24h) and not empty (>100 bytes, gzip + CREATE TABLE):
@@ -129,7 +129,7 @@ psql postgresql://convocaradar:${POSTGRES_PASSWORD}@localhost:5432/convocaradar_
 
 - `POSTGRES_PASSWORD:?must be set` error → `cp .env.production.example .env` and fill 5 secrets + URLs
 - `reset_token_secret must be >=16` or `DATABASE_URL must be PostgreSQL` → running `APP_ENV=production` with SQLite or weak placeholder secrets — generate strong values with `openssl rand -base64 48`
-- `docker compose config` shows `5434:5432` in prod → missing `-f docker-compose.prod.yml` overlay — always use both `-f` flags
+- Port confusion (5434/8002/3002) → those belong to the retired dev/prod-overlay setup; server stack only publishes web on `127.0.0.1:${WEB_PORT:-3001}` — always use `-p convocaradar --env-file .env -f docker-compose.server.yml`
 - `verify_latest_backup.sh` reports `Backup is stale: ... older than 24h` → no backup in last 24h — run `docker compose exec backup sh /scripts/backup-cycle.sh` and check `docker compose logs backup`
 - `verify_latest_backup.sh` reports `Backup too small` → `pg_dump` failed (check `PGPASSWORD` bridging in `scripts/backup-loop.sh` and `POSTGRES_PASSWORD` in `.env`)
 - Web shows `NEXT_PUBLIC_API_URL` bake error → `NEXT_PUBLIC_API_URL` is baked at `docker compose build web` time — rebuild with `docker compose -f ... build --no-cache web` after changing `.env`

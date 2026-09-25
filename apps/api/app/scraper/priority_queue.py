@@ -79,3 +79,26 @@ def build_priority_queue(sources: list) -> PriorityQueue:
     for s in sources:
         q.enqueue(s)
     return q
+
+
+#: Tier buckets for T3 per-tier concurrency. Unknown/untiered sources share
+#: the ``experimental`` bucket (lowest priority, still runs every tick).
+TIER_BUCKETS = ("strategic", "complementary", "experimental")
+
+
+def tier_bucket(tier: str | None) -> str:
+    """Normalize a ``Source.tier`` value to one of :data:`TIER_BUCKETS`."""
+    key = (tier or "").strip().lower()
+    return key if key in TIER_BUCKETS else "experimental"
+
+
+def partition_by_tier(sources: list) -> dict[str, list]:
+    """Group an already priority-ordered list into per-tier buckets.
+
+    Order within each bucket is preserved, so strategic sources still run
+    first when the scheduler gathers bucket-by-bucket in priority order.
+    """
+    buckets: dict[str, list] = {t: [] for t in TIER_BUCKETS}
+    for src in sources:
+        buckets[tier_bucket(getattr(src, "tier", None))].append(src)
+    return buckets
