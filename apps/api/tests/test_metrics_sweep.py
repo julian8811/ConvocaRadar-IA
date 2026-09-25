@@ -29,6 +29,7 @@ from sqlalchemy.orm import Session, sessionmaker
 import app.main as app_main
 from app.db.session import Base
 from app.models import Alert, Organization, Source, SourceRun
+from app.scraper import metrics as scrape_metrics
 from app.scraper.metrics import compute_sweep_gauges
 
 
@@ -134,6 +135,66 @@ class TestPendingAlerts:
         gauges = compute_sweep_gauges(db)
 
         assert gauges["pending_alerts"] == 1
+
+
+class TestSweepDurationGauges:
+    """T3 (fortalecer-201): sweep_duration_seconds + sweep_overrun.
+
+    In-memory (same degraded spirit as T2): ``None``/0 until the first
+    scheduler tick completes in this process — no new tables/migrations.
+    """
+
+    @pytest.fixture(autouse=True)
+    def _clean_sweep_state(self):
+        scrape_metrics.reset()
+        yield
+        scrape_metrics.reset()
+
+    def test_none_before_first_tick(self) -> None:
+        snap = scrape_metrics.snapshot()
+
+        assert snap["sweep_duration_seconds"] is None
+        assert scrape_metrics.sweep_overrun(interval_seconds=1800) == 0
+
+    def test_records_last_cycle_duration(self) -> None:
+        start = scrape_metrics.record_sweep_start()
+        duration = scrape_metrics.record_sweep_end(start)
+
+        assert duration >= 0
+        assert scrape_metrics.snapshot()["sweep_duration_seconds"] == duration
+
+    def test_overrun_when_cycle_outlasts_interval(self) -> None:
+        scrape_metrics._sweep_duration_seconds = 2000.0
+
+        assert scrape_metrics.sweep_overrun(interval_seconds=1800) == 1
+        assert scrape_metrics.sweep_overrun(interval_seconds=3600) == 0
+
+    def test_endpoint_exposes_t3_gauges(self, client: TestClient) -> None:
+        scrape_metrics._sweep_duration_seconds = 12.5
+
+        body = client.get("/metrics").json()
+
+        assert body["sweep_duration_seconds"] == 12.5
+        assert body["sweep_overrun"] == 0
+
+    def test_degraded_endpoint_keeps_t3_gauges(
+        self, client: TestClient, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """T3 gauges are in-memory: still present on the 503 degraded path."""
+        from app.db import session as session_module
+
+        scrape_metrics._sweep_duration_seconds = 12.5
+
+        def _connect_raises(*args, **kwargs):
+            raise OperationalError("SELECT 1", {}, Exception("connection refused"))
+
+        monkeypatch.setattr(session_module.engine, "connect", _connect_raises)
+        response = client.get("/metrics")
+
+        assert response.status_code == 503
+        body = response.json()
+        assert body["sweep_duration_seconds"] == 12.5
+        assert body["sweep_overrun"] == 0
 
 
 @pytest.fixture()
