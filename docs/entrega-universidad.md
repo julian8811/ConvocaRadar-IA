@@ -98,6 +98,8 @@ server {
 
 Nightly `backup` service runs `scripts/backup-cycle.sh` via `supercronic` at 03:30 UTC (see `scripts/crontab-backup`), retention `BACKUP_RETENTION_DAYS=14`.
 
+Off-site (T6, best-effort): each cycle also uploads the validated `.sql.gz` to MinIO (`s3://convocaradar/backups/`, own 30-day retention via `BACKUP_S3_RETENTION_DAYS`); S3 failures never fail the local cycle. Verify either source with `verify_latest_backup.sh <dir|s3://bucket/prefix>` (`[STALE]` ≠ `[CORRUPT]`); full S3 restore drill in `docs/restore-runbook.md` §4.4.
+
 ```bash
 # Verify latest backup is fresh (<24h) and not empty (>100 bytes, gzip + CREATE TABLE):
 bash scripts/verify_latest_backup.sh backups
