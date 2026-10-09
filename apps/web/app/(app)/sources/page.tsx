@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { ErrorState, LoadingState } from "@/components/ui/state";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { api } from "@/lib/api";
+import { api, isAbortError, RUN_ALL_ABORT_MESSAGE } from "@/lib/api";
 import type { SourceHealth } from "@/lib/types";
 
 function translateSourceStatus(status: string) {
@@ -166,7 +166,9 @@ export default function SourcesPage() {
     mutationFn: api.runAllSources,
     onSuccess: (response) => {
       setSweepTaskId(response.task_id);
-      toast.success(`${response.sources_due} fuentes iniciadas; ${response.sources_skipped} omitidas por frecuencia`);
+      // T2: the endpoint answers 202 before loading the catalog, so the
+      // counts are not known yet — point at the progress card instead.
+      toast.success("Barrido iniciado en segundo plano; sigue el progreso aquí");
       queryClient.invalidateQueries({ queryKey: ["sources"] });
       queryClient.invalidateQueries({ queryKey: ["source-health"] });
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
@@ -174,7 +176,17 @@ export default function SourcesPage() {
       queryClient.invalidateQueries({ queryKey: ["admin-metrics"] });
       queryClient.invalidateQueries({ queryKey: ["source-runs-overview"] });
     },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "No se pudo lanzar la corrida masiva"),
+    onError: (error) => {
+      // T1: a client-side abort does NOT mean the sweep failed — the server
+      // keeps running it. Show a friendly message instead of the raw DOM
+      // "AbortError: signal is aborted without reason".
+      if (isAbortError(error)) {
+        toast.info(RUN_ALL_ABORT_MESSAGE);
+        queryClient.invalidateQueries({ queryKey: ["tasks"] });
+        return;
+      }
+      toast.error(error instanceof Error ? error.message : "No se pudo lanzar la corrida masiva");
+    },
   });
 
   useEffect(() => {
