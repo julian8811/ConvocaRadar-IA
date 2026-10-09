@@ -359,7 +359,7 @@ class FindeterConnector:
     async def _parse_html_fallback(self, raw: RawSourceResult) -> list[OpportunityCandidate]:
         """Extract convocatorias links from HTML listing page (when sitemap fails or base_url is HTML)."""
         try:
-            from selectolax.parser import HTMLParser
+            from selectolax.lexbor import LexborHTMLParser as HTMLParser
             from urllib.parse import urljoin
 
             from app.connectors.common import clean_text

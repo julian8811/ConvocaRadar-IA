@@ -67,17 +67,48 @@ def _defer_background_sweep(monkeypatch) -> None:
     monkeypatch.setattr(_threading, "Thread", DeferredThread)
 
 
+def _sync_background_sweep(monkeypatch) -> None:
+    """Run the sweep's background thread inline (T2: catalog load and
+    decision logs now happen in the thread, so tests that assert on them
+    must execute it synchronously)."""
+    import threading as _threading
+
+    def sync_thread(target, *args, **kwargs):
+        class SyncThread:
+            def __init__(self):
+                self._target = target
+
+            def start(self):
+                self._target()
+
+        return SyncThread()
+
+    monkeypatch.setattr(_threading, "Thread", sync_thread)
+
+
+def _noop_dispatcher(monkeypatch) -> None:
+    """Replace dispatcher.run_source with an instant no-op (no network)."""
+    from app.api.v1 import sources as sources_module
+
+    async def mock_run_source(db, source, organization_id=None):
+        return None
+
+    monkeypatch.setattr(sources_module, "dispatcher_run_source", mock_run_source)
+
+
 def test_run_all_sources_emits_sources_loaded_event(monkeypatch) -> None:
     """POST /sources/run-all must log how many sources it loaded.
 
-    The sources_loaded log line is emitted SYNCHRONOUSLY before the
-    background thread starts, so it is captured by structlog.testing.capture_logs.
+    T2: the sources_loaded log line is emitted from the background thread,
+    so the test runs the sweep inline via _sync_background_sweep and
+    captures the thread's logs with structlog.testing.capture_logs.
     """
-    _defer_background_sweep(monkeypatch)
+    _sync_background_sweep(monkeypatch)
+    _noop_dispatcher(monkeypatch)
     c = _client_with_admin()
     with structlog.testing.capture_logs() as captured:
         response = c.post("/api/v1/sources/run-all")
-    assert response.status_code == 200
+    assert response.status_code == 202
     loaded_events = [e for e in captured if e.get("event") == "run_all.sources_loaded"]
     assert len(loaded_events) >= 1, (
         f"expected run_all.sources_loaded event, got events: {[e.get('event') for e in captured]}"
@@ -93,12 +124,14 @@ def test_run_all_sources_emits_decision_summary_event(monkeypatch) -> None:
     The decision_summary log line is the single most useful log line for
     diagnosing the run-all empty-return bug: if sources_due == 0, the bug
     is upstream of the dispatch (e.g. a frequency mismatch or org-scope filter).
+    T2: emitted from the background thread — run inline to capture it.
     """
-    _defer_background_sweep(monkeypatch)
+    _sync_background_sweep(monkeypatch)
+    _noop_dispatcher(monkeypatch)
     c = _client_with_admin()
     with structlog.testing.capture_logs() as captured:
         response = c.post("/api/v1/sources/run-all")
-    assert response.status_code == 200
+    assert response.status_code == 202
 
     summary_events = [e for e in captured if e.get("event") == "run_all.decision_summary"]
     assert len(summary_events) >= 1, (
@@ -112,45 +145,102 @@ def test_run_all_sources_emits_decision_summary_event(monkeypatch) -> None:
     assert summary["sources_due"] + summary["sources_skipped"] == summary["total"]
 
 
-def test_run_all_sources_endpoint_response_unchanged_by_instrumentation(monkeypatch) -> None:
-    """The endpoint's return value must NOT change — only logs are added.
-
-    The instrumentation must be observability-only: it must not affect the
-    endpoint's return value or the sweep's behavior.
+def test_run_all_sources_responds_202_with_queued_task(monkeypatch) -> None:
+    """T2: the endpoint answers 202/started immediately with a queued Task
+    row; catalog counts are filled in by the background thread (zeros here
+    because the thread is deferred), never computed synchronously.
     """
     _defer_background_sweep(monkeypatch)
     c = _client_with_admin()
     with structlog.testing.capture_logs():
         response = c.post("/api/v1/sources/run-all")
-    assert response.status_code == 200
+    assert response.status_code == 202
     payload = response.json()
-    assert "status" in payload
-    assert "sources" in payload
     assert payload["status"] == "started"
-    assert isinstance(payload["sources"], int)
-    assert payload["sources"] >= 1
+    assert payload["task_id"]
+    assert payload["sources"] == 0
+    assert payload["sources_due"] == 0
+    assert payload["sources_skipped"] == 0
+    db = SessionLocal()
+    try:
+        task = db.get(Task, payload["task_id"])
+        assert task is not None
+        assert task.status == "queued"
+    finally:
+        db.close()
+
+
+def test_run_all_sources_does_not_evaluate_due_sources_synchronously(monkeypatch) -> None:
+    """T2 (runall-abort): POST /sources/run-all must respond started/202
+    immediately — creating only the Task row — and move the catalog load +
+    per-source due/skip evaluation into the background thread.
+
+    RED on the old code: the endpoint loads all sources and evaluates
+    source_due_for_scraping synchronously before responding (so the spy
+    records calls and the status is 200, not 202).
+    """
+    from app.api.v1 import sources as sources_module
+
+    _defer_background_sweep(monkeypatch)
+
+    due_calls: list[str] = []
+    real_due = sources_module.source_due_for_scraping
+
+    def spy_due(source, *, now=None):
+        due_calls.append(source.key)
+        return real_due(source, now=now)
+
+    monkeypatch.setattr(sources_module, "source_due_for_scraping", spy_due)
+
+    c = _client_with_admin()
+    response = c.post("/api/v1/sources/run-all?force=true")
+    assert response.status_code == 202
+    payload = response.json()
+    assert payload["status"] == "started"
+    assert payload["task_id"]
+    assert due_calls == [], (
+        "catalog due/skip evaluation must run in the background thread, "
+        f"not synchronously (saw {len(due_calls)} sync evaluations)"
+    )
+
+    # The minimal Task row must already be committed so the client can poll it.
+    db = SessionLocal()
+    try:
+        task = db.get(Task, payload["task_id"])
+        assert task is not None
+        assert task.task_type == "source_sweep"
+        assert task.status == "queued"
+    finally:
+        db.close()
 
 
 def test_run_all_sources_does_not_cap_the_catalog_at_twenty(monkeypatch) -> None:
-    """Every due source is scheduled; catalog size must not be truncated."""
-    import threading as _threading
+    """Every due source is scheduled; catalog size must not be truncated.
 
-    class DeferredThread:
-        def __init__(self, *args, **kwargs):
-            pass
+    T2: counts are computed in the background thread — run it inline with
+    force=true and assert the dispatcher saw the whole catalog (>20).
+    """
+    from app.api.v1 import sources as sources_module
 
-        def start(self):
-            pass
+    _sync_background_sweep(monkeypatch)
 
-    monkeypatch.setattr(_threading, "Thread", DeferredThread)
+    call_log: list[str] = []
+
+    async def mock_run_source(db, source, organization_id=None):
+        call_log.append(source.key)
+        return None
+
+    monkeypatch.setattr(sources_module, "dispatcher_run_source", mock_run_source)
     c = _client_with_admin()
-    response = c.post("/api/v1/sources/run-all?force=true")
+    with structlog.testing.capture_logs() as captured:
+        response = c.post("/api/v1/sources/run-all?force=true")
 
-    assert response.status_code == 200
-    payload = response.json()
-    assert payload["sources_due"] == payload["sources"]
-    assert payload["sources_due"] > 20
-    assert payload["sources_skipped"] == 0
+    assert response.status_code == 202
+    completed = [e for e in captured if e.get("event") == "run_all.completed"]
+    assert len(completed) >= 1
+    assert completed[0]["total"] > 20
+    assert len(call_log) == completed[0]["total"]
+    assert completed[0]["failed"] == 0
 
 
 def test_run_all_sources_logs_failure_when_execute_raises(monkeypatch) -> None:
@@ -188,7 +278,7 @@ def test_run_all_sources_logs_failure_when_execute_raises(monkeypatch) -> None:
 
     with structlog.testing.capture_logs() as captured:
         response = c.post("/api/v1/sources/run-all")
-    assert response.status_code == 200
+    assert response.status_code == 202
     # The structured failure event MUST be emitted.
     failure_events = [e for e in captured if e.get("event") == "run_all.source_failed"]
     assert len(failure_events) >= 1, (
@@ -259,7 +349,7 @@ def test_background_sweep_times_out_hanging_connector(monkeypatch) -> None:
     # Restore cached settings so other tests are not affected.
     get_settings.cache_clear()
 
-    assert response.status_code == 200
+    assert response.status_code == 202
 
     # --- Assertions ---
     timeout_events = [e for e in captured if e.get("event") == "run_all.source_timeout"]
@@ -310,7 +400,7 @@ def test_run_all_sources_uses_dispatcher_instead_of_locally(monkeypatch) -> None
     with structlog.testing.capture_logs():
         response = c.post("/api/v1/sources/run-all")
 
-    assert response.status_code == 200
+    assert response.status_code == 202
     assert len(call_log) >= 1, (
         f"expected dispatcher.run_source to be called at least once, got {len(call_log)} calls"
     )
@@ -375,7 +465,7 @@ def test_run_all_sweep_survives_progress_commit_failure(monkeypatch) -> None:
     c = _client_with_admin()
     with structlog.testing.capture_logs() as captured:
         response = c.post("/api/v1/sources/run-all")
-    assert response.status_code == 200
+    assert response.status_code == 202
 
     warning_events = [
         e for e in captured if e.get("event") == "run_all.progress_update_failed"

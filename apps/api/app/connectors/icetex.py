@@ -5,7 +5,7 @@ from app.connectors.registry import register
 import re
 from urllib.parse import urljoin, urlparse
 
-from selectolax.parser import HTMLParser, Node
+from selectolax.lexbor import LexborHTMLParser as HTMLParser, LexborNode as Node
 
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
 from app.connectors.common import clean_text, fetch_httpx_text, normalize_text, parse_date_text, thin_fill_candidates
