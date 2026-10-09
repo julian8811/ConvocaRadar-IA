@@ -22,9 +22,9 @@ Sin esto el botón principal del observatorio es un error garantizado y el harve
 - Delivery `ask-on-risk`, heurística ~400 líneas (la migración lexbor es mecánica: 1 línea por archivo × ~25 + verificación).
 
 ## Tasks
-- [ ] **T1 (P0 web)** Timeout largo para runAll (120s, patrón como login 65s) + toast amigable ante abort ("el barrido sigue en segundo plano") en vez del mensaje DOM crudo. Tests vitest (RED: runAll usa default 12s). Ruta: delegada (writer único T1-T3).
-- [ ] **T2 (P0 api)** `POST /sources/run-all` responde 202/`started` inmediato: mover el trabajo síncrono pesado (carga de catálogo) al thread de fondo, creando solo la fila Task + commit mínimo antes de responder. Sin cambiar semántica de auditoría ni filtros. Tests pytest (RED: el POST hace load síncrono antes de responder). Ruta: delegada.
-- [ ] **T3 (P0 scraper)** Migrar `HTMLParser` (Modest) → `LexborHTMLParser` en conectores + `dom_monitor.py`; verificar compat API (css/text/attributes) con tests de conectores en verde; pin o doc si lexbor diverge en algún selector. Tests pytest (RED: scrape de fixture falla con error Modest). Ruta: delegada.
+- [x] **T1 (P0 web)** ✅ commit `aa7d0c9` (writer delegado, TDD RED→GREEN: 3 failed → 20 passed). `RUN_ALL_TIMEOUT_MS=120s` + `isAbortError`/`RUN_ALL_ABORT_MESSAGE` en `api.ts`; toast amigable en `page.tsx`. Ruta: delegada.
+- [x] **T2 (P0 api)** ✅ commit `31bba40` (writer delegado, TDD RED→GREEN: 11 passed). POST responde 202 con Task mínima; catálogo + decisiones en el thread. Tests actualizados 200→202. Ruta: delegada.
+- [x] **T3 (P0 scraper)** ✅ commit `9e0aecb` (writer delegado, TDD RED→GREEN: guard 2 failed → 13 passed; triangulación 573 passed). 23 conectores + `dom_monitor.py` a lexbor; mecanismo confirmado: prod tiene selectolax 1.0.0 (Modest levanta ImportError), local 0.4.10. Ruta: delegada.
 - [ ] **T4 (P1 deploy, PENDIENTE autorización)** Port a `server/observatorio-production-prebasepath-20260909` (cherry-pick), rebuild api/worker, clic "Ejecutar todas" cronometrado + logs `run_all.completed` con ítems > 0. No iniciar sin autorización explícita del usuario.
 
 ## Acceptance
@@ -34,9 +34,20 @@ Sin esto el botón principal del observatorio es un error garantizado y el harve
 
 ## Progress
 - 2026-10-09: doc creado en `feature/convocaradar-runall-abort`. Exploración delegada (mapa completo + 3 hipótesis) + logs de prod como evidencia. Supuesto resuelto por usuario: prueba solo en server universitario.
+- 2026-10-09: T1-T3 implementados y commiteados (`aa7d0c9`, `31bba40`, `9e0aecb`). Review nativa: T1 `medium/under_budget` (sigue en slice); slice T1-T3 `medium/slice_budget_reached` → review aprobado con 3 WARNING advisory (R3-scope-unbound, R3-abort-recognition, R3-lexbor-node-parity; lineage `review-b13e57733fa66200`, authority burned). Engram mirror pendiente (conflicto de sesiones múltiples).
 
 ## Verification evidence
-- (comando → resultado observado, por tarea)
+- `pytest tests/test_sources.py -q` → 11 passed (writer) + spot-check padre 11 passed.
+- `pytest -k "connector or html or scraper or parse or lexbor or closed or dom"` → 573 passed.
+- `npm run test -- --run __tests__/api.test.ts` → 20 passed.
+- `ruff check` archivos tocados → exit 0.
+- Prod: selectolax 1.0.0 + `selectolax.lexbor` OK (verificado por padre vía docker exec); `requirements.txt` deja `selectolax` sin pin (1.0.0 trae lexbor, no se cambia nada).
+
+## Follow-ups (no bloqueantes, fuera de este slice)
+- `apps/api/scripts/re_scrape_detail.py:106` sigue en Modest (fuera de superficie autorizada).
+- R3-scope-unbound: si la carga del catálogo falla antes de asignar scope, `_record_sweep_scope` referencia locales sin asignar.
+- R3-abort-recognition: `isAbortError` solo cubre `Error` con nombre AbortError.
+- R3-lexbor-node-parity: paridad probada a nivel parser, no a nivel `Node` específico.
 
 ## Next step
-- Lanzar writer único T1-T3 con TDD RED→GREEN→REFACT0R.
+- T4 deploy al server (requiere autorización): port a rama server, rebuild, clic e2e.
