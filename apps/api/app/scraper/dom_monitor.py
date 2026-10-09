@@ -130,7 +130,7 @@ def extract_list_item_count(
     if not html_content or not selectors:
         return 0
 
-    from selectolax.parser import HTMLParser
+    from selectolax.lexbor import LexborHTMLParser as HTMLParser
 
     tree = HTMLParser(html_content)
 
