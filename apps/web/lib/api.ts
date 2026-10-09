@@ -50,9 +50,16 @@ export const RUN_ALL_TIMEOUT_MS = 120_000;
 export const RUN_ALL_ABORT_MESSAGE =
   "El barrido sigue ejecutándose en segundo plano; puedes seguir el progreso en esta página.";
 
-/** T1: true for request aborts (DOM AbortError or AbortError-shaped rejections). */
+/** T1: true for request aborts (DOM AbortError, cross-realm, or AbortError-shaped rejections).
+ * Duck-types on `name` instead of `instanceof Error`: real browsers reject
+ * fetch with a DOMException, which does NOT inherit from Error. */
 export function isAbortError(error: unknown): boolean {
-  return error instanceof Error && error.name === "AbortError";
+  return (
+    typeof error === "object" &&
+    error !== null &&
+    "name" in error &&
+    (error as { name?: unknown }).name === "AbortError"
+  );
 }
 
 /**
