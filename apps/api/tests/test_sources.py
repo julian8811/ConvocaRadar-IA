@@ -22,7 +22,7 @@ from sqlalchemy import select  # noqa: E402
 from app.db.session import SessionLocal  # noqa: E402
 from app.db.seed import seed  # noqa: E402
 from app.main import app  # noqa: E402
-from app.models import Organization, Role, Source, SourceRun, User  # noqa: E402
+from app.models import Organization, Role, Source, SourceRun, Task, User  # noqa: E402
 from app.core.security import hash_password, create_access_token  # noqa: E402
 
 
@@ -316,6 +316,94 @@ def test_run_all_sources_uses_dispatcher_instead_of_locally(monkeypatch) -> None
     )
     assert call_log[0]["source_key"] is not None
     assert call_log[0]["org_id"] is not None
+
+
+def test_run_all_sweep_survives_progress_commit_failure(monkeypatch) -> None:
+    """A failing progress commit must never strand the sweep Task in `running`.
+
+    The progress write is observability-only: the first progress-session
+    commit is forced to raise (simulating sqlite 'database is locked') and
+    the sweep must still reach terminal Task status `success` with a
+    `run_all.completed` event — plus a `run_all.progress_update_failed`
+    warning — instead of aborting via `run_all.sweep_failed`.
+    """
+    import threading as _threading
+
+    from sqlalchemy.exc import OperationalError
+
+    from app.api.v1 import sources as sources_module
+
+    real_session_local = sources_module.SessionLocal
+    state = {"failed_once": False}
+
+    def flaky_session_factory(*args, **kwargs):
+        session = real_session_local(*args, **kwargs)
+        real_commit = session.commit
+
+        def flaky_commit():
+            if not state["failed_once"]:
+                state["failed_once"] = True
+                raise OperationalError(
+                    "UPDATE task SET status", {}, Exception("database is locked")
+                )
+            return real_commit()
+
+        session.commit = flaky_commit  # type: ignore[method-assign]
+        return session
+
+    monkeypatch.setattr(sources_module, "SessionLocal", flaky_session_factory)
+
+    def fake_run_source_via_dispatcher(source_id, org_id):
+        return None
+
+    monkeypatch.setattr(
+        sources_module, "_run_source_via_dispatcher", fake_run_source_via_dispatcher
+    )
+
+    def sync_thread(target, *args, **kwargs):
+        class SyncThread:
+            def __init__(self):
+                self._target = target
+
+            def start(self):
+                self._target()
+
+        return SyncThread()
+
+    monkeypatch.setattr(_threading, "Thread", sync_thread)
+
+    c = _client_with_admin()
+    with structlog.testing.capture_logs() as captured:
+        response = c.post("/api/v1/sources/run-all")
+    assert response.status_code == 200
+
+    warning_events = [
+        e for e in captured if e.get("event") == "run_all.progress_update_failed"
+    ]
+    assert len(warning_events) >= 1, (
+        "expected run_all.progress_update_failed warning, "
+        f"got events: {[e.get('event') for e in captured]}"
+    )
+    assert warning_events[0]["error_type"] == "OperationalError"
+
+    completed_events = [e for e in captured if e.get("event") == "run_all.completed"]
+    assert len(completed_events) >= 1, (
+        "expected run_all.completed event, "
+        f"got events: {[e.get('event') for e in captured]}"
+    )
+    assert completed_events[0]["failed"] == 0
+
+    sweep_failures = [e for e in captured if e.get("event") == "run_all.sweep_failed"]
+    assert sweep_failures == [], f"sweep must not abort, got: {sweep_failures}"
+
+    task_id = response.json()["task_id"]
+    db = SessionLocal()
+    try:
+        task = db.get(Task, task_id)
+        assert task is not None
+        assert task.status == "success", f"sweep stranded with status {task.status!r}"
+    finally:
+        db.close()
 
 
 def _find_source_id(db, key: str) -> str:
