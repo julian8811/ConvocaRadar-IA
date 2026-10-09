@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import UTC, datetime
 from urllib.parse import urljoin, urlparse
 
-from selectolax.parser import HTMLParser
+from selectolax.lexbor import LexborHTMLParser as HTMLParser
 
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
 from app.connectors.common import (

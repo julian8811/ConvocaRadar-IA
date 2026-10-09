@@ -1117,7 +1117,7 @@ def extract_application_url(html_or_tree: object, base_url: str) -> str | None:
         else:
             if not isinstance(html_or_tree, str) or not html_or_tree.strip():
                 return None
-            from selectolax.parser import HTMLParser
+            from selectolax.lexbor import LexborHTMLParser as HTMLParser
 
             tree = HTMLParser(html_or_tree)
 
@@ -1354,7 +1354,7 @@ def extract_structured_data(html: str, base_url: str | None = None) -> dict[str,
     try:
         import json as _json
 
-        from selectolax.parser import HTMLParser
+        from selectolax.lexbor import LexborHTMLParser as HTMLParser
 
         tree = HTMLParser(html)
 
@@ -1487,7 +1487,7 @@ def extract_page_fields(
         if structured.get("eligible_applicants"):
             result["eligible_applicants"] = list(structured["eligible_applicants"] or [])
         try:
-            from selectolax.parser import HTMLParser
+            from selectolax.lexbor import LexborHTMLParser as HTMLParser
 
             tree = HTMLParser(html)
             if result["title"] is None:
@@ -1633,7 +1633,7 @@ def is_safe_candidate_snippet(html: str | None, official_url: str | None = None)
     try:
         from urllib.parse import urlparse
 
-        from selectolax.parser import HTMLParser
+        from selectolax.lexbor import LexborHTMLParser as HTMLParser
 
         tree = HTMLParser(html)
         card_nodes = tree.css(_SNIPPET_CARD_SELECTOR)

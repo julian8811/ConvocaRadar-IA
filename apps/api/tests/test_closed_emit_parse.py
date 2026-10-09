@@ -9,7 +9,7 @@ import json
 from datetime import UTC, datetime, timedelta
 
 import pytest
-from selectolax.parser import HTMLParser
+from selectolax.lexbor import LexborHTMLParser as HTMLParser
 
 from app.connectors.apc_colombia import ApcColombiaConnector
 from app.connectors.base import RawSourceResult
