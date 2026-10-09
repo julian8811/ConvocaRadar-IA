@@ -483,3 +483,108 @@ describe("PR 3 — 401 discrimination by request path", () => {
     await expect(api.me()).rejects.toThrow("Internal server error");
   });
 });
+
+/**
+ * T1 (runall-abort): the full-catalog sweep exceeds the 12s default timeout,
+ * so api.runAllSources() must use a long timeout (120s, same override
+ * pattern as login's 65s) instead of the REQUEST_TIMEOUT_MS default.
+ * The page replaces a raw AbortError with a friendly "continues in
+ * background" message (see isAbortError / RUN_ALL_ABORT_MESSAGE).
+ */
+describe("T1 — runAllSources() uses a long timeout, not the 12s default", () => {
+  beforeEach(() => {
+    vi.stubEnv("NEXT_PUBLIC_ENV", "development");
+  });
+
+  function stubAbortableFetch(capture: FetchCapture) {
+    let externalReject: (err: Error) => void = () => {};
+    const externalPromise = new Promise<Response>((_resolve, reject) => {
+      externalReject = reject;
+    });
+    externalPromise.catch(() => {});
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((_url: string, init: RequestInit = {}) => {
+        capture.signal = init.signal ?? null;
+        capture.init = init;
+        if (init.signal) {
+          init.signal.addEventListener("abort", () => {
+            const err = new Error("signal is aborted without reason");
+            err.name = "AbortError";
+            externalReject(err);
+          });
+        }
+        return externalPromise;
+      }),
+    );
+  }
+
+  it("does NOT abort at the 12s default", async () => {
+    const capture: FetchCapture = { signal: null, init: null };
+    stubAbortableFetch(capture);
+
+    const { api } = await loadApiModule();
+    vi.useFakeTimers();
+
+    const promise = api.runAllSources();
+    promise.catch(() => {});
+
+    await vi.advanceTimersByTimeAsync(12_000);
+    expect(capture.signal?.aborted).toBe(false);
+    await vi.advanceTimersByTimeAsync(60_000);
+    expect(capture.signal?.aborted).toBe(false);
+  });
+
+  it("aborts at 120s", async () => {
+    const capture: FetchCapture = { signal: null, init: null };
+    stubAbortableFetch(capture);
+
+    const { api } = await loadApiModule();
+    vi.useFakeTimers();
+
+    const promise = api.runAllSources();
+    promise.catch(() => {});
+
+    await vi.advanceTimersByTimeAsync(119_999);
+    expect(capture.signal?.aborted).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(1);
+    expect(capture.signal?.aborted).toBe(true);
+    await expect(promise).rejects.toMatchObject({ name: "AbortError" });
+  });
+
+  it("still hits POST /sources/run-all?force=true", async () => {
+    const captured: { url: string; init: RequestInit }[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string, init: RequestInit = {}) => {
+        captured.push({ url, init });
+        return Promise.resolve(
+          new Response(
+            JSON.stringify({ status: "started", task_id: "t1", sources: 0, sources_due: 0, sources_skipped: 0 }),
+            { status: 202 },
+          ),
+        );
+      }),
+    );
+
+    const { api } = await loadApiModule();
+    await api.runAllSources();
+    expect(captured).toHaveLength(1);
+    expect(captured[0].url).toMatch(/\/sources\/run-all\?force=true$/);
+    expect(captured[0].init.method).toBe("POST");
+  });
+
+  it("isAbortError() identifies abort rejections, not network errors", async () => {
+    const { isAbortError, RUN_ALL_ABORT_MESSAGE } = await loadApiModule();
+    const abort = new Error("signal is aborted without reason");
+    abort.name = "AbortError";
+    // Both the DOM abort (DOMException) and AbortError-shaped rejections count.
+    const domAbort = new DOMException("signal is aborted without reason", "AbortError");
+    expect(isAbortError(domAbort)).toBe(true);
+    expect(isAbortError(abort)).toBe(true);
+    expect(isAbortError(new TypeError("Failed to fetch"))).toBe(false);
+    expect(isAbortError(null)).toBe(false);
+    expect(RUN_ALL_ABORT_MESSAGE).toMatch(/segundo plano/);
+  });
+});

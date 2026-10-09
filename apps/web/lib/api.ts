@@ -39,6 +39,23 @@ const LEGACY_TOKEN_STORAGE_KEY = "convocaradar_token";
 const REQUEST_TIMEOUT_MS = 12_000;
 
 /**
+ * T1 (runall-abort): the full-catalog sweep exceeds the 12s default, so
+ * runAllSources() uses this long timeout instead — same override pattern
+ * as login's 65s. The sweep continues server-side even if the client
+ * aborts; progress is followed via the sweep Task (see sources page).
+ */
+export const RUN_ALL_TIMEOUT_MS = 120_000;
+
+/** T1: friendly message shown when the run-all request itself aborts. */
+export const RUN_ALL_ABORT_MESSAGE =
+  "El barrido sigue ejecutándose en segundo plano; puedes seguir el progreso en esta página.";
+
+/** T1: true for request aborts (DOM AbortError or AbortError-shaped rejections). */
+export function isAbortError(error: unknown): boolean {
+  return error instanceof Error && error.name === "AbortError";
+}
+
+/**
  * Is the running environment "production"?
  *
  * SEC-1.5: the legacy localStorage Bearer fallback is ONLY allowed in
@@ -297,7 +314,10 @@ export const api = {
   createSource: (payload: Record<string, unknown>) =>
     request<Source>("/sources", { method: "POST", body: JSON.stringify(payload) }),
   runSource: (id: string) => request<SourceRun>(`/sources/${id}/run`, { method: "POST" }),
-  runAllSources: () => request<SourceSweepResponse>("/sources/run-all?force=true", { method: "POST" }),
+  runAllSources: () =>
+    // T1 (runall-abort): the sweep runs minutes server-side — never use the
+    // 12s default here or the UI reports an abort for a sweep that started.
+    request<SourceSweepResponse>("/sources/run-all?force=true", { method: "POST" }, RUN_ALL_TIMEOUT_MS),
   sourceRuns: (id: string) => request<SourceRun[]>(`/sources/${id}/runs`),
   reports: () => request<Report[]>("/reports"),
   createReport: (payload: Record<string, unknown>) =>
