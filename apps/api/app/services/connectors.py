@@ -145,10 +145,13 @@ def execute_source_run_locally(
     thread can deadlock with the parent event loop on some platforms, so
     we use an explicit fresh loop (same pattern as the original).
     """
+    from app.core.http_client import closing_per_loop_client
     from app.scraper.runner import run_source_inline
 
     loop = asyncio.new_event_loop()
     try:
-        return loop.run_until_complete(run_source_inline(db, source, organization_id))
+        return loop.run_until_complete(
+            closing_per_loop_client(run_source_inline(db, source, organization_id))
+        )
     finally:
         loop.close()

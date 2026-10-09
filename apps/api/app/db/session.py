@@ -21,7 +21,13 @@ def _connect_args(url: str) -> dict[str, object]:
     # negligible for this app's workload.
     if url.startswith("sqlite"):
         return {"check_same_thread": False}
-    return {"prepare_threshold": None}
+    # A leaked open transaction once held row locks for weeks: every later
+    # writer queued behind it until the pool was exhausted and all requests
+    # (login included) timed out. Bound both so failures stay local.
+    return {
+        "prepare_threshold": None,
+        "options": "-c idle_in_transaction_session_timeout=900000 -c lock_timeout=60000",
+    }
 
 
 settings = get_settings()
