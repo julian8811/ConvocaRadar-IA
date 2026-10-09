@@ -9,7 +9,7 @@ from __future__ import annotations
 import json
 from datetime import datetime
 
-from selectolax.parser import HTMLParser
+from selectolax.lexbor import LexborHTMLParser as HTMLParser
 
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
 from app.connectors.common import (

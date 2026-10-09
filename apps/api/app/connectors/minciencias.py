@@ -5,7 +5,7 @@ from datetime import datetime
 from urllib.parse import urljoin, urlparse
 
 from playwright.async_api import async_playwright
-from selectolax.parser import HTMLParser, Node
+from selectolax.lexbor import LexborHTMLParser as HTMLParser, LexborNode as Node
 
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
 from app.connectors.common import (
