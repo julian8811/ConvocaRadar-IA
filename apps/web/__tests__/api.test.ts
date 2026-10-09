@@ -587,4 +587,15 @@ describe("T1 — runAllSources() uses a long timeout, not the 12s default", () =
     expect(isAbortError(null)).toBe(false);
     expect(RUN_ALL_ABORT_MESSAGE).toMatch(/segundo plano/);
   });
+
+  it("recognizes a real DOMException abort by name, not by instanceof", async () => {
+    const { isAbortError } = await loadApiModule();
+    // Real browsers reject fetch with DOMException, which does not inherit
+    // Error — so recognition must duck-type on `name`, never instanceof.
+    // (This test env's DOMException happens to inherit Error; Chrome's does not.)
+    const domAbort = new DOMException("signal is aborted without reason", "AbortError");
+    expect(domAbort.name).toBe("AbortError");
+    expect(isAbortError(domAbort)).toBe(true);
+    expect(isAbortError({ name: "AbortError" })).toBe(true);
+  });
 });
