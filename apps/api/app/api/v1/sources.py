@@ -519,6 +519,14 @@ def run_all_sources(
             if finished:
                 task.finished_at = datetime.now(UTC).replace(tzinfo=None)
             progress_db.commit()
+        except Exception as exc:
+            # Progress writes are observability-only: they must never be
+            # able to kill the sweep (e.g. sqlite "database is locked").
+            struct_logger.warning(
+                "run_all.progress_update_failed",
+                error_type=type(exc).__name__,
+                error_message=str(exc)[:500],
+            )
         finally:
             progress_db.close()
 
