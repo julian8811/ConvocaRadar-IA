@@ -398,7 +398,7 @@ def run_source(
     return run
 
 
-@router.post("/sources/run-all", response_model=dict)
+@router.post("/sources/run-all", response_model=dict, status_code=202)
 def run_all_sources(
     force: bool = Query(default=False, description="Bypass the scheduling-frequency check"),
     organization: Organization = Depends(get_current_organization),
@@ -407,8 +407,10 @@ def run_all_sources(
 ) -> dict[str, object]:
     """Start a background sweep of all enabled sources.
 
-    The sweep runs in a daemon thread so the HTTP response returns
-    immediately. Use GET /api/v1/sources/health to monitor progress.
+    Responds ``202 started`` immediately after creating the minimal Task
+    row: the catalog load, the per-source due/skip evaluation, and the
+    sweep itself run in a daemon thread. Use GET /api/v1/tasks/{task_id}
+    (or /sources/health) to monitor progress.
 
     When ``force=true``, all enabled sources are processed regardless of
     their ``scraping_frequency`` or ``last_run_at``.
@@ -419,116 +421,29 @@ def run_all_sources(
     - ``run_all.skip`` — per-source skip reason (frequency, last_run_at, elapsed)
     - ``run_all.completed`` — final processed/skipped counts
 
-    The per-source decision logs are emitted SYNCHRONOUSLY (before the
-    background thread starts) so the run-all empty-return bug can be
-    diagnosed from a single request's log output — the same request
-    that returned an empty run list.
+    T2: these decision logs are emitted from the background thread (not
+    synchronously) so the HTTP response is never held behind a slow
+    catalog or a cold database.
     """
     import threading
 
-    sources = list(
-        db.scalars(
-            select(Source).where(
-                Source.enabled.is_(True),
-                (Source.organization_id == organization.id) | (Source.organization_id.is_(None)),
-            )
-        )
-    )
     org_id = organization.id
-    struct_logger.info(
-        "run_all.sources_loaded",
-        sources_loaded=len(sources),
-        force=force,
-        org_id=org_id,
-    )
 
-    # Pre-compute the per-source due/skip decisions synchronously so the
-    # diagnostic logs are emitted in the request's log context (visible to
-    # the operator who triggered the empty-return bug). The actual scrape
-    # execution is still dispatched to the background thread.
-    now = datetime.now(UTC).replace(tzinfo=None)
-    due_sources: list[Source] = []
-    for source in sources:
-        if force or source_due_for_scraping(source, now=now):
-            struct_logger.info(
-                "run_all.process",
-                source_id=str(source.id),
-                source_key=source.key,
-                reason="forced" if force else "due",
-                frequency=(source.scraping_frequency or "daily").lower(),
-            )
-            due_sources.append(source)
-        else:
-            frequency = (source.scraping_frequency or "daily").lower()
-            last_run = source.last_run_at
-            elapsed_seconds = (now - last_run).total_seconds() if last_run else None
-            struct_logger.info(
-                "run_all.skip",
-                source_id=str(source.id),
-                source_key=source.key,
-                reason="not_due",
-                frequency=frequency,
-                last_run_at=last_run.isoformat() if last_run else None,
-                elapsed_seconds=elapsed_seconds,
-            )
-    struct_logger.info(
-        "run_all.decision_summary",
-        sources_due=len(due_sources),
-        sources_skipped=len(sources) - len(due_sources),
-        total=len(sources),
-    )
-
-    # Materialize primitive values before the request transaction commits.
-    # ORM instances expire on commit and cannot safely be read by the
-    # background thread afterwards.
-    due_source_items = [{"id": str(source.id), "key": source.key} for source in due_sources]
-
+    # T2 (runall-abort): create only the minimal Task row synchronously so
+    # the endpoint can answer 202 immediately. Everything heavy — catalog
+    # load, due/skip evaluation, sweep execution — runs in _background_sweep.
+    # Audit semantics, org/enabled filters, and the force flag are unchanged.
     sweep_task = Task(
         organization_id=org_id,
         task_type="source_sweep",
         provider="local",
         status="queued",
-        payload={
-            "total_sources": len(sources),
-            "sources_due": len(due_sources),
-            "sources_skipped": len(sources) - len(due_sources),
-            "force": force,
-        },
-        result={"completed": 0, "processed": 0, "failed": 0, "total": len(due_sources)},
+        payload={"force": force},
+        result={"completed": 0, "processed": 0, "failed": 0, "total": 0},
     )
     db.add(sweep_task)
     db.flush()
     sweep_task_id = sweep_task.id
-
-    def _update_sweep_task(
-        *, status: str, processed: int, failed: int, finished: bool = False
-    ) -> None:
-        progress_db = SessionLocal()
-        try:
-            task = progress_db.get(Task, sweep_task_id)
-            if task is None:
-                return
-            task.status = status
-            task.started_at = task.started_at or datetime.now(UTC).replace(tzinfo=None)
-            task.result = {
-                "completed": processed + failed,
-                "processed": processed,
-                "failed": failed,
-                "total": len(due_sources),
-            }
-            if finished:
-                task.finished_at = datetime.now(UTC).replace(tzinfo=None)
-            progress_db.commit()
-        except Exception as exc:
-            # Progress writes are observability-only: they must never be
-            # able to kill the sweep (e.g. sqlite "database is locked").
-            struct_logger.warning(
-                "run_all.progress_update_failed",
-                error_type=type(exc).__name__,
-                error_message=str(exc)[:500],
-            )
-        finally:
-            progress_db.close()
 
     def _background_sweep() -> None:
         from app.core.config import get_settings
@@ -536,16 +451,140 @@ def run_all_sources(
         settings = get_settings()
         processed = 0
         failed = 0
+        total_due = 0
+        due_source_items: list[dict[str, str]] = []
+
+        def _update_sweep_task(
+            *, status: str, processed: int, failed: int, finished: bool = False
+        ) -> None:
+            progress_db = SessionLocal()
+            try:
+                task = progress_db.get(Task, sweep_task_id)
+                if task is None:
+                    return
+                task.status = status
+                task.started_at = task.started_at or datetime.now(UTC).replace(tzinfo=None)
+                task.result = {
+                    "completed": processed + failed,
+                    "processed": processed,
+                    "failed": failed,
+                    "total": total_due,
+                }
+                if finished:
+                    task.finished_at = datetime.now(UTC).replace(tzinfo=None)
+                progress_db.commit()
+            except Exception as exc:
+                # Progress writes are observability-only: they must never be
+                # able to kill the sweep (e.g. sqlite "database is locked").
+                struct_logger.warning(
+                    "run_all.progress_update_failed",
+                    error_type=type(exc).__name__,
+                    error_message=str(exc)[:500],
+                )
+            finally:
+                progress_db.close()
+
+        def _record_sweep_scope(*, total: int, due: int, skipped: int) -> None:
+            """Persist the catalog counts on the Task payload (observability-only)."""
+            scope_db = SessionLocal()
+            try:
+                task = scope_db.get(Task, sweep_task_id)
+                if task is None:
+                    return
+                task.payload = {
+                    "total_sources": total,
+                    "sources_due": due,
+                    "sources_skipped": skipped,
+                    "force": force,
+                }
+                task.result = {
+                    "completed": 0,
+                    "processed": 0,
+                    "failed": 0,
+                    "total": due,
+                }
+                scope_db.commit()
+            except Exception as exc:
+                struct_logger.warning(
+                    "run_all.progress_update_failed",
+                    error_type=type(exc).__name__,
+                    error_message=str(exc)[:500],
+                )
+            finally:
+                scope_db.close()
+
         try:
+            # T2: the catalog load + due/skip evaluation live here, inside
+            # the background thread on a worker-owned session — never on
+            # the request transaction.
+            worker_db = SessionLocal()
+            try:
+                sources = list(
+                    worker_db.scalars(
+                        select(Source).where(
+                            Source.enabled.is_(True),
+                            (Source.organization_id == org_id) | (Source.organization_id.is_(None)),
+                        )
+                    )
+                )
+                struct_logger.info(
+                    "run_all.sources_loaded",
+                    sources_loaded=len(sources),
+                    force=force,
+                    org_id=org_id,
+                )
+                now = datetime.now(UTC).replace(tzinfo=None)
+                due_sources: list[Source] = []
+                for source in sources:
+                    if force or source_due_for_scraping(source, now=now):
+                        struct_logger.info(
+                            "run_all.process",
+                            source_id=str(source.id),
+                            source_key=source.key,
+                            reason="forced" if force else "due",
+                            frequency=(source.scraping_frequency or "daily").lower(),
+                        )
+                        due_sources.append(source)
+                    else:
+                        frequency = (source.scraping_frequency or "daily").lower()
+                        last_run = source.last_run_at
+                        elapsed_seconds = (now - last_run).total_seconds() if last_run else None
+                        struct_logger.info(
+                            "run_all.skip",
+                            source_id=str(source.id),
+                            source_key=source.key,
+                            reason="not_due",
+                            frequency=frequency,
+                            last_run_at=last_run.isoformat() if last_run else None,
+                            elapsed_seconds=elapsed_seconds,
+                        )
+                struct_logger.info(
+                    "run_all.decision_summary",
+                    sources_due=len(due_sources),
+                    sources_skipped=len(sources) - len(due_sources),
+                    total=len(sources),
+                )
+
+                # Materialize primitive values before the worker session
+                # closes: ORM instances cannot safely leave their session.
+                due_source_items = [
+                    {"id": str(source.id), "key": source.key} for source in due_sources
+                ]
+                total_due = len(due_source_items)
+                scope_total = len(sources)
+                scope_skipped = len(sources) - len(due_sources)
+            finally:
+                worker_db.close()
+            _record_sweep_scope(total=scope_total, due=total_due, skipped=scope_skipped)
             _update_sweep_task(status="running", processed=0, failed=0)
             saved_thread = _base_threading.Thread
             _base_threading.Thread = _original_thread_cls
             max_workers = (
                 min(
-                    len(due_sources),
+                    len(due_source_items),
                     max(1, settings.scraping_max_concurrency),
                 )
-                if due_sources
+                if due_source_items
                 else 1
             )
             # The previous fixed global timeout (2x one connector timeout)
@@ -553,7 +592,7 @@ def run_all_sources(
             # completing normally. Scale the sweep window to the number of
             # worker batches so every enabled source gets its turn.
             sweep_timeout = settings.per_connector_timeout_seconds * max(
-                1, math.ceil(len(due_sources) / max_workers)
+                1, math.ceil(len(due_source_items) / max_workers)
             ) + min(30.0, max(1.0, settings.per_connector_timeout_seconds * 0.25))
             pool = concurrent.futures.ThreadPoolExecutor(max_workers=max_workers)
             try:
@@ -617,10 +656,10 @@ def run_all_sources(
                 "run_all.completed",
                 processed=processed,
                 failed=failed,
-                total=len(due_sources),
+                total=total_due,
             )
         except Exception as exc:
-            remaining = max(len(due_sources) - processed, failed)
+            remaining = max(total_due - processed, failed)
             _update_sweep_task(
                 status="failed", processed=processed, failed=remaining, finished=True
             )
@@ -629,12 +668,14 @@ def run_all_sources(
     audit(db, "run_source_sweep_dispatched", "source_sweep", user, None)
     db.commit()
     threading.Thread(target=_background_sweep, daemon=True).start()
+    # T2: counts are unknown until the background thread loads the catalog —
+    # the client follows progress via task_id.
     return {
         "status": "started",
         "task_id": sweep_task_id,
-        "sources": len(sources),
-        "sources_due": len(due_sources),
-        "sources_skipped": len(sources) - len(due_sources),
+        "sources": 0,
+        "sources_due": 0,
+        "sources_skipped": 0,
     }
 
 
