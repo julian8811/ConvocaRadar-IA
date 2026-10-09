@@ -25,7 +25,7 @@ Sin esto el botón principal del observatorio es un error garantizado y el harve
 - [x] **T1 (P0 web)** ✅ commit `aa7d0c9` (writer delegado, TDD RED→GREEN: 3 failed → 20 passed). `RUN_ALL_TIMEOUT_MS=120s` + `isAbortError`/`RUN_ALL_ABORT_MESSAGE` en `api.ts`; toast amigable en `page.tsx`. Ruta: delegada.
 - [x] **T2 (P0 api)** ✅ commit `31bba40` (writer delegado, TDD RED→GREEN: 11 passed). POST responde 202 con Task mínima; catálogo + decisiones en el thread. Tests actualizados 200→202. Ruta: delegada.
 - [x] **T3 (P0 scraper)** ✅ commit `9e0aecb` (writer delegado, TDD RED→GREEN: guard 2 failed → 13 passed; triangulación 573 passed). 23 conectores + `dom_monitor.py` a lexbor; mecanismo confirmado: prod tiene selectolax 1.0.0 (Modest levanta ImportError), local 0.4.10. Ruta: delegada.
-- [ ] **T4 (P1 deploy, PENDIENTE autorización)** Port a `server/observatorio-production-prebasepath-20260909` (cherry-pick), rebuild api/worker, clic "Ejecutar todas" cronometrado + logs `run_all.completed` con ítems > 0. No iniciar sin autorización explícita del usuario.
+- [x] **T4 (P1 deploy)** ✅ merge a `main` (`a7eb265`, push `b6f1564..a7eb265` vía SSH) + port a `server/observatorio-production-prebasepath-20260909` (cherry-picks limpios `7c79b2a`, `fc64fde`, `5a6efb3`), rebuild api/worker/web, api 200, bundle web con mensaje nuevo. E2E con clic real: pendiente que el usuario lo pruebe en el observatorio.
 
 ## Acceptance
 - Clic "Ejecutar todas" en el server → sin toast de abort; `task_id` en estado `running` → `completed`.
