@@ -155,6 +155,28 @@ const RETRY_DELAYS_MS = process.env.NEXT_PUBLIC_ENABLE_WAKE_RETRIES === "true"
   ? [3_000, 8_000, 15_000, 25_000]
   : [];
 
+/**
+ * Extract a human-readable message from an error response body. FastAPI
+ * returns `{"detail": "string"}` for most errors, but some endpoints (e.g.
+ * POST /sources/{id}/run 409s) return `{"detail": {"reason": ..., "message":
+ * ...}}`. Stringifying that object yields "[object Object]" in toasts, so
+ * prefer the nested message, then a JSON fallback.
+ */
+export function readableDetail(body: unknown, fallback: string): string {
+  const detail = (body as { detail?: unknown } | null)?.detail;
+  if (typeof detail === "string" && detail) return detail;
+  if (detail && typeof detail === "object") {
+    const message = (detail as { message?: unknown }).message;
+    if (typeof message === "string" && message) return message;
+    try {
+      return JSON.stringify(detail);
+    } catch {
+      return fallback;
+    }
+  }
+  return fallback;
+}
+
 export async function request<T>(path: string, init: RequestInit = {}, timeoutMs: number = REQUEST_TIMEOUT_MS): Promise<T> {
   const lastError: Error[] = [];
 
@@ -193,7 +215,7 @@ export async function request<T>(path: string, init: RequestInit = {}, timeoutMs
           handleUnauthorized(path);
           throw new Error("Sesión expirada. Redirigiendo al inicio de sesión.");
         }
-        throw new Error(body.detail ?? "Request failed");
+        throw new Error(readableDetail(body, "Request failed"));
       }
       if (response.status === 204) return undefined as T;
       return response.json() as Promise<T>;
