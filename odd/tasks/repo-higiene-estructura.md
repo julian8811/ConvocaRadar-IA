@@ -44,7 +44,7 @@ Sin esto cada cambio paga impuesto de orientación, el deploy universitario vive
 ## Progress
 - 2026-10-10: doc creado en `odd/tasks/repo-higiene-estructura.md` (8 tareas). Mapa read-only delegado (explorer, ~2k tokens, 15 puntos accionables). `main` en sync con `origin/main` (`eff02d8`, fetch confirma remote = local). PAT usado one-shot vía URL explícita sin mutar `origin`; pendiente rotación por el usuario. Mirror Engram pendiente (sesiones runtime múltiples, reintentar con sesión autoritativa).
 - 2026-10-10: T1+T8-doc ejecutados en `feature/repo-higiene-estructura` (writer `partial`: verificación + doc, sin comandos mutantes; padre cerró terminal). Commits `d3e7544` (chore) + `4579416` (docs). `check-secrets.sh` exit 0; spot-check padre `git status` + lectura del doc OK.
-- 2026-10-10: push `feature/repo-higiene-estructura` a `origin` verificado (remote = `f293cae`, 5 commits sobre `main`); PAT usado one-shot vía URL explícita sin mutar `origin`. PR aún no creado (decisión del usuario).
+- 2026-10-10: push `feature/repo-higiene-estructura` a `origin` verificado (remote = `f293cae`, 5 commits sobre `main`); PAT usado one-shot vía URL explícita sin mutar `origin`. PR #35 creado por el padre (título `chore(repo): higiene raiz + mapa local-vs-servidor (T1, T8)`, base `main`, label `type:chore`, body según template del repo; nota honesta: sin issue linkeada porque el repo no usa ese flujo — rama `feature/` sigue la convención propia del repo como `feature/convocaradar-runall-abort`).
 
 ## Verification evidence
 - Mapa: handoff explorer (15 evidencias path:línea) + spot-check padre (`ls`, compose/docs/scripts listados).
