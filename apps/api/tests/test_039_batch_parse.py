@@ -1,4 +1,8 @@
-"""039 parse fixtures for 8-source expansion. Mocked fetch only."""
+"""039 parse fixtures for 7-source expansion. Mocked fetch only.
+
+NOTE (F1 fuentes-cirugia-mayor): eu-creative-europe-calls migrated to the
+unified F&T v2 connector — see tests/test_ft_search_v2.py.
+"""
 
 from __future__ import annotations
 
@@ -11,15 +15,6 @@ import pytest
 from app.connectors.configurable_html import ConfigurableHtmlConnector
 
 BATCH = {
-    "eu-creative-europe-calls": {
-        "url": "https://culture.ec.europa.eu/calls",
-        "entity": "Creative Europe",
-        "html": """<html><body><main>
-<article><h2><a href="/calls/call-1">Creative Europe Call for Proposals 2026</a></h2></article>
-<article><h2><a href="/calls/call-2">Culture Moves Europe — Mobility Grants</a></h2></article>
-</main></body></html>""",
-        "titles": ("Creative Europe Call for Proposals 2026", "Culture Moves Europe"),
-    },
     "eu-eacea-grants": {
         "url": "https://www.eacea.ec.europa.eu/grants_en",
         "entity": "EACEA",
