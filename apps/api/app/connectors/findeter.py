@@ -245,19 +245,31 @@ class FindeterConnector:
         lowered = raw.content.lower()
         content_stripped = raw.content.strip()
         if not content_stripped.startswith("<"):
-            return await self._parse_html_fallback(raw)
+            html_cands = await self._parse_html_fallback(raw)
+            if html_cands:
+                return html_cands
+            return await self._sitemap_fallback()
 
-        # HTML fallback: if content is HTML listing instead of XML sitemap
+        # HTML fallback: if content is HTML listing instead of XML sitemap.
+        # The /convocatorias listing is JS-rendered (SSR carries 0 links), so
+        # an empty HTML result falls back to the canonical sitemap, which is
+        # the proven data source (3351 locs, ~1146 recent as of 2026-10-10).
         if "<html" in lowered or "<!doctype" in lowered:
             html_cands = await self._parse_html_fallback(raw)
             if html_cands:
                 return html_cands
+            sitemap_cands = await self._sitemap_fallback()
+            if sitemap_cands:
+                return sitemap_cands
             # fall through to XML attempt (will parse 0)
 
         try:
             root = ElementTree.fromstring(raw.content)
         except ElementTree.ParseError:
-            return await self._parse_html_fallback(raw)
+            html_cands = await self._parse_html_fallback(raw)
+            if html_cands:
+                return html_cands
+            return await self._sitemap_fallback()
 
         # Handle sitemapindex (250 sub-sitemaps): fetch up to 3 sub-sitemaps streaming.
         tag = root.tag.lower()
@@ -341,7 +353,32 @@ class FindeterConnector:
         # background batch job if enabled.
         return thin_fill_candidates(candidates)
 
-    async def _parse_sitemap_content(self, content: str, base_url: str) -> list[OpportunityCandidate]:
+    async def _sitemap_fallback(self) -> list[OpportunityCandidate]:
+        """Fetch the canonical sitemap when the HTML listing yields nothing.
+
+        The seed base_url points at the JS-rendered /convocatorias listing
+        (0 SSR links); the sitemap is the proven source. Never raises.
+        """
+        try:
+            _, content, _ = await asyncio.wait_for(
+                fetch_httpx_text(
+                    FINDETER_SITEMAP_URL,
+                    fallback_content_type="application/xml",
+                    playwright_fallback=False,
+                    timeout_seconds=25,
+                    retries=1,
+                ),
+                timeout=28,
+            )
+        except Exception:
+            return []
+        return await self._parse_sitemap_content(
+            content, FINDETER_SITEMAP_URL, limit=_MAX_CANDIDATES
+        )
+
+    async def _parse_sitemap_content(
+        self, content: str, base_url: str, limit: int = 10
+    ) -> list[OpportunityCandidate]:
         """Parse a single sitemap XML string (helper for sitemapindex streaming)."""
         try:
             root = ElementTree.fromstring(content)
@@ -374,7 +411,7 @@ class FindeterConnector:
                     topics=["findeter-convocatorias"],
                 )
             )
-            if len(cands) >= 10:
+            if len(cands) >= limit:
                 break
         return cands
 

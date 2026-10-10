@@ -123,6 +123,9 @@ def _wordpress_connector(source_key: str, base_url: str) -> WordPressGrantsConne
             "entity_name": "Novo Nordisk Foundation",
             "default_country": "Denmark",
             "allowed_domains": ["novonordiskfonden.dk"],
+            # Catalog ~136 grants / 2 pages; 3 pages (300 items) cover it with
+            # margin while keeping worst-case fetch ~= 45s (was ~150s).
+            "max_pages": 3,
         },
     }
     config = defaults.get(source_key, {})
@@ -132,6 +135,7 @@ def _wordpress_connector(source_key: str, base_url: str) -> WordPressGrantsConne
         entity_name=config.get("entity_name"),
         default_country=config.get("default_country", "Por validar"),
         allowed_domains=config.get("allowed_domains"),
+        max_pages=config.get("max_pages"),
     )
 
 
