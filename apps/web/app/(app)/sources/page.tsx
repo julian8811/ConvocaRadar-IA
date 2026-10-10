@@ -13,7 +13,7 @@ import { Input } from "@/components/ui/input";
 import { Select } from "@/components/ui/select";
 import { ErrorState, LoadingState } from "@/components/ui/state";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { api, isAbortError, RUN_ALL_ABORT_MESSAGE } from "@/lib/api";
+import { api, isAbortError, RUN_ALL_ABORT_MESSAGE, RUN_SOURCE_ABORT_MESSAGE } from "@/lib/api";
 import type { SourceHealth } from "@/lib/types";
 
 function translateSourceStatus(status: string) {
@@ -158,7 +158,16 @@ export default function SourcesPage() {
       queryClient.invalidateQueries({ queryKey: ["admin-metrics"] });
       queryClient.invalidateQueries({ queryKey: ["source-runs-overview"] });
     },
-    onError: (error) => toast.error(error instanceof Error ? error.message : "No se pudo ejecutar la fuente"),
+    onError: (error) => {
+      // A client-side abort does NOT mean the run failed — the scrape may
+      // still be working server-side. Show a friendly message instead of
+      // the raw DOM "AbortError: signal is aborted without reason".
+      if (isAbortError(error)) {
+        toast.info(RUN_SOURCE_ABORT_MESSAGE);
+        return;
+      }
+      toast.error(error instanceof Error ? error.message : "No se pudo ejecutar la fuente");
+    },
     onSettled: () => setRunningSourceId(null),
   });
 
