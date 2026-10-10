@@ -88,6 +88,28 @@ _ENTITY_PREFIX_MAP: dict[str, str] = {
 
 _SITEMAP_NS = {"ns": "http://www.sitemaps.org/schemas/sitemap/0.9"}
 
+# Markers of a real PerfDrive/Cloudflare bot challenge page. Deliberately NOT
+# the bare substring "perfdrive": healthy Findeter pages embed a PerfDrive
+# *analytics* snippet (ssConf("cu", "validate.perfdrive.com, ssc")) and must
+# not be mislabelled as challenged (T2 fuentes-todas-on: false positive hid
+# the real diagnosis behind findeter_perfdrive_challenge_detected).
+_CHALLENGE_MARKERS = frozenset(
+    {
+        "checking if the site connection is secure",
+        "just a moment",
+        "verify you are human",
+        "cf-challenge",
+        "ddos protection",
+    }
+)
+
+
+def _is_challenge_page(content: str) -> bool:
+    """True when *content* is a bot-challenge page rather than real content."""
+    lowered = (content or "").lower()
+    return any(marker in lowered for marker in _CHALLENGE_MARKERS)
+
+
 # Regex to extract year from a convocatoria URL slug.
 # Accepts formats like: paf-euc-o-152-2024, con-0413-2025, cs-0085-2025
 _CONVOCATORIA_YEAR_RE = re.compile(r"(\d{4})$")
@@ -215,12 +237,12 @@ class FindeterConnector:
 
     async def parse(self, raw: RawSourceResult) -> list[OpportunityCandidate]:
         # Perfdrive / bot-challenge detection: HTML challenge instead of XML sitemap
-        lowered = raw.content.lower()
-        if "perfdrive" in lowered or "checking if the site connection is secure" in lowered:
+        if _is_challenge_page(raw.content):
             logger.warning("findeter_perfdrive_challenge_detected", url=raw.url)
             # Try HTML fallback extraction instead of empty
             return await self._parse_html_fallback(raw)
 
+        lowered = raw.content.lower()
         content_stripped = raw.content.strip()
         if not content_stripped.startswith("<"):
             return await self._parse_html_fallback(raw)
