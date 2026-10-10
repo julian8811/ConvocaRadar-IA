@@ -46,7 +46,7 @@ Decisión explícita del usuario: cirugía mayor (opción a).
 
 ## Progress
 - 2026-10-10: doc creado (5 tareas F0–F4). Mapa explorer completo. Mirror Engram pendiente.
-- 2026-10-10: F0 completo (padre inline). sloan/ccb → cuarentena con motivo (WAF persiste con render); findeter Parisable.
+- 2026-10-10: batch persist+409+pines verificado live (cherry-pick + rebuild + reseed 203): **ascun 188 success, novo 135 success** (tras unpause manual; el 409 `paused_cooldown` funcionó en vivo antes del unpause), apc 34 y WB 93 ya verdes. PR #50 mergeado. Timeouts sistémicos cerrados.
 - 2026-10-10: F2 completo (writer, commits `0ad842a`+`3290fe5`): RED danida-sin-flag→0 renders / flag-sin-cablear→no-op (8 failed); GREEN 12/12 + triangulación 1613 passed (+60 test_api.py) + 91 seeds; `ruff check` limpio (format-diffs preexistentes no tocados).
 - 2026-10-10: findeter verificado live (unpause manual + runs): **100 ítems ×2 runs consecutivos, success** (created 3/updated 97, luego 0/100). Hallazgos: (1) el HTTP 500 del cliente era del path de respuesta con runs grandes, el run completaba igual — seguir con body a fichero; (2) endpoint single-run devuelve 500 si dispatcher retorna None (pausada en cooldown) en vez de 409 con motivo — bug real a corregir; (3) ascun/novo mueren EXACTO a ~90s (cap por fuente mata la fase persist: url-check HEAD por candidato + embeddings) — el fix es acotar persist, no fetch.
  - 2026-10-10: F3 completo (writer, rama `feature/fuentes-f3-js`, commits `de6cc53`+`55c06b7`): RED finep-fixture→0 candidatos + seed-URL mismatch (3 failed) / split-keys→connector_config missing (8 failed); GREEN test_finep_api 7/7 + 026 18/18 + lote tocado 64 passed; `ruff check` limpio (6 ficheros).
@@ -67,7 +67,7 @@ Decisión explícita del usuario: cirugía mayor (opción a).
   | eu-creative-europe-calls | Creative Europe, CREA | id `CREA*`, `\bCREA\b`, phrase | html+ConfigurableHtml→api |
 
 ## Next step
-- F4: cuarentenas verificadas + T4 ruido + T5 timeouts + T6 sweep cierre.
+- Cuarentena firmada 9/9 (3 ya pausadas, 6 seteadas; reintentan solas cada 24h por cooldown). Feature completo. Resta: rotaciones al cierre de sesión.
 
 ## F3 evidence (writer 2026-10-10, rama `feature/fuentes-f3-js`, sin push)
 - RED finep: `test_parse_real_fixture_yields_five` → 0==5 (GenericHtml sobre JSON), `test_close_date...` → KeyError, `test_seed_base_url...` → mismatch (3 failed); resto en verde (basura/validate/routing ya valían).
@@ -88,3 +88,7 @@ Decisión explícita del usuario: cirugía mayor (opción a).
 - RED: 409 → 2×200 en vez de 409; persist → AttributeError (sin `_warm_url_cache`/deadline) + `max_pages=10`; pines → `got 203`.
 - GREEN: conflict 3 passed; persist_bounds 6 passed; 039+040 8 passed; lote tocado (persist-bounds/wordpress/scraper-module/resilience/sources/ascun/conflict) 47 passed; `ruff check` limpio.
 - Pendiente padre (verify por fuente, sin servidor del writer): ascun y novo deben completar <90s sin TimeoutError; confirmar `persist capped` en logs si acota; POST run sobre pausada→409.
+
+## Progress (cont.)
+- 2026-10-10: batch persist verificado live (cherry-pick + rebuild + reseed 203): **ascun 188 success, novo 135 success** (tras unpause; el 409 `paused_cooldown` funcionó en vivo), apc 34 y WB 93 ya verdes. PR #50 mergeado. Timeouts sistémicos cerrados.
+- 2026-10-10: sweep force final de cierre (`cb9f3a41`): **203/203 success, failed 0**, 2885 ítems, 194 success / 9 degraded / 0 failed. Restan solo: aladi/cali (sección eliminada), bogota/sloan (WAF), dane/idb/procolombia/sicon (sin contenido vigente o migrado), conacyt-mexico (único sin triage profundo).
