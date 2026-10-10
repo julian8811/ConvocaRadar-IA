@@ -96,6 +96,11 @@ class Settings(BaseSettings):
     alert_default_recipient: str | None = None
     frontend_url: str = "http://localhost:3002"
     backend_url: str = "http://localhost:8000"
+    # ── Session cookie flags (plain-HTTP LAN support) ───────────────────
+    # True (default) = current production behavior: Secure + SameSite=None
+    # for cross-origin frontends. False = plain-HTTP LAN: no Secure flag +
+    # SameSite=Lax (SameSite=None requires Secure; Lax fits same-origin).
+    cookie_secure: bool = True
     app_timezone: str = "America/Bogota"
     rate_limit_requests_per_minute: int = 120
     rate_limit_window_seconds: int = 60
