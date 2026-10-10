@@ -1,7 +1,11 @@
+import asyncio
 import json
+from copy import deepcopy
 from datetime import datetime
+from urllib.parse import quote
 
 from app.connectors.common import (
+    apply_extracted_fields,
     extract_funding_details,
     fetch_httpx_text,
     fill_candidate_from_content,
@@ -16,6 +20,165 @@ from app.connectors.simpler_grants import SimplerGrantsConnector
 GRANTS_GOV_SEARCH_URL = "https://api.grants.gov/v1/api/search2"
 GRANTS_GOV_SEARCH_PAGE = "https://www.grants.gov/search-grants"
 GRANTS_GOV_OPPORTUNITY_URL = "https://www.grants.gov/search-results-detail/{opportunity_id}"
+
+# ── E8 grants-gov detail XHR award gap-fill ────────────────────────────────
+#
+# The search2 list API returns hits WITHOUT award fields, and the detail HTML
+# (SSR and rendered) is a JS shell without amounts. The real detail data comes
+# from a keyless endpoint (discovered by intercepting the ficha's traffic):
+#   POST apply07.grants.gov/grantsws/rest/opportunity/details
+#   Content-Type: application/x-www-form-urlencoded;charset=UTF-8
+#   Referer: https://www.grants.gov/
+#   body: oppId={id} (form-encoded)
+# → 200 JSON with awardCeiling / awardFloor / awardCeilingFormatted /
+#   awardFloorFormatted / estimatedFunding / synopsisDesc.
+# Candidates still missing funding get a bounded, best-effort XHR gap-fill
+# mapped through the same funding extractor the search-hit parse uses.
+# Gap-fill only — existing funding/dates are never overwritten.
+
+GRANTS_GOV_DETAIL_XHR_URL = "https://apply07.grants.gov/grantsws/rest/opportunity/details"
+GRANTS_GOV_DETAIL_XHR_CAP: int = 25
+GRANTS_GOV_DETAIL_XHR_TIMEOUT: int = 15
+GRANTS_GOV_DETAIL_XHR_CONCURRENCY: int = 5
+
+# Priority order mirrors the search-hit parse (ceiling → estimated → floor),
+# with the human-formatted "$1,234" variants as fallback for each level.
+_DETAIL_FUNDING_KEYS: tuple[str, ...] = (
+    "awardCeiling",
+    "awardCeilingFormatted",
+    "estimatedFunding",
+    "awardFloor",
+    "awardFloorFormatted",
+    "funding",
+)
+
+
+def detail_funding_fields(payload: dict) -> dict[str, object]:
+    """Map a detail-XHR payload onto candidate funding field names.
+
+    Runs the first present award blob through :func:`extract_funding_details`
+    (the exact mapping the search-hit parse uses). Plain numeric blobs such as
+    ``"750000"`` carry no currency token for the extractor, so a bare-number
+    salvage pass fills the value; a found value with no detected currency
+    defaults to USD — this endpoint only serves US federal awards quoted in
+    dollars (``$``-formatted). Returns ``{}`` when no award key is present.
+    """
+    fields: dict[str, object] = {}
+    if not isinstance(payload, dict):
+        return fields
+    blob = next(
+        (payload.get(key) for key in _DETAIL_FUNDING_KEYS if payload.get(key) not in (None, "")),
+        None,
+    )
+    if blob is None:
+        return fields
+    text = str(blob).strip()
+    if not text:
+        return fields
+    raw, value, currency = extract_funding_details(text)
+    if value is None:
+        # Bare numeric blob ("750000") — strip grouping/formatting and read it.
+        try:
+            value = float(text.replace("$", "").replace(",", "").strip())
+        except ValueError:
+            value = None
+    if not raw:
+        raw = text[:200]
+    if raw:
+        fields["funding_amount_raw"] = raw
+    if value is not None:
+        fields["funding_amount_value"] = value
+        fields["funding_amount_currency"] = currency or "USD"
+    return fields
+
+
+async def _fetch_grants_gov_detail(opp_id: str) -> dict | None:
+    """POST one detail-XHR request; return the JSON dict or None. Never raises."""
+    opp_id = (opp_id or "").strip()
+    if not opp_id:
+        return None
+    try:
+        from app.core.http_client import http_client
+
+        client = await http_client()
+        response = await client.request(
+            "POST",
+            GRANTS_GOV_DETAIL_XHR_URL,
+            content=f"oppId={quote(opp_id, safe='')}",
+            headers={
+                "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+                "Referer": "https://www.grants.gov/",
+            },
+            timeout=GRANTS_GOV_DETAIL_XHR_TIMEOUT,
+        )
+        response.raise_for_status()
+        data = response.json()
+        return data if isinstance(data, dict) else None
+    except Exception:
+        return None
+
+
+def _candidate_needs_detail_xhr(candidate: OpportunityCandidate) -> bool:
+    """True when a grants-gov candidate still has no funding to gap-fill."""
+    return (
+        candidate.funding_amount_raw is None and candidate.funding_amount_value is None
+    )
+
+
+def _detail_opp_id(candidate: OpportunityCandidate) -> str:
+    """Opportunity id for the XHR body: external_id, else the detail-URL tail."""
+    if candidate.external_id and candidate.external_id.strip():
+        return candidate.external_id.strip()
+    return (candidate.official_url or "").rstrip("/").rsplit("/", 1)[-1]
+
+
+async def enrich_grants_gov_funding_xhr(
+    candidates: list[OpportunityCandidate],
+) -> list[OpportunityCandidate]:
+    """Gap-fill unfunded grants-gov candidates via the keyless detail XHR.
+
+    Fetches at most GRANTS_GOV_DETAIL_XHR_CAP details (funded candidates are
+    skipped, order and count are preserved) with bounded concurrency and merges
+    each result with apply_extracted_fields (gap-fill only). Best-effort:
+    any fetch/parse failure degrades to the input candidate, never raises.
+    """
+    try:
+        targets = [c for c in candidates if _candidate_needs_detail_xhr(c)][
+            :GRANTS_GOV_DETAIL_XHR_CAP
+        ]
+        if not targets:
+            return list(candidates)
+        semaphore = asyncio.Semaphore(GRANTS_GOV_DETAIL_XHR_CONCURRENCY)
+
+        async def _one(candidate: OpportunityCandidate) -> dict | None:
+            async with semaphore:
+                payload = await _fetch_grants_gov_detail(_detail_opp_id(candidate))
+            if not payload:
+                return None
+            try:
+                fields = detail_funding_fields(payload)
+            except Exception:
+                return None
+            return fields or None
+
+        results = await asyncio.gather(
+            *(_one(candidate) for candidate in targets),
+            return_exceptions=True,
+        )
+        url_to_fields: dict[str, dict] = {}
+        for candidate, result in zip(targets, results):
+            if isinstance(result, dict) and result:
+                url_to_fields.setdefault(candidate.official_url, result)
+        enriched: list[OpportunityCandidate] = []
+        for candidate in candidates:
+            fields = url_to_fields.get(candidate.official_url)
+            if fields is not None:
+                enriched.append(apply_extracted_fields(candidate, fields))
+            else:
+                enriched.append(deepcopy(candidate))
+        return enriched
+    except Exception:
+        return list(candidates)
 
 
 def _parse_grants_date(value: str | None) -> datetime | None:
