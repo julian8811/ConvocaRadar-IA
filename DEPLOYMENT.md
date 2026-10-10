@@ -27,7 +27,7 @@ Los despliegues corren vía GitHub Actions (`.github/workflows/deploy.yml`):
 
 Ruta documentada en el anexo técnico `docs/deploy-universidad.md`: compose autónomo del servidor, preflight obligatorio (`scripts/check-secrets.sh`, `scripts/server-preflight.sh`), Nginx como proxy reverso, verificación funcional y backup/restore. Para la entrega evaluada paso a paso, ver `docs/entrega-universidad.md`.
 
-Nota: el repositorio también contiene `docker-compose.prod.yml` (overlay sobre `docker-compose.yml`). Qué camino prod prevalece (standalone vs overlay) está pendiente de decisión en `odd/tasks/repo-higiene-estructura.md` (T4); el anexo técnico documenta el camino del servidor.
+Camino prod canónico: `docker-compose.server.yml` standalone (no extiende `docker-compose.yml`; solo `web` publica en localhost).
 
 ## Variables requeridas
 
