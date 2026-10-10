@@ -37,7 +37,7 @@ from app.connectors.procolombia_convocatorias import ProcolombiaConvocatoriasCon
 from app.connectors.anii_uruguay import AniiUruguayConnector  # noqa: F401 — @register side effect
 from app.connectors.development_aid import DevelopmentAidConnector
 from app.connectors.dane import DaneConnector
-from app.connectors.brazil_portals import FinepConnector
+from app.connectors.brazil_portals import FapemigConnector, FinepConnector
 from app.connectors.findeter import FindeterConnector  # noqa: F401 — @register side effect
 from app.connectors.uniandes import UniandesConnector  # noqa: F401 — @register side effect
 from app.connectors.erc_calls import ErcCallsConnector  # noqa: F401
@@ -158,6 +158,14 @@ def connector_for(
             source_key,
             base_url or "",
             entity_name=entity_name or "FINEP",
+            default_country=default_country or "Brazil",
+            default_categories=default_categories,
+        )
+    if source_key == "fapemig-brasil":
+        return FapemigConnector(
+            source_key,
+            base_url or "",
+            entity_name=entity_name or "FAPEMIG",
             default_country=default_country or "Brazil",
             default_categories=default_categories,
         )
