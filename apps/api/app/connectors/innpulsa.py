@@ -7,7 +7,14 @@ from playwright.async_api import async_playwright
 from selectolax.lexbor import LexborHTMLParser as HTMLParser, LexborNode as Node
 
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
-from app.connectors.common import clean_text, fetch_httpx_text, launch_chromium, parse_date_text, thin_fill_candidates
+from app.connectors.common import (
+    clean_text,
+    extract_funding_details,
+    fetch_httpx_text,
+    launch_chromium,
+    parse_date_text,
+    thin_fill_candidates,
+)
 from app.connectors.registry import register
 
 
@@ -45,6 +52,103 @@ def _extract_money(text: str) -> str | None:
 def _is_closed_text(text: str) -> bool:
     lowered = _clean(text).lower()
     return any(keyword in lowered for keyword in INNPULSA_CLOSED_KEYWORDS)
+
+
+# ── E4: API-payload field maps ─────────────────────────────────────────────
+# Detail pages are JS shells in SSR (generic title, no dates/funding in the
+# served HTML), so open/close/funding must be read from these payload keys
+# instead of fetched HTML. Key lists are tried in order; the legacy
+# start_date/end_date stay first so existing payloads resolve identically.
+
+_API_OPEN_DATE_KEYS: tuple[str, ...] = (
+    "start_date",
+    "startDate",
+    "fecha_inicio",
+    "fechaInicio",
+    "open_date",
+    "opening_date",
+    "fecha_apertura",
+    "published_at",
+)
+
+_API_CLOSE_DATE_KEYS: tuple[str, ...] = (
+    "end_date",
+    "endDate",
+    "fecha_cierre",
+    "fechaCierre",
+    "close_date",
+    "closing_date",
+    "deadline",
+    "fecha_limite",
+    "fechaLimite",
+)
+
+_API_FUNDING_KEYS: tuple[str, ...] = (
+    "budget",
+    "presupuesto",
+    "amount",
+    "monto",
+    "funding",
+    "financiamiento",
+    "award",
+    "premio",
+    "prize",
+    "valor",
+    "recursos",
+    "funding_amount",
+    "award_amount",
+    "max_amount",
+    "total_amount",
+)
+
+_API_CURRENCY_KEYS: tuple[str, ...] = ("currency", "moneda", "currency_code")
+
+_API_CURRENCY_RE = re.compile(
+    r"\b(USD|COP|EUR|GBP|BRL|MXN|CLP|PEN|ARS|UYU)\b", flags=re.IGNORECASE
+)
+
+
+def _api_first_date(item: dict[str, object], keys: tuple[str, ...]) -> datetime | None:
+    """First parseable date across ``keys`` (ordered); None when absent."""
+    for key in keys:
+        value = item.get(key)
+        if value is None or isinstance(value, bool):
+            continue
+        parsed = parse_date_text(str(value))
+        if parsed is not None:
+            return parsed
+    return None
+
+
+def _api_funding(item: dict[str, object]) -> tuple[str | None, float | None, str | None]:
+    """Funding ``(raw, value, currency)`` from structured payload keys.
+
+    Only the explicit funding keys above are scanned — never ids or unrelated
+    scalars. Values are prefixed with ``budget:`` so the shared keyword tier
+    catches bare numbers (e.g. ``250000000``); an explicit payload currency
+    fills in when the text itself is ambiguous (bare ``$`` rule stays
+    downstream in country inference).
+    """
+    values: list[str] = []
+    for key in _API_FUNDING_KEYS:
+        value = item.get(key)
+        if value is None or isinstance(value, bool):
+            continue
+        text = _clean(str(value))
+        if text:
+            values.append(text)
+    if not values:
+        return None, None, None
+    raw, numeric, currency = extract_funding_details(
+        "budget: " + " | ".join(values)
+    )
+    if currency is None:
+        for key in _API_CURRENCY_KEYS:
+            match = _API_CURRENCY_RE.search(_clean(str(item.get(key) or "")))
+            if match:
+                currency = match.group(1).upper()
+                break
+    return raw, numeric, currency
 
 
 def _is_past(date_value: datetime | None) -> bool:
@@ -127,6 +231,7 @@ class InnpulsaConnector:
         requirements = self._unique([target_audience, purpose]) or [
             "Revisar la convocatoria oficial"
         ]
+        funding_raw, funding_value, funding_currency = _api_funding(item)
         # Emit closed/past-deadline API rows; soft-pass + reconcile own status.
         return OpportunityCandidate(
             title=title[:180],
@@ -139,8 +244,11 @@ class InnpulsaConnector:
             requirements=requirements[:5],
             raw_text=raw_text[:6000],
             confidence_score=0.98,
-            open_date=parse_date_text(str(item.get("start_date") or "")),
-            close_date=parse_date_text(str(item.get("end_date") or "")),
+            open_date=_api_first_date(item, _API_OPEN_DATE_KEYS),
+            close_date=_api_first_date(item, _API_CLOSE_DATE_KEYS),
+            funding_amount_raw=funding_raw,
+            funding_amount_value=funding_value,
+            funding_amount_currency=funding_currency,
             language="es",
         )
 
