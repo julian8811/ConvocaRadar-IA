@@ -72,10 +72,15 @@ class WorldBankConnector:
         self.base_url = base_url or WORLD_BANK_API_URL
 
     async def fetch(self) -> RawSourceResult:
+        # Single JSON call: bound it (30s, 1 attempt, no render — a browser
+        # can never help a JSON API). Worst case ~30s instead of >400s.
         url = f"{self.base_url}?format=json&rows=100&srt=submission_date desc&order=desc"
         final_url, content, content_type = await fetch_httpx_text(
             url,
             fallback_content_type="application/json",
+            timeout_seconds=30,
+            retries=1,
+            playwright_fallback=False,
         )
         return RawSourceResult(
             source_key=self.source_key,

@@ -204,7 +204,14 @@ class TestParse:
         assert candidates == []
 
     @pytest.mark.asyncio
-    async def test_parse_handles_garbage_content(self, connector):
+    async def test_parse_handles_garbage_content(self, connector, mock_fetch):
+        # Garbage (non-XML, non-HTML) also consults the sitemap fallback;
+        # an empty sitemap keeps the result empty without raising.
+        mock_fetch.return_value = (
+            "https://www.findeter.gov.co/sitemap.xml",
+            '<?xml version="1.0" encoding="UTF-8"?><urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"></urlset>',
+            "application/xml",
+        )
         raw = RawSourceResult(
             source_key="findeter-convocatorias",
             url="https://www.findeter.gov.co/sitemap.xml",
@@ -214,6 +221,140 @@ class TestParse:
 
         candidates = await connector.parse(raw)
         assert candidates == []
+
+
+# ── sitemap fallback when the HTML listing yields nothing ──────────────
+# Server evidence 2026-10-10: seed base_url is the /convocatorias HTML
+# listing (SSR 15KB, 0 links — list is JS-rendered) while sitemap.xml holds
+# 3351 locs / 2869 /convocatorias/ with recent years. parse() must fall back
+# to the canonical sitemap when the HTML listing yields 0 candidates.
+
+
+FINDETER_SITEMAP_REAL_SHAPE_XML = """<?xml version="1.0" encoding="UTF-8"?>
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+  <url><loc>https://www.findeter.gov.co/</loc></url>
+  <url><loc>https://www.findeter.gov.co/convocatorias/paf-icbfgs-i-001-2026</loc></url>
+  <url><loc>https://www.findeter.gov.co/convocatorias/paf-icbfgs-o-001-2026</loc></url>
+  <url><loc>https://www.findeter.gov.co/convocatorias/paf-dps-i-002-2025</loc></url>
+  <url><loc>https://www.findeter.gov.co/convocatorias/paf-atsed-o-001-2025</loc></url>
+  <url><loc>https://www.findeter.gov.co/convocatorias/paf-menpnie-i-002-2024</loc></url>
+  <url><loc>https://www.findeter.gov.co/convocatorias/paf-atf-o-045-2020</loc></url>
+  <url><loc>https://www.findeter.gov.co/convocatorias/paf-atf-124-2015</loc></url>
+</urlset>
+"""
+
+FINDETER_HTML_LISTING_WITHOUT_LINKS = """<!DOCTYPE html>
+<html><head><title>Convocatorias - Findeter</title></head>
+<body><div id="app"></div><p>Cargando convocatorias...</p></body></html>
+"""
+
+
+class TestSitemapFallbackWhenHtmlYieldsNothing:
+    @pytest.mark.asyncio
+    async def test_html_listing_without_links_falls_back_to_sitemap(
+        self, mock_fetch
+    ):
+        """RED: HTML listing (seed base_url) with 0 SSR links -> sitemap cands."""
+        mock_fetch.return_value = (
+            "https://www.findeter.gov.co/sitemap.xml",
+            FINDETER_SITEMAP_REAL_SHAPE_XML,
+            "application/xml",
+        )
+        connector = FindeterConnector("https://www.findeter.gov.co/convocatorias")
+        raw = RawSourceResult(
+            source_key="findeter-convocatorias",
+            url="https://www.findeter.gov.co/convocatorias",
+            content=FINDETER_HTML_LISTING_WITHOUT_LINKS,
+            content_type="text/html",
+        )
+
+        candidates = await connector.parse(raw)
+
+        assert len(candidates) == 5
+        assert all("/convocatorias/" in c.official_url for c in candidates)
+
+    @pytest.mark.asyncio
+    async def test_fallback_excludes_old_years(self, mock_fetch):
+        mock_fetch.return_value = (
+            "https://www.findeter.gov.co/sitemap.xml",
+            FINDETER_SITEMAP_REAL_SHAPE_XML,
+            "application/xml",
+        )
+        connector = FindeterConnector("https://www.findeter.gov.co/convocatorias")
+        raw = RawSourceResult(
+            source_key="findeter-convocatorias",
+            url="https://www.findeter.gov.co/convocatorias",
+            content=FINDETER_HTML_LISTING_WITHOUT_LINKS,
+            content_type="text/html",
+        )
+
+        candidates = await connector.parse(raw)
+        urls = [c.official_url for c in candidates]
+
+        assert not any(u.endswith("-2020") for u in urls)
+        assert not any(u.endswith("-2015") for u in urls)
+        assert any(u.endswith("-2026") for u in urls)
+
+    @pytest.mark.asyncio
+    async def test_fallback_fetch_failure_returns_empty(self, mock_fetch):
+        """Triangulation: sitemap unreachable -> [] (no crash, no raise)."""
+        mock_fetch.side_effect = RuntimeError("boom")
+        connector = FindeterConnector("https://www.findeter.gov.co/convocatorias")
+        raw = RawSourceResult(
+            source_key="findeter-convocatorias",
+            url="https://www.findeter.gov.co/convocatorias",
+            content=FINDETER_HTML_LISTING_WITHOUT_LINKS,
+            content_type="text/html",
+        )
+
+        assert await connector.parse(raw) == []
+
+    @pytest.mark.asyncio
+    async def test_fallback_respects_max_candidates(self, mock_fetch):
+        """Triangulation: fallback path caps at _MAX_CANDIDATES (100)."""
+        urls = "\n".join(
+            f"  <url><loc>https://www.findeter.gov.co/convocatorias/paf-dps-i-{i:03d}-2025</loc></url>"
+            for i in range(1, 121)
+        )
+        big_xml = (
+            '<?xml version="1.0" encoding="UTF-8"?>\n'
+            '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">\n'
+            f"{urls}\n</urlset>"
+        )
+        mock_fetch.return_value = (
+            "https://www.findeter.gov.co/sitemap.xml",
+            big_xml,
+            "application/xml",
+        )
+        connector = FindeterConnector("https://www.findeter.gov.co/convocatorias")
+        raw = RawSourceResult(
+            source_key="findeter-convocatorias",
+            url="https://www.findeter.gov.co/convocatorias",
+            content=FINDETER_HTML_LISTING_WITHOUT_LINKS,
+            content_type="text/html",
+        )
+
+        candidates = await connector.parse(raw)
+
+        assert len(candidates) == 100
+
+    @pytest.mark.asyncio
+    async def test_html_with_links_does_not_hit_sitemap(self, mock_fetch):
+        """Triangulation: HTML listing WITH links never fetches the sitemap."""
+        connector = FindeterConnector("https://www.findeter.gov.co/convocatorias")
+        raw = RawSourceResult(
+            source_key="findeter-convocatorias",
+            url="https://www.findeter.gov.co/convocatorias",
+            content="""<html><body><main>
+<a href="https://www.findeter.gov.co/convocatorias/paf-dps-i-002-2025">Convocatoria DPS 002 de 2025 para infraestructura</a>
+</main></body></html>""",
+            content_type="text/html",
+        )
+
+        candidates = await connector.parse(raw)
+
+        assert len(candidates) == 1
+        mock_fetch.assert_not_awaited()
 
 
 # ── validate tests ────────────────────────────────────────────────────────
