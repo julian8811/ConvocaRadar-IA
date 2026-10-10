@@ -1,5 +1,8 @@
 # Scraper Pipeline — 021 Optimization
 
+> Estado actual (2026-10-10): vigente. Los componentes del ciclo 021 (sweep concurrente, presupuesto por dominio, métricas y cadena de migraciones 0012–0014) conservan cobertura en `apps/api/tests/` (`test_sweep_tier_concurrency.py`, `test_domain_budget.py`, `test_metrics_sweep.py`, `test_migrations_chain.py`, familia `test_scraper_*`).
+> Las familias `test_023_*` y `test_026`–`test_040` (`*_batch_parse`, `*_batch_seeds`) amplían semillas y lotes sin reemplazar esta arquitectura.
+
 ## Overview
 Pipeline was starving: sequential `_run_periodic_source_sweep` took 45-60m for 75 due sources (>30m interval), only 30/91 ran daily. ~20m/day sync HEAD blocking + 25s/source serial embeddings wasted.
 
