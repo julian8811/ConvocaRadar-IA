@@ -13,7 +13,9 @@ from app.connectors.configurable_html import HtmlConnectorConfig
 
 PR1_KEYS = (
     "anid-concursos",
-    "startup-chile",
+    "startup-chile-build",
+    "startup-chile-growth",
+    "startup-chile-ignite",
     "proinnovate-calendario",
 )
 
@@ -26,7 +28,9 @@ BATCH1_KEYS = PR1_KEYS + PR2_KEYS
 
 BATCH1_URLS = {
     "anid-concursos": "https://anid.cl/concursos/",
-    "startup-chile": "https://startupchile.org/postula/",
+    "startup-chile-build": "https://startupchile.org/postula/build/",
+    "startup-chile-growth": "https://startupchile.org/postula/growth/",
+    "startup-chile-ignite": "https://startupchile.org/postula/ignite/",
     "proinnovate-calendario": "https://calendario.proinnovate.gob.pe/",
     "idb-calls-proposals": (
         "https://www.iadb.org/en/how-we-can-work-together/calls-proposals"
@@ -36,7 +40,9 @@ BATCH1_URLS = {
 
 BATCH1_DOMAIN_HINTS = {
     "anid-concursos": ("anid.cl",),
-    "startup-chile": ("startupchile.org",),
+    "startup-chile-build": ("startupchile.org",),
+    "startup-chile-growth": ("startupchile.org",),
+    "startup-chile-ignite": ("startupchile.org",),
     "proinnovate-calendario": ("proinnovate.gob.pe",),
     "idb-calls-proposals": ("iadb.org",),
     "fulbright-colombia": ("fulbright.edu.co",),

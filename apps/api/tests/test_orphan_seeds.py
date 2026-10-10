@@ -22,7 +22,7 @@ REACTIVATED_FORMER_ORPHANS = (
 REACTIVATED_URLS = {
     "innovamos-fid": "https://www.innovamos.gov.co/convocatorias",
     "innovamos-global-innovation-fund": "https://www.innovamos.gov.co/convocatorias",
-    "finep-brasil": "https://www.finep.gov.br/oportunidades",
+    "finep-brasil": "https://www.finep.gov.br/o/c/chamadapublicas?sort=dataDePublicacao:desc",
     "dane-convocatorias": (
         "https://www.dane.gov.co/index.php/component/content/category/"
         "275-servicios-al-ciudadano/276-convocatorias-y-contratacion?Itemid=109"
