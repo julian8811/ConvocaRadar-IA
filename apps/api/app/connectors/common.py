@@ -2320,6 +2320,15 @@ async def enrich_pilot_candidates(
         by_url.setdefault(item.official_url, item)
     merged_list = [by_url.get(c.official_url, c) for c in candidates]
     if source_key == "grants-gov":
+        # E8: keyless detail XHR fills awards the shell HTML cannot (bounded,
+        # best-effort, gap-fill only) before the heavier render+LLM step, so
+        # E6 only spends renders on candidates the XHR could not fund.
+        try:
+            from app.connectors.grants_gov import enrich_grants_gov_funding_xhr
+
+            merged_list = await enrich_grants_gov_funding_xhr(merged_list)
+        except Exception:
+            pass
         # E6: shells need a bounded render + LLM pass (grants-gov only).
         try:
             return await enrich_grants_gov_render_llm(merged_list)
