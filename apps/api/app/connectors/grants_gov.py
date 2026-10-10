@@ -66,10 +66,21 @@ def detail_funding_fields(payload: dict) -> dict[str, object]:
     fields: dict[str, object] = {}
     if not isinstance(payload, dict):
         return fields
-    blob = next(
-        (payload.get(key) for key in _DETAIL_FUNDING_KEYS if payload.get(key) not in (None, "")),
-        None,
-    )
+
+    def _first_blob(scope: dict) -> object:
+        return next(
+            (scope.get(key) for key in _DETAIL_FUNDING_KEYS if scope.get(key) not in (None, "")),
+            None,
+        )
+
+    blob = _first_blob(payload)
+    if blob is None:
+        # Live detail payloads nest award fields under "synopsis"
+        # (verified 2026-10-10: top-level awardCeiling None,
+        # synopsis.awardCeiling = 62500000).
+        nested = payload.get("synopsis")
+        if isinstance(nested, dict):
+            blob = _first_blob(nested)
     if blob is None:
         return fields
     text = str(blob).strip()
