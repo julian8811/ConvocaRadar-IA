@@ -14,7 +14,7 @@ Guía canónica breve: qué se despliega dónde. El detalle paso a paso vive en 
 
 Almacenamiento: Cloudflare R2 o sistema de archivos local (según entorno).
 
-Otros documentos (solo mención, no se duplican aquí): `docs/restore-runbook.md` (restauración y drill), `docs/estructura-local-vs-servidor.md` (qué vive dónde y qué diverge entre local y servidor), `docs/secret-rotation.md` (rotación de secretos).
+Otros documentos (solo mención, no se duplican aquí): `docs/restore-runbook.md` (restauración y drill), `docs/estructura-local-vs-servidor.md` (qué vive dónde y qué diverge entre local y servidor), `docs/security/secret-rotation.md` (rotación de secretos).
 
 ## Cloud (Vercel + Render)
 
