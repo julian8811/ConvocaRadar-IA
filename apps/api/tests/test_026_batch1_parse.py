@@ -43,25 +43,10 @@ BATCH1 = {
 </main></body></html>""",
         "titles": ("Apply via Charly",),
     },
-    "proinnovate-calendario": {
-        "url": "https://calendario.proinnovate.gob.pe/",
-        "country": "Peru",
-        "entity": "ProInnóvate",
-        "html": """<html><body><main><table>
-<thead><tr><th>Convocatoria</th><th>Cierre</th></tr></thead>
-<tbody>
-<tr>
-  <td><a href="https://calendario.proinnovate.gob.pe/programa-innova-2027/">Programa Innova PYME 2027</a></td>
-  <td>Cierre: 12 de agosto, 2027</td>
-</tr>
-<tr>
-  <td><a href="https://calendario.proinnovate.gob.pe/startup-peru-8/">Startup Perú 8va Gen</a></td>
-  <td>Cierre: 1 de septiembre, 2027</td>
-</tr>
-</tbody>
-</table></main></body></html>""",
-        "titles": ("Programa Innova PYME 2027", "Startup Perú 8va Gen"),
-    },
+    # NOTE (T3 fuentes-todas-on): proinnovate-calendario migrated to
+    # source_type pdf (base URL 302s to calendario-de-concursos-2026.pdf);
+    # its HTML table fixture no longer applies. PDF path is covered by
+    # test_fuentes_t3_lote2.py.
     "idb-calls-proposals": {
         "url": "https://www.iadb.org/en/how-we-can-work-together/calls-proposals",
         "country": "International",
