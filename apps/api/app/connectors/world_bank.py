@@ -14,6 +14,7 @@ from selectolax.lexbor import LexborHTMLParser as HTMLParser
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
 from app.connectors.common import (
     clean_text,
+    extract_funding_details,
     fetch_httpx_text,
     is_safe_candidate_snippet,
     thin_fill_candidates,
@@ -143,6 +144,21 @@ class WorldBankConnector:
                 if is_safe_candidate_snippet(notice_text, official_url):
                     snippet_html = notice_text
 
+            # E10: mine notice_text → funding_* at parse (zero new requests).
+            # Gap-fill only on a fresh candidate (all funding fields start
+            # None); the downstream thin-fill/runner fill never overwrite.
+            # Best-effort: any extractor failure leaves funding unset.
+            funding_raw: str | None = None
+            funding_value: float | None = None
+            funding_currency: str | None = None
+            if stripped:
+                try:
+                    funding_raw, funding_value, funding_currency = extract_funding_details(
+                        stripped
+                    )
+                except Exception:
+                    funding_raw, funding_value, funding_currency = None, None, None
+
             candidates.append(
                 OpportunityCandidate(
                     title=title,
@@ -159,6 +175,9 @@ class WorldBankConnector:
                     close_date=close_date,
                     external_id=notice_id or None,
                     snippet_html=snippet_html,
+                    funding_amount_raw=funding_raw,
+                    funding_amount_value=funding_value,
+                    funding_amount_currency=funding_currency,
                 )
             )
 
