@@ -482,6 +482,52 @@ describe("PR 3 — 401 discrimination by request path", () => {
     const { api } = await loadApiModule();
     await expect(api.me()).rejects.toThrow("Internal server error");
   });
+
+  it("prefers nested message when body.detail is an object (409 run-source shape)", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(
+            JSON.stringify({
+              detail: {
+                reason: "paused_cooldown",
+                source_key: "world-bank-procurement",
+                message:
+                  "Source 'world-bank-procurement' is auto-paused and inside its 24h cooldown.",
+              },
+            }),
+            {
+              status: 409,
+              headers: { "Content-Type": "application/json" },
+            },
+          ),
+        ),
+      ),
+    );
+
+    const { api } = await loadApiModule();
+    await expect(api.me()).rejects.toThrow(
+      "Source 'world-bank-procurement' is auto-paused and inside its 24h cooldown.",
+    );
+  });
+
+  it("falls back to JSON when object detail has no message", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() =>
+        Promise.resolve(
+          new Response(JSON.stringify({ detail: { reason: "x" } }), {
+            status: 409,
+            headers: { "Content-Type": "application/json" },
+          }),
+        ),
+      ),
+    );
+
+    const { api } = await loadApiModule();
+    await expect(api.me()).rejects.toThrow('{"reason":"x"}');
+  });
 });
 
 /**
