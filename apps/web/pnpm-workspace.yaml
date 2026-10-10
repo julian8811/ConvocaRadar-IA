@@ -1,3 +1,8 @@
+# T6: dos niveles a proposito, NO fusionar. La raiz define `packages` y rige
+# `pnpm -r` desde la raiz; este fichero solo rige cuando apps/web es su propia
+# raiz (pnpm corrido dentro de apps/web). Sus `allowBuilds` son placeholders
+# autogenerados por pnpm ("set this to true or false"), no aprobaciones reales:
+# fusionarlos copiaria valores sin efecto. Fijarlos a true/false es tarea aparte.
 allowBuilds:
   es5-ext: set this to true or false
   esbuild: set this to true or false
