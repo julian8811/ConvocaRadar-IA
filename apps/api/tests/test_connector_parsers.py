@@ -66,20 +66,25 @@ class TestEicAcceleratorParse:
 
 
 class TestHorizonSediaParse:
-    """Misma estructura SEDIA (metadata.callTitle + identifier)."""
+    """Misma estructura SEDIA (metadata.callTitle + identifier).
+
+    F1 fuentes-cirugia-mayor: HorizonV2Connector (catch-all: reclama lo que
+    ERC/MSCA/CREA rechazan) — el fixture usa identificador HORIZON real.
+    """
 
     @pytest.mark.asyncio
     async def test_parse_yields_candidate(self):
-        from app.connectors.horizon_sedia import HorizonSediaConnector
+        from app.connectors.ft_search_v2 import HorizonV2Connector
 
-        connector = HorizonSediaConnector()
+        connector = HorizonV2Connector()
         data = {
             "results": [
                 {
+                    "summary": "HORIZON-CL2-2027-DEMOCRACY call topic",
                     "metadata": {
-                        "callTitle": ["MSCA Postdoctoral Fellowships 2027"],
-                        "identifier": ["MSCA-PF-2027"],
-                        "callIdentifier": ["MSCA-PF-2027"],
+                        "callTitle": ["Call for proposals for HORIZON-CL2-2027-DEMOCRACY"],
+                        "identifier": ["HORIZON-CL2-2027-DEMOCRACY-01"],
+                        "callIdentifier": ["HORIZON-CL2-2027-DEMOCRACY-01"],
                         "status": ["31094501"],
                         "actions": [
                             {
@@ -87,14 +92,14 @@ class TestHorizonSediaParse:
                                 "deadlineDates": ["2027-09-15T00:00:00Z"],
                             }
                         ],
-                    }
+                    },
                 }
             ]
         }
         raw = _raw(json.dumps(data))
         candidates = await connector.parse(raw)
         assert len(candidates) >= 1
-        assert "MSCA" in candidates[0].title
+        assert "HORIZON" in candidates[0].title
 
 
 class TestWellcomeParse:

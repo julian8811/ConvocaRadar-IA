@@ -1,4 +1,8 @@
-"""028 parse fixtures for six new global HTML sources. Mocked fetch only."""
+"""028 parse fixtures for five new global HTML sources. Mocked fetch only.
+
+NOTE (F1 fuentes-cirugia-mayor): msca-funding migrated to the unified F&T v2
+connector — see tests/test_ft_search_v2.py. It is intentionally absent here.
+"""
 
 from __future__ import annotations
 
@@ -74,22 +78,6 @@ BATCH = {
 </ul>
 </main></body></html>""",
         "titles": ("Postdoctoral Fellowships", "Young Investigator Programme"),
-    },
-    "msca-funding": {
-        "url": "https://marie-sklodowska-curie-actions.ec.europa.eu/funding",
-        "country": "European Union",
-        "entity": "MSCA",
-        "html": """<html><body><main>
-<ul>
-  <li>
-    <a href="/actions/postdoctoral-fellowships">Postdoctoral Fellowships</a>
-  </li>
-  <li>
-    <a href="/actions/doctoral-networks">Doctoral Networks</a>
-  </li>
-</ul>
-</main></body></html>""",
-        "titles": ("Postdoctoral Fellowships", "Doctoral Networks"),
     },
     "open-society-grants": {
         "url": "https://www.opensocietyfoundations.org/grants",
