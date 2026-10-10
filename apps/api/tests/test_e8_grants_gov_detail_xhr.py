@@ -51,6 +51,19 @@ _DETAIL_PAYLOAD = {
     "synopsisDesc": "Supports rural small businesses developing clean energy solutions.",
 }
 
+# Live shape (verified 2026-10-10, oppId 364026): award fields live nested
+# under "synopsis", top level carries none.
+_DETAIL_PAYLOAD_NESTED = {
+    "id": 364026,
+    "opportunityNumber": "DE-FOA-0003577",
+    "synopsis": {
+        "awardCeiling": 62500000,
+        "awardFloor": 0,
+        "estimatedFunding": 50000000,
+        "synopsisDesc": "Silicon Carbide Cladding research and fabrication.",
+    },
+}
+
 
 def _mock_detail(monkeypatch, payload: dict | None = None):
     mock_fetch = AsyncMock(return_value=dict(payload if payload is not None else _DETAIL_PAYLOAD))
@@ -134,6 +147,18 @@ class TestGapFillSemantics:
 
         assert result.close_date == datetime(2026, 10, 31)
         assert result.funding_amount_value == 750000.0
+
+    @pytest.mark.asyncio
+    async def test_nested_synopsis_awards_map(self, monkeypatch):
+        """Live shape: award fields nested under "synopsis" must map."""
+        from app.connectors.grants_gov import enrich_grants_gov_funding_xhr
+
+        _mock_detail(monkeypatch, _DETAIL_PAYLOAD_NESTED)
+
+        (result,) = await enrich_grants_gov_funding_xhr([_unfunded_candidate()])
+
+        assert result.funding_amount_value == 62500000.0
+        assert result.funding_amount_currency == "USD"
 
     @pytest.mark.asyncio
     async def test_http_error_degrades_to_current_behavior(self, monkeypatch):
