@@ -160,10 +160,10 @@ async def _scrape_candidates(
         is_safe_candidate_snippet,
     )
 
-    # E1 pilot detail enrichment: ascun-convocatorias / minciencias / innpulsa
-    # publish open/close dates and funding on their detail pages. Bounded by
-    # extraction_detail_limit inside enrich_candidates_batch; non-pilot keys
-    # pass through untouched.
+    # E1/E4 pilot detail enrichment: innpulsa / grants-gov (/minciencias gated,
+    # triage pending) publish open/close dates and funding on their detail
+    # pages or API payloads. Bounded by extraction_detail_limit inside
+    # enrich_candidates_batch; non-pilot keys pass through untouched.
     candidates = await enrich_pilot_candidates(source.key, candidates)
     if stats is not None:
         stats["detail_enriched"] = sum(

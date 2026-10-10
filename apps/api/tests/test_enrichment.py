@@ -110,7 +110,7 @@ class TestPilotDetailEnrichment:
         candidate = _pilot_candidate()
         candidate.close_date = _dt(2026, 10, 31)
 
-        result = await enrich_pilot_candidates("ascun-convocatorias", [candidate])
+        result = await enrich_pilot_candidates("grants-gov", [candidate])
 
         # Detail page says 2026-09-30; list value must win.
         assert result[0].close_date == _dt(2026, 10, 31)

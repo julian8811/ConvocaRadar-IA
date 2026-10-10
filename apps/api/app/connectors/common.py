@@ -2247,24 +2247,36 @@ async def enrich_candidates_batch(
     return enriched
 
 
-# ── E1 pilot detail enrichment (runner-level hook) ──────────────────────────
+# ── E4 enrichment round 2 (runner-level hook) ───────────────────────────────
 #
-# Coverage (server, ~3097 opps): open 22%, close 40%, amount 9%. These three
-# pilots emit per-opportunity detail URLs from their list pages but only set
-# a subset of dates/funding there, while their detail pages publish the rest:
-# - ascun-convocatorias: live path is WordPressGrantsConnector (factory routes
-#   any /wp-json/wp/v2/ base_url there, shadowing AscunConnector); every WP
-#   item carries a ``link`` detail URL; parse caps at 200 candidates.
-# - minciencias: parse builds one official_url per /convocatorias/<slug>
-#   anchor (up to 200 candidates); list cards carry sparse dates.
-# - innpulsa: _detail_url builds convocatoria/<id|slug> URLs (API up to 200,
-#   HTML cards up to 100); the HTML-card path carries no dates at all.
-# Gating by source key keeps the shared WordPress connector untouched for
-# novo-nordisk-grants and leaves every non-pilot source byte-identical.
+# Coverage (server, ~3097 opps): open 22%, close 40%, amount 9%. E1 live gains
+# were 0; E4 verdict per pilot:
+# - ascun-convocatorias DROPPED: the feed returns NEWS posts (/noticias-ies/),
+#   not calls, and the live path is WordPressGrantsConnector (factory routes
+#   any /wp-json/wp/v2/ base_url there, shadowing AscunConnector) — detail
+#   enrichment on news links cannot yield call dates/funding. Replaced by
+#   grants-gov: JSON API (search2, explicit openDate/closeDate/award fields),
+#   stable detail URLs (search-results-detail/{id}), allowlisted for the SPA
+#   retry. Parse caps at 25 rows per fetch.
+# - minciencias KEPT GATED (dictamen, no verified fix): degraded with 0 found.
+#   Static triage: parse requires /convocatorias/<slug> anchors inside
+#   tr/.views-row/article/li containers (plus a link fallback), all gated on
+#   TITLE_KEYWORDS in the anchor text. An empty/changed listing (markup moved,
+#   Drupal pager ?page=N no longer paging, or JS-rendered cards) yields 0 with
+#   no signal to distinguish the cause offline. Guessing selectors without
+#   live listing HTML risks breaking the path that works when anchors exist
+#   (pinned by test_e4 minciencias triangulation), so no selector change.
+# - innpulsa: detail pages are JS shells in SSR (generic title, no
+#   dates/funding in served HTML — proven by live probe), so E4 reads
+#   open/close/funding from the API payload keys in innpulsa.py
+#   (_API_OPEN_DATE_KEYS/_API_CLOSE_DATE_KEYS/_API_FUNDING_KEYS) instead of
+#   HTML. The gate stays for the HTML-card fallback path, which carries no
+#   dates at all.
+# Gating by source key leaves every non-pilot source byte-identical.
 
 DETAIL_ENRICHMENT_PILOT_KEYS: frozenset[str] = frozenset(
     {
-        "ascun-convocatorias",
+        "grants-gov",
         "minciencias",
         "innpulsa",
     }
