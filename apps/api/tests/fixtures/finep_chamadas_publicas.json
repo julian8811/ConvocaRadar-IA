@@ -1,0 +1,344 @@
+{
+ "totalCount": 478,
+ "page": 1,
+ "pageSize": 500,
+ "lastPage": 1,
+ "items": [
+  {
+   "id": 1075469,
+   "externalReferenceCode": "b50bdf7d-1924-ee8e-2bce-4938cd13a279",
+   "titulo": "Programa de Cooperação para Inovação da Rede EUREKA ",
+   "situacao": {
+    "key": ""
+   },
+   "publicoAlvo": [
+    {
+     "key": "empresa1",
+     "name": "Receita: até R$ 4,8 Mi"
+    },
+    {
+     "key": "empresa2",
+     "name": "Receita: R$ 4,8 Mi - R$ 16,0 Mi"
+    },
+    {
+     "key": "empresa3",
+     "name": "Receita: R$ 16,0 Mi - R$ 90,0 Mi"
+    },
+    {
+     "key": "empresa4",
+     "name": "Receita: R$ 90,0 Mi - R$ 300,0 Mi"
+    },
+    {
+     "key": "empresa5",
+     "name": "Receita: maior que R$ 300,0 Mi"
+    }
+   ],
+   "tipoDeOportunidade": {
+    "key": ""
+   },
+   "regiao": {
+    "key": "todoBrasil",
+    "name": "Todo Brasil"
+   },
+   "dataDePublicacao": "2026-10-06T00:00:00.000Z",
+   "descricao": "<p>Programa de Cooperação para Inovação da Rede EUREKA – Chamada para\n  projetos de resiliência, resposta e recuperação de desastres – Fase Nacional</p>\n<p>&nbsp;</p>\n<p>ASPECTOS GERAIS DA CHAMADA PÚBLICA CONJUNTA</p>\n<p>&nbsp;</p>\n<p>A iniciativa faz parte de uma ação coordenada da rede internacional\n  EUREKA, que reúne países e agências de fomento comprometidos com o\n  fortalecimento da inovação colaborativa. Os projetos apoiados deverão\n  promover avanços tecnológicos com potencial de mercado e impacto\n  social relevante, contribuindo para aumentar a capacidade de\n  prevenção, preparação, r",
+   "temaPrincipal": {
+    "key": ""
+   },
+   "tema": "Energia e Transição Sustentável Tecnologias Digitais e ConectividadeMobilidade e LogísticaMeio Ambiente - Água e ClimaEnergia e Transição Sustentável",
+   "tipoCooperacao": {
+    "key": ""
+   },
+   "contrapartida": {
+    "key": "financeira",
+    "name": "Financeira"
+   },
+   "vigenciaFim": "2026-12-18T00:00:00.000Z",
+   "vigenciaInicio": "2026-10-06T00:00:00.000Z",
+   "prazoProposto": "2026-11-06T17:00:00.000Z",
+   "descricaoRawText": "Programa de Cooperação para Inovação da Rede EUREKA – Chamada para projetos de resiliência, resposta e recuperação de desastres – Fase Nacional   ASPECTOS GERAIS DA CHAMADA PÚBLICA CONJUNTA   A iniciativa faz parte de uma ação coordenada da rede internacional EUREKA, que reúne países e agências de fomento comprometidos com o fortalecimento da inovação colaborativa. Os projetos apoiados deverão promover avanços tecnológicos com potencial de mercado e impacto social relevante, contribuindo para aumentar a capacidade de prevenção, preparação, resposta e recuperação diante de eventos extremos.   O",
+   "actions": {
+    "get": {
+     "method": "GET",
+     "href": "https://www.finep.gov.br/o/c/chamadapublicas/1075469"
+    }
+   }
+  },
+  {
+   "id": 1060720,
+   "externalReferenceCode": "4158a9ab-1d1c-d067-d89c-5639cad6046e",
+   "titulo": "Finep COOPERAMAIS Brasil Tecnologias – Empresas",
+   "situacao": {
+    "key": "aberta",
+    "name": "Aberta"
+   },
+   "publicoAlvo": [
+    {
+     "key": "empresa1",
+     "name": "Receita: até R$ 4,8 Mi"
+    },
+    {
+     "key": "empresa2",
+     "name": "Receita: R$ 4,8 Mi - R$ 16,0 Mi"
+    },
+    {
+     "key": "empresa3",
+     "name": "Receita: R$ 16,0 Mi - R$ 90,0 Mi"
+    },
+    {
+     "key": "empresa4",
+     "name": "Receita: R$ 90,0 Mi - R$ 300,0 Mi"
+    },
+    {
+     "key": "empresa5",
+     "name": "Receita: maior que R$ 300,0 Mi"
+    }
+   ],
+   "tipoDeOportunidade": {
+    "key": "naoReembolsavel",
+    "name": "Não reembolsável"
+   },
+   "regiao": {
+    "key": "todoBrasil",
+    "name": "Todo Brasil"
+   },
+   "dataDePublicacao": "2026-09-22T00:00:00.000Z",
+   "descricao": "<p style=\"margin-bottom: 11.0px;\">\n  <span style=\"font-size: 12.0pt;\">\n    <span style=\"line-height: 115.0%;\">\n      <span style=\"font-family: Aptos , sans-serif;\">\n        <b>Finep COOPERAMAIS Brasil Tecnologias – Empresas</b>\n      </span>\n    </span>\n  </span>\n</p>\n<p style=\"margin-bottom: 11.0px;\">\n  <span style=\"font-size: 12.0pt;\">\n    <span style=\"line-height: 115.0%;\">\n      <span style=\"font-family: Aptos , sans-serif;\">\n        <b>SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT - Subvenção Econômica à\n          Inovação em Fluxo Contínuo –&nbsp;Finep COOPERAMAIS Brasil\n          Tecnologias – Empre",
+   "temaPrincipal": {
+    "key": "180694",
+    "name": "Indústria e Materiais Avançados"
+   },
+   "tema": "Agro e alimentos",
+   "tipoCooperacao": {
+    "key": "entreEmpresas",
+    "name": "Entre Empresas"
+   },
+   "contrapartida": {
+    "key": "financeira",
+    "name": "Financeira"
+   },
+   "vigenciaFim": null,
+   "vigenciaInicio": "2026-09-22T00:00:00.000Z",
+   "prazoProposto": "2027-04-30T17:00:00.000Z",
+   "descricaoRawText": "Finep COOPERAMAIS Brasil Tecnologias – Empresas SELEÇÃO PÚBLICA MCTI/FINEP/FNDCT - Subvenção Econômica à Inovação em Fluxo Contínuo – Finep COOPERAMAIS Brasil Tecnologias – Empresas Esta Seleção Pública objetiva conceder recursos de subvenção econômica para o desenvolvimento de produtos ou processos inovadores, promovendo o desenvolvimento da agroindústria nacional visando a garantida da segurança alimentar e nutricional da população brasileira. Também visa promover parcerias para o desenvolvimento entre empresas e cooperativas cadastradas no CAF com, no mínimo, 70% de agricultores familiares ",
+   "actions": {
+    "get": {
+     "method": "GET",
+     "href": "https://www.finep.gov.br/o/c/chamadapublicas/1060720"
+    }
+   }
+  },
+  {
+   "id": 1060260,
+   "externalReferenceCode": "9014174e-3f50-2c1a-310b-fc8f845ad645",
+   "titulo": "COOPERAMAIS Tecnologia - ICT",
+   "situacao": {
+    "key": "aberta",
+    "name": "Aberta"
+   },
+   "publicoAlvo": [
+    {
+     "key": "ict",
+     "name": "ICT"
+    },
+    {
+     "key": "cooperativa",
+     "name": "Cooperativa"
+    }
+   ],
+   "tipoDeOportunidade": {
+    "key": "naoReembolsavel",
+    "name": "Não reembolsável"
+   },
+   "regiao": {
+    "key": "todoBrasil",
+    "name": "Todo Brasil"
+   },
+   "dataDePublicacao": "2026-09-22T00:00:00.000Z",
+   "descricao": "<p style=\"margin-top: 4.0px;margin-bottom: 8.0px;text-align: justify;\">\n  <span style=\"font-size: 12.0pt;\"> A chamada tem por objetivo\n    selecionar projetos de P,D&amp;I apresentados por ICTs públicas e\n    privadas para desenvolvimento de soluções tecnológicas voltadas à\n    agricultura familiar brasileira, obrigatoriamente em parceria com\n    cooperativas da agricultura familiar.<br>\n    <br>\n    <strong>Orçamento total</strong>\n    <br>\n    <br> R$ 100 milhões em recursos não reembolsáveis do\n    FNDCT/CT-Agro.<br> Pelo menos 30% dos recursos deverão ser\n    destinados às regiões Norte, N",
+   "temaPrincipal": {
+    "key": ""
+   },
+   "tema": " Agro – Bioeconomia e Alimento, Tecnologias Digitais e Conectividade, Energia e Transição Energética, Meio ambiente: Água e Clima; Mobilidade e Logística",
+   "tipoCooperacao": {
+    "key": "entreEmpresasICTs",
+    "name": "Entre Empresas e ICTs"
+   },
+   "contrapartida": {
+    "key": "financeira",
+    "name": "Financeira"
+   },
+   "vigenciaFim": "2027-05-25T00:00:00.000Z",
+   "vigenciaInicio": "2026-09-22T00:00:00.000Z",
+   "prazoProposto": "2026-12-08T18:00:00.000Z",
+   "descricaoRawText": "A chamada tem por objetivo selecionar projetos de P,D&I apresentados por ICTs públicas e privadas para desenvolvimento de soluções tecnológicas voltadas à agricultura familiar brasileira, obrigatoriamente em parceria com cooperativas da agricultura familiar. Orçamento total R$ 100 milhões em recursos não reembolsáveis do FNDCT/CT-Agro. Pelo menos 30% dos recursos deverão ser destinados às regiões Norte, Nordeste e Centro-Oeste, desde que existam projetos meritórios. Linhas Temáticas 1- Comercialização, acesso a mercados e logística cooperativa. 2 - Desenvolvimento de cadeias produtivas e agroi",
+   "actions": {
+    "get": {
+     "method": "GET",
+     "href": "https://www.finep.gov.br/o/c/chamadapublicas/1060260"
+    }
+   }
+  },
+  {
+   "id": 1057230,
+   "externalReferenceCode": "65cb8373-f924-adb8-6423-165bfffca468",
+   "titulo": "Programa Nacional de Incubadoras Tecnológicas de Cooperativas Populares (Proninc) / 2026",
+   "situacao": {
+    "key": "aberta",
+    "name": "Aberta"
+   },
+   "publicoAlvo": [
+    {
+     "key": "ict",
+     "name": "ICT"
+    }
+   ],
+   "tipoDeOportunidade": {
+    "key": "naoReembolsavel",
+    "name": "Não reembolsável"
+   },
+   "regiao": {
+    "key": "todoBrasil",
+    "name": "Todo Brasil"
+   },
+   "dataDePublicacao": "2026-09-18T00:00:00.000Z",
+   "descricao": "<h4>\n  <span style=\"font-size: 10.0pt;\">\n    <span style=\"line-height: 104.0%;\">\n      <span style=\"font-family: Aptos , sans-serif;\">\n        <span style=\"color: black;\">\n          <b>\n            <span style=\"font-size: 11.0pt;\">\n              <span style=\"line-height: 104.0%;\">\n                <span style=\"color: rgb(63,63,63);\">Seleção pública de\n                  propostas para concessão de apoio financeiro não\n                  reembolsável para o desenvolvimento de tecnologias e\n                  inovação social em economia solidária.</span>\n              </span>\n            </span>\n   ",
+   "temaPrincipal": {
+    "key": ""
+   },
+   "tema": "",
+   "tipoCooperacao": {
+    "key": "entreEmpresasICTs",
+    "name": "Entre Empresas e ICTs"
+   },
+   "contrapartida": {
+    "key": "naoFinanceira",
+    "name": "Não Financeira"
+   },
+   "vigenciaFim": "2027-02-25T00:00:00.000Z",
+   "vigenciaInicio": "2026-09-18T00:00:00.000Z",
+   "prazoProposto": "2027-01-14T17:00:00.000Z",
+   "descricaoRawText": "Seleção pública de propostas para concessão de apoio financeiro não reembolsável para o desenvolvimento de tecnologias e inovação social em economia solidária. OBJETIVO DA CHAMADA PÚBLICA PRONINC/2026 Selecionar propostas para apoio à execução de projetos conduzidos por Instituições Científicas, Tecnológicas e de Inovação (ICTs), por meio da atuação conjunta de Incubadoras Tecnológicas de Cooperativas Populares (ITCPs) e Núcleos de Inovação Tecnológica (NITs), voltados ao desenvolvimento ou à adaptação de soluções tecnológicas para fins de economia solidária, aplicáveis aos Empreendimentos Eco",
+   "actions": {
+    "get": {
+     "method": "GET",
+     "href": "https://www.finep.gov.br/o/c/chamadapublicas/1057230"
+    }
+   }
+  },
+  {
+   "id": 1019381,
+   "externalReferenceCode": "9548bb4d-910a-0f3b-f784-03e5da388c2a",
+   "titulo": "5ª Chamada Pública Conjunta - Finep e Conselho Norueguês de Pesquisa (RCN)",
+   "situacao": {
+    "key": "aberta",
+    "name": "Aberta"
+   },
+   "publicoAlvo": [],
+   "tipoDeOportunidade": {
+    "key": "naoReembolsavel",
+    "name": "Não reembolsável"
+   },
+   "regiao": {
+    "key": "todoBrasil",
+    "name": "Todo Brasil"
+   },
+   "dataDePublicacao": "2026-08-05T00:00:00.000Z",
+   "descricao": "<p>O Conselho Norueguês de Pesquisa (RCN) e a Financiadora de Estudos e\n  Projetos (Finep) instituem a quinta chamada pública conjunta Finep-RCN\n  em 2026, para&nbsp;apoio de projetos a serem iniciados em 2027, com a\n  observância dos termos e procedimentos adiante&nbsp;estabelecidos.</p>\n<p>Alinhados com o acordo BN21 (Brasil-Noruega Século XXI), a Finep e o\n  RCN lançam esta chamada conjunta com vistas a aumentar a colaboração\n  entre a Noruega e o Brasil por meio de parcerias entre instituições\n  científicas e tecnológicas e empresas de ambos os países para o\n  desenvolvimento de produtos, ",
+   "temaPrincipal": {
+    "key": "180697",
+    "name": "Energia e Transição Sustentável"
+   },
+   "tema": "Tecnologias Digitais e Conectividade; Energia e Transição Energética; Meio ambiente: Água e Clima; Mobilidade e Logística",
+   "tipoCooperacao": {
+    "key": "entreEmpresasICTs",
+    "name": "Entre Empresas e ICTs"
+   },
+   "contrapartida": {
+    "key": "financeira",
+    "name": "Financeira"
+   },
+   "vigenciaFim": "2027-02-26T00:00:00.000Z",
+   "vigenciaInicio": "2026-08-05T00:00:00.000Z",
+   "prazoProposto": "2026-09-09T13:00:00.000Z",
+   "descricaoRawText": "O Conselho Norueguês de Pesquisa (RCN) e a Financiadora de Estudos e Projetos (Finep) instituem a quinta chamada pública conjunta Finep-RCN em 2026, para apoio de projetos a serem iniciados em 2027, com a observância dos termos e procedimentos adiante estabelecidos. Alinhados com o acordo BN21 (Brasil-Noruega Século XXI), a Finep e o RCN lançam esta chamada conjunta com vistas a aumentar a colaboração entre a Noruega e o Brasil por meio de parcerias entre instituições científicas e tecnológicas e empresas de ambos os países para o desenvolvimento de produtos, processos e serviços inovadores co",
+   "actions": {
+    "get": {
+     "method": "GET",
+     "href": "https://www.finep.gov.br/o/c/chamadapublicas/1019381"
+    }
+   }
+  },
+  {
+   "id": 968467,
+   "externalReferenceCode": "2275f48a-39f6-0c53-8bfa-e6a81bdda389",
+   "titulo": "DESAFIO TECNOLÓGICO ELETROLISADOR NACIONAL",
+   "situacao": {
+    "key": "encerrada",
+    "name": "Encerrada"
+   },
+   "publicoAlvo": [
+    {
+     "key": "startup",
+     "name": "Startup"
+    },
+    {
+     "key": "empresa1",
+     "name": "Receita: até R$ 4,8 Mi"
+    },
+    {
+     "key": "empresa2",
+     "name": "Receita: R$ 4,8 Mi - R$ 16,0 Mi"
+    },
+    {
+     "key": "empresa3",
+     "name": "Receita: R$ 16,0 Mi - R$ 90,0 Mi"
+    },
+    {
+     "key": "empresa4",
+     "name": "Receita: R$ 90,0 Mi - R$ 300,0 Mi"
+    },
+    {
+     "key": "empresa5",
+     "name": "Receita: maior que R$ 300,0 Mi"
+    },
+    {
+     "key": "ict",
+     "name": "ICT"
+    }
+   ],
+   "tipoDeOportunidade": {
+    "key": "naoReembolsavel",
+    "name": "Não reembolsável"
+   },
+   "regiao": {
+    "key": "todoBrasil",
+    "name": "Todo Brasil"
+   },
+   "dataDePublicacao": "2026-06-16T00:00:00.000Z",
+   "descricao": "<p>SELEÇÃO PÚBLICA FINEP/PETROBRAS</p>\n<p>A Financiadora de Estudos e Projetos – Finep, a Petrobras e o\n  Ministério da Ciência, Tecnologia e Inovação (MCTI), com apoio técnico\n  do Ministério da Fazenda, tornam pública a presente Seleção Pública,\n  cujo objetivo é apoiar o desenvolvimento de um projeto de inovação\n  voltado para o desenvolvimento tecnológico de um Eletrolisador\n  Nacional, seguindo as especificações apresentadas no Edital e seus\n  anexos, especialmente, no Anexo 1.</p>\n<p>A executora líder do projeto deverá ser necessariamente uma empresa\n  brasileira, com participação de, no",
+   "temaPrincipal": {
+    "key": "180697",
+    "name": "Energia e Transição Sustentável"
+   },
+   "tema": "Energia",
+   "tipoCooperacao": {
+    "key": ""
+   },
+   "contrapartida": {
+    "key": "financeira",
+    "name": "Financeira"
+   },
+   "vigenciaFim": null,
+   "vigenciaInicio": "2026-06-16T00:00:00.000Z",
+   "prazoProposto": "2026-09-21T17:00:00.000Z",
+   "descricaoRawText": "SELEÇÃO PÚBLICA FINEP/PETROBRAS A Financiadora de Estudos e Projetos – Finep, a Petrobras e o Ministério da Ciência, Tecnologia e Inovação (MCTI), com apoio técnico do Ministério da Fazenda, tornam pública a presente Seleção Pública, cujo objetivo é apoiar o desenvolvimento de um projeto de inovação voltado para o desenvolvimento tecnológico de um Eletrolisador Nacional, seguindo as especificações apresentadas no Edital e seus anexos, especialmente, no Anexo 1. A executora líder do projeto deverá ser necessariamente uma empresa brasileira, com participação de, no mínimo, duas empresas brasilei",
+   "actions": {
+    "get": {
+     "method": "GET",
+     "href": "https://www.finep.gov.br/o/c/chamadapublicas/968467"
+    }
+   }
+  }
+ ]
+}

@@ -32,16 +32,41 @@ BATCH1 = {
 </body></html>""",
         "titles": ("Concurso FONDECYT Regular 2027", "Concurso Exploración 2027"),
     },
-    "startup-chile": {
-        "url": "https://startupchile.org/postula/",
+    # F3 (fuentes-cirugia-mayor): split en 3 subfuentes. Fixtures que espejan
+    # el SSR real (2026-10-10): sin <main>/<article>, secciones <section>,
+    # h1 estaticos en hero Vue y link de bases PDF en section-long-content.
+    "startup-chile-build": {
+        "url": "https://startupchile.org/postula/build/",
         "country": "Chile",
         "entity": "Start-Up Chile",
-        "html": """<html><body><main class="entry-content">
-<h1>Postula a Start-Up Chile</h1>
-<p>Aplicaciones abiertas hasta el 30 de junio de 2027.</p>
-<p><a href="https://startupchile.org/apply/charly-gen/">Apply via Charly</a></p>
-</main></body></html>""",
-        "titles": ("Apply via Charly",),
+        "html": """<html><body><div id="app"><section class="section-long-content">
+<div class="long-content__content"><p>Términos y Condiciones de Build</p></div>
+<div class="long-content__link-container">
+<a href="https://startupchile.org/content/uploads/bases-build-11.pdf">¡Leer aquí! add</a>
+</div></section></div></body></html>""",
+        "titles": ("¡Leer aquí! add",),
+    },
+    "startup-chile-growth": {
+        "url": "https://startupchile.org/postula/growth/",
+        "country": "Chile",
+        "entity": "Start-Up Chile",
+        "html": """<html><body><div id="app"><section class="section-long-content">
+<div class="long-content__content"><p>Términos y Condiciones de Growth</p></div>
+<div class="long-content__link-container">
+<a href="https://startupchile.org/content/uploads/bases-growth.pdf">¡Leer aquí! add</a>
+</div></section></div></body></html>""",
+        "titles": ("¡Leer aquí! add",),
+    },
+    "startup-chile-ignite": {
+        "url": "https://startupchile.org/postula/ignite/",
+        "country": "Chile",
+        "entity": "Start-Up Chile",
+        "html": """<html><body><div id="app"><section class="section-long-content">
+<div class="long-content__content"><p>Términos y Condiciones de Ignite</p></div>
+<div class="long-content__link-container">
+<a href="https://startupchile.org/content/uploads/bases-ignite.pdf">¡Lee aquí! add</a>
+</div></section></div></body></html>""",
+        "titles": ("¡Lee aquí! add",),
     },
     # NOTE (T3 fuentes-todas-on): proinnovate-calendario migrated to
     # source_type pdf (base URL 302s to calendario-de-concursos-2026.pdf);
@@ -148,6 +173,32 @@ async def test_parse_fixture_yields_candidates(key: str, monkeypatch: pytest.Mon
     assert any(expected in titles for expected in meta["titles"])
     assert mock.await_count >= 1
     # All HTTP goes through the mock — no live network calls.
+
+
+@pytest.mark.asyncio
+async def test_startup_split_yields_bases_pdf_per_program(
+    monkeypatch: pytest.MonkeyPatch,
+):
+    """F3 split: cada subfuente extrae su PDF de bases como official_url."""
+    expected_pdf = {
+        "startup-chile-build": "bases-build-11.pdf",
+        "startup-chile-growth": "bases-growth.pdf",
+        "startup-chile-ignite": "bases-ignite.pdf",
+    }
+    for key, pdf in expected_pdf.items():
+        meta = BATCH1[key]
+        mock = AsyncMock(return_value=(meta["url"], meta["html"], "text/html"))
+        monkeypatch.setattr("app.connectors.common.fetch_httpx_text", mock)
+        connector = ConfigurableHtmlConnector(
+            key,
+            meta["url"],
+            _seed_config(key),
+            entity_name=meta["entity"],
+            default_country=meta["country"],
+        )
+        candidates = await connector.parse(await connector.fetch())
+        assert len(candidates) >= 1, key
+        assert any(c.official_url.endswith(pdf) for c in candidates), key
 
 
 @pytest.mark.asyncio
