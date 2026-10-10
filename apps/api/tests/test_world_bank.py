@@ -394,6 +394,86 @@ class TestRichFieldMap:
         assert past.close_date.strftime("%Y-%m-%d") == notice["submission_deadline_date"][:10]
 
 
+# ── E10: funding mined from notice_text (parse-only, zero new fetches) ────
+
+
+class TestFundingFromNoticeText:
+    """E10: parse maps notice_text → funding_* itself (parse-only, zero fetches).
+
+    The downstream thin-fill would also mine the same text, so these tests
+    neutralize it to pin the parse-construction contract directly (Ascun
+    lesson: enrichment must be proven at the source, not assumed downstream).
+    """
+
+    @staticmethod
+    def _neutralize_thin_fill(monkeypatch) -> None:
+        monkeypatch.setattr(
+            "app.connectors.common.fill_candidate_from_content",
+            lambda candidate, **kwargs: candidate,
+        )
+
+    @pytest.mark.asyncio
+    async def test_parse_mines_usd_funding_from_notice_text(self, connector, monkeypatch):
+        self._neutralize_thin_fill(monkeypatch)
+        notice = _rich_notice()
+        notice["notice_text"] = (
+            "<p>The estimated project cost is USD 15,000,000 for implementation.</p>"
+        )
+        raw = RawSourceResult(
+            source_key="world-bank-procurement",
+            url="http://example.com",
+            content=json.dumps({"procnotices": {notice["id"]: notice}}),
+            content_type="application/json",
+        )
+
+        candidates = await connector.parse(raw)
+
+        assert len(candidates) == 1
+        c = candidates[0]
+        assert c.funding_amount_raw is not None
+        assert "15,000,000" in c.funding_amount_raw
+        assert c.funding_amount_value == 15000000.0
+        assert c.funding_amount_currency == "USD"
+
+    @pytest.mark.asyncio
+    async def test_parse_mines_eur_funding_from_notice_text(self, connector, monkeypatch):
+        self._neutralize_thin_fill(monkeypatch)
+        notice = _rich_notice()
+        notice["notice_text"] = "<p>The contract value is estimated at EUR 73,877.</p>"
+        raw = RawSourceResult(
+            source_key="world-bank-procurement",
+            url="http://example.com",
+            content=json.dumps({"procnotices": {notice["id"]: notice}}),
+            content_type="application/json",
+        )
+
+        candidates = await connector.parse(raw)
+
+        assert len(candidates) == 1
+        c = candidates[0]
+        assert c.funding_amount_value == 73877.0
+        assert c.funding_amount_currency == "EUR"
+
+    @pytest.mark.asyncio
+    async def test_parse_leaves_funding_unset_without_amounts(self, connector):
+        notice = _rich_notice()
+        notice["notice_text"] = "<p>Full notice body with <b>eligibility</b> details.</p>"
+        raw = RawSourceResult(
+            source_key="world-bank-procurement",
+            url="http://example.com",
+            content=json.dumps({"procnotices": {notice["id"]: notice}}),
+            content_type="application/json",
+        )
+
+        candidates = await connector.parse(raw)
+
+        assert len(candidates) == 1
+        c = candidates[0]
+        assert c.funding_amount_raw is None
+        assert c.funding_amount_value is None
+        assert c.funding_amount_currency is None
+
+
 # ── Registration tests ────────────────────────────────────────────────────
 
 
