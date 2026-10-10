@@ -42,6 +42,8 @@ Camino prod canónico: `docker-compose.server.yml` standalone (no extiende `dock
 
 Ver `.env.example` (todas las variables) y `.env.production.example` (producción cloud). Los valores del servidor se generan en el servidor según `docs/deploy-universidad.md` (§3).
 
+Qué clave alimenta cada compose (dev vs server, por servicio): `docs/env-matrix.md`.
+
 ## Desarrollo local
 
 ```bash
