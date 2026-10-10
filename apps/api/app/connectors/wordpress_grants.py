@@ -74,6 +74,7 @@ class WordPressGrantsConnector:
         entity_name: str | None = None,
         default_country: str = "Por validar",
         allowed_domains: list[str] | None = None,
+        max_pages: int | None = None,
     ) -> None:
         self.source_key = source_key
         self.base_url = base_url
@@ -82,6 +83,10 @@ class WordPressGrantsConnector:
         parsed = urlparse(base_url)
         hostname = parsed.hostname or ""
         self.allowed_domains = allowed_domains or ([hostname] if hostname else [])
+        # Per-source page cap (None = legacy 10). Novo caps at 3: its catalog
+        # holds ~136 grants over 2 pages; 10 sequential slow pages (~15s each)
+        # can brush the 180s per-source cap.
+        self.max_pages = max_pages or 10
 
     async def fetch(self) -> RawSourceResult:
         settings = get_settings()
@@ -94,7 +99,7 @@ class WordPressGrantsConnector:
         # the entire connector. The WordPress REST API with per_page=100
         # typically returns in under 3s.
         _page_timeout = min(15, settings.scraping_timeout_seconds or 30)
-        for page in range(1, 11):  # max 10 pages (1000 items at per_page=100)
+        for page in range(1, self.max_pages + 1):  # capped per source
             page_url = _with_page(self.base_url, page)
             try:
                 response = await client.get(
@@ -121,7 +126,7 @@ class WordPressGrantsConnector:
             url=final_url,
             content=content,
             content_type="application/json",
-            metadata={"pages_fetched": min(total_pages, 10), "items_fetched": len(all_items)},
+            metadata={"pages_fetched": min(total_pages, self.max_pages), "items_fetched": len(all_items)},
         )
 
     async def parse(self, raw: RawSourceResult) -> list[OpportunityCandidate]:

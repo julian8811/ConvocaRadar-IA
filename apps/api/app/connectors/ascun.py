@@ -19,9 +19,15 @@ class AscunConnector:
         self.base_url = base_url or ASCUN_API_URL
 
     async def fetch(self) -> RawSourceResult:
+        # Single JSON call: bound it (20s, 1 attempt, no render — a browser
+        # can never help a JSON API). Worst case ~20s instead of >400s.
         url = f"{self.base_url}?search=convocatoria&per_page=20&_fields=id,title,content,excerpt,date,link"
         final_url, content, content_type = await fetch_httpx_text(
-            url, fallback_content_type="application/json"
+            url,
+            fallback_content_type="application/json",
+            timeout_seconds=20,
+            retries=1,
+            playwright_fallback=False,
         )
         return RawSourceResult(
             source_key=self.source_key,
