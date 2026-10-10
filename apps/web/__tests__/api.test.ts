@@ -599,3 +599,91 @@ describe("T1 — runAllSources() uses a long timeout, not the 12s default", () =
     expect(isAbortError({ name: "AbortError" })).toBe(true);
   });
 });
+
+/**
+ * Single-source run: server-side scrapes take 30-90s+, so api.runSource()
+ * must use the long 180s timeout (server per-source cap) instead of the
+ * 12s default — same override pattern as runAllSources' 120s. A request
+ * completing at 60s must NOT abort; past 180s it must.
+ */
+describe("runSource() uses a long timeout, not the 12s default", () => {
+  beforeEach(() => {
+    vi.stubEnv("NEXT_PUBLIC_ENV", "development");
+  });
+
+  function stubAbortableFetch(capture: FetchCapture) {
+    let externalReject: (err: Error) => void = () => {};
+    const externalPromise = new Promise<Response>((_resolve, reject) => {
+      externalReject = reject;
+    });
+    externalPromise.catch(() => {});
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((_url: string, init: RequestInit = {}) => {
+        capture.signal = init.signal ?? null;
+        capture.init = init;
+        if (init.signal) {
+          init.signal.addEventListener("abort", () => {
+            const err = new Error("signal is aborted without reason");
+            err.name = "AbortError";
+            externalReject(err);
+          });
+        }
+        return externalPromise;
+      }),
+    );
+  }
+
+  it("does NOT abort a request completing at 60s", async () => {
+    const capture: FetchCapture = { signal: null, init: null };
+    stubAbortableFetch(capture);
+
+    const { api } = await loadApiModule();
+    vi.useFakeTimers();
+
+    const promise = api.runSource("source-123");
+    promise.catch(() => {});
+
+    await vi.advanceTimersByTimeAsync(12_000);
+    expect(capture.signal?.aborted).toBe(false);
+    await vi.advanceTimersByTimeAsync(48_000);
+    expect(capture.signal?.aborted).toBe(false);
+  });
+
+  it("aborts past 180s", async () => {
+    const capture: FetchCapture = { signal: null, init: null };
+    stubAbortableFetch(capture);
+
+    const { api } = await loadApiModule();
+    vi.useFakeTimers();
+
+    const promise = api.runSource("source-123");
+    promise.catch(() => {});
+
+    await vi.advanceTimersByTimeAsync(179_999);
+    expect(capture.signal?.aborted).toBe(false);
+
+    await vi.advanceTimersByTimeAsync(1);
+    expect(capture.signal?.aborted).toBe(true);
+    await expect(promise).rejects.toMatchObject({ name: "AbortError" });
+  });
+
+  it("still hits POST /sources/{id}/run", async () => {
+    const captured: { url: string; init: RequestInit }[] = [];
+    vi.stubGlobal(
+      "fetch",
+      vi.fn((url: string, init: RequestInit = {}) => {
+        captured.push({ url, init });
+        return Promise.resolve(
+          new Response(JSON.stringify({ id: "r1", status: "success" }), { status: 200 }),
+        );
+      }),
+    );
+
+    const { api } = await loadApiModule();
+    await api.runSource("source-123");
+    expect(captured).toHaveLength(1);
+    expect(captured[0].url).toMatch(/\/sources\/source-123\/run$/);
+    expect(captured[0].init.method).toBe("POST");
+  });
+});
