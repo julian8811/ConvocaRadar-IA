@@ -2245,3 +2245,65 @@ async def enrich_candidates_batch(
         else:
             enriched.append(deepcopy(c))
     return enriched
+
+
+# ── E1 pilot detail enrichment (runner-level hook) ──────────────────────────
+#
+# Coverage (server, ~3097 opps): open 22%, close 40%, amount 9%. These three
+# pilots emit per-opportunity detail URLs from their list pages but only set
+# a subset of dates/funding there, while their detail pages publish the rest:
+# - ascun-convocatorias: live path is WordPressGrantsConnector (factory routes
+#   any /wp-json/wp/v2/ base_url there, shadowing AscunConnector); every WP
+#   item carries a ``link`` detail URL; parse caps at 200 candidates.
+# - minciencias: parse builds one official_url per /convocatorias/<slug>
+#   anchor (up to 200 candidates); list cards carry sparse dates.
+# - innpulsa: _detail_url builds convocatoria/<id|slug> URLs (API up to 200,
+#   HTML cards up to 100); the HTML-card path carries no dates at all.
+# Gating by source key keeps the shared WordPress connector untouched for
+# novo-nordisk-grants and leaves every non-pilot source byte-identical.
+
+DETAIL_ENRICHMENT_PILOT_KEYS: frozenset[str] = frozenset(
+    {
+        "ascun-convocatorias",
+        "minciencias",
+        "innpulsa",
+    }
+)
+
+
+def _candidate_needs_detail_enrichment(candidate: OpportunityCandidate) -> bool:
+    """True when any E1 target field is still missing (open/close/funding)."""
+    return (
+        candidate.open_date is None
+        or candidate.close_date is None
+        or (
+            candidate.funding_amount_raw is None
+            and candidate.funding_amount_value is None
+        )
+    )
+
+
+async def enrich_pilot_candidates(
+    source_key: str,
+    candidates: list[OpportunityCandidate],
+) -> list[OpportunityCandidate]:
+    """Enrich pilot-source candidates from their detail pages.
+
+    Non-pilot keys and fully-dated/funded candidates pass through untouched
+    (no fetch). Otherwise delegates to :func:`enrich_candidates_batch`, which
+    reuses the 15s detail timeout and ``extraction_detail_limit`` cap and
+    merges via :func:`apply_extracted_fields` (gap-fill only — existing
+    dates/funding are never overwritten). Order and count are preserved.
+    """
+    if source_key not in DETAIL_ENRICHMENT_PILOT_KEYS:
+        return candidates
+    missing = [c for c in candidates if _candidate_needs_detail_enrichment(c)]
+    if not missing:
+        return candidates
+    enriched = await enrich_candidates_batch(missing)
+    if not enriched:
+        return candidates
+    by_url: dict[str, OpportunityCandidate] = {}
+    for item in enriched:
+        by_url.setdefault(item.official_url, item)
+    return [by_url.get(c.official_url, c) for c in candidates]

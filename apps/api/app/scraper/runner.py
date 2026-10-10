@@ -154,7 +154,25 @@ async def _scrape_candidates(
             candidates = fallback_candidates
     if stats is not None:
         stats["candidates_parsed"] = len(candidates)
-    from app.connectors.common import fill_candidate_from_content, is_safe_candidate_snippet
+    from app.connectors.common import (
+        enrich_pilot_candidates,
+        fill_candidate_from_content,
+        is_safe_candidate_snippet,
+    )
+
+    # E1 pilot detail enrichment: ascun-convocatorias / minciencias / innpulsa
+    # publish open/close dates and funding on their detail pages. Bounded by
+    # extraction_detail_limit inside enrich_candidates_batch; non-pilot keys
+    # pass through untouched.
+    candidates = await enrich_pilot_candidates(source.key, candidates)
+    if stats is not None:
+        stats["detail_enriched"] = sum(
+            1
+            for c in candidates
+            if c.close_date is not None
+            or c.funding_amount_raw is not None
+            or c.funding_amount_value is not None
+        )
 
     opportunities: list[OpportunityCreate] = []
     noise_rejected = 0
