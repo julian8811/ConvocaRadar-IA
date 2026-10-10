@@ -22,7 +22,8 @@ Pedido explícito del usuario: apertura, cierre, montos, resúmenes e info clave
 
 ## Tasks
 - [x] **E1 (P1 writer)** ✅ 2026-10-10 Piloto cableado a nivel runner: `enrich_pilot_candidates` en common.py (gate `DETAIL_ENRICHMENT_PILOT_KEYS` = ascun-convocatorias/minciencias/innpulsa, solo fetchea candidatos sin open/close/funding, merge gap-fill vía `enrich_candidates_batch`) + hook en `runner._scrape_candidates` con stat `detail_enriched`. Runner-level porque ascun en vivo resuelve al WordPressGrantsConnector compartido (edición de conector contaminaría). RED ImportError pre-símbolo / GREEN 12 passed + triangulación 149 + 59 passed.
-- [ ] **E2 (P1)** Verify live en servidor: rebuild + reseed + runs por fuente; medir cobertura open/close/monto en las piloto. Ruta: padre.
+- [x] **E2 (P1)** ✅ Verify live: ganancia 0 con forense (ascun=noticias, innpulsa SSR vacío, minciencias 0 found). Mecanismo E1 validado; falta lado contenido.
+- [ ] **E4 (P1 writer)** Vuelta 2 (autorizada): innpulsa fechas/montos vía payload API + reemplazo de ascun como piloto (elegir con evidencia) + triage minciencias (diagnóstico; fix si es menor, dictamen si no). Ruta: delegada.
 - [ ] **E3 (P1)** Decisión de escala con el usuario (todas vs tanda 2) según números del piloto. Ruta: padre inline.
 
 ## Acceptance
