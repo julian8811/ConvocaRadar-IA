@@ -72,8 +72,10 @@ class ApcColombiaConnector:
         self.base_url = base_url or APC_URLS[0]
 
     async def fetch(self) -> RawSourceResult:
-        # Fetch pages concurrently with a per-page timeout cap so a single
-        # slow or blocked page doesn't stall the entire connector.
+        # Fetch pages concurrently with tight per-page bounds so a single
+        # hanging page (e.g. ?page=2 stalls at TLS) fails fast instead of
+        # blowing the 180s per-source cap via retries + render queue.
+        # Drupal SSR needs no browser: playwright_fallback=False.
         import asyncio
 
         async def _fetch_one(url: str) -> dict[str, str] | None:
@@ -81,7 +83,9 @@ class ApcColombiaConnector:
                 final_url, content, _ = await fetch_httpx_text(
                     url,
                     fallback_content_type="text/html",
-                    timeout_seconds=30,
+                    timeout_seconds=15,
+                    retries=1,
+                    playwright_fallback=False,
                 )
                 return {"url": final_url, "content": content}
             except Exception:
@@ -97,6 +101,9 @@ class ApcColombiaConnector:
             final_url, content, _ = await fetch_httpx_text(
                 APC_URLS[0],
                 fallback_content_type="text/html",
+                timeout_seconds=15,
+                retries=1,
+                playwright_fallback=False,
             )
             pages = [{"url": final_url, "content": content}]
 
