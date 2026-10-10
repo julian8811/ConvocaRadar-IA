@@ -127,6 +127,15 @@ def _wordpress_connector(source_key: str, base_url: str) -> WordPressGrantsConne
             # margin while keeping worst-case fetch ~= 45s (was ~150s).
             "max_pages": 3,
         },
+        "ascun-convocatorias": {
+            "entity_name": "ASCUN Colombia",
+            "default_country": "Colombia",
+            "allowed_domains": ["ascun.org.co", "www.ascun.org.co"],
+            # WP paginates ~9 pages x100 posts; 3 pages (newest 300) bound
+            # fetch (~45s worst) while parse caps at 200 and persist
+            # timeboxes the rest — same precedent as novo.
+            "max_pages": 3,
+        },
     }
     config = defaults.get(source_key, {})
     return WordPressGrantsConnector(

@@ -93,8 +93,9 @@ def test_039_keys_enabled_and_configurable():
 
 def test_039_catalog_count_and_uniqueness():
     defs = _seed_definitions_by_key()
-    # 185 -> 193 -> 201 (040)
-    assert len(defs) == 201, f"expected 201 keys, got {len(defs)}"
+    # 185 -> 193 -> 201 (040) -> 203 (F3: split startup-chile 1 key -> 3
+    # subfuentes build/growth/ignite, net +2; finep-brasil kept its key)
+    assert len(defs) == 203, f"expected 203 keys, got {len(defs)}"
     # uniqueness via keys already dict, also check no dup via Counter logic
     from collections import Counter
 
