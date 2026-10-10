@@ -183,6 +183,20 @@ class HtmlConnectorConfig:
     browser_fallback: bool = False
     """If True, re-fetch with Playwright when httpx returns a tiny HTML shell."""
 
+    force_render: bool = False
+    """If True, always re-fetch with Playwright (no size gate).
+
+    Explicit opt-in for heavy SSR pages whose content only materialises
+    after JS runs (e.g. DynamicWeb dynamic-list modules). Default off so
+    no source pays the browser cost unless it asked for it."""
+
+    wait_selector: str | None = None
+    """Optional CSS selector Playwright waits for before snapshotting.
+
+    Only used when ``force_render`` is True. Best-effort: a selector that
+    never matches falls through after the render timeout, keeping the
+    httpx content path intact."""
+
     @classmethod
     def from_dict(cls, data: dict[str, Any]) -> "HtmlConnectorConfig":
         """Parse and validate a config *dict* (e.g. from JSON API payload).
@@ -227,6 +241,12 @@ class HtmlConnectorConfig:
                 f"Field 'pagination' must be a dict or None, got {type(pagination).__name__}"
             )
 
+        wait_selector = raw.get("wait_selector")
+        if wait_selector is not None and not isinstance(wait_selector, str):
+            raise ValueError(
+                f"Field 'wait_selector' must be a str or None, got {type(wait_selector).__name__}"
+            )
+
         return cls(
             list_selectors=list(raw["list_selectors"]),
             title_selectors=list(raw["title_selectors"]),
@@ -237,6 +257,8 @@ class HtmlConnectorConfig:
             detail_enrichment=bool(raw.get("detail_enrichment", False)),
             user_agent=raw.get("user_agent"),
             browser_fallback=bool(raw.get("browser_fallback", False)),
+            force_render=bool(raw.get("force_render", False)),
+            wait_selector=wait_selector,
         )
 
     @classmethod
@@ -320,8 +342,24 @@ class ConfigurableHtmlConnector:
             self.base_url,
             **kwargs,
         )
+        # Explicit opt-in render: ALWAYS re-fetch via Playwright, no size gate.
+        # For heavy SSR pages whose calls only materialise after JS runs.
+        if self.config.force_render:
+            try:
+                final_url, rendered, content_type = await common.render_page_html(
+                    self.base_url,
+                    user_agent=self.config.user_agent,
+                    wait_until="domcontentloaded",
+                    timeout_ms=45000,
+                    wait_selector=self.config.wait_selector,
+                    post_wait_ms=800,
+                )
+                if rendered:
+                    content = rendered
+            except Exception:
+                pass
         # Cookie/bot shells often return tiny HTML with 200; opt-in browser render.
-        if self.config.browser_fallback and len(content or "") < 1500:
+        elif self.config.browser_fallback and len(content or "") < 1500:
             try:
                 final_url, rendered, content_type = await common.render_page_html(
                     self.base_url,
