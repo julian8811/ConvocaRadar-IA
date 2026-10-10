@@ -3597,7 +3597,7 @@ def seed_default_sources(
             "key": "finep-brasil",
             "name": "FINEP Brasil — Oportunidades",
             "enabled": True,
-            "base_url": "https://www.finep.gov.br/oportunidades",
+            "base_url": "https://www.finep.gov.br/o/c/chamadapublicas?sort=dataDePublicacao:desc",
             "country": "Brazil",
             "region": "LatAm",
             "source_type": "html",

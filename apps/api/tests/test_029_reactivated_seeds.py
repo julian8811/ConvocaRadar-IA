@@ -55,7 +55,7 @@ REACTIVATED = {
         "connector": "InnovamosConnector",
     },
     "finep-brasil": {
-        "url": "https://www.finep.gov.br/oportunidades",
+        "url": "https://www.finep.gov.br/o/c/chamadapublicas?sort=dataDePublicacao:desc",
         "source_type": "html",
         "needs_config": False,
         "connector": "FinepConnector",
