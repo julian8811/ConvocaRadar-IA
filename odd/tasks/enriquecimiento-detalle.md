@@ -31,6 +31,7 @@ Pedido explícito del usuario: apertura, cierre, montos, resúmenes e info clave
 ## Progress
 - 2026-10-10: doc creado. Mapa explorer completo (candidate→runner→opportunity, helpers en common.py, piloto propuesto). Mirror Engram pendiente.
 - 2026-10-10: E1 completo + commit `bd11401` pusheado + cherry-pick `a260290` + rebuild api en servidor (gate piloto verificado vivo). Baseline piloto: ascun 67 (ap67/ci0/mo0), innpulsa 68 (ap68/ci68/mo4), minciencias 1 (todo 0). E2 pendiente: medir tras el barrido en curso del usuario.
+- 2026-10-10: barrido `b642c8ee` 203/203 success pero cobertura piloto INTACTA. Hallazgo: el scraping real corre en el worker, que tenía imagen pre-E1 (ImportError del gate) — rebuild worker + verificado gate vivo. E2 pendiente: correr las 3 piloto individualmente y medir.
 
 ## Verification evidence
 - (pendiente E1)
