@@ -545,6 +545,23 @@ def test_run_source_runs_inline(monkeypatch) -> None:
         f"expected status='running' (inline), got {body['status']!r}"
     )
     assert body["source_id"] == src_id
+    # A real synchronous execution finishes the run before the endpoint
+    # returns; the mock must not leave a stale `running` row behind or the
+    # already_running 409 guard trips later tests sharing this DB file.
+    db = SessionLocal()
+    try:
+        for run in list(
+            db.scalars(
+                select(SourceRun).where(
+                    SourceRun.source_id == src_id, SourceRun.status == "running"
+                )
+            )
+        ):
+            run.status = "success"
+            run.finished_at = datetime.now(UTC).replace(tzinfo=None)
+        db.commit()
+    finally:
+        db.close()
 
 
 def test_run_source_returns_within_timeout(monkeypatch) -> None:

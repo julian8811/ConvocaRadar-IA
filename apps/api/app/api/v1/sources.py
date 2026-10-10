@@ -22,6 +22,7 @@ from app.models import Opportunity, Organization, Source, SourceRun, Task, User
 from app.schemas import SourceCreate, SourceHealthRead, SourceRead, SourceRunRead, SourceUpdate
 from app.schemas.source import QuarantineRead
 from app.services.quarantine import QUARANTINE_REASONS, extract_quarantine_items
+from app.scraper.dispatcher import dispatch_block_reason
 from app.scraper.dispatcher import run_source as dispatcher_run_source
 from app.services import audit, source_due_for_scraping, validate_source_url
 from app.services.scoring import (
@@ -385,6 +386,27 @@ def run_source(
     db: Session = Depends(get_db),
 ) -> SourceRun:
     source = _get_source_for_org(db, source_id, organization)
+    # Surface dispatcher skip decisions as 409 (not 500/silent re-run):
+    # auto-paused inside the 24h cooldown, or a run already in progress.
+    # Pause semantics are unchanged — this only reports the decision.
+    block = dispatch_block_reason(db, source)
+    if block is not None:
+        reason = str(block.get("reason"))
+        detail: dict[str, object] = {"reason": reason, "source_key": source.key}
+        if reason == "paused_cooldown":
+            if block.get("retry_after_seconds") is not None:
+                detail["retry_after_seconds"] = block["retry_after_seconds"]
+            detail["message"] = (
+                f"Source '{source.key}' is auto-paused and inside its "
+                "24h cooldown. Retry later or unpause it explicitly."
+            )
+        else:
+            if block.get("run_id") is not None:
+                detail["run_id"] = block["run_id"]
+            detail["message"] = (
+                f"Source '{source.key}' already has a run in progress."
+            )
+        raise HTTPException(status_code=409, detail=detail)
     # Execute directly — Celery worker is not available (Render free tier).
     # schedule_or_execute_source_run with prefer_worker_for_slow=True would
     # try to enqueue, fail, delete, and recreate the SourceRun, which causes
