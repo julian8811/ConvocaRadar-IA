@@ -86,6 +86,12 @@ def test_batch1_keys_present_enabled_with_urls_and_config():
         definition = defs[key]
         assert definition.get("enabled", True) is True, f"{key} must be enabled=true"
         assert definition["base_url"] == BATCH1_URLS[key], f"{key} base_url mismatch"
+        if key == "proinnovate-calendario":
+            # T3 fuentes-todas-on: base URL 302s to a PDF calendar; the
+            # source is PdfConnector-backed (no HTML connector_config).
+            assert definition["source_type"] == "pdf"
+            assert "connector_config" not in definition
+            continue
         assert definition["source_type"] == "html"
         domains = definition.get("allowed_domains") or []
         assert domains, f"{key} needs allowed_domains"
