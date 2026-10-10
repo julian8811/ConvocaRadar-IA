@@ -2318,4 +2318,178 @@ async def enrich_pilot_candidates(
     by_url: dict[str, OpportunityCandidate] = {}
     for item in enriched:
         by_url.setdefault(item.official_url, item)
-    return [by_url.get(c.official_url, c) for c in candidates]
+    merged_list = [by_url.get(c.official_url, c) for c in candidates]
+    if source_key == "grants-gov":
+        # E6: shells need a bounded render + LLM pass (grants-gov only).
+        try:
+            return await enrich_grants_gov_render_llm(merged_list)
+        except Exception:
+            return merged_list
+    return merged_list
+
+
+# ── E6 grants-gov rendered detail + LLM extraction ──────────────────────────
+#
+# grants-gov detail pages (search-results-detail/{id}) are JS shells in SSR:
+# plain-HTML enrichment (batch path above) recovers boilerplate at best, so
+# candidates still missing funding get one bounded Playwright render via the
+# existing render_page_html helper followed by the existing Gemini structured
+# extraction. Best-effort: any render/LLM failure degrades to the candidate
+# the batch path produced, never raises. Gap-fill only via
+# apply_extracted_fields — existing dates/funding are never overwritten.
+# Scoped to grants-gov, pilot-capped at GRANTS_GOV_RENDER_LLM_CAP renders/run.
+
+GRANTS_GOV_RENDER_LLM_CAP: int = 10
+GRANTS_GOV_RENDER_TIMEOUT_MS: int = DETAIL_PAGE_TIMEOUT * 1000
+GRANTS_GOV_LLM_TEXT_LIMIT: int = 8000
+
+
+def _candidate_needs_render_llm(candidate: OpportunityCandidate) -> bool:
+    """True when a grants-gov candidate still has no funding to gap-fill."""
+    return (
+        candidate.funding_amount_raw is None and candidate.funding_amount_value is None
+    )
+
+
+def _llm_data_to_candidate_fields(data: dict[str, object]) -> dict[str, object]:
+    """Map an LLM extraction payload onto candidate field names.
+
+    Dates arrive as ISO strings and are parsed to datetimes; unparseable or
+    absent values are dropped so the gap-fill merge never fabricates fields.
+    """
+    fields: dict[str, object] = {}
+    for key in ("open_date", "close_date"):
+        raw = data.get(key)
+        if isinstance(raw, str) and raw.strip():
+            parsed = parse_date_text(raw.strip())
+            if parsed is not None:
+                fields[key] = parsed
+    raw_amount = data.get("funding_amount_raw")
+    if isinstance(raw_amount, str) and raw_amount.strip():
+        fields["funding_amount_raw"] = raw_amount.strip()[:200]
+    value = data.get("funding_amount_value")
+    if value is not None:
+        try:
+            fields["funding_amount_value"] = float(value)
+        except (TypeError, ValueError):
+            pass
+    currency = data.get("funding_amount_currency")
+    if isinstance(currency, str) and currency.strip():
+        fields["funding_amount_currency"] = currency.strip().upper()[:3]
+    summary = data.get("summary")
+    if isinstance(summary, str) and summary.strip():
+        fields["summary"] = summary.strip()
+    categories = data.get("category", data.get("categories"))
+    if isinstance(categories, str):
+        categories = [categories]
+    if isinstance(categories, (list, tuple)):
+        cleaned = [str(item).strip() for item in categories if str(item).strip()][:4]
+        if cleaned:
+            fields["categories"] = cleaned
+    for key in (
+        "eligible_applicants",
+        "requirements",
+        "documents_required",
+        "evaluation_criteria",
+        "restrictions",
+    ):
+        items = data.get(key)
+        if isinstance(items, (list, tuple)):
+            cleaned_items = [str(item).strip() for item in items if str(item).strip()][:12]
+            if cleaned_items:
+                fields[key] = cleaned_items
+    application_url = data.get("application_url")
+    if (
+        isinstance(application_url, str)
+        and application_url.strip().lower().startswith(("http://", "https://"))
+    ):
+        fields["application_url"] = application_url.strip()
+    return fields
+
+
+async def _enrich_grants_gov_candidate_render_llm(
+    candidate: OpportunityCandidate,
+) -> dict | None:
+    """Render one grants-gov detail page and extract fields via deterministic + LLM.
+
+    Returns an extracted-fields dict ready for apply_extracted_fields, or None
+    when the render yields nothing usable. Never raises.
+    """
+    url = candidate.official_url
+    try:
+        _, rendered, _ = await render_page_html(
+            url,
+            wait_until="domcontentloaded",
+            timeout_ms=GRANTS_GOV_RENDER_TIMEOUT_MS,
+            post_wait_ms=800,
+        )
+    except Exception:
+        return None
+    if not rendered or not clean_text(rendered):
+        return None
+    deterministic = extract_page_fields(html=rendered, page_url=url)
+    visible = str(deterministic.get("raw_text") or "") or clean_text(rendered)
+    visible = visible.strip()
+    if not visible:
+        return deterministic if deterministic.get("title") else None
+    try:
+        from app.core import ai as _ai
+
+        extraction = await _ai.extract_opportunity_structured(
+            visible[:GRANTS_GOV_LLM_TEXT_LIMIT]
+        )
+    except Exception:
+        return deterministic if deterministic.get("title") else None
+    try:
+        data = extraction.data if extraction is not None else None
+    except Exception:
+        data = None
+    if not isinstance(data, dict) or not data:
+        return deterministic if deterministic.get("title") else None
+    merged = dict(deterministic)
+    for key, value in _llm_data_to_candidate_fields(data).items():
+        if merged.get(key) in (None, "", []) and value not in (None, "", []):
+            merged[key] = value
+    if not merged.get("raw_text") and visible:
+        merged["raw_text"] = visible[:_RAW_TEXT_LIMIT]
+    return merged if merged.get("title") else None
+
+
+async def enrich_grants_gov_render_llm(
+    candidates: list[OpportunityCandidate],
+) -> list[OpportunityCandidate]:
+    """Gap-fill unfunded grants-gov candidates via rendered detail + LLM.
+
+    Renders at most GRANTS_GOV_RENDER_LLM_CAP detail pages (funded candidates
+    are skipped, order and count are preserved) and merges each result with
+    apply_extracted_fields (gap-fill only). Best-effort: never raises.
+    """
+    try:
+        import asyncio
+        from copy import deepcopy
+
+        targets = [c for c in candidates if _candidate_needs_render_llm(c)][
+            :GRANTS_GOV_RENDER_LLM_CAP
+        ]
+        if not targets:
+            return list(candidates)
+        results = await asyncio.gather(
+            *(_enrich_grants_gov_candidate_render_llm(c) for c in targets),
+            return_exceptions=True,
+        )
+        url_to_fields: dict[str, dict] = {}
+        for candidate, result in zip(targets, results):
+            if isinstance(result, dict) and result.get("title"):
+                url_to_fields.setdefault(candidate.official_url, result)
+        enriched: list[OpportunityCandidate] = []
+        for candidate in candidates:
+            fields = url_to_fields.get(candidate.official_url)
+            if fields is not None:
+                enriched.append(
+                    apply_extracted_fields(candidate, fields, prefer_extracted_text=True)
+                )
+            else:
+                enriched.append(deepcopy(candidate))
+        return enriched
+    except Exception:
+        return list(candidates)
