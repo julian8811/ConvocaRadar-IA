@@ -19,6 +19,52 @@ from app.scraper.runner import run_source_inline
 _AUTO_PAUSE_COOLDOWN_HOURS = 24
 
 
+def _cooldown_elapsed(source: Source) -> bool:
+    """Pure check: has the auto-pause cooldown elapsed for this source?"""
+    last_run = getattr(source, "last_run_at", None)
+    if last_run is None:
+        return False
+    elapsed = (datetime.now(UTC).replace(tzinfo=None) - last_run).total_seconds()
+    return elapsed >= _AUTO_PAUSE_COOLDOWN_HOURS * 3600
+
+
+def dispatch_block_reason(db, source: Source) -> dict[str, object] | None:
+    """Read-only mirror of ``run_source``'s skip decisions (no side effects).
+
+    Returns ``{"reason": "paused_cooldown", ...}`` when the source is
+    auto-paused inside its 24h cooldown (or paused with no run history),
+    ``{"reason": "already_running", "run_id": ...}`` when a SourceRun is
+    already in progress, else ``None``.
+
+    Unlike ``run_source`` this never reactivates: a source whose cooldown
+    already elapsed is NOT blocked (``None``) — reactivation stays inside
+    ``run_source`` so HTTP guards using this helper cannot mutate pause
+    state. Parity with ``run_source`` is pinned by
+    tests/test_source_run_conflict.py.
+    """
+    if getattr(source, "auto_paused", False):
+        last_run = getattr(source, "last_run_at", None)
+        if last_run is None:
+            return {"reason": "paused_cooldown"}
+        elapsed = (datetime.now(UTC).replace(tzinfo=None) - last_run).total_seconds()
+        cooldown_seconds = _AUTO_PAUSE_COOLDOWN_HOURS * 3600
+        if elapsed < cooldown_seconds:
+            return {
+                "reason": "paused_cooldown",
+                "retry_after_seconds": int(cooldown_seconds - elapsed),
+            }
+        return None
+    existing = db.scalar(
+        select(SourceRun).where(
+            SourceRun.source_id == source.id,
+            SourceRun.status == "running",
+        )
+    )
+    if existing is not None:
+        return {"reason": "already_running", "run_id": str(existing.id)}
+    return None
+
+
 async def run_source(db, source: Source, organization_id: str | None = None) -> SourceRun | None:
     """Dispatch a source scrape — runs inline.
 

@@ -51,6 +51,57 @@ except Exception:  # pragma: no cover
 # Phases tracked in run.progress
 PROGRESS_STEPS = ["fetch", "parse", "persist"]
 
+# ── Persist bounds (ascun/novo ~90s TimeoutError evidence) ────────────────
+# Per-candidate persist cost is serial: up to 2 HEAD url-checks (5s timeout
+# each) + one gateway embedding call (~2s observed in prod) + a possible
+# LLM enrich. Hundreds of WP candidates (ascun ~9 pages x100, novo dozens)
+# blow scraping_max_source_seconds. Bounds, in application order:
+#  1. fetch-side page caps per source (factory _wordpress_connector) and the
+#     existing parse cap (candidates[:200]) shrink the persist input;
+#  2. PERSIST_MAX_ITEMS_PER_RUN truncates absurd inputs with a visible skip;
+#  3. the timebox (deadline = remaining budget - reserve) stops the loop
+#     early so the run completes with what was persisted instead of dying
+#     with TimeoutError -> failed and 0 items.
+# Budget math: 50 items x ~2s ~= 100s worst-case cold, but the timebox binds
+# first in slow environments (remaining - 5s reserve); the count cap only
+# binds when items are cheap. Both paths log a "persist capped" entry.
+PERSIST_MAX_ITEMS_PER_RUN = 50
+PERSIST_TIME_RESERVE_SECONDS = 5.0
+URL_CHECK_WARMUP_CONCURRENCY = 16
+URL_CHECK_WARMUP_TIMEOUT_SECONDS = 15.0
+
+
+async def _warm_url_cache(urls: list[str | None]) -> None:
+    """Best-effort concurrent pre-flight of persist url-checks.
+
+    Calls the same ``async_url_is_reachable`` (same 24h TTL cache) the
+    serial persist loop uses, just earlier and concurrently, so N serial
+    HEADs become one bounded wave. Any failure is swallowed: the serial
+    loop re-checks through the cache-or-fresh path regardless, so
+    semantics are identical with or without the warmup.
+    """
+    from app.services.validation import async_url_is_reachable
+
+    distinct = sorted({url for url in urls if url})
+    if not distinct:
+        return
+    semaphore = asyncio.Semaphore(URL_CHECK_WARMUP_CONCURRENCY)
+
+    async def _one(url: str) -> None:
+        async with semaphore:
+            try:
+                await async_url_is_reachable(url)
+            except Exception:
+                pass
+
+    try:
+        await asyncio.wait_for(
+            asyncio.gather(*(_one(url) for url in distinct)),
+            timeout=URL_CHECK_WARMUP_TIMEOUT_SECONDS,
+        )
+    except Exception:
+        pass
+
 
 async def _scrape_candidates(
     source: Source, stats: dict[str, object] | None = None
@@ -335,12 +386,23 @@ def _setup_run(db, source: Source, organization_id: str | None) -> tuple[SourceR
 
 
 async def _persist_opportunities(
-    db, run: SourceRun, opportunities: list[OpportunityCreate], organization_id: str | None
+    db,
+    run: SourceRun,
+    opportunities: list[OpportunityCreate],
+    organization_id: str | None,
+    *,
+    deadline: float | None = None,
 ) -> tuple[int, int, int]:
     """Persist scraped opportunities, returning (created, updated, failed).
 
     Uses bulk dedup preload_external_ids per source to avoid N+1, with
     clear_bulk_cache after each source batch.
+
+    ``deadline`` is a ``time.monotonic()`` timestamp: the loop stops before
+    it (leaving PERSIST_TIME_RESERVE_SECONDS for finalize/flush) and records
+    the remainder as a visible ``persist capped`` skip instead of letting the
+    outer ``wait_for`` raise TimeoutError. ``None`` disables the timebox
+    (keeps the historical unbounded behavior for callers without a budget).
     """
     from app.services.opportunity import clear_bulk_cache, preload_external_ids
 
@@ -351,6 +413,21 @@ async def _persist_opportunities(
             preload_external_ids(db, sid)
         except Exception:
             pass
+    kept = list(opportunities)
+    skipped = 0
+    skip_reason: str | None = None
+    if len(kept) > PERSIST_MAX_ITEMS_PER_RUN:
+        skipped = len(kept) - PERSIST_MAX_ITEMS_PER_RUN
+        kept = kept[:PERSIST_MAX_ITEMS_PER_RUN]
+        skip_reason = "count_cap"
+    # Concurrent pre-flight of the serial url-checks below (same function,
+    # same cache — best-effort, never blocks persistence on failure).
+    try:
+        await _warm_url_cache(
+            [o.official_url for o in kept] + [o.application_url for o in kept]
+        )
+    except Exception:
+        pass
     created = 0
     updated = 0
     failed_items = 0
@@ -368,7 +445,10 @@ async def _persist_opportunities(
         if _quarantine_count() < QUARANTINE_CAP_PER_RUN:
             run.logs = [*run.logs, entry]
 
-    for opportunity_data in opportunities:
+    for opportunity_data in kept:
+        if deadline is not None and time.monotonic() >= deadline:
+            skip_reason = "time_budget"
+            break
         try:
             had_url = bool(opportunity_data.official_url)
             opportunity_result = create_opportunity(
@@ -434,6 +514,19 @@ async def _persist_opportunities(
         clear_bulk_cache()
     except Exception:
         pass
+    processed = created + updated + failed_items
+    skipped += len(kept) - processed
+    if skipped > 0:
+        run.logs = [
+            *run.logs,
+            {
+                "level": "info",
+                "message": "persist capped",
+                "reason": skip_reason or "time_budget",
+                "items_persisted": created + updated,
+                "items_skipped": skipped,
+            },
+        ]
     return created, updated, failed_items
 
 
@@ -599,8 +692,12 @@ async def run_source_inline(db, source: Source, organization_id: str | None = No
 
         elapsed = (datetime.now(UTC).replace(tzinfo=None) - _started_at).total_seconds()
         remaining = max(1.0, get_settings().scraping_max_source_seconds - elapsed)
+        # Timebox persist to the remaining budget minus a reserve for
+        # finalize/flush, so slow sources complete with partial items
+        # instead of dying with TimeoutError (ascun/novo ~90s evidence).
+        persist_deadline = time.monotonic() + max(1.0, remaining - PERSIST_TIME_RESERVE_SECONDS)
         created, updated, failed = await asyncio.wait_for(
-            _persist_opportunities(db, run, opportunities, organization_id),
+            _persist_opportunities(db, run, opportunities, organization_id, deadline=persist_deadline),
             timeout=remaining,
         )
         _set_progress(run, {"persist": _now()})
