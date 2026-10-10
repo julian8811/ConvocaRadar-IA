@@ -25,6 +25,7 @@ Pedido explícito del usuario: apertura, cierre, montos, resúmenes e info clave
 - [x] **E2 (P1)** ✅ Verify live: ganancia 0 con forense (ascun=noticias, innpulsa SSR vacío, minciencias 0 found). Mecanismo E1 validado; falta lado contenido.
 - [x] **E4 (P1 writer)** ✅ 2026-10-10 Vuelta 2: innpulsa fechas/monto vía payload API (`_api_first_date` + `_api_funding`, sin fetches nuevos); gate ascun→grants-gov (verificado offline); minciencias DICTAMEN (sin HTML live no se toca). RED 5 failed / GREEN 23 + triangulación 143 + 48 passed.
 - [ ] **E3 (P1)** Decisión de escala con el usuario (todas vs tanda 2) según números del piloto. Ruta: padre inline.
+- [x] **E5 (P1)** ✅ Extracción LLM Gemini cableada y probada en vivo: `.env` (LLM_PROVIDER=gemini, base OpenAI-compat, model gemini-3.8-flash — 2.0 retirado), recreate api+worker, probe sintético exacto (provider google, conf 0.9, open/close + 500M COP). Dry-run real: innpulsa 5 muestras (fechas buenas 0.68-0.95, montos ausentes en texto) + grants-gov 3 muestras (nada en synopsis). Veredicto: mecanismo OK, las fuentes no traen montos en el texto disponible.
 
 ## Acceptance
 - Piloto: ≥70% de sus oportunidades con close_date y monto donde la página de detalle los publica; suite verde; nada fuera del piloto afectado.
