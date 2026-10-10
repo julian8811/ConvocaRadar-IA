@@ -79,32 +79,42 @@ def _password_reset_url(token: str) -> str:
 
 
 def _set_token_cookie(response: Response, token: str) -> None:
-    """Set the JWT as an HttpOnly, SameSite=None cookie for browser-based auth.
+    """Set the JWT as an HttpOnly cookie for browser-based auth.
 
     SEC-1.5: dual-support migration — the cookie is the new primary path; the
     Authorization: Bearer header remains supported by get_current_user for legacy
-    clients. SameSite=None (with Secure=True) allows the cookie to be sent on
-    cross-origin fetch calls from the frontend (Vercel) to the API (Render).
+    clients. By default (``COOKIE_SECURE=true``) SameSite=None (with
+    Secure=True) allows the cookie to be sent on cross-origin fetch calls
+    from the frontend (Vercel) to the API (Render). With
+    ``COOKIE_SECURE=false`` (plain-HTTP LAN) the cookie uses Secure=False +
+    SameSite=Lax — browsers drop Secure cookies over plain HTTP, and
+    SameSite=None requires Secure.
     """
+    from app.core.config import get_settings
+
+    secure = get_settings().cookie_secure
     response.set_cookie(
         key=TOKEN_COOKIE_NAME,
         value=token,
         max_age=TOKEN_COOKIE_MAX_AGE_SECONDS,
         httponly=True,
-        secure=True,
-        samesite="none",
+        secure=secure,
+        samesite="none" if secure else "lax",
         path="/",
     )
 
 
 def _clear_token_cookie(response: Response) -> None:
-    """Delete the JWT cookie on logout."""
+    """Delete the JWT cookie on logout (flags must match the set path)."""
+    from app.core.config import get_settings
+
+    secure = get_settings().cookie_secure
     response.delete_cookie(
         key=TOKEN_COOKIE_NAME,
         path="/",
         httponly=True,
-        secure=True,
-        samesite="none",
+        secure=secure,
+        samesite="none" if secure else "lax",
     )
 
 
