@@ -1,5 +1,4 @@
 from datetime import UTC, datetime
-import os
 from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -69,51 +68,53 @@ def _password_changed_at_epoch(user: User) -> int:
 def _password_reset_url(token: str) -> str:
     """Build the user-facing reset URL the endpoint logs at info level.
 
-    Centralized so the frontend route (``/reset-password?token=...``) and
-    the backend stay in sync — the design §"reset_version" links the two.
+    Centralized so the frontend route (``/reset?token=...``) and the
+    backend stay in sync — the design §"reset_version" links the two.
     """
     from app.core.config import get_settings
 
     settings = get_settings()
     base = settings.frontend_url.rstrip("/")
-    return f"{base}/reset-password?token={token}"
+    return f"{base}/reset?token={token}"
 
 
 def _set_token_cookie(response: Response, token: str) -> None:
-    """Set the JWT as an HttpOnly, SameSite=None cookie for browser-based auth.
+    """Set the JWT as an HttpOnly cookie for browser-based auth.
 
     SEC-1.5: dual-support migration — the cookie is the new primary path; the
     Authorization: Bearer header remains supported by get_current_user for legacy
-    clients. SameSite=None (with Secure=True) allows the cookie to be sent on
-    cross-origin fetch calls from the frontend (Vercel) to the API (Render).
+    clients. By default (``COOKIE_SECURE=true``) SameSite=None (with
+    Secure=True) allows the cookie to be sent on cross-origin fetch calls
+    from the frontend (Vercel) to the API (Render). With
+    ``COOKIE_SECURE=false`` (plain-HTTP LAN) the cookie uses Secure=False +
+    SameSite=Lax — browsers drop Secure cookies over plain HTTP, and
+    SameSite=None requires Secure.
     """
-    cookie_secure = os.getenv("AUTH_COOKIE_SECURE", "true").lower() == "true"
-    cookie_samesite = "none" if cookie_secure else "lax"
-    cookie_path = os.getenv("AUTH_COOKIE_PATH", "/")
+    from app.core.config import get_settings
 
+    secure = get_settings().cookie_secure
     response.set_cookie(
         key=TOKEN_COOKIE_NAME,
         value=token,
         max_age=TOKEN_COOKIE_MAX_AGE_SECONDS,
         httponly=True,
-        secure=cookie_secure,
-        samesite=cookie_samesite,
-        path=cookie_path,
+        secure=secure,
+        samesite="none" if secure else "lax",
+        path="/",
     )
 
 
 def _clear_token_cookie(response: Response) -> None:
-    """Delete the JWT cookie on logout."""
-    cookie_secure = os.getenv("AUTH_COOKIE_SECURE", "true").lower() == "true"
-    cookie_samesite = "none" if cookie_secure else "lax"
-    cookie_path = os.getenv("AUTH_COOKIE_PATH", "/")
+    """Delete the JWT cookie on logout (flags must match the set path)."""
+    from app.core.config import get_settings
 
+    secure = get_settings().cookie_secure
     response.delete_cookie(
         key=TOKEN_COOKIE_NAME,
-        path=cookie_path,
+        path="/",
         httponly=True,
-        secure=cookie_secure,
-        samesite=cookie_samesite,
+        secure=secure,
+        samesite="none" if secure else "lax",
     )
 
 
