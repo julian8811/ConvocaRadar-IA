@@ -3,6 +3,8 @@
 Checklist for evaluators to clone, configure, and run the production stack unaided
 via `docker-compose.server.yml` (standalone, see `docs/deploy-universidad.md` as canonical).
 
+Guía general de despliegue (cloud + índice de anexos): `DEPLOYMENT.md`. Qué vive dónde (local vs servidor): `docs/estructura-local-vs-servidor.md`.
+
 ## 1. Requisitos previos
 
 - Ubuntu 22.04+ (VM de la universidad) with Docker Engine ≥ 24 + Compose v2 (`docker compose version`)

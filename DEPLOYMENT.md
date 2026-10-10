@@ -1,77 +1,53 @@
 # Deployment — ConvocaRadar IA
 
-## Architecture
+Guía canónica breve: qué se despliega dónde. El detalle paso a paso vive en los anexos; esta guía no lo duplica.
 
-### Opción A — Cloud (actual)
+## Dónde se despliega qué
 
-```
-Frontend (Vercel) ──→ API (Render) ──→ Database (Neon)
-                                        └── PostgreSQL + pgvector
-```
+| Destino | Qué corre | Documento con el detalle |
+|---------|-----------|--------------------------|
+| Vercel (Hobby) | Frontend web (Next.js App Router) | Esta guía (§ Cloud) |
+| Render (Web Service) | API (FastAPI + SQLAlchemy) | Esta guía (§ Cloud) |
+| Neon (Free) | PostgreSQL + pgvector (base cloud) | Esta guía (§ Cloud) |
+| Servidor universitario | Stack autónomo `docker-compose.server.yml`: web tras Nginx + api, postgres, minio, worker y backup en red interna | `docs/deploy-universidad.md` (anexo técnico) |
+| Entrega a evaluadores | Clonar, configurar, levantar y verificar el stack sin ayuda | `docs/entrega-universidad.md` (anexo de entrega) |
 
-- **Frontend**: Vercel Hobby — Next.js App Router
-- **API**: Render Web Service — FastAPI + SQLAlchemy
-- **Database**: Neon Free — PostgreSQL + pgvector
-- **Storage**: Cloudflare R2 or local filesystem
+Almacenamiento: Cloudflare R2 o sistema de archivos local (según entorno).
 
-### Opción B — Servidor universitario (self-hosted, recomendado para entrega)
+Otros documentos (solo mención, no se duplican aquí): `docs/restore-runbook.md` (restauración y drill), `docs/estructura-local-vs-servidor.md` (qué vive dónde y qué diverge entre local y servidor), `docs/secret-rotation.md` (rotación de secretos).
 
-```
-Nginx/Caddy (80/443, TLS) ──→ web:3000  (Next.js)
-                          └──→ api:8000  (FastAPI)
-                                  ├── postgres:5432 (pgvector/pg16)
-                                  ├── minio:9000    (S3)
-                                  ├── worker        (scheduler)
-                                  └── backup        (pg_dump 03:30 UTC)
-```
+## Cloud (Vercel + Render)
 
-Todo el stack está en `docker-compose.yml`. Producción usa el overlay `docker-compose.prod.yml` (`docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d`) que elimina los puertos 5434/9004, añade `depends_on: service_healthy`, `read_only`/`cap_drop`/`no-new-privileges`/limits/`restart` y valida secretos vía `config.py`. Ver guía paso a paso en
-**`docs/deploy-universidad.md`**.
+Los despliegues corren vía GitHub Actions (`.github/workflows/deploy.yml`):
 
-## Required variables
+1. **CI** en push/PR a `main` — lint + test API + test web.
+2. **Deploy** cuando CI pasa en `main`: redeploy de la API en Render + `vercel deploy --prod` del frontend.
 
-| Variable | Description |
+## Servidor universitario
+
+Ruta documentada en el anexo técnico `docs/deploy-universidad.md`: compose autónomo del servidor, preflight obligatorio (`scripts/check-secrets.sh`, `scripts/server-preflight.sh`), Nginx como proxy reverso, verificación funcional y backup/restore. Para la entrega evaluada paso a paso, ver `docs/entrega-universidad.md`.
+
+Nota: el repositorio también contiene `docker-compose.prod.yml` (overlay sobre `docker-compose.yml`). Qué camino prod prevalece (standalone vs overlay) está pendiente de decisión en `odd/tasks/repo-higiene-estructura.md` (T4); el anexo técnico documenta el camino del servidor.
+
+## Variables requeridas
+
+| Variable | Descripción |
 |----------|-------------|
-| `DATABASE_URL` | PostgreSQL connection string (Neon o compose) |
-| `POSTGRES_PASSWORD` | Password de Postgres (compose) |
-| `MINIO_ROOT_PASSWORD` | Password de MinIO (compose) |
-| `JWT_SECRET` | JWT signing secret (min 32 chars) |
-| `INTERNAL_API_KEY` | Internal API key (min 32 chars) |
-| `RESET_TOKEN_SECRET` | Password reset token secret (min 32 chars) |
+| `DATABASE_URL` | Cadena de conexión PostgreSQL (Neon o compose) |
+| `POSTGRES_PASSWORD` | Clave de Postgres (compose) |
+| `MINIO_ROOT_PASSWORD` | Clave de MinIO (compose) |
+| `JWT_SECRET` | Firma JWT (mín. 32 caracteres) |
+| `INTERNAL_API_KEY` | Clave API interna (mín. 32 caracteres) |
+| `RESET_TOKEN_SECRET` | Secreto de restablecimiento de clave (mín. 32 caracteres) |
 
-See `.env.example` for all configurable variables and `.env.production.example` for producción cloud.
+Ver `.env.example` (todas las variables) y `.env.production.example` (producción cloud). Los valores del servidor se generan en el servidor según `docs/deploy-universidad.md` (§3).
 
-## Deploy workflow
-
-### Cloud (Vercel + Render)
-
-Deploys run via GitHub Actions (`.github/workflows/deploy.yml`):
-
-1. **CI** runs on push/PR to `main` — lint + test API + test web
-2. **Deploy** triggers when CI succeeds on `main`:
-   - Render API: triggers redeploy via Render API
-   - Vercel: `vercel deploy --prod`
-
-### Servidor universitario (prod overlay — entrega)
-
-```bash
-git clone https://github.com/julian8811/ConvocaRadar-IA.git && cd ConvocaRadar-IA
-cp .env.production.example .env && nano .env   # completar 5 secretos + FRONTEND_URL/BACKEND_URL
-# Generate secrets: openssl rand -base64 24 (POSTGRES/MINIO) y openssl rand -base64 48 (JWT/INTERNAL/RESET)
-docker compose -f docker-compose.yml -f docker-compose.prod.yml build --pull
-docker compose -f docker-compose.yml -f docker-compose.prod.yml up -d
-curl -fsS http://localhost:8002/api/v1/health/live   # health live
-curl -fsS http://localhost:8002/api/v1/health/ready  # health ready (DB + migrations)
-```
-
-Detalle completo: `docs/entrega-universidad.md` (6 secciones: requisitos, .env + secretos, prod up, health URLs, backup/restore, troubleshooting) + `docs/restore-runbook.md` + `docs/deploy-universidad.md`.
-
-## Local development
+## Desarrollo local
 
 ```bash
 # API + DB + Storage
 docker compose up
 
-# Or standalone API
+# O API aislada
 cd apps/api && pip install -e ".[dev]" && uvicorn app.main:app --reload
 ```
