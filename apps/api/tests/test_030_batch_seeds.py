@@ -29,7 +29,7 @@ BATCH_URLS = {
     "eafit-becas-financiacion": "https://www.eafit.edu.co/becas-y-financiacion",
     "hubbog-aceleracion": "https://www.hubbog.com/",
     "urosario-fondos-concursables": (
-        "https://urosario.edu.co/investigacion/formas-de-incentivos-y-convocatorias"
+        "https://urosario.edu.co/investigacion-y-extension/apoyo-e-infraestructura/fondos-concursables"
     ),
     "hhmi-programs": "https://www.hhmi.org/programs",
 }
