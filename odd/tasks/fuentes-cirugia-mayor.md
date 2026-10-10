@@ -21,8 +21,11 @@ Decisión explícita del usuario: cirugía mayor (opción a).
 
 ## Tasks
 - [x] **F0 (P0 padre)** ✅ Probes 2026-10-10: F&T v2 con `apiKey=SEDIA` → 200 + metadata (ERC/MSCA/CREA), sin cuenta necesaria. Render Chromium en api OK: sloan = challenge Cloudflare (28KB, sin fix), ccb = Access Denied 337B (sin fix), findeter = página completa 387KB con título (contenido accesible, falla el parse → F1/F2). Script vía stdin (`docker exec -i`, rootfs read-only impide `docker cp`).
-- [x] **F1 (P0 writer)** ✅ 2026-10-10 Conector F&T v2 parametrizado (erc/horizon/msca/creative) con filtros por programa + tests fixtures del probe; conectores viejos pruneados. Commits `cd72be2` (feat: conector unificado + migración) + `af3e181` (refactor: prune v1). Rama `feature/fuentes-f1-ftv2`, sin push (portea el padre con rebuild+reseed y verifica por fuente).
-- [ ] **F2 (P1 writer)** Flag render opt-in (`force_render`/`wait_selector`) en `ConfigurableHtml` o dedicado (danida primero); evaluar slot 1→2.
+- [x] **F1 (P0 writer)** ✅ 2026-10-10 Conector F&T v2 parametrizado (erc/horizon/msca/creative) con filtros por programa + tests fixtures del probe; conectores viejos pruneados. Commits `cd72be2` (feat: conector unificado + migración) + `af3e181` (refactor: prune v1). PR #46 mergeado (`1b81529`). Verificado live: erc 48, horizon 17, msca 11, creative 27, todos success. Incidente: parsing shell frágil ocultó el run msca (el run SÍ ocurrió); lección: body a fichero + parse python.
+- [x] **F2 (P1 writer)** ✅ 2026-10-10 Flag render opt-in en `ConfigurableHtml`: `force_render: bool=False` + `wait_selector: str|None=None` en `HtmlConnectorConfig`/`from_dict`; `fetch` renderiza SIEMPRE vía `render_page_html` (domcontentloaded, 45s, post-wait 800ms) cuando el flag está on, sin gate de tamaño; fallo de render conserva el contenido httpx. Gate `browser_fallback<1500` y slot playwright=1 INTACTOS. danida-denmark: base_url → `/en/danida/calls-for-proposals/` (DynamicWeb currentPageId 10308, GET 200/52KB con `js-dynamic-list-module`, 0 calls en SSR) + `force_render=true`, `wait_selector=.js-dynamic-list-module`. Commits `0ad842a` (flag+12 tests) + `3290fe5` (seed danida). Rama `feature/fuentes-f2-render`, sin push (portea el padre con rebuild+reseed y verifica por fuente).
+  - Diseño: opt-in explícito default-off (ninguna de las 10 duras lo tenía; solo danida lo lleva ahora); reemplazo de contenido solo si el render no viene vacío; `wait_selector` best-effort (falla → post-wait, sin romper fetch).
+  - RECOMENDACIÓN slot 1→2 (NO aplicada): si el sweep muestra renders concurrentes encolados (timeout "Timed out waiting for a Playwright slot"), subir `playwright: max_concurrent` 1→2 en `domain_budget.py:64`. Costo: ~150–300MB RAM extra por browser concurrente; con Chromium ya en imagen y frecuencia weekly de danida, slot=1 alcanza para F2 — reevaluar solo con evidencia de cola en F3 (finep/startup).
+  - Pendiente del padre: verify live por fuente (rebuild+reseed-force; danida debería pasar de 0 a N calls); selectores de lista son best-effort sobre DOM renderizado (ajustar contra snapshot real si el parse da 0).
 - [ ] **F3 (P1)** Descubrimiento JS (finep Liferay, startup split con aprobación) + dictámenes.
 - [ ] **F4 (P1)** Cuarentenas verificadas + T4 ruido + T5 timeouts + T6 sweep cierre.
 
@@ -32,6 +35,7 @@ Decisión explícita del usuario: cirugía mayor (opción a).
 ## Progress
 - 2026-10-10: doc creado (5 tareas F0–F4). Mapa explorer completo. Mirror Engram pendiente.
 - 2026-10-10: F0 completo (padre inline). sloan/ccb → cuarentena con motivo (WAF persiste con render); findeter Parisable.
+- 2026-10-10: F2 completo (writer, commits `0ad842a`+`3290fe5`): RED danida-sin-flag→0 renders / flag-sin-cablear→no-op (8 failed); GREEN 12/12 + triangulación 1613 passed (+60 test_api.py) + 91 seeds; `ruff check` limpio (format-diffs preexistentes no tocados).
 
 ## Verification evidence
 - F1 (writer, rama `feature/fuentes-f1-ftv2`, commits `cd72be2`+`af3e181`, sin push):
@@ -48,4 +52,4 @@ Decisión explícita del usuario: cirugía mayor (opción a).
   | eu-creative-europe-calls | Creative Europe, CREA | id `CREA*`, `\bCREA\b`, phrase | html+ConfigurableHtml→api |
 
 ## Next step
-- F1: conector F&T v2 parametrizado (writer).
+- F3: descubrimiento JS (finep Liferay, startup split con aprobación) + dictámenes.
