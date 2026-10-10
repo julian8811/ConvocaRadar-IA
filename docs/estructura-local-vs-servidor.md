@@ -15,7 +15,7 @@ Raíz: `README.md`, `DEPLOYMENT.md`, `CONTRIBUTING.md`, `VERSIONING.md`, `CHANGE
 | `apps/backup/` | Solo `Dockerfile`; la lógica vive en `scripts/backup-*` |
 | `scripts/` | ~30 ficheros (`.py` / `.sh` / `.mjs`), sin `README`. Incluye `check-secrets.sh`, `server-preflight.sh`, `trigger-render-deploy.sh`, `verify_latest_backup.sh`, `crontab-backup` y la familia `backup-cycle.sh` / `backup-loop.sh` / `backup_offsite.py` |
 | `docs/` | `deploy-universidad.md`, `entrega-universidad.md`, `restore-runbook.md`, `scraper.md` (describe el ciclo "021", probablemente desactualizado), `secret-rotation.md`, `security/` |
-| Compose | `docker-compose.yml` (dev: puertos 5434/9004-5/8002/3002), `docker-compose.server.yml` (prod standalone, web en `127.0.0.1:3001`), `docker-compose.prod.yml` (overlay) |
+| Compose | `docker-compose.yml` (dev: puertos 5434/9004-5/8002/3002), `docker-compose.server.yml` (prod standalone canónico, web en `127.0.0.1:3001`) |
 | `.github/` + CI | `ci.yml` (8 jobs), `deploy.yml` (Render `srv-d938h6m7r5hc73bo7u00` + Vercel + healthcheck), además `health-check.yml`, `keep-alive.yml`, `release.yml` |
 
 ## Servidor (datos provistos, sin re-inspección remota)
