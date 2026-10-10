@@ -710,11 +710,15 @@ def seed_default_sources(
                 "detail_enrichment": False,
             },
         },
+        # F3 (fuentes-cirugia-mayor): split aprobado por el usuario. La URL
+        # agregada /postula/ no trae links de convocatorias en SSR (programas
+        # solo en nav + secciones Vue); cada programa tiene pagina propia con
+        # SSR extraible (descripcion + monto + bases PDF + link apply).
         {
-            "key": "startup-chile",
-            "name": "Start-Up Chile Apply",
+            "key": "startup-chile-build",
+            "name": "Start-Up Chile — Build",
             "enabled": True,
-            "base_url": "https://startupchile.org/postula/",
+            "base_url": "https://startupchile.org/postula/build/",
             "country": "Chile",
             "region": "LatAm",
             "source_type": "html",
@@ -722,18 +726,66 @@ def seed_default_sources(
             "allowed_domains": ["startupchile.org", "www.startupchile.org"],
             "scraping_frequency": "weekly",
             "connector_config": {
-                "list_selectors": ["article", "main a[href*='convocatoria']", "main a[href*='call']", "main a[href*='grant']", "main a[href*='apply']", "main a[href*='postula']", "main"],
-                "title_selectors": ["h2", "h3", "a", "h1"],
+                "list_selectors": ["section", "article", "main"],
+                "title_selectors": ["h1", "h2", "h3", "a"],
                 "link_selectors": [
-                    "a[href*='convocatoria']",
-                    "a[href*='call']",
-                    "a[href*='grant']",
+                    "a[href$='.pdf']",
                     "a[href*='apply']",
                     "a[href*='postula']",
                     "a",
                 ],
-                "content_selectors": ["article", "main", ".entry-content"],
-                "date_labels": ["hasta el", "closes on", "Deadline:", "Cierre:"],
+                "content_selectors": ["main", "article", ".entry-content"],
+                "date_labels": ["convocatoria", "hasta el", "Deadline:", "Cierre:"],
+                "detail_enrichment": False,
+            },
+        },
+        {
+            "key": "startup-chile-growth",
+            "name": "Start-Up Chile — Growth",
+            "enabled": True,
+            "base_url": "https://startupchile.org/postula/growth/",
+            "country": "Chile",
+            "region": "LatAm",
+            "source_type": "html",
+            "category": ["convocatorias", "emprendimiento", "aceleradora"],
+            "allowed_domains": ["startupchile.org", "www.startupchile.org"],
+            "scraping_frequency": "weekly",
+            "connector_config": {
+                "list_selectors": ["section", "article", "main"],
+                "title_selectors": ["h1", "h2", "h3", "a"],
+                "link_selectors": [
+                    "a[href$='.pdf']",
+                    "a[href*='apply']",
+                    "a[href*='postula']",
+                    "a",
+                ],
+                "content_selectors": ["main", "article", ".entry-content"],
+                "date_labels": ["convocatoria", "hasta el", "Deadline:", "Cierre:"],
+                "detail_enrichment": False,
+            },
+        },
+        {
+            "key": "startup-chile-ignite",
+            "name": "Start-Up Chile — Ignite",
+            "enabled": True,
+            "base_url": "https://startupchile.org/postula/ignite/",
+            "country": "Chile",
+            "region": "LatAm",
+            "source_type": "html",
+            "category": ["convocatorias", "emprendimiento", "aceleradora"],
+            "allowed_domains": ["startupchile.org", "www.startupchile.org"],
+            "scraping_frequency": "weekly",
+            "connector_config": {
+                "list_selectors": ["section", "article", "main"],
+                "title_selectors": ["h1", "h2", "h3", "a"],
+                "link_selectors": [
+                    "a[href$='.pdf']",
+                    "a[href*='apply']",
+                    "a[href*='postula']",
+                    "a",
+                ],
+                "content_selectors": ["main", "article", ".entry-content"],
+                "date_labels": ["convocatoria", "hasta el", "Deadline:", "Cierre:"],
                 "detail_enrichment": False,
             },
         },
@@ -3597,7 +3649,7 @@ def seed_default_sources(
             "key": "finep-brasil",
             "name": "FINEP Brasil — Oportunidades",
             "enabled": True,
-            "base_url": "https://www.finep.gov.br/oportunidades",
+            "base_url": "https://www.finep.gov.br/o/c/chamadapublicas?sort=dataDePublicacao:desc",
             "country": "Brazil",
             "region": "LatAm",
             "source_type": "html",
@@ -4234,7 +4286,7 @@ def seed() -> None:
                 )
             )
 
-        # Create all 201 sources WITHOUT an organization_id (unowned).
+        # Create all 202 sources WITHOUT an organization_id (unowned).
         # This allows ANY org to claim them when they register, via the
         # query (organization_id IS NULL) in the sources endpoint and
         # the seed_default_sources claim logic in enqueue_seed_default_sources.

@@ -1,26 +1,49 @@
 """Tests for the FINEP/Brazilian opportunity portal connector.
 
-FinepConnector extends GenericHtmlConnector without overrides — it exists
-as a dedicated type so the factory can route ``finep-brasil`` to a
-specific class for future customisation.
+F3 (fuentes-cirugia-mayor): ``FinepConnector`` reads the public Liferay
+headless custom-object endpoint ``GET /o/c/chamadapublicas`` (no auth) —
+the ``/oportunidades`` landing renders its list client-side, so HTML
+scraping yields zero. See ``tests/test_finep_api.py`` for real-fixture
+coverage; this file pins fetch/validate/routing behaviour.
 """
 
 from __future__ import annotations
 
+import json
+
 import pytest
 
 from app.connectors.base import OpportunityCandidate, RawSourceResult
-from app.connectors.brazil_portals import FinepConnector
+from app.connectors.brazil_portals import FINEP_API_URL, FinepConnector
 from app.connectors.factory import connector_for
 from tests.connector_fixtures import apply_fixture_data
 
-_SAMPLE_HTML = """<html><body>
-  <a href="/chamada/1">Chamada Pública para Inovação 2027</a>
-  <a href="/chamada/2">Chamada Econômica para Startups</a>
-</body></html>"""
+_LISTING_URL = "https://www.finep.gov.br/oportunidades"
 
-_EMPTY_HTML = "<html><body></body></html>"
-_GARBAGE_HTML = "not useful content at all"
+_SAMPLE_PAYLOAD = {
+    "items": [
+        {
+            "id": 1060720,
+            "titulo": "Finep COOPERAMAIS Brasil Tecnologias – Empresas",
+            "situacao": {"key": "aberta", "name": "Aberta"},
+            "dataDePublicacao": "2026-09-22T00:00:00.000Z",
+            "vigenciaInicio": "2026-09-22T00:00:00.000Z",
+            "prazoProposto": "2027-04-30T17:00:00.000Z",
+            "descricaoRawText": "Seleção pública MCTI/FINEP/FNDCT em fluxo contínuo",
+        },
+        {
+            "id": 968467,
+            "titulo": "DESAFIO TECNOLÓGICO ELETROLISADOR NACIONAL",
+            "situacao": {"key": "encerrada", "name": "Encerrada"},
+            "dataDePublicacao": "2025-01-01T00:00:00.000Z",
+            "descricaoRawText": "Desafio encerrado",
+        },
+    ],
+    "totalCount": 478,
+}
+
+_EMPTY_PAYLOAD = {"items": [], "totalCount": 478}
+_GARBAGE = "not useful content at all"
 
 
 # ── fetch + parse (using shared connector_factory from conftest) ────────────
@@ -31,14 +54,14 @@ class TestFetchAndParse:
     async def test_fetch_and_parse_yields_candidates(self, connector_factory):
         connector, mocks = connector_factory(
             "finep-brasil",
-            base_url="https://www.finep.gov.br/oportunidades",
+            base_url=FINEP_API_URL,
             source_type="html",
         )
         apply_fixture_data(mocks, "httpx-get-html", "sample")
         mocks["fetch_httpx_text"].return_value = (
-            "https://www.finep.gov.br/oportunidades",
-            _SAMPLE_HTML,
-            "text/html",
+            FINEP_API_URL,
+            json.dumps(_SAMPLE_PAYLOAD),
+            "application/json",
         )
 
         raw = await connector.fetch()
@@ -55,34 +78,35 @@ class TestFetchAndParse:
     async def test_parse_extracts_chamadas_publicas(self, connector_factory):
         connector, mocks = connector_factory(
             "finep-brasil",
-            base_url="https://www.finep.gov.br/oportunidades",
+            base_url=FINEP_API_URL,
             source_type="html",
         )
         apply_fixture_data(mocks, "httpx-get-html", "sample")
         mocks["fetch_httpx_text"].return_value = (
-            "https://www.finep.gov.br/oportunidades",
-            _SAMPLE_HTML,
-            "text/html",
+            FINEP_API_URL,
+            json.dumps(_SAMPLE_PAYLOAD),
+            "application/json",
         )
         raw = await connector.fetch()
         candidates = await connector.parse(raw)
         titles = [c.title for c in candidates]
 
-        assert "Chamada Pública para Inovação 2027" in titles
-        assert "Chamada Econômica para Startups" in titles
+        assert "Finep COOPERAMAIS Brasil Tecnologias – Empresas" in titles
+        # Encerrada history stays out.
+        assert "DESAFIO TECNOLÓGICO ELETROLISADOR NACIONAL" not in titles
 
     @pytest.mark.asyncio
-    async def test_parse_empty_html_returns_empty_list(self, connector_factory):
+    async def test_parse_empty_items_returns_empty_list(self, connector_factory):
         connector, mocks = connector_factory(
             "finep-brasil",
-            base_url="https://www.finep.gov.br/oportunidades",
+            base_url=FINEP_API_URL,
             source_type="html",
         )
         apply_fixture_data(mocks, "httpx-get-html", "sample")
         mocks["fetch_httpx_text"].return_value = (
-            "https://www.finep.gov.br/oportunidades",
-            _EMPTY_HTML,
-            "text/html",
+            FINEP_API_URL,
+            json.dumps(_EMPTY_PAYLOAD),
+            "application/json",
         )
         raw = await connector.fetch()
         candidates = await connector.parse(raw)
@@ -92,14 +116,14 @@ class TestFetchAndParse:
     async def test_parse_garbage_does_not_raise(self, connector_factory):
         connector, mocks = connector_factory(
             "finep-brasil",
-            base_url="https://www.finep.gov.br/oportunidades",
+            base_url=FINEP_API_URL,
             source_type="html",
         )
         apply_fixture_data(mocks, "httpx-get-html", "sample")
         mocks["fetch_httpx_text"].return_value = (
-            "https://www.finep.gov.br/oportunidades",
-            _GARBAGE_HTML,
-            "text/html",
+            FINEP_API_URL,
+            _GARBAGE,
+            "application/json",
         )
         raw = await connector.fetch()
         candidates = await connector.parse(raw)
@@ -109,7 +133,7 @@ class TestFetchAndParse:
     async def test_fetch_raises_on_network_error(self, connector_factory):
         connector, mocks = connector_factory(
             "finep-brasil",
-            base_url="https://www.finep.gov.br/oportunidades",
+            base_url=FINEP_API_URL,
             source_type="html",
         )
         apply_fixture_data(
@@ -128,14 +152,14 @@ class TestValidate:
     async def test_validate_passes_valid_candidate(self, connector_factory):
         connector, _ = connector_factory(
             "finep-brasil",
-            base_url="https://www.finep.gov.br/oportunidades",
+            base_url=FINEP_API_URL,
             source_type="html",
         )
         candidate = OpportunityCandidate(
             title="Chamada FINEP 2027",
             entity="FINEP",
             country="Brazil",
-            official_url="https://www.finep.gov.br/chamada/1",
+            official_url=_LISTING_URL,
         )
 
         result = await connector.validate(candidate)
@@ -145,14 +169,14 @@ class TestValidate:
     async def test_validate_rejects_missing_title(self, connector_factory):
         connector, _ = connector_factory(
             "finep-brasil",
-            base_url="https://www.finep.gov.br/oportunidades",
+            base_url=FINEP_API_URL,
             source_type="html",
         )
         candidate = OpportunityCandidate(
             title="",
             entity="FINEP",
             country="Brazil",
-            official_url="https://www.finep.gov.br/chamada/1",
+            official_url=_LISTING_URL,
         )
 
         result = await connector.validate(candidate)
