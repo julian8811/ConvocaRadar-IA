@@ -106,6 +106,24 @@ class TestFetch:
         assert "order=desc" in call_url
         assert "search.worldbank.org" in call_url
 
+    @pytest.mark.asyncio
+    async def test_fetch_is_bounded_without_render(self, connector, mock_fetch):
+        """RED: JSON API must be short, single-attempt, render-free.
+
+        Server evidence 2026-10-10: TimeoutError at the 180s cap. Diagnosis
+        (1 respectful fetch rows=5): 200 in 0.4s — healthy. The slow phase is
+        the unbounded client config (120s x2 + render). Worst case >400s.
+        """
+        mock_fetch.return_value = ("", "{}", "application/json")
+
+        await connector.fetch()
+
+        mock_fetch.assert_awaited_once()
+        call = mock_fetch.await_args_list[0]
+        assert call.kwargs.get("timeout_seconds") == 30
+        assert call.kwargs.get("retries") == 1
+        assert call.kwargs.get("playwright_fallback") is False
+
 
 # ── parse tests ───────────────────────────────────────────────────────────
 
