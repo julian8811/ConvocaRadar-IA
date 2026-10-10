@@ -1103,7 +1103,7 @@ def seed_default_sources(
             "allowed_domains": ["faperj.br", "www.faperj.br"],
             "scraping_frequency": "weekly",
             "connector_config": {
-                "list_selectors": ["article", "main a[href*='convocatoria']", "main a[href*='call']", "main a[href*='edital']", "main a[href*='grant']", "main p", "main li"],
+                "list_selectors": ["article", "main a[href*='convocatoria']", "main a[href*='call']", "main a[href*='edital']", "main a[href*='grant']", "main p", "main li", "section.corpo-interna a[href*='Edital']", "div.tamanho-fonte a[href*='Edital']", "div.tamanho-fonte a[href*='edital']", "section.corpo-interna a[href*='.pdf']"],
                 "title_selectors": ["a", "strong", "em", "h2", "h3"],
                 "link_selectors": [
                     "a[href*='convocatoria']",
