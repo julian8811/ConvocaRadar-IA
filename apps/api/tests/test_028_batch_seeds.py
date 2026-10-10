@@ -1,6 +1,9 @@
-"""028 global high-volume seeds: enable WB/DA + six ConfigurableHtml sources.
+"""028 global high-volume seeds: enable WB/DA + five ConfigurableHtml sources.
 
 AST checks only — no live HTTP.
+
+NOTE (F1 fuentes-cirugia-mayor): msca-funding migrated to the unified F&T v2
+connector (source_type api) — see tests/test_ft_search_v2.py.
 """
 
 from __future__ import annotations
@@ -30,7 +33,6 @@ NEW_KEYS = (
     "usa-gov-challenges",
     "fogarty-funding-opps",
     "embo-fellowships",
-    "msca-funding",
     "open-society-grants",
     "who-tdr-grants",
 )
@@ -43,7 +45,6 @@ NEW_URLS = {
     "embo-fellowships": (
         "https://www.embo.org/funding/fellowships-grants-and-career-support/"
     ),
-    "msca-funding": "https://marie-sklodowska-curie-actions.ec.europa.eu/funding",
     "open-society-grants": "https://www.opensocietyfoundations.org/grants",
     "who-tdr-grants": "https://tdr.who.int/grants",
 }
@@ -52,7 +53,6 @@ NEW_DOMAIN_HINTS = {
     "usa-gov-challenges": ("usa.gov",),
     "fogarty-funding-opps": ("fic.nih.gov", "grants.nih.gov"),
     "embo-fellowships": ("embo.org",),
-    "msca-funding": ("marie-sklodowska-curie-actions.ec.europa.eu",),
     "open-society-grants": ("opensocietyfoundations.org",),
     "who-tdr-grants": ("tdr.who.int",),
 }

@@ -45,6 +45,13 @@ BATCH_COUNTRIES = {
     "erasmus-plus-opportunities": "European Union",
 }
 
+# F1 fuentes-cirugia-mayor: migrated to the unified F&T v2 connector
+# (source_type api) — covered by tests/test_ft_search_v2.py, excluded from the
+# ConfigurableHtml-specific assertions below (catalog presence/tier still hold).
+V2_MIGRATED = frozenset({"eu-creative-europe-calls"})
+
+HTML_BATCH_KEYS = tuple(k for k in BATCH_KEYS if k not in V2_MIGRATED)
+
 
 def _seed_definitions_by_key() -> dict[str, dict]:
     seed_path = Path(__file__).resolve().parents[1] / "app" / "db" / "seed.py"
@@ -63,7 +70,7 @@ def _seed_definitions_by_key() -> dict[str, dict]:
 
 def test_039_keys_enabled_and_configurable():
     defs = _seed_definitions_by_key()
-    for key in BATCH_KEYS:
+    for key in HTML_BATCH_KEYS:
         assert key in defs, f"missing {key}"
         definition = defs[key]
         assert definition.get("enabled", True) is True, f"{key} not enabled"
@@ -114,7 +121,7 @@ def test_039_sicon_allowed_domain():
     sicon = defs["sicon-bogota-estimulos"]
     assert "sicon.scrd.gov.co" in sicon["allowed_domains"]
     # Also check factory
-    for key in BATCH_KEYS:
+    for key in HTML_BATCH_KEYS:
         connector = connector_for(
             key,
             BATCH_URLS[key],

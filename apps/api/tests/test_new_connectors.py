@@ -1,4 +1,4 @@
-"""Tests for 4 new connectors: ERC, COST, CARICOM, ASCUN."""
+"""Tests for 4 new connectors: ERC (F&T v2 unified), COST, CARICOM, ASCUN."""
 
 from __future__ import annotations
 
@@ -8,14 +8,15 @@ import pytest
 
 from app.connectors.base import OpportunityCandidate, RawSourceResult
 from app.connectors.cost_open_calls import CostOpenCallsConnector
-from app.connectors.erc_calls import ErcCallsConnector
+from app.connectors.ft_search_v2 import ErcV2Connector
 from app.connectors.caricom import CaricomConnector
 from app.connectors.ascun import AscunConnector
 from app.connectors.registry import registered_keys
 
 # ── Fixture data ────────────────────────────────────────────────────────────
 
-ERC_SAMPLE = """{"results": [{"identifier": "ERC-2026-StG", "title": "ERC Starting Grant 2026", "shortDescription": ["Funding for early-career researchers"], "contentDate": "2026-01-15T00:00:00.000Z", "deadlineDate": ["2026-10-15T00:00:00.000Z"]}]}"""
+# F&T search-API v2 shape (metadata.callTitle/callIdentifier/identifier/...).
+ERC_SAMPLE = """{"results": [{"summary": "ERC Starting Grant", "reference": "31086861sl", "metadata": {"callTitle": ["Call for proposals for ERC Starting Grant"], "callIdentifier": ["ERC-2026-STG"], "identifier": ["ERC-2026-STG"], "status": ["Ongoing"], "keywords": ["European Research Council"], "actions": [], "startDate": ["2025-07-03T00:00:00.000+0000"], "deadlineDate": ["2026-10-15T00:00:00.000+0000"]}}]}"""
 ERC_EMPTY = """{"results": []}"""
 ERC_GARBAGE = "not json"
 
@@ -48,20 +49,7 @@ def _mock_fetch(monkeypatch, data: tuple[str, str, str]) -> AsyncMock:
 class TestErcConnector:
     @pytest.mark.asyncio
     async def test_parse_sample(self):
-        conn = ErcCallsConnector()
-        raw = RawSourceResult(
-            source_key="erc-calls",
-            url="http://example.com",
-            content=ERC_SAMPLE,
-            content_type="application/json",
-        )
-        candidates = await conn.parse(raw)
-        assert len(candidates) >= 1
-        assert "Starting Grant" in candidates[0].title
-
-    @pytest.mark.asyncio
-    async def test_parse_sample(self):
-        conn = ErcCallsConnector()
+        conn = ErcV2Connector()
         raw = RawSourceResult(
             source_key="erc-calls",
             url="http://example.com",
@@ -74,7 +62,7 @@ class TestErcConnector:
 
     @pytest.mark.asyncio
     async def test_parse_empty(self):
-        conn = ErcCallsConnector()
+        conn = ErcV2Connector()
         raw = RawSourceResult(
             source_key="erc-calls",
             url="http://example.com",
@@ -86,15 +74,15 @@ class TestErcConnector:
 
     @pytest.mark.asyncio
     async def test_parse_garbage(self):
-        conn = ErcCallsConnector()
+        conn = ErcV2Connector()
         raw = RawSourceResult(
             source_key="erc-calls",
             url="http://example.com",
             content=ERC_GARBAGE,
             content_type="application/json",
         )
-        candidates = await conn.parse(raw)
-        assert isinstance(candidates, list)
+        with pytest.raises(Exception):
+            await conn.parse(raw)
 
     def test_registered(self):
         assert "erc-calls" in registered_keys()

@@ -21,7 +21,6 @@ from app.connectors.undef import UNDEFConnector  # noqa: F401 — @register side
 from app.connectors.ukri import UKRIConnector  # noqa: F401 — @register side effect
 from app.connectors.unwomen_innovate import UnwomenInnovateConnector  # noqa: F401 — @register side effect
 from app.connectors.wordpress_grants import WordPressGrantsConnector
-from app.connectors.horizon_sedia import HorizonSediaConnector  # noqa: F401 — @register side effect
 from app.connectors.mincit import MincitConvocatoriasConnector  # noqa: F401 — @register side effect
 from app.connectors.wellcome import WellcomeConnector  # noqa: F401 — @register side effect
 from app.connectors.bdn_convocatorias import BdnConvocatoriasConnector
@@ -40,8 +39,13 @@ from app.connectors.dane import DaneConnector
 from app.connectors.brazil_portals import FapemigConnector, FinepConnector
 from app.connectors.findeter import FindeterConnector  # noqa: F401 — @register side effect
 from app.connectors.uniandes import UniandesConnector  # noqa: F401 — @register side effect
-from app.connectors.erc_calls import ErcCallsConnector  # noqa: F401
 from app.connectors.cost_open_calls import CostOpenCallsConnector  # noqa: F401
+from app.connectors.ft_search_v2 import (  # noqa: F401 — @register side effect; overrides erc/horizon/msca/creative
+    CreativeEuropeV2Connector,
+    ErcV2Connector,
+    HorizonV2Connector,
+    MscaV2Connector,
+)
 from app.connectors.caricom import CaricomConnector  # noqa: F401
 from app.connectors.ascun import AscunConnector  # noqa: F401
 from app.connectors.world_bank import WorldBankConnector  # noqa: F401 — @register side effect
