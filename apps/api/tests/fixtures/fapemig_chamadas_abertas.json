@@ -1,0 +1,119 @@
+{
+ "data": [
+  {
+   "id": 195,
+   "titulo": "CHAMADA FAPEMIG - SEDE 018/2026 HUBMG GOV - RESOLUÇÃO DE DESAFIOS PÚBLICOS POR MEIO DE INOVAÇÃO ABERTA",
+   "numero": "018/2026",
+   "slug": "chamada-fapemig-sede-018-2026-hubmg-gov-resolucao-de-desafios-publicos-por-meio-de-inovacao-aberta",
+   "status_chamada": "aberta",
+   "fluxo_tipo": "prazo",
+   "publicacao_status": "publish",
+   "data_publicacao": "2026-10-09 09:51:29",
+   "data_inicio_submissao": "2026-10-09 14:11:00",
+   "data_fim_submissao": "2026-12-09 14:11:00",
+   "data_divulgacao_resultado": {
+    "label": "Resultado (Previsto)",
+    "data": "2027-03-31"
+   },
+   "descricao_chamada": "<p class=\"Texto_Justificado\">A Chamada HUBMG GOV busca aumentar a eficiência, a desburocratização e a inovação no setor público estadual, com foco na melhoria da qualidade da prestação dos serviços públicos, por meio do financiamento de projetos de pesquisa científica ou desenvolvimento tecnológico ",
+   "quem_pode_participar": "Empresas, cooperativas, startups e Instituições Científicas, Tecnológicas e de Inovação no Estado de Minas Gerais - ICTMG.\r\n\r\nTodas as Proponentes deverão ter pré-cadastro ou cadastro regular na FAPEM",
+   "valor": "20000000.00",
+   "programas_institucionais": {
+    "validate": {
+     "bolsa-de-iniciacao-cientifica-bic": false,
+     "bolsa-de-iniciacao-cientifica-junior-bic-jr": false,
+     "programa-de-apoio-a-pos-graduacao-papg": false,
+     "programa-de-capacitacao-de-recursos-humanos-pcrh": false
+    },
+    "selected": []
+   }
+  },
+  {
+   "id": 193,
+   "titulo": "CHAMADA PÚBLICA FAPEMIG/CNPQ/CAPES N. 17/2026 PROGRAMA DE APOIO À FIXAÇÃO DE DOUTORES NO BRASIL – PROFIX-CB",
+   "numero": "17/2026",
+   "slug": "chamada-publica-fapemig-cnpq-capes-n-17-2026-programa-de-apoio-a-fixacao-de-doutores-no-brasil-profix-cb",
+   "status_chamada": "aberta",
+   "fluxo_tipo": "prazo",
+   "publicacao_status": "publish",
+   "data_publicacao": "2026-09-14 10:35:23",
+   "data_inicio_submissao": "2026-09-15 08:00:00",
+   "data_fim_submissao": "2026-11-03 23:59:00",
+   "data_divulgacao_resultado": {
+    "label": "Resultado (Previsto)",
+    "data": "2027-01-05"
+   },
+   "descricao_chamada": "<p style=\"text-align: left\">Selecionar e apoiar projetos de pesquisa científica, tecnológica ou de inovação desenvolvidos por pesquisadores doutores vinculados a Programas de Pós-Graduação de Instituições Científicas, Tecnológicas e de Inovação do Estado de Minas Gerais (ICTMG), com o objetivo de fo",
+   "quem_pode_participar": "<div class=\"flex max-w-full flex-col gap-4 grow\">\r\n<div class=\"min-h-8 text-message relative flex w-full flex-col items-end gap-2 text-start break-words whitespace-normal outline-none keyboard-focused",
+   "valor": "4207600.00",
+   "programas_institucionais": {
+    "validate": {
+     "bolsa-de-iniciacao-cientifica-bic": false,
+     "bolsa-de-iniciacao-cientifica-junior-bic-jr": false,
+     "programa-de-apoio-a-pos-graduacao-papg": false,
+     "programa-de-capacitacao-de-recursos-humanos-pcrh": false
+    },
+    "selected": []
+   }
+  },
+  {
+   "id": 192,
+   "titulo": "Chamada FAPEMIG 004/2026 - Participação Coletiva em Eventos Técnicos no País - 3ª Entrada",
+   "numero": "004/2026",
+   "slug": "chamada-fapemig-004-2026-participacao-coletiva-em-eventos-tecnicos-no-pais-3a-entrada",
+   "status_chamada": "aberta",
+   "fluxo_tipo": "prazo",
+   "publicacao_status": "publish",
+   "data_publicacao": "2026-08-18 08:51:22",
+   "data_inicio_submissao": "2026-08-18 11:23:00",
+   "data_fim_submissao": "2026-12-31 17:00:00",
+   "data_divulgacao_resultado": {
+    "label": "Resultado (Previsto)",
+    "data": "2027-02-26"
+   },
+   "descricao_chamada": "A Chamada 04/2026 - PCE 3ª Entrada tem por objetivo incentivar a divulgação de resultados de pesquisas científicas, tecnológicas e de inovação desenvolvidas por pesquisadores das ICTs-MG e contribuir para a promoção do intercâmbio científico e tecnológico por meio do apoio à participação coletiva em",
+   "quem_pode_participar": "Participação de pesquisadores e estudantes mineiros em eventos de caráter científico e tecnológico para a apresentação de trabalhos relacionados às suas pesquisas.",
+   "valor": "5904000.00",
+   "programas_institucionais": {
+    "validate": {
+     "bolsa-de-iniciacao-cientifica-bic": false,
+     "bolsa-de-iniciacao-cientifica-junior-bic-jr": false,
+     "programa-de-apoio-a-pos-graduacao-papg": false,
+     "programa-de-capacitacao-de-recursos-humanos-pcrh": false
+    },
+    "selected": []
+   }
+  },
+  {
+   "id": 191,
+   "titulo": "CHAMADA FAPEMIG 007/2026 - Organização de Eventos de Caráter Técnico-Científico - OET 2ª Entrada",
+   "numero": "007/2026",
+   "slug": "chamada-fapemig-007-2026-organizacao-de-eventos-de-carater-tecnico-cientifico-oet-2a-entrada",
+   "status_chamada": "aberta",
+   "fluxo_tipo": "prazo",
+   "publicacao_status": "publish",
+   "data_publicacao": "2026-07-29 10:52:22",
+   "data_inicio_submissao": "2026-07-29 08:00:00",
+   "data_fim_submissao": "2026-10-27 17:00:00",
+   "data_divulgacao_resultado": {
+    "label": "Resultado (Previsto)",
+    "data": "2026-12-16"
+   },
+   "descricao_chamada": "Incentivar a divulgação de resultados de pesquisas científicas, tecnológicas e de inovação e contribuir para a promoção do intercâmbio científico e tecnológico por meio do apoio à organização de eventos científico-tecnológicos no Estado de Minas Gerais.",
+   "quem_pode_participar": "Pesquisadores que tenham vínculo empregatício (celetista, estatutário ou contratual) com ICTs-MG.",
+   "valor": "7500000.00",
+   "programas_institucionais": {
+    "validate": {
+     "bolsa-de-iniciacao-cientifica-bic": false,
+     "bolsa-de-iniciacao-cientifica-junior-bic-jr": false,
+     "programa-de-apoio-a-pos-graduacao-papg": false,
+     "programa-de-capacitacao-de-recursos-humanos-pcrh": false
+    },
+    "selected": []
+   }
+  }
+ ],
+ "total": 4,
+ "page": 1,
+ "per_page": 20
+}

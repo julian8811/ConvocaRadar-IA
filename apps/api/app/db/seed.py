@@ -1120,12 +1120,12 @@ def seed_default_sources(
         {
             "key": "fapemig-brasil",
             "name": "FAPEMIG Minas Gerais",
-            "base_url": "https://fapemig.br/pt/menu/editais/",
+            "base_url": "https://api.site.fapemig.br/wp-json/fapemig-chamadas-e-editais/v1/chamadas?status=aberta",
             "country": "Brazil",
             "region": "LatAm",
             "source_type": "html",
             "category": ["convocatorias", "ciencia", "estadual"],
-            "allowed_domains": ["fapemig.br", "www.fapemig.br"],
+            "allowed_domains": ["fapemig.br", "www.fapemig.br", "api.site.fapemig.br"],
             "scraping_frequency": "weekly",
         },
         {
