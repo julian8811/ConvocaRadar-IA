@@ -48,7 +48,9 @@ Decisión explícita del usuario: cirugía mayor (opción a).
 - 2026-10-10: doc creado (5 tareas F0–F4). Mapa explorer completo. Mirror Engram pendiente.
 - 2026-10-10: F0 completo (padre inline). sloan/ccb → cuarentena con motivo (WAF persiste con render); findeter Parisable.
 - 2026-10-10: F2 completo (writer, commits `0ad842a`+`3290fe5`): RED danida-sin-flag→0 renders / flag-sin-cablear→no-op (8 failed); GREEN 12/12 + triangulación 1613 passed (+60 test_api.py) + 91 seeds; `ruff check` limpio (format-diffs preexistentes no tocados).
-- 2026-10-10: F3 completo (writer, rama `feature/fuentes-f3-js`, commits `de6cc53`+`55c06b7`): RED finep-fixture→0 candidatos + seed-URL mismatch (3 failed) / split-keys→connector_config missing (8 failed); GREEN test_finep_api 7/7 + 026 18/18 + lote tocado 64 passed; `ruff check` limpio (6 ficheros).
+- 2026-10-10: findeter verificado live (unpause manual + runs): **100 ítems ×2 runs consecutivos, success** (created 3/updated 97, luego 0/100). Hallazgos: (1) el HTTP 500 del cliente era del path de respuesta con runs grandes, el run completaba igual — seguir con body a fichero; (2) endpoint single-run devuelve 500 si dispatcher retorna None (pausada en cooldown) en vez de 409 con motivo — bug real a corregir; (3) ascun/novo mueren EXACTO a ~90s (cap por fuente mata la fase persist: url-check HEAD por candidato + embeddings) — el fix es acotar persist, no fetch.
+ - 2026-10-10: F3 completo (writer, rama `feature/fuentes-f3-js`, commits `de6cc53`+`55c06b7`): RED finep-fixture→0 candidatos + seed-URL mismatch (3 failed) / split-keys→connector_config missing (8 failed); GREEN test_finep_api 7/7 + 026 18/18 + lote tocado 64 passed; `ruff check` limpio (6 ficheros).
+ - 2026-10-10: batch robustez sweep completo (writer, rama `feature/fuentes-persist-409-pines`, commits `b45b3ba`+`d47a799`+pin, sin push): persist acotada (ascun max_pages 3 + timebox remaining-5s + tope 50 + warmup concurrente) + 409 paused_cooldown/already_running + pines 039/040 201→203. Ver sección "Persist-409-pines evidence".
 
 ## Verification evidence
 - F1 (writer, rama `feature/fuentes-f1-ftv2`, commits `cd72be2`+`af3e181`, sin push):
@@ -76,3 +78,13 @@ Decisión explícita del usuario: cirugía mayor (opción a).
 - Descubrimiento: 5 GETs finep (landing + bundle 215KB + api p1/p2/p1000→cap 500) + 4 GETs startup (postula + 3 programas). Nada irreversible (lecturas + seed); split revierte con revert del seed.
 - Catálogo: 201→202 (startup-chile → 3 subfuentes; finep misma key).
 - Pendiente padre (verify por fuente): rebuild + reseed-force; finep debería dar ~35 candidatos (34 abertas + EUREKA); startup 1 c/u (PDF bases); DESACTIVAR fila huérfana `startup-chile` (el seed no borra).
+
+## Persist-409-pines evidence (writer 2026-10-10, rama `feature/fuentes-persist-409-pines`, sin push)
+| ítem | diseño (números) | commits |
+|---|---|---|
+| persist acotada | ascun-convocatorias resuelve a WordPressGrantsConnector por fallback `/wp-json/` (no a AscunConnector): max_pages 10→3 (precedente novo; fetch ≤~45s peor caso). `PERSIST_MAX_ITEMS_PER_RUN=50` + timebox `remaining-5s` (deadline monotónica): el run completa con lo alcanzado y deja `persist capped` visible en logs en vez de TimeoutError→failed. Warmup concurrente (semaforo 16, 15s) de `async_url_is_reachable` (misma fn + mismo TTL 24h, best-effort). Budget: 50×~2s≈100s peor caso frío, pero el timebox manda primero en envs lentos. services/ intacto. | `d47a799` |
+| 409 con motivo | `dispatch_block_reason()` espejo read-only de los skips del dispatcher (sin mutar pausa; dispatcher intacto). Endpoint responde 409 `paused_cooldown` (+retry_after_seconds) / `already_running` (+run_id). Casos: pausada-en-cooldown→409 sin crear run; run-en-curso→409 sin duplicar; cooldown vencido→pasa (200, semántica intacta). Colateral: `test_run_source_runs_inline` dejaba un `running` huérfano en la DB compartida (invisible antes); ahora se finaliza. | `b45b3ba` |
+| pines 039/040 | 201→**203** (verificado por AST + diff de keys: split startup-chile 1→3 = net +2, finep-brasil conservó key). OJO: la nota F3 decía 202 y el brief del batch decía 204 — ambas mal; el conteo vigente es 203. `grep 201` en tests/ solo deja los comentarios históricos. | pin (este batch) |
+- RED: 409 → 2×200 en vez de 409; persist → AttributeError (sin `_warm_url_cache`/deadline) + `max_pages=10`; pines → `got 203`.
+- GREEN: conflict 3 passed; persist_bounds 6 passed; 039+040 8 passed; lote tocado (persist-bounds/wordpress/scraper-module/resilience/sources/ascun/conflict) 47 passed; `ruff check` limpio.
+- Pendiente padre (verify por fuente, sin servidor del writer): ascun y novo deben completar <90s sin TimeoutError; confirmar `persist capped` en logs si acota; POST run sobre pausada→409.
