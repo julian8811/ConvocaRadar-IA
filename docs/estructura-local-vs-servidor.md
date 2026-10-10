@@ -6,7 +6,7 @@ Comparación verificada entre el repo local (`main`) y el servidor de producció
 
 ## Estructura local verificada (`main` en `eff02d8`, en sync con `origin/main`)
 
-Raíz: `README.md`, `DEPLOYMENT.md`, `CONTRIBUTING.md`, `VERSIONING.md`, `CHANGELOG.md`, `Makefile`, `package.json` (scripts `test:api` / `test:web` / `dev:api`), `pnpm-workspace.yaml` + `pnpm-lock.yaml`, `CNAME` (trackeado, apunta a `convocaradar-web.vercel.app`), `render.yaml`, `vercel.json`.
+Raíz: `README.md`, `DEPLOYMENT.md`, `CONTRIBUTING.md`, `VERSIONING.md`, `CHANGELOG.md`, `Makefile`, `package.json` (scripts `test:api` / `test:web` / `dev:api`), `pnpm-workspace.yaml` + `pnpm-lock.yaml`, `render.yaml`, `vercel.json`.
 
 | Área | Contenido verificado |
 |------|----------------------|
@@ -33,13 +33,13 @@ Host `10.3.1.128`. Repo en `/srv/apps/convocaradar` (symlink desde `~/apps/convo
 ## Divergencias local vs servidor
 
 - Al servidor le faltan 2 commits de `main`: `cd0ea27` (fix `isAbortError` DOM) y `8119f7a` (doc T4). El servidor NO está en `main`: sigue su rama `server/...` con HEAD `5a6efb3`.
-- `CNAME` existe y está trackeado en local; su vigencia en el flujo Vercel actual está sin decidir (borrar vs documentar).
+- `CNAME` (resto inerte del commit `051e200`, sin efecto en Vercel/Render/Pages): borrado en local en `cfad978` por decisión del usuario.
 - `apps/web/.gitignore` es 100 % redundante con `.gitignore:40-52`; pendiente eliminarlo en local (T1).
 
 ## Qué falta verificar
 
 - [ ] Estado real de `api` / `worker` / `db` en el servidor (caídos vs nunca desplegados en este host).
 - [ ] Porte de `cd0ea27` y `8119f7a` a la rama del servidor (o decisión de no portar).
-- [ ] Decisión `CNAME`: borrar vs documentar su propósito.
+- [x] Decisión `CNAME`: borrado en `cfad978` (era resto inerte).
 - [ ] `docs/scraper.md`: confirmar si el ciclo "021" sigue vigente o actualizarlo.
 - [ ] Secretos: solo nombres de claves en plantillas; rotación según `docs/secret-rotation.md` (ver `security/`).
