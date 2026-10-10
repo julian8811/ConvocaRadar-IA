@@ -50,6 +50,17 @@ export const RUN_ALL_TIMEOUT_MS = 120_000;
 export const RUN_ALL_ABORT_MESSAGE =
   "El barrido sigue ejecutándose en segundo plano; puedes seguir el progreso en esta página.";
 
+/**
+ * Single-source run: server-side scrapes take 30-90s+, so runSource()
+ * uses this long timeout (matching the server per-source cap) instead of
+ * the 12s default — same override pattern as runAllSources' 120s.
+ */
+export const RUN_SOURCE_TIMEOUT_MS = 180_000;
+
+/** Friendly message shown when a single-source run request itself aborts. */
+export const RUN_SOURCE_ABORT_MESSAGE =
+  "La ejecución está tardando más de lo esperado; vuelve a consultar el resultado en unos momentos.";
+
 /** T1: true for request aborts (DOM AbortError, cross-realm, or AbortError-shaped rejections).
  * Duck-types on `name` instead of `instanceof Error`: real browsers reject
  * fetch with a DOMException, which does NOT inherit from Error. */
@@ -320,7 +331,10 @@ export const api = {
   sourceHealth: () => request<SourceHealth[]>("/sources/health"),
   createSource: (payload: Record<string, unknown>) =>
     request<Source>("/sources", { method: "POST", body: JSON.stringify(payload) }),
-  runSource: (id: string) => request<SourceRun>(`/sources/${id}/run`, { method: "POST" }),
+  runSource: (id: string) =>
+    // Single scrapes run 30-90s+ server-side — never use the 12s default
+    // here or the UI reports an abort for a run that is still working.
+    request<SourceRun>(`/sources/${id}/run`, { method: "POST" }, RUN_SOURCE_TIMEOUT_MS),
   runAllSources: () =>
     // T1 (runall-abort): the sweep runs minutes server-side — never use the
     // 12s default here or the UI reports an abort for a sweep that started.
