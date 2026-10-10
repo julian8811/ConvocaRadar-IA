@@ -744,7 +744,7 @@ def seed_default_sources(
             "base_url": "https://calendario.proinnovate.gob.pe/",
             "country": "Peru",
             "region": "LatAm",
-            "source_type": "html",
+            "source_type": "pdf",
             "category": ["convocatorias", "innovacion", "emprendimiento"],
             "allowed_domains": [
                 "proinnovate.gob.pe",
@@ -752,14 +752,6 @@ def seed_default_sources(
                 "www.proinnovate.gob.pe",
             ],
             "scraping_frequency": "daily",
-            "connector_config": {
-                "list_selectors": ["table tbody tr", "table tr", "article", "main a[href*='convocatoria']", "main a[href*='call']"],
-                "title_selectors": ["td:first-child a", "td:first-child", "a", "h2", "h3"],
-                "link_selectors": ["a[href*='convocatoria']", "a[href*='call']", "a", "td:first-child a"],
-                "content_selectors": ["table", "main", "body", "article"],
-                "date_labels": ["Cierre:", "Apertura:", "Deadline:"],
-                "detail_enrichment": False,
-            },
         },
         {
             "key": "conicet-argentina",
@@ -1202,6 +1194,14 @@ def seed_default_sources(
             "category": ["convocatorias", "filantropia", "innovacion"],
             "allowed_domains": ["rockefellerfoundation.org", "www.rockefellerfoundation.org"],
             "scraping_frequency": "weekly",
+            "connector_config": {
+                "list_selectors": ["a[href*='residency-program'], a[href*='big-bets-fellowships'], a[href*='/convenings/']"],
+                "title_selectors": ["h2", "h3", "a"],
+                "link_selectors": ["a"],
+                "content_selectors": ["main", "article"],
+                "date_labels": ["Deadline:", "Closing date:", "Applications:"],
+                "detail_enrichment": False,
+            },
         },
         {
             "key": "mozilla-foundation",
@@ -1800,7 +1800,7 @@ def seed_default_sources(
             "key": "urosario-fondos-concursables",
             "name": "Universidad del Rosario — Fondos e Incentivos",
             "enabled": True,
-            "base_url": "https://urosario.edu.co/investigacion/formas-de-incentivos-y-convocatorias",
+            "base_url": "https://urosario.edu.co/investigacion-y-extension/apoyo-e-infraestructura/fondos-concursables",
             "country": "Colombia",
             "region": "LatAm",
             "source_type": "html",
@@ -1809,6 +1809,7 @@ def seed_default_sources(
             "scraping_frequency": "weekly",
             "connector_config": {
                 "list_selectors": [
+                    "div[id*='tab-convocatoria']",
                     ".card-hover-button",
                     ".card-dropdowm",
                     "article",
@@ -3801,7 +3802,7 @@ def seed_default_sources(
             "allowed_domains": ["jsps.go.jp"],
             "scraping_frequency": "weekly",
             "connector_config": {
-                "list_selectors": ["article", "main a[href*='grant']", "main a[href*='kakenhi']", "main a[href*='fellowship']", "main a[href*='fellow']", "main li a"],
+                "list_selectors": ["article", "main a[href*='grant']", "main a[href*='kakenhi']", "main a[href*='fellowship']", "main a[href*='fellow']", "main li a", "div.ww-text a[href*='grants01'], div.ww-text a[href*='lsrp'], div.ww-text a[href*='multi-year_fund']"],
                 "title_selectors": ["a", "h2", "h3"],
                 "link_selectors": ["a[href*='grant']", "a[href*='kakenhi']", "a[href*='fellowship']", "a[href*='fellow']", "a"],
                 "content_selectors": ["article", "main"],
@@ -3822,7 +3823,7 @@ def seed_default_sources(
             "allowed_domains": ["jsps.go.jp"],
             "scraping_frequency": "weekly",
             "connector_config": {
-                "list_selectors": ["article", "main a[href*='fellow']", "main a[href*='fellowship']", "main a[href*='grant']", "main a[href*='kakenhi']", "main li a"],
+                "list_selectors": ["article", "main a[href*='fellow']", "main a[href*='fellowship']", "main a[href*='grant']", "main a[href*='kakenhi']", "main li a", "div.ww-text a[href*='/e-fellow/e-']"],
                 "title_selectors": ["a", "h2", "h3"],
                 "link_selectors": ["a[href*='fellow']", "a[href*='fellowship']", "a[href*='grant']", "a"],
                 "content_selectors": ["article", "main"],
