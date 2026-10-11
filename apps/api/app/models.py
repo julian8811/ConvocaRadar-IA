@@ -244,6 +244,11 @@ class Opportunity(Base):
     country: Mapped[str] = mapped_column(String, index=True)
     region: Mapped[str | None] = mapped_column(String, nullable=True)
     categories: Mapped[list[str]] = mapped_column(JSON, default=list)
+    # T4 sectorization cache (hybrid classifier: rules/embeddings/llm).
+    # Nullable so pre-migration rows stay valid; backfill fills them.
+    sector: Mapped[str | None] = mapped_column(String, nullable=True)
+    sector_confidence: Mapped[float | None] = mapped_column(Float, nullable=True)
+    sector_source: Mapped[str | None] = mapped_column(String, nullable=True)
     topics: Mapped[list[str]] = mapped_column(JSON, default=list)
     description: Mapped[str] = mapped_column(Text, default="")
     summary: Mapped[str] = mapped_column(Text, default="")
