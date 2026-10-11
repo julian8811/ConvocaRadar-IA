@@ -78,7 +78,7 @@ class TestPilotDetailEnrichment:
         mock_fetch = _mock_detail_page(monkeypatch)
         candidate = _pilot_candidate(url="https://novonordiskfonden.dk/grant-1")
 
-        result = await enrich_pilot_candidates("novo-nordisk-grants", [candidate])
+        result = await enrich_pilot_candidates("danida-denmark", [candidate])
 
         assert result == [candidate]
         mock_fetch.assert_not_awaited()
@@ -166,7 +166,7 @@ class TestPilotDetailEnrichment:
         class _FakeConnector:
             async def fetch(self):
                 return RawSourceResult(
-                    source_key="novo-nordisk-grants",
+                    source_key="danida-denmark",
                     url="https://example.com/api",
                     content="<html></html>",
                     content_type="text/html",
@@ -182,8 +182,8 @@ class TestPilotDetailEnrichment:
             "app.connectors.factory.connector_for", lambda *a, **k: _FakeConnector()
         )
         source = Source(
-            name="Novo Nordisk",
-            key="novo-nordisk-grants",
+            name="Danida",
+            key="danida-denmark",
             base_url="https://example.com/api",
         )
 

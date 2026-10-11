@@ -8,7 +8,14 @@ from urllib.parse import parse_qs, urlencode, urlparse, urlunparse
 from app.core.config import get_settings
 from app.core.http_client import http_client
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
-from app.connectors.common import clean_text, is_allowed_host, parse_date_text, thin_fill_candidates
+from app.connectors.common import (
+    clean_text,
+    extract_funding_details,
+    is_allowed_host,
+    normalize_text,
+    parse_date_text,
+    thin_fill_candidates,
+)
 
 
 def _clean(value: str | None) -> str:
@@ -48,6 +55,66 @@ def _parse_wp_date(value: str | None) -> datetime | None:
         except ValueError:
             continue
     return parse_date_text(value)
+
+
+def extract_novo_detail_fields(html: str) -> dict[str, object]:
+    """Parse a Novo Nordisk Foundation grant detail page (SSR HTML).
+
+    The WP JSON list always carries ``acf: []``, so deadlines never appear
+    there (E18 forensic). The SSR ficha instead renders header pairs —
+    ``div.nnf-grant-header__label`` (``Call opens`` / ``Call closes``) each
+    followed by ``div.nnf-grant-header__paragraph`` (``8 October 2026`` /
+    ``25 January 2027 2:00pm (Copenhagen time)``) — and a sidebar row,
+    ``div.nnf-project-sidebar__label`` (``Amount``) with
+    ``div.nnf-project-sidebar__data`` (``DKK 10 million per grant``).
+    Labels pair with their data node by document order. Some fichas carry
+    no Amount row: the funding keys then stay None (pure gap-fill, never
+    fabricated). Returns the five field keys; merging stays gap-fill-only
+    in the callers (mirror of ``_update_opportunity``). Never raises.
+    """
+    result: dict[str, object] = {
+        "open_date": None,
+        "close_date": None,
+        "funding_amount_raw": None,
+        "funding_amount_value": None,
+        "funding_amount_currency": None,
+    }
+    if not html or not isinstance(html, str):
+        return result
+    try:
+        from selectolax.lexbor import LexborHTMLParser as HTMLParser
+
+        tree = HTMLParser(html)
+        labels = [clean_text(node.text()) for node in tree.css("div.nnf-grant-header__label")]
+        paragraphs = [
+            clean_text(node.text()) for node in tree.css("div.nnf-grant-header__paragraph")
+        ]
+        for label, paragraph in zip(labels, paragraphs):
+            lowered = normalize_text(label)
+            if "opens" in lowered and result["open_date"] is None:
+                parsed = parse_date_text(paragraph)
+                if parsed is not None:
+                    result["open_date"] = parsed
+            elif "closes" in lowered and result["close_date"] is None:
+                parsed = parse_date_text(paragraph)
+                if parsed is not None:
+                    result["close_date"] = parsed
+        side_labels = [
+            clean_text(node.text()) for node in tree.css("div.nnf-project-sidebar__label")
+        ]
+        side_data = [
+            clean_text(node.text()) for node in tree.css("div.nnf-project-sidebar__data")
+        ]
+        for label, data in zip(side_labels, side_data):
+            if normalize_text(label) == "amount" and result["funding_amount_value"] is None:
+                raw, value, currency = extract_funding_details(data)
+                if value is not None:
+                    result["funding_amount_raw"] = raw
+                    result["funding_amount_value"] = value
+                    result["funding_amount_currency"] = currency
+    except Exception:
+        return result
+    return result
 
 
 def _with_page(url: str, page: int, *, per_page: int = 100) -> str:
