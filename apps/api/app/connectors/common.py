@@ -2126,6 +2126,14 @@ async def fetch_httpx_bytes(
 
 DETAIL_PAGE_TIMEOUT: int = 15
 
+# E20: overall cap for the sequential detail walk in
+# ``enrich_candidates_batch`` (per-URL cap stays DETAIL_PAGE_TIMEOUT + 10
+# inside ``enrich_from_detail_page``). The 180s per-source scrape budget
+# must still fit listing + parse + persist: 120s bounds the pathological
+# half-down host (listing OK, every detail hanging) to partials instead
+# of a source timeout; healthy hosts finish ~25 fetches well inside it.
+_DETAIL_BATCH_TIMEOUT_S: float = 120.0
+
 
 async def enrich_from_detail_page(url: str) -> dict | None:
     """Fetch a detail page and extract every opportunity field we can read."""
@@ -2335,21 +2343,41 @@ async def enrich_candidates_batch(
 ) -> list[OpportunityCandidate]:
     """Batch-enrich low-confidence candidates by fetching detail pages.
 
-    Fetches up to ``max_fetches`` detail pages concurrently, extracts
-    close_date, funding_amount, and title, then returns an enriched
-    copy of the full candidate list.
+    Fetches up to ``max_fetches`` detail pages, extracts close_date,
+    funding_amount, and title, then returns an enriched copy of the full
+    candidate list.
     """
-    import asyncio
     from copy import deepcopy
 
     limit = max_fetches if max_fetches is not None else int(get_settings().extraction_detail_limit)
     to_enrich = candidates[:limit]
-    tasks = {c.official_url: enrich_from_detail_page(c.official_url) for c in to_enrich}
-    results = await asyncio.gather(*tasks.values(), return_exceptions=True)
 
+    # E20: walk the window SEQUENTIALLY, not concurrently. The domain
+    # budget (DomainBudgetManager) grants 1-2 concurrent slots per host
+    # (fallback 2; fapesp.br 1) and fetch_httpx_text raises "Domain budget
+    # exhausted" past capacity — a 25-wide gather filled ~1-2 details per
+    # run (live novo 2/111, fapesp funding 1/124) instead of the intended
+    # window. Sequential fetches always find a free slot; denials stay
+    # free (no burst burn), so the weekly cap self-throttles instead of
+    # starving listings. Bounded by _DETAIL_BATCH_TIMEOUT_S so a half-down
+    # host degrades to partials, never to a source timeout.
     url_to_data: dict[str, dict | None] = {}
-    for url, task in zip(tasks, results):
-        url_to_data[url] = task if isinstance(task, dict) and task.get("title") else None
+    seen_urls: set[str] = set()
+    try:
+        async with asyncio.timeout(_DETAIL_BATCH_TIMEOUT_S):
+            for candidate in to_enrich:
+                url = candidate.official_url
+                if not url or url in seen_urls:
+                    continue
+                seen_urls.add(url)
+                try:
+                    detail = await enrich_from_detail_page(url)
+                except Exception:
+                    detail = None
+                if isinstance(detail, dict) and detail.get("title"):
+                    url_to_data.setdefault(url, detail)
+    except TimeoutError:
+        pass
 
     enriched: list[OpportunityCandidate] = []
     for c in candidates:
@@ -2411,6 +2439,16 @@ DETAIL_ENRICHMENT_PILOT_KEYS: frozenset[str] = frozenset(
         # ``extract_page_fields``) — the existing SSR batch path covers it,
         # no connector fetch change.
         "novo-nordisk-grants",
+        # E20: fondo-emprender-sena. The E19 extractor
+        # (``extract_fondo_detail_fields`` via ``extract_page_fields``,
+        # host-gated on fondoemprender.com) only runs on fetched fichas,
+        # and the seed ``detail_enrichment: True`` only drives the
+        # connector-level deep fetch (ConfigurableHtmlConnector.parse
+        # step 4: confidence < 0.82 filter, first-25 window). The runner
+        # gate here COMPLEMENTS it — field-missing filter with its own
+        # 25-window, so fichas the connector pass skipped get a second
+        # chance. Both merge gap-fill-only; non-pilot sources untouched.
+        "fondo-emprender-sena",
     }
 )
 
