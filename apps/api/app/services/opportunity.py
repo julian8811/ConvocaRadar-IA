@@ -613,6 +613,29 @@ def _update_opportunity(
         if data.funding_amount_value is not None and opportunity.funding_amount_value is None:
             opportunity.funding_amount_value = data.funding_amount_value
             opportunity.funding_amount_currency = data.funding_amount_currency
+    # E24: a missing currency is also missing data. Backfill it (and a
+    # missing raw) only when the incoming value is absent or matches the
+    # stored one — never mix a new raw/currency with a different stored
+    # value, never overwrite a stored value or currency.
+    values_coincide = (
+        data.funding_amount_value is None
+        or (
+            opportunity.funding_amount_value is not None
+            and data.funding_amount_value == opportunity.funding_amount_value
+        )
+    )
+    if (
+        values_coincide
+        and opportunity.funding_amount_currency is None
+        and data.funding_amount_currency is not None
+    ):
+        opportunity.funding_amount_currency = data.funding_amount_currency
+    if (
+        values_coincide
+        and opportunity.funding_amount_raw is None
+        and data.funding_amount_raw is not None
+    ):
+        opportunity.funding_amount_raw = data.funding_amount_raw
     if data.open_date is not None and opportunity.open_date is None:
         opportunity.open_date = data.open_date
     if data.close_date is not None and opportunity.close_date is None:
