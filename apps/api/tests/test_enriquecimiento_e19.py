@@ -355,3 +355,160 @@ class TestFapespStipend:
 
         assert result.funding_amount_value == 9000.0
         assert result.funding_amount_raw == "R$ 9.000,00"
+
+
+# ── E20: gate + budget-aware batch ──────────────────────────────────────────
+#
+# E20-A (fondo-emprender-sena): ``extract_fondo_detail_fields`` is wired into
+# ``extract_page_fields`` behind a host gate, but the runner-level SSR batch
+# never fetches fondo fichas: the key is absent from
+# ``DETAIL_ENRICHMENT_PILOT_KEYS`` so ``enrich_pilot_candidates`` passes them
+# through untouched. The seed ``detail_enrichment: True`` (seed.py) only
+# drives the connector-level deep fetch (confidence-based filter, first-25
+# window) — a complement, not a substitute, for the runner-level
+# field-missing filter.
+#
+# E20-B (fapesp-brasil / novo-nordisk-grants): ``enrich_candidates_batch``
+# fires up to ``extraction_detail_limit`` (25) detail fetches concurrently,
+# but ``DomainBudgetManager`` grants 1–2 concurrent slots per host
+# (fallback 2; fapesp.br 1 — domain_budget.py) and ``fetch_httpx_text``
+# raises ``Domain budget exhausted`` past capacity. All but the first
+# slot(s) fail instantly, so a run fills ~1–2 details instead of ~25
+# (matches live novo 2/111 and fapesp funding 1/124). Walking the window
+# sequentially finds a free slot per fetch; denials stay free (no burn)
+# so the weekly burst cap self-throttles instead of starving listings.
+
+
+class TestFondoPilotGate:
+    def test_fondo_key_joins_pilot_gate(self):
+        """RED E20: fondo fichas must flow through the runner-level SSR batch."""
+        from app.connectors.common import DETAIL_ENRICHMENT_PILOT_KEYS
+
+        assert "fondo-emprender-sena" in DETAIL_ENRICHMENT_PILOT_KEYS
+
+    @pytest.mark.asyncio
+    async def test_pilot_batch_gap_fills_fondo_dates_and_funding(self, monkeypatch):
+        """RED E20: an undated fondo ficha gains Apertura/Cierre + amount."""
+        from app.connectors.common import enrich_pilot_candidates
+
+        mock_fetch = AsyncMock(return_value=(FONDO_URL, FONDO_DETAIL_HTML, "text/html"))
+        monkeypatch.setattr("app.connectors.common.fetch_httpx_text", mock_fetch)
+
+        (result,) = await enrich_pilot_candidates(
+            "fondo-emprender-sena",
+            [_candidate(FONDO_URL, entity="SENA", country="Colombia")],
+        )
+
+        assert result.open_date is not None
+        assert (result.open_date.year, result.open_date.month, result.open_date.day) == (2026, 5, 20)
+        assert result.close_date is not None
+        assert (result.close_date.year, result.close_date.month, result.close_date.day) == (2026, 6, 19)
+        assert result.funding_amount_value == 1050000000.0
+        mock_fetch.assert_awaited()
+
+    @pytest.mark.asyncio
+    async def test_pilot_batch_preserves_existing_fondo_close(self, monkeypatch):
+        """Gap-fill only: an already-dated ficha keeps its dates."""
+        from app.connectors.common import enrich_pilot_candidates
+
+        mock_fetch = AsyncMock(return_value=(FONDO_URL, FONDO_DETAIL_HTML, "text/html"))
+        monkeypatch.setattr("app.connectors.common.fetch_httpx_text", mock_fetch)
+        existing_close = datetime(2026, 7, 1)
+
+        (result,) = await enrich_pilot_candidates(
+            "fondo-emprender-sena",
+            [_candidate(FONDO_URL, entity="SENA", country="Colombia", close_date=existing_close)],
+        )
+
+        assert result.close_date == existing_close
+
+
+class TestBudgetAwareBatch:
+    async def _run_batch_with_slot_budget(self, monkeypatch, urls, slots: int = 1):
+        """Drive ``enrich_candidates_batch`` through a fake fetch that mirrors
+        the real budget denial (RuntimeError past ``slots`` concurrent)."""
+        import asyncio as _asyncio
+
+        from app.connectors.common import enrich_candidates_batch
+
+        in_flight = 0
+
+        async def _budgeted_fetch(url, **kwargs):
+            nonlocal in_flight
+            if in_flight >= slots:
+                raise RuntimeError(f"Domain budget exhausted for {url}")
+            in_flight += 1
+            try:
+                await _asyncio.sleep(0.01)
+                return (url, FAPESP_DETAIL_HTML, "text/html")
+            finally:
+                in_flight -= 1
+
+        monkeypatch.setattr("app.connectors.common.fetch_httpx_text", _budgeted_fetch)
+        return await enrich_candidates_batch([_candidate(u) for u in urls])
+
+    @pytest.mark.asyncio
+    async def test_single_slot_budget_still_fills_every_candidate(self, monkeypatch):
+        """RED E20: 5 concurrent-intent fetches against a 1-slot budget
+        (fapesp.br shape) must all merge — today all but one are denied."""
+        urls = [f"https://fapesp.br/oportunidades/bolsa-{i}/" for i in range(5)]
+
+        results = await self._run_batch_with_slot_budget(monkeypatch, urls, slots=1)
+
+        assert len(results) == 5
+        for result in results:
+            assert result.funding_amount_value == 12570.0
+            assert result.funding_amount_currency == "BRL"
+
+    @pytest.mark.asyncio
+    async def test_fallback_two_slot_budget_fills_every_candidate(self, monkeypatch):
+        """RED E20: same guarantee under the fallback 2-slot budget
+        (novonordiskfonden.dk shape) — today only two survive the gather."""
+        urls = [f"https://novonordiskfonden.dk/grant-{i}" for i in range(5)]
+
+        results = await self._run_batch_with_slot_budget(monkeypatch, urls, slots=2)
+
+        assert len(results) == 5
+        for result in results:
+            assert result.funding_amount_value == 12570.0
+
+    @pytest.mark.asyncio
+    async def test_batch_preserves_order_and_count(self, monkeypatch):
+        """Pin: the sequential walk keeps input order and never drops rows."""
+        from app.connectors.common import enrich_candidates_batch
+
+        async def _ok_fetch(url, **kwargs):
+            return (url, FAPESP_DETAIL_HTML, "text/html")
+
+        monkeypatch.setattr("app.connectors.common.fetch_httpx_text", _ok_fetch)
+        urls = [f"https://fapesp.br/oportunidades/bolsa-{i}/" for i in range(3)]
+
+        results = await enrich_candidates_batch([_candidate(u) for u in urls])
+
+        assert [r.official_url for r in results] == urls
+
+    @pytest.mark.asyncio
+    async def test_window_slides_across_runs(self, monkeypatch):
+        """Pin (novo 2/111): per-run ``extraction_detail_limit`` window plus
+        the missing-filter means a second run enriches what the first
+        window skipped — coverage progresses instead of clogging."""
+        from app.core.config import get_settings
+        from app.connectors.common import enrich_candidates_batch
+
+        limit = int(get_settings().extraction_detail_limit)
+
+        async def _ok_fetch(url, **kwargs):
+            return (url, FAPESP_DETAIL_HTML, "text/html")
+
+        monkeypatch.setattr("app.connectors.common.fetch_httpx_text", _ok_fetch)
+        urls = [f"https://fapesp.br/oportunidades/bolsa-{i}/" for i in range(limit + 3)]
+
+        first = await enrich_candidates_batch([_candidate(u) for u in urls])
+        assert sum(1 for r in first if r.funding_amount_value == 12570.0) == limit
+
+        # The window skipped the tail: those rows still lack funding, so the
+        # runner-level missing-filter retries them on the next run.
+        unfunded = [u for u, r in zip(urls, first) if r.funding_amount_value is None]
+        assert len(unfunded) == 3
+        second = await enrich_candidates_batch([_candidate(u) for u in unfunded])
+        assert all(r.funding_amount_value == 12570.0 for r in second)
