@@ -21,6 +21,8 @@ education/health/research signals win exact ties.
 
 from __future__ import annotations
 
+import asyncio
+import inspect
 import re
 import unicodedata
 
@@ -719,6 +721,10 @@ def groq_sector_judge(system_prompt: str, user_text: str) -> dict | None:
     the canonical ``SECTOR_JUDGE_SYSTEM_PROMPT`` is always sent (single
     source of truth). Never raises: transport/validation failures (and
     local/no-key configuration) return ``None``.
+
+    Sync-loop callers only: ``asyncio.run()`` raises inside a running
+    event loop, so async callers (e.g. the sector backfill) must use
+    ``agroq_sector_judge`` / ``aclassify_sector`` instead.
     """
     del system_prompt
     from app.core.http_client import closing_per_loop_client
@@ -729,6 +735,90 @@ def groq_sector_judge(system_prompt: str, user_text: str) -> dict | None:
         return asyncio.run(closing_per_loop_client(_call_sector_llm(user_text)))
     except Exception:
         return None
+
+
+async def agroq_sector_judge(system_prompt: str, user_text: str) -> dict | None:
+    """Async production ``llm_client``: loop-safe twin of ``groq_sector_judge``.
+
+    Awaits the judge coroutine on the caller's loop instead of
+    ``asyncio.run()`` — which raises ``RuntimeError`` inside a running
+    loop and used to make the judge silently abstain (always ``None``)
+    in async callers such as the sector backfill. Same contract:
+    canonical prompt always sent, never raises, ``None`` when
+    unconfigured or on any failure.
+    """
+    del system_prompt
+    from app.core.http_client import closing_per_loop_client
+
+    try:
+        return await closing_per_loop_client(_call_sector_llm(user_text))
+    except Exception:
+        return None
+
+
+async def aclassify_by_llm_judge(
+    text: str,
+    llm_client: object = None,
+) -> tuple[str, float]:
+    """Async twin of ``classify_by_llm_judge`` — safe inside a running loop.
+
+    ``llm_client`` may be sync or async (awaitables are awaited); ``None``
+    selects the production ``agroq_sector_judge`` (abstains when
+    unconfigured — zero network). Abstain semantics mirror the sync twin:
+    any failure degrades to ``("otros", 0.0)``.
+    """
+    if not (text or "").strip():
+        return ("otros", 0.0)
+    client = agroq_sector_judge if llm_client is None else llm_client
+    try:
+        raw = client(SECTOR_JUDGE_SYSTEM_PROMPT, text)  # type: ignore[operator]
+        if inspect.isawaitable(raw):
+            raw = await raw
+    except Exception:
+        return ("otros", 0.0)
+    if not isinstance(raw, dict):
+        return ("otros", 0.0)
+    sector = _normalize_judge_sector(raw.get("sector"))
+    if sector is None:
+        return ("otros", 0.0)
+    return (sector, _normalize_judge_confidence(raw.get("confidence")))
+
+
+async def aclassify_sector(
+    text: str | None,
+    *,
+    embed_fn: object = None,
+    llm_client: object = None,
+) -> tuple[str, float, str]:
+    """Async hybrid pipeline twin — safe to await inside a running loop.
+
+    Same routing as ``classify_sector`` (rules → otros-only embeddings →
+    otros/low-confidence LLM judge). The embedding step runs in a worker
+    thread so loop-unsafe sync ``embed_fn`` implementations (``asyncio.run``
+    based, e.g. ``build_embedding_sync``) also work from async callers;
+    the judge step awaits the coroutine instead of ``asyncio.run``.
+    Abstain semantics mirror the sync twin — never regresses below rules.
+    """
+    combined = (text or "").strip()
+    if not combined:
+        return ("otros", 0.0, "rules")
+    sector, confidence = classify_by_rules(combined, None)
+    source = "rules"
+    if sector != "otros" and confidence >= LLM_JUDGE_LOW_CONFIDENCE_THRESHOLD:
+        return (sector, confidence, source)
+    if embed_fn is not None and sector == "otros":
+        embedded_sector, embedded_confidence = await asyncio.to_thread(
+            classify_by_embedding, combined, None, embed_fn
+        )
+        if embedded_sector != "otros":
+            sector, confidence = embedded_sector, embedded_confidence
+            source = "embeddings"
+            if confidence >= LLM_JUDGE_LOW_CONFIDENCE_THRESHOLD:
+                return (sector, confidence, source)
+    judge = await aclassify_by_llm_judge(combined, llm_client)
+    if judge != ("otros", 0.0):
+        return (judge[0], judge[1], "llm")
+    return (sector, confidence, source)
 
 
 def classify_sector(
