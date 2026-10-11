@@ -897,9 +897,10 @@ def extract_unitar_detail_fields(html: str) -> dict[str, object]:
     across sampled fichas). ``Deadline`` maps to ``close_date``; the
     ``Date`` range start/end map to ``open_date``/``close_date`` but
     gap-fill only, so an explicit Deadline keeps ``close_date``;
-    ``Price`` maps to funding via ``extract_funding_details`` (bare
-    ``$`` stays currency-None — the course is International so no
-    country resolves it downstream, same precedent as fondo E19).
+    ``Price`` maps to funding via ``extract_funding_details``; a parsed
+    bare ``$`` (value set, currency None) records as USD — product
+    decision: UNITAR bills in dollars, strictly scoped to this host
+    (the global E19 no-persist-without-currency rule holds elsewhere).
     Self-paced courses may carry no ``Deadline``/``Date``/``Price``
     at all: the keys then stay None (pure gap-fill, never
     fabricated). Returns the five field keys; merging stays
@@ -946,6 +947,11 @@ def extract_unitar_detail_fields(html: str) -> dict[str, object]:
         if price:
             _, value, currency = extract_funding_details(price.group(0))
             if value is not None:
+                # Product decision: UNITAR bills in dollars, so a bare-$ Price
+                # on an event.unitar.org ficha records as USD. Strictly scoped
+                # to this host; the global E19 rule holds elsewhere.
+                if currency is None:
+                    currency = "USD"
                 result["funding_amount_raw"] = price.group(1).strip()[:200]
                 result["funding_amount_value"] = value
                 result["funding_amount_currency"] = currency

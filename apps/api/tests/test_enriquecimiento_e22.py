@@ -122,16 +122,31 @@ class TestUnitarDetailFields:
         )
 
     def test_price_maps_to_funding(self):
-        """RED E22: Price $600.00 parses to (raw, 600.0, currency None)."""
+        """RED E23: Price $600.00 parses to (raw, 600.0, USD).
+
+        Product decision (strictly scoped to event.unitar.org): UNITAR
+        bills in dollars, so a bare-$ Price on a UNITAR ficha records
+        as USD. The global E19 rule (no persisting currency-less
+        amounts) stays intact elsewhere — see the global pin below.
+        """
         from app.connectors.common import extract_unitar_detail_fields
 
         fields = extract_unitar_detail_fields(UNITAR_DETAIL_HTML)
 
         assert fields["funding_amount_raw"] is not None and "600" in str(fields["funding_amount_raw"])
         assert fields["funding_amount_value"] == 600.0
-        # Bare "$" stays currency-None (fondo E19 precedent); the course
-        # is International so no country resolves it downstream.
-        assert fields["funding_amount_currency"] is None
+        assert fields["funding_amount_currency"] == "USD"
+
+    def test_global_bare_dollar_stays_currency_none(self):
+        """Pin E23: outside UNITAR the global E19 rule holds — a bare-$
+
+        amount parses with currency None (no persistence default)."""
+        from app.connectors.common import extract_funding_details
+
+        _, value, currency = extract_funding_details("Price $600.00")
+
+        assert value == 600.0
+        assert currency is None
 
     def test_self_paced_without_dates_yields_empty(self):
         """Self-paced fichas carry no Deadline/Date: pure gap-fill, no fabrication."""
