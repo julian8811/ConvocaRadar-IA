@@ -2590,7 +2590,7 @@ def seed_default_sources(
                 "link_selectors": ["a"],
                 "content_selectors": ["article", "main"],
                 "date_labels": ["Deadline:", "Start:", "End:"],
-                "detail_enrichment": False,
+                "detail_enrichment": True,
             },
         },
         {

@@ -827,6 +827,7 @@ def extract_funding_details(text: str) -> tuple[str | None, float | None, str | 
 
 _NOVO_HOST_MARKER = "novonordiskfonden.dk"
 _FONDO_HOST_MARKER = "fondoemprender.com"
+_UNITAR_HOST_MARKER = "event.unitar.org"
 
 
 def extract_fondo_detail_fields(html: str) -> dict[str, object]:
@@ -873,6 +874,81 @@ def extract_fondo_detail_fields(html: str) -> dict[str, object]:
                         result["funding_amount_raw"] = sibling.strip()[:200]
                         result["funding_amount_value"] = value
                         result["funding_amount_currency"] = currency
+    except Exception:
+        return result
+    return result
+
+
+_UNITAR_DEADLINE_RE = re.compile(r"deadline\s*:?\s*(\d{1,2}\s+[A-Za-z]+\s+\d{4})", re.IGNORECASE)
+_UNITAR_DATE_RANGE_RE = re.compile(
+    r"\bdate\s*:?\s*(\d{1,2}\s+[A-Za-z]+\s+\d{4})\s*(?:-|–|—|to)\s*"
+    r"(\d{1,2}\s+[A-Za-z]+\s+\d{4})",
+    re.IGNORECASE,
+)
+_UNITAR_PRICE_RE = re.compile(r"price\s*:?\s*(\$[\d.,]+)", re.IGNORECASE)
+
+
+def extract_unitar_detail_fields(html: str) -> dict[str, object]:
+    """Parse a UNITAR course ficha (``event.unitar.org`` SSR HTML).
+
+    The ficha carries flat label/value pairs — ``Type`` (``Course``),
+    ``Deadline 7 Oct 2026``, ``Date 12 Oct 2026 - 1 Nov 2026``,
+    ``Duration 3 Weeks`` and ``Price $600.00`` (forensic E21, stable
+    across sampled fichas). ``Deadline`` maps to ``close_date``; the
+    ``Date`` range start/end map to ``open_date``/``close_date`` but
+    gap-fill only, so an explicit Deadline keeps ``close_date``;
+    ``Price`` maps to funding via ``extract_funding_details`` (bare
+    ``$`` stays currency-None — the course is International so no
+    country resolves it downstream, same precedent as fondo E19).
+    Self-paced courses may carry no ``Deadline``/``Date``/``Price``
+    at all: the keys then stay None (pure gap-fill, never
+    fabricated). Returns the five field keys; merging stays
+    gap-fill-only in the callers. Never raises.
+    """
+    result: dict[str, object] = {
+        "open_date": None,
+        "close_date": None,
+        "funding_amount_raw": None,
+        "funding_amount_value": None,
+        "funding_amount_currency": None,
+    }
+    if not html or not isinstance(html, str):
+        return result
+    try:
+        try:
+            from selectolax.lexbor import LexborHTMLParser as HTMLParser
+
+            tree = HTMLParser(html)
+            node = (
+                tree.css_first("main")
+                or tree.css_first("article")
+                or tree.css_first("body")
+            )
+            visible = clean_text(node.text()) if node is not None else ""
+        except Exception:
+            visible = ""
+        if not visible:
+            visible = clean_text(html)
+        deadline = _UNITAR_DEADLINE_RE.search(visible)
+        if deadline:
+            parsed = parse_date_text(deadline.group(1))
+            if parsed is not None:
+                result["close_date"] = parsed
+        date_range = _UNITAR_DATE_RANGE_RE.search(visible)
+        if date_range:
+            start = parse_date_text(date_range.group(1))
+            if start is not None and result["open_date"] is None:
+                result["open_date"] = start
+            end = parse_date_text(date_range.group(2))
+            if end is not None and result["close_date"] is None:
+                result["close_date"] = end
+        price = _UNITAR_PRICE_RE.search(visible)
+        if price:
+            _, value, currency = extract_funding_details(price.group(0))
+            if value is not None:
+                result["funding_amount_raw"] = price.group(1).strip()[:200]
+                result["funding_amount_value"] = value
+                result["funding_amount_currency"] = currency
     except Exception:
         return result
     return result
@@ -1610,6 +1686,8 @@ def extract_page_fields(
                 targeted = None
         elif _FONDO_HOST_MARKER in host:
             targeted = extract_fondo_detail_fields(html)
+        elif _UNITAR_HOST_MARKER in host:
+            targeted = extract_unitar_detail_fields(html)
         if targeted:
             for key in (
                 "open_date",
@@ -2449,6 +2527,11 @@ DETAIL_ENRICHMENT_PILOT_KEYS: frozenset[str] = frozenset(
         # 25-window, so fichas the connector pass skipped get a second
         # chance. Both merge gap-fill-only; non-pilot sources untouched.
         "fondo-emprender-sena",
+        # E22: unitar-courses. The ``event.unitar.org`` ficha carries
+        # Deadline/Date-range/Price pairs parsed by the host-gated
+        # ``extract_unitar_detail_fields`` via ``extract_page_fields`` —
+        # the existing SSR batch path covers it, no connector change.
+        "unitar-courses",
     }
 )
 
