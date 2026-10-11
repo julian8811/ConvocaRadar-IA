@@ -614,7 +614,7 @@ def extract_funding_amount(text: str) -> str | None:
         # Portuguese: "investimento: R$ 500.000" / "valor: R$ 500.000"
         r"(?:investimento|valor|recursos|aporte|orçamento|orçamento|custeio|subvenção|subvencao)\s*(?:total|estimado|disponivel|disponível|maximo|máximo|solicitado)?\s*[:\-]?\s*([\w\s.$€£,]+?\d[\d.,\s]*(?:million|milhão|milhões|mil|m|k|brl|usd|eur)?)",
         # Portuguese: "bolsa: R$ 5.000,00" (scholarship/stipend patterns)
-        r"(?:bolsa|auxilio|auxílio|ajuda\s+de\s+custo|salário|salario|stipend)\s*(?::|de|)\s*(?:R?\$[\s\d.,]+)",
+        r"(?:bolsa|auxilio|auxílio|ajuda\s+de\s+custo|salário|salario|stipend)\s*(?::|de|)\s*(R?\$[\s\d.,]+)",
     ]
     for pattern in tier1:
         match = re.search(pattern, _text, flags=re.IGNORECASE)
@@ -2279,6 +2279,8 @@ DETAIL_ENRICHMENT_PILOT_KEYS: frozenset[str] = frozenset(
         "grants-gov",
         "minciencias",
         "innpulsa",
+        "fapesp-brasil",
+        "developmentaid-tenders",
     }
 )
 
@@ -2312,6 +2314,13 @@ async def enrich_pilot_candidates(
     missing = [c for c in candidates if _candidate_needs_detail_enrichment(c)]
     if not missing:
         return candidates
+    if source_key == "developmentaid-tenders":
+        # E11: plain fetch hits a Cloudflare challenge, so the SSR batch
+        # path below would burn fetches on junk — go straight to render.
+        try:
+            return await enrich_developmentaid_render(candidates)
+        except Exception:
+            return candidates
     enriched = await enrich_candidates_batch(missing)
     if not enriched:
         return candidates
@@ -2484,6 +2493,101 @@ async def enrich_grants_gov_render_llm(
             return list(candidates)
         results = await asyncio.gather(
             *(_enrich_grants_gov_candidate_render_llm(c) for c in targets),
+            return_exceptions=True,
+        )
+        url_to_fields: dict[str, dict] = {}
+        for candidate, result in zip(targets, results):
+            if isinstance(result, dict) and result.get("title"):
+                url_to_fields.setdefault(candidate.official_url, result)
+        enriched: list[OpportunityCandidate] = []
+        for candidate in candidates:
+            fields = url_to_fields.get(candidate.official_url)
+            if fields is not None:
+                enriched.append(
+                    apply_extracted_fields(candidate, fields, prefer_extracted_text=True)
+                )
+            else:
+                enriched.append(deepcopy(candidate))
+        return enriched
+    except Exception:
+        return list(candidates)
+
+
+# ── E11 enrichment batch 3 (runner-level hook) ─────────────────────────────
+#
+# - fapesp-brasil: NO dedicated connector file (generic HTML path). Detail
+#   pages are full SSR text and the deterministic extractors already yield
+#   open/close dates from it (live-verified), so the key just joins
+#   DETAIL_ENRICHMENT_PILOT_KEYS and the existing SSR batch path covers it.
+# - developmentaid-tenders: plain fetch hits a Cloudflare challenge
+#   ("Just a moment"), but a bounded Chromium render passes it
+#   (live-verified), so it gets a key-gated render-based detail step below
+#   (render_page_html + extract_page_fields + apply_extracted_fields,
+#   capped, best-effort never-raises, gap-fill only). The SSR batch path is
+#   skipped for this key — it would burn fetches on challenge junk.
+# - cost-open-calls: DICTAMEN, no code. Its stored rows point at site-nav
+#   junk URLs (am-i-eligible, vacancies, multimedia) — a parse-quality
+#   problem in the WordPress-API listing path, outside enrichment scope. A
+#   future fix belongs in the cost_open_calls parse/validate layer (filter
+#   non-call links), not in detail enrichment: enriching junk URLs cannot
+#   yield call dates/funding.
+
+DEVELOPMENTAID_RENDER_CAP: int = 5
+DEVELOPMENTAID_RENDER_TIMEOUT_MS: int = DETAIL_PAGE_TIMEOUT * 1000
+
+# Markers of a Cloudflare challenge remnant: both must be present (normalized)
+# before a render is discarded, so legit pages mentioning either word survive.
+_CHALLENGE_MARKERS: tuple[str, ...] = ("just a moment", "cloudflare")
+
+
+async def _enrich_developmentaid_candidate_render(
+    candidate: OpportunityCandidate,
+) -> dict | None:
+    """Render one developmentaid detail page and extract fields deterministically.
+
+    Returns an extracted-fields dict ready for apply_extracted_fields, or None
+    when the render yields nothing usable (including a Cloudflare challenge
+    remnant). Never raises.
+    """
+    url = candidate.official_url
+    try:
+        _, rendered, _ = await render_page_html(
+            url,
+            wait_until="domcontentloaded",
+            timeout_ms=DEVELOPMENTAID_RENDER_TIMEOUT_MS,
+            post_wait_ms=800,
+        )
+    except Exception:
+        return None
+    if not rendered or not clean_text(rendered):
+        return None
+    if all(marker in normalize_text(rendered) for marker in _CHALLENGE_MARKERS):
+        return None
+    deterministic = extract_page_fields(html=rendered, page_url=url)
+    return deterministic if deterministic.get("title") else None
+
+
+async def enrich_developmentaid_render(
+    candidates: list[OpportunityCandidate],
+) -> list[OpportunityCandidate]:
+    """Gap-fill developmentaid candidates via bounded rendered detail pages.
+
+    Renders at most DEVELOPMENTAID_RENDER_CAP detail pages (candidates with
+    nothing missing are skipped, order and count are preserved) and merges
+    each result with apply_extracted_fields (gap-fill only — existing dates
+    are never overwritten). Best-effort: never raises.
+    """
+    try:
+        import asyncio
+        from copy import deepcopy
+
+        targets = [c for c in candidates if _candidate_needs_detail_enrichment(c)][
+            :DEVELOPMENTAID_RENDER_CAP
+        ]
+        if not targets:
+            return list(candidates)
+        results = await asyncio.gather(
+            *(_enrich_developmentaid_candidate_render(c) for c in targets),
             return_exceptions=True,
         )
         url_to_fields: dict[str, dict] = {}
