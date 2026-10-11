@@ -30,7 +30,8 @@ Pedido explícito del usuario: apertura, cierre, montos, resúmenes e info clave
 - 2026-10-10: E11 verificado por padre en plataforma (sesión consultor): fapesp success 50/50 → ci 114/115 (fechas rindieron); devaid degraded 0 (sitemap devuelve vacío CF — `detail_enriched:0`, hook presente pero sin candidatos; bloqueo a nivel listado, fuera de E11). Nota: runs >~30s dan 500 cosmético en cliente pero completan en servidor (proxy reset) — fapesp completó igual.
 - [x] **E12 (P1)** ✅ 2026-10-10 Tanda 4 toda-DICTAMEN (sin código, lección ascun): sdde=documentos PDF (requiere pipeline PDF-texto, fuera de scope), unwomen=secciones sin datos extraíbles (+35 URLs NULL), adaptation-fund=URLs nav-junk (parse-quality, fuera de scope).
 - [x] **E13 (P1)** ✅ 2026-10-10 Tanda 5 forense: idt-noticias=noticias (dictamen), idartes=shell incluso renderizado (dictamen), simpler=fechas completas+montos ausentes (dictamen), grants-gov-forecast=sin IDs numéricos + key-wall (dictamen). Sin código.
-- [x] **E14 (P1 writer)** ✅ 2026-10-10 Tanda 6: secihti + unal al gate (solo keys + comment, RED 0/3 → GREEN 3 + 33 + 16 passed). Funding dictamen documentado.
+- [x] **E14 (P1 writer)** ✅ 2026-10-10 Tanda 6: secihti + unal al gate (solo keys + comment, RED 0/3 → GREEN 3 + 33 + 16 passed). Funding dictamen documentado. Deployado cherry `9f60f69`. Verificado por padre: secihti success 36/36 (ap2/ci2), unal success 37/37 (ap0/ci4) — marginal, el contenido detallado rara vez trae más.
+- [x] **E15 (P1 padre)** ✅ 2026-10-10 Tanda 7 toda-DICTAMEN (sin código): segib-noticias=noticias (1/1/0), rhodes=program pages sin datos (0/0/0), finep=API sin montos (ap29/ci22/mo1 — fechas OK por F3). Toda fuente ≥15 sin-mo tiene veredicto.
 - [x] **E7 (P1)** ✅ Vía XHR sin key (reemplaza Simpler-key): `POST apply07.grants.gov/grantsws/rest/opportunity/details` form `oppId=` → 200 keyless con awardCeiling/Floor/estimatedFunding/synopsisDesc (12.5KB). Descubierto por intercepción Playwright del tráfico real de la ficha.
 - [x] **E8 (P1 writer)** ✅ 2026-10-10 Detail-XHR awards: `enrich_grants_gov_funding_xhr` (form POST keyless, cap 25, concurrencia 5, gap-fill, never-raise) cableado ANTES del render E6. RED ImportError / GREEN 7 + 32 + 85 passed. Fix anidado `synopsis.*` verificado live (364026 → USD 62.5M). Deployado cherry `009f888`, api+worker sanos. E2c: grants-gov mo 0→19 (raw 23) en 1 run — PRIMERAS GANANCIAS. Resta iterar (cap 25/run).
 - 2026-10-10: E2c run 2 sin ganancia (25 updated, mo 19). Forense: top-25 fijos ya fondeados; 73 viejos fuera de ventana nunca reintentados. Probe live 8 unfunded → 6 CON awards (62500000, 750000, 13M, 3.5M...). Vía: backfill directo E9.
@@ -54,5 +55,5 @@ Pedido explícito del usuario: apertura, cierre, montos, resúmenes e info clave
 ## Verification evidence
 - (pendiente E1)
 
-## Next step
-- E1: writer implementa el piloto.
+## Cierre
+- 2026-10-10: feature completo. Global: mo 277→341 (+64), ap 689→691, ci 1233→1235, res 100%. Grants-gov 0→60 (backfill XHR), WB +2, fapesp ci 114 (fechas). Toda fuente ≥15 sin-mo con veredicto (built: grants-gov/WB/fapesp/secihti/unal; dictamen: ascun-news, innpulsa-mo-ausente, minciencias-stub, devaid-CF, cost/adaptation-junk, novo-ACF, simpler-shell, sdde-PDF, unwomen, idt-news, idartes-shell, segib-news, rhodes, finep-mo, grants-forecast-keywall). E3 cerrado: escala por tandas completada; resto es cola <15 con retornos marginales.
