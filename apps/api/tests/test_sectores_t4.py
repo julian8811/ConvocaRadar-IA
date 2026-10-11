@@ -503,3 +503,117 @@ class TestBackfillScope:
         )
         assert summary["failed"] == 1
         assert summary["filled"] == 1
+
+
+# ── T8 async-safe judge + backfill embed wiring ─────────────────────
+# Bug evidence (server, not re-verified live): ``groq_sector_judge`` calls
+# ``asyncio.run()`` while ``run_backfill`` already runs inside an event
+# loop -> RuntimeError swallowed (judge always None in backfill) and the
+# backfill never passes ``embed_fn`` (100% rules pass). These tests pin
+# the fix: judge usable from a running loop + embed layer wired in.
+
+_NOISE_TEXT_T8 = "PQRSDF contenido sin senal alguna xyz"
+
+
+class TestAsyncJudgeLoopSafety:
+    async def test_async_judge_returns_sector_inside_running_loop(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        import asyncio
+
+        from app.core import sectors as sectors_mod
+
+        assert asyncio.get_running_loop() is not None
+
+        async def fake_call(text: str) -> dict:
+            return {"sector": "salud", "confidence": 0.9}
+
+        monkeypatch.setattr(sectors_mod, "_call_sector_llm", fake_call)
+        result = await sectors_mod.agroq_sector_judge(
+            sectors_mod.SECTOR_JUDGE_SYSTEM_PROMPT, "Convocatoria de hospitales y vacunas"
+        )
+        assert result == {"sector": "salud", "confidence": 0.9}
+
+    async def test_aclassify_sector_reaches_judge_inside_loop(self) -> None:
+        from app.core import sectors as sectors_mod
+
+        async def async_judge(system_prompt: str, user_text: str) -> dict | None:
+            return {"sector": "salud", "confidence": 0.9}
+
+        sector, confidence, source = await sectors_mod.aclassify_sector(
+            _NOISE_TEXT_T8,
+            embed_fn=_surrogate_embed,
+            llm_client=async_judge,
+        )
+        assert sector == "salud"
+        assert source == "llm"
+        assert 0.0 < confidence <= 1.0
+
+    def test_sync_judge_still_works_outside_loop(
+        self, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Sync CLI path contract: usable with no running loop."""
+
+        from app.core import sectors as sectors_mod
+
+        async def fake_call(text: str) -> dict:
+            return {"sector": "salud", "confidence": 0.9}
+
+        monkeypatch.setattr(sectors_mod, "_call_sector_llm", fake_call)
+        assert sectors_mod.groq_sector_judge("ignored", "hospitales y vacunas") == {
+            "sector": "salud",
+            "confidence": 0.9,
+        }
+
+
+class TestBackfillEmbedWiring:
+    async def test_backfill_forwards_embed_fn_to_pipeline(
+        self, backfill_db, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        from app.core import sectors as sectors_mod
+
+        embed_calls: list[str] = []
+
+        def spy_embed(text: str) -> list[float]:
+            embed_calls.append(text)
+            return _surrogate_embed(text)
+
+        def abstain(system_prompt: str, user_text: str) -> dict | None:
+            return None
+
+        _make_backfill_opp(
+            backfill_db,
+            title="PQRSDF sin senal",
+            description="xyz qwerty sin senal alguna",
+        )
+        summary = await _backfill.run_backfill(
+            backfill_db, limit=10, sleep_seconds=0, dry_run=True,
+            embed_fn=spy_embed, llm_client=abstain,
+        )
+        assert embed_calls, "backfill never invoked the embedding layer"
+        assert summary["filled"] == 1
+
+    async def test_backfill_default_pipeline_judge_fires_inside_loop(
+        self, backfill_db, monkeypatch: pytest.MonkeyPatch
+    ) -> None:
+        """Default (no classify_fn) pipeline from a running loop must reach
+        the LLM judge instead of degrading to rules via swallowed
+        RuntimeError. Zero network: transport stubbed below HTTP."""
+        from app.core import sectors as sectors_mod
+
+        async def fake_call(text: str) -> dict:
+            return {"sector": "salud", "confidence": 0.9}
+
+        monkeypatch.setattr(sectors_mod, "_call_sector_llm", fake_call)
+        opp = _make_backfill_opp(
+            backfill_db,
+            title="PQRSDF sin senal",
+            description="xyz qwerty sin senal alguna",
+        )
+        summary = await _backfill.run_backfill(
+            backfill_db, limit=10, sleep_seconds=0, dry_run=False,
+        )
+        backfill_db.refresh(opp)
+        assert summary["failed"] == 0
+        assert opp.sector == "salud"
+        assert opp.sector_source == "llm"
