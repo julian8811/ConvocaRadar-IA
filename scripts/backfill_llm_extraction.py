@@ -192,10 +192,11 @@ async def run_backfill(
 ) -> dict:
     """Run Gemini/local extraction over stored rows missing dates/funding.
 
-    Batches of ``batch_size`` rows go through
-    ``extract_opportunity_structured`` (gap-fill only, best-effort per row),
-    with a politeness sleep between batches and one commit per batch when not
-    a dry-run. A dead extraction degrades to failed — the run never aborts.
+    Rows are processed STRICTLY SEQUENTIALLY — one
+    ``extract_opportunity_structured`` call at a time — with a politeness
+    sleep of ``sleep_seconds`` between EVERY row (free-tier 429 protection),
+    and one commit per ``batch_size`` rows (commit cadence only) when not a
+    dry-run. A dead extraction degrades to failed — the run never aborts.
     Rows whose extraction text (title+description+raw_text, capped) is
     shorter than ``min_text_length`` are skipped with reason short_text and
     never sent to the LLM. Returns ``{"scanned", "filled",
@@ -225,7 +226,7 @@ async def run_backfill(
     for index, batch in enumerate(batches):
         providers: set[str] = set()
         batch_updates: list[dict] = []
-        for opp in batch:
+        for pos, opp in enumerate(batch):
             text = build_extraction_text(opp)
             if len(text) < min_text_length:
                 print(
@@ -234,45 +235,48 @@ async def run_backfill(
                 )
                 summary["skipped"] += 1
                 summary["short_text_skipped"] += 1
-                continue
-            try:
-                result = await ai_module.extract_opportunity_structured(text)
-            except Exception as exc:
-                print(f"  row {opp.id} extraction failed ({exc}); skipping")
-                summary["failed"] += 1
-                continue
-            providers.add(getattr(result, "provider", "?"))
-            try:
-                data = getattr(result, "data", None) or {}
-                fields = parsed_fields_from_extraction(
-                    data=data, country=opp.country, url=opp.official_url
-                )
-                if dry_run:
-                    updates = llm_gap_fill_updates(
-                        existing_open=opp.open_date,
-                        existing_close=opp.close_date,
-                        existing_raw=opp.funding_amount_raw,
-                        existing_value=opp.funding_amount_value,
-                        existing_currency=opp.funding_amount_currency,
-                        existing_summary=opp.summary,
-                        fields=fields,
-                    )
-                    if updates:
-                        batch_updates.append(updates)
-                        print(f"  would fill: {(opp.title or '')[:50]} ({updates.keys()})")
-                    else:
-                        summary["skipped"] += 1
+            else:
+                try:
+                    result = await ai_module.extract_opportunity_structured(text)
+                except Exception as exc:
+                    print(f"  row {opp.id} extraction failed ({exc}); skipping")
+                    summary["failed"] += 1
                 else:
-                    updates = apply_llm_gap_fill(opp, fields)
-                    if updates:
-                        batch_updates.append(updates)
-                        print(f"  filled: {(opp.title or '')[:50]} ({updates.keys()})")
-                    else:
-                        summary["skipped"] += 1
-                        print(f"  no new fields: {(opp.title or '')[:50]}")
-            except Exception as exc:
-                print(f"  row {opp.id} failed ({exc}); skipping")
-                summary["failed"] += 1
+                    providers.add(getattr(result, "provider", "?"))
+                    try:
+                        data = getattr(result, "data", None) or {}
+                        fields = parsed_fields_from_extraction(
+                            data=data, country=opp.country, url=opp.official_url
+                        )
+                        if dry_run:
+                            updates = llm_gap_fill_updates(
+                                existing_open=opp.open_date,
+                                existing_close=opp.close_date,
+                                existing_raw=opp.funding_amount_raw,
+                                existing_value=opp.funding_amount_value,
+                                existing_currency=opp.funding_amount_currency,
+                                existing_summary=opp.summary,
+                                fields=fields,
+                            )
+                            if updates:
+                                batch_updates.append(updates)
+                                print(f"  would fill: {(opp.title or '')[:50]} ({updates.keys()})")
+                            else:
+                                summary["skipped"] += 1
+                        else:
+                            updates = apply_llm_gap_fill(opp, fields)
+                            if updates:
+                                batch_updates.append(updates)
+                                print(f"  filled: {(opp.title or '')[:50]} ({updates.keys()})")
+                            else:
+                                summary["skipped"] += 1
+                                print(f"  no new fields: {(opp.title or '')[:50]}")
+                    except Exception as exc:
+                        print(f"  row {opp.id} failed ({exc}); skipping")
+                        summary["failed"] += 1
+            is_last_row = index == len(batches) - 1 and pos == len(batch) - 1
+            if not is_last_row and sleep_seconds > 0:
+                await sleep(sleep_seconds)
         print(
             f"  batch {index + 1}/{len(batches)} "
             f"providers={sorted(providers) if providers else ['none']}"
@@ -299,8 +303,8 @@ async def run_backfill(
                 summary["filled_dates"] -= batch_dates
                 summary["filled_funding"] -= batch_funding
                 summary["skipped"] += batch_filled
-        if index < len(batches) - 1 and sleep_seconds > 0:
-            await sleep(sleep_seconds)
+        # NOTE: pacing sleep happens per row above (sequential, free-tier
+        # 429 protection); batches of `batch_size` are commit cadence only.
 
     if dry_run:
         print(f"\nDry-run: {summary['filled']} opportunities would be updated")
@@ -335,7 +339,7 @@ def main(argv: list[str] | None = None) -> int:
         dest="sleep_seconds",
         type=float,
         default=DEFAULT_SLEEP_SECONDS,
-        help="Politeness delay in seconds between batches",
+        help="Politeness delay in seconds between EVERY row (sequential pacing)",
     )
     parser.add_argument(
         "--source-key",

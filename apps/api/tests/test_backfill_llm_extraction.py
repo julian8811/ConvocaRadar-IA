@@ -345,7 +345,7 @@ class TestPerRowFailure:
 
 class TestBatching:
     async def test_politeness_sleep_and_commit_per_batch(self, db, monkeypatch):
-        """3 rows with batch_size=2 → 1 sleep between batches, 2 commits."""
+        """3 rows with batch_size=2 → sleep between EVERY row, 2 commits."""
         src = _make_source(db)
         for _ in range(3):
             _make_opp(db, src)
@@ -369,8 +369,66 @@ class TestBatching:
 
         assert summary["scanned"] == 3
         assert summary["filled"] == 3
-        sleep_fn.assert_awaited_once_with(1.0)
+        assert sleep_fn.await_count == 2
+        sleep_fn.assert_awaited_with(1.0)
         assert len(commits) == 2
+
+
+class TestSequentialPacing:
+    async def test_sleep_between_every_row_not_just_batches(self, db, monkeypatch):
+        """Sequential pacing: sleep --sleep between EVERY row (free-tier 429s)."""
+        src = _make_source(db)
+        for _ in range(3):
+            _make_opp(db, src)
+        _mock_extraction(monkeypatch)
+        sleep_fn = AsyncMock()
+
+        await script.run_backfill(
+            db,
+            limit=100,
+            sleep_seconds=1.0,
+            dry_run=False,
+            batch_size=5,
+            sleep_fn=sleep_fn,
+        )
+
+        # 3 rows in a single commit-batch → 2 inter-row sleeps.
+        assert sleep_fn.await_count == 2
+        sleep_fn.assert_awaited_with(1.0)
+
+    async def test_max_one_inflight_extraction(self, db, monkeypatch):
+        """At most 1 extraction in flight at a time (strictly sequential)."""
+        import asyncio as _asyncio
+
+        src = _make_source(db)
+        for _ in range(4):
+            _make_opp(db, src)
+        state = {"in_flight": 0, "max_in_flight": 0}
+
+        async def _counting(text: str):
+            state["in_flight"] += 1
+            state["max_in_flight"] = max(
+                state["max_in_flight"], state["in_flight"]
+            )
+            await _asyncio.sleep(0)
+            state["in_flight"] -= 1
+            return _extraction(dict(_FULL_DATA))
+
+        monkeypatch.setattr(
+            "app.core.ai.extract_opportunity_structured",
+            AsyncMock(side_effect=_counting),
+        )
+        sleep_fn = AsyncMock()
+
+        await script.run_backfill(
+            db,
+            limit=100,
+            sleep_seconds=1.0,
+            dry_run=True,
+            sleep_fn=sleep_fn,
+        )
+
+        assert state["max_in_flight"] == 1
 
 
 class TestMinTextLength:
