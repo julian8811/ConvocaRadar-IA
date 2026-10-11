@@ -28,6 +28,7 @@ from __future__ import annotations
 
 import argparse
 import asyncio
+import inspect
 import os
 import sys
 
@@ -36,7 +37,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(os.path.abspath(__file__)), ".."
 
 from sqlalchemy import or_, select
 
-from app.core.sectors import SECTOR_HIGH_CONFIDENCE_KEEP, classify_sector
+from app.core.sectors import SECTOR_HIGH_CONFIDENCE_KEEP, aclassify_sector
 from app.models import Opportunity
 
 DEFAULT_LIMIT = 100
@@ -90,6 +91,33 @@ def fetch_targets(db, limit: int, *, force: bool = False) -> list[Opportunity]:
     return list(db.scalars(stmt))
 
 
+def _default_embed_fn():
+    """Real embedding layer for the default backfill pipeline (lazy import).
+
+    Local provider (or unconfigured remote): pure ``build_local_hash_vector``
+    wrapper — loop-safe, zero network. Configured remote provider:
+    ``build_embedding_sync`` (loop-unsafe on its own, but the async pipeline
+    runs the embedding step in a worker thread).
+    """
+    from app.core import ai as _ai
+    from app.core.config import get_settings
+
+    try:
+        settings = get_settings()
+        dimensions = settings.embedding_dimensions or 64
+        remote = (
+            _ai.effective_llm_provider(settings.llm_provider) != "local"
+            and bool(settings.llm_api_key)
+            and bool(settings.embedding_model)
+        )
+    except Exception:
+        dimensions = 64
+        remote = False
+    if remote:
+        return _ai.build_embedding_sync
+    return lambda text: _ai.build_local_hash_vector(text, dimensions)
+
+
 async def run_backfill(
     db,
     *,
@@ -100,6 +128,8 @@ async def run_backfill(
     batch_size: int = BACKFILL_BATCH_SIZE,
     classify_fn=None,
     sleep_fn=None,
+    embed_fn=None,
+    llm_client=None,
 ) -> dict:
     """Classify stored rows missing (or unsure of) their sector.
 
@@ -108,12 +138,27 @@ async def run_backfill(
     and one commit per ``batch_size`` rows (commit cadence only) when not
     a dry-run. A dead classification degrades to failed — the run never
     aborts. ``classify_fn(text) -> (sector, confidence, source)`` is
-    injectable (tests pass a stub; default is the real hybrid pipeline).
+    injectable (tests pass a stub; may be sync or async) and wins over the
+    default pipeline. Otherwise the default is the real async hybrid
+    pipeline (``aclassify_sector``: rules -> embeddings -> LLM judge) with
+    ``embed_fn`` (default: real embedding layer) and ``llm_client``
+    (default: async Groq judge, abstains when unconfigured). ``embed_fn``
+    maps text -> vector; ``llm_client`` is
+    ``(system_prompt, user_text) -> dict | None`` (sync or async).
     Returns ``{"scanned", "filled", "skipped", "high_conf_skipped",
     "failed", "dry_run", "force"}``.
     """
     sleep = sleep_fn or asyncio.sleep
-    classify = classify_fn or (lambda text: classify_sector(text))
+    if classify_fn is not None:
+        classify = classify_fn
+    else:
+        _embed = embed_fn if embed_fn is not None else _default_embed_fn()
+        _llm = llm_client
+
+        async def _default_classify(text: str, _embed=_embed, _llm=_llm):
+            return await aclassify_sector(text, embed_fn=_embed, llm_client=_llm)
+
+        classify = _default_classify
     targets = fetch_targets(db, limit, force=force)
     summary: dict = {
         "scanned": len(targets),
@@ -140,7 +185,11 @@ async def run_backfill(
                 print(f"  keep high-confidence sector: {(opp.title or '')[:50]}")
             else:
                 try:
-                    sector, confidence, source = classify(build_sector_text(opp))
+                    result = classify(build_sector_text(opp))
+                    if inspect.isawaitable(result):
+                        sector, confidence, source = await result
+                    else:
+                        sector, confidence, source = result
                 except Exception as exc:
                     print(f"  row {opp.id} classification failed ({exc}); skipping")
                     summary["failed"] += 1
