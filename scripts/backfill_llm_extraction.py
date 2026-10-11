@@ -55,6 +55,7 @@ from app.services.opportunity import (
 
 DEFAULT_LIMIT = 100
 DEFAULT_SLEEP_SECONDS = 1.0
+DEFAULT_MIN_TEXT_LENGTH = 200
 BACKFILL_BATCH_SIZE = 5
 RAW_TEXT_CAP = 8000
 
@@ -186,6 +187,7 @@ async def run_backfill(
     dry_run: bool = True,
     source_key: str | None = None,
     batch_size: int = BACKFILL_BATCH_SIZE,
+    min_text_length: int = DEFAULT_MIN_TEXT_LENGTH,
     sleep_fn=None,
 ) -> dict:
     """Run Gemini/local extraction over stored rows missing dates/funding.
@@ -194,8 +196,11 @@ async def run_backfill(
     ``extract_opportunity_structured`` (gap-fill only, best-effort per row),
     with a politeness sleep between batches and one commit per batch when not
     a dry-run. A dead extraction degrades to failed — the run never aborts.
-    Returns ``{"scanned", "filled", "filled_dates", "filled_funding",
-    "skipped", "failed", ...}``.
+    Rows whose extraction text (title+description+raw_text, capped) is
+    shorter than ``min_text_length`` are skipped with reason short_text and
+    never sent to the LLM. Returns ``{"scanned", "filled",
+    "filled_dates", "filled_funding", "skipped", "short_text_skipped",
+    "failed", ...}``.
     """
     sleep = sleep_fn or asyncio.sleep
     targets = fetch_targets(db, source_key, limit)
@@ -205,6 +210,7 @@ async def run_backfill(
         "filled_dates": 0,
         "filled_funding": 0,
         "skipped": 0,
+        "short_text_skipped": 0,
         "failed": 0,
         "source_key": source_key,
         "dry_run": dry_run,
@@ -220,8 +226,16 @@ async def run_backfill(
         providers: set[str] = set()
         batch_updates: list[dict] = []
         for opp in batch:
+            text = build_extraction_text(opp)
+            if len(text) < min_text_length:
+                print(
+                    f"  short text ({len(text)} chars): "
+                    f"{(opp.title or '')[:50]}; skipping (short_text)"
+                )
+                summary["skipped"] += 1
+                summary["short_text_skipped"] += 1
+                continue
             try:
-                text = build_extraction_text(opp)
                 result = await ai_module.extract_opportunity_structured(text)
             except Exception as exc:
                 print(f"  row {opp.id} extraction failed ({exc}); skipping")
@@ -296,7 +310,9 @@ async def run_backfill(
         f"Summary: scanned={summary['scanned']} "
         f"filled_dates={summary['filled_dates']} "
         f"filled_funding={summary['filled_funding']} "
-        f"skipped={summary['skipped']} failed={summary['failed']}"
+        f"skipped={summary['skipped']} "
+        f"short_text_skipped={summary['short_text_skipped']} "
+        f"failed={summary['failed']}"
     )
     return summary
 
@@ -326,11 +342,21 @@ def main(argv: list[str] | None = None) -> int:
         default=None,
         help="Scope to one source key (default: all sources)",
     )
+    parser.add_argument(
+        "--min-text-length",
+        dest="min_text_length",
+        type=int,
+        default=DEFAULT_MIN_TEXT_LENGTH,
+        help="Skip rows whose title+description+raw_text (capped) is shorter "
+        "than this many characters, without calling the LLM (default: 200).",
+    )
     args = parser.parse_args(argv)
     if args.limit < 0:
         parser.error("--limit must be >= 0")
     if args.sleep_seconds < 0:
         parser.error("--sleep must be >= 0")
+    if args.min_text_length < 0:
+        parser.error("--min-text-length must be >= 0")
 
     from app.db.session import SessionLocal
 
@@ -348,6 +374,7 @@ def main(argv: list[str] | None = None) -> int:
                     sleep_seconds=args.sleep_seconds,
                     dry_run=args.dry_run,
                     source_key=args.source_key,
+                    min_text_length=args.min_text_length,
                 )
             )
         except Exception as exc:
@@ -362,7 +389,9 @@ def main(argv: list[str] | None = None) -> int:
             f"filled={summary['filled']} "
             f"filled_dates={summary['filled_dates']} "
             f"filled_funding={summary['filled_funding']} "
-            f"skipped={summary['skipped']} failed={summary['failed']} "
+            f"skipped={summary['skipped']} "
+            f"short_text_skipped={summary['short_text_skipped']} "
+            f"failed={summary['failed']} "
             f"dry_run={args.dry_run}"
         )
         return 0
