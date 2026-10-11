@@ -93,8 +93,8 @@ def _make_opp(db: Session, source, **overrides):
         "country": "United States",
         "official_url": "https://example.com/opp",
         "summary": "",
-        "description": "description",
-        "raw_text": "raw",
+        "description": "detailed description of the funding opportunity " * 10,
+        "raw_text": "full raw text of the funding opportunity " * 10,
         "external_id": f"ext-{_OPP_SEQ}",
         "source_id": source.id,
     }
@@ -371,3 +371,78 @@ class TestBatching:
         assert summary["filled"] == 3
         sleep_fn.assert_awaited_once_with(1.0)
         assert len(commits) == 2
+
+
+class TestMinTextLength:
+    async def test_short_text_skipped_without_llm_call(self, db, monkeypatch):
+        """Rows below --min-text-length never reach the LLM (dry-run)."""
+        src = _make_source(db)
+        _make_opp(db, src, title="Hi", description="short", raw_text="tiny")
+        mock = _mock_extraction(monkeypatch)
+        sleep_fn = AsyncMock()
+
+        summary = await script.run_backfill(
+            db, limit=100, sleep_seconds=0, dry_run=True, sleep_fn=sleep_fn
+        )
+
+        assert mock.await_count == 0
+        assert summary["scanned"] == 1
+        assert summary["filled"] == 0
+        assert summary["skipped"] == 1
+        assert summary["short_text_skipped"] == 1
+
+    async def test_short_text_skipped_in_real_mode_no_write(self, db, monkeypatch):
+        """Short rows are skipped without writes even when persisting."""
+        src = _make_source(db)
+        opp = _make_opp(db, src, title="Hi", description="short", raw_text="tiny")
+        mock = _mock_extraction(monkeypatch)
+        sleep_fn = AsyncMock()
+
+        summary = await script.run_backfill(
+            db, limit=100, sleep_seconds=0, dry_run=False, sleep_fn=sleep_fn
+        )
+
+        db.refresh(opp)
+        assert mock.await_count == 0
+        assert opp.close_date is None
+        assert summary["skipped"] == 1
+        assert summary["short_text_skipped"] == 1
+
+    async def test_long_text_still_calls_llm(self, db, monkeypatch):
+        """Rows at/above the threshold still go through extraction."""
+        src = _make_source(db)
+        _make_opp(db, src, title="Rich opportunity", description="x" * 250, raw_text="")
+        mock = _mock_extraction(monkeypatch)
+        sleep_fn = AsyncMock()
+
+        summary = await script.run_backfill(
+            db, limit=100, sleep_seconds=0, dry_run=True, sleep_fn=sleep_fn
+        )
+
+        assert mock.await_count == 1
+        assert summary["filled"] == 1
+        assert summary["short_text_skipped"] == 0
+
+    async def test_custom_threshold_respected(self, db, monkeypatch):
+        """An explicit min_text_length overrides the default 200."""
+        src = _make_source(db)
+        _make_opp(db, src, title="Hi", description="short", raw_text="tiny")
+        mock = _mock_extraction(monkeypatch)
+        sleep_fn = AsyncMock()
+
+        summary = await script.run_backfill(
+            db, limit=100, sleep_seconds=0, dry_run=True,
+            sleep_fn=sleep_fn, min_text_length=5,
+        )
+
+        assert mock.await_count == 1
+        assert summary["short_text_skipped"] == 0
+
+    def test_default_min_text_length_is_200(self):
+        """Default threshold is 200 chars (argparse + run_backfill agree)."""
+        import argparse as _ap
+        assert script.DEFAULT_MIN_TEXT_LENGTH == 200
+        import inspect as _inspect
+        assert _inspect.signature(script.run_backfill).parameters[
+            "min_text_length"
+        ].default == 200
