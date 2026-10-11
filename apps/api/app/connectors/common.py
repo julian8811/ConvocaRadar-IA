@@ -2281,6 +2281,12 @@ DETAIL_ENRICHMENT_PILOT_KEYS: frozenset[str] = frozenset(
         "innpulsa",
         "fapesp-brasil",
         "developmentaid-tenders",
+        # E14: secihti-mexico-ciencias + universidad-nacional-colombia detail
+        # pages are full SSR text with extractable dates and no funding
+        # anywhere (DICTAMEN, live-verified) — the existing SSR batch covers
+        # them, no connector change.
+        "secihti-mexico-ciencias",
+        "universidad-nacional-colombia",
     }
 )
 
