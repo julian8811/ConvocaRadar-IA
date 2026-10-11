@@ -504,10 +504,38 @@ def _load_dateparser():
     return _DATEPARSER_STATE["module"]
 
 
+# E19: trailing time-of-day junk on an otherwise clean date line, e.g. the
+# Novo Nordisk close line "25 January 2027 2:00pm (Copenhagen time)".
+# Stripped only as a second chance when the full value yields no date, so
+# existing parses are byte-identical.
+_DATE_TIME_SUFFIX = re.compile(
+    r"\s+\d{1,2}:\d{2}(?::\d{2})?\s*(?:am|pm|hrs?)?\s*(\([^)]*\))?\s*$",
+    flags=re.IGNORECASE,
+)
+_PAREN_SUFFIX = re.compile(r"\s*\([^)]*\)\s*$")
+
+
 def parse_date_text(text: str | None) -> datetime | None:
+    """Parse a date, tolerating a trailing time/parenthetical suffix.
+
+    The full value is tried first (unchanged behavior); when it yields no
+    date, one retry runs on the value with a trailing ``2:00pm
+    (Copenhagen time)``-style suffix removed, so detail lines that append
+    the hour to the date still fill open/close.
+    """
     value = clean_text(text)
     if not value:
         return None
+    parsed = _parse_date_text_value(value)
+    if parsed is not None:
+        return parsed
+    stripped = _PAREN_SUFFIX.sub("", _DATE_TIME_SUFFIX.sub("", value)).strip()
+    if stripped and stripped != value:
+        return _parse_date_text_value(stripped)
+    return None
+
+
+def _parse_date_text_value(value: str) -> datetime | None:
     # Unambiguous ISO (YYYY-MM-DD) first: dateparser with DATE_ORDER=DMY
     # otherwise reads "2026-04-01" as 4 January.
     iso_match = _ISO_DATE.search(value)
@@ -579,13 +607,13 @@ def parse_date_text(text: str | None) -> datetime | None:
     # 4. Spanish comma: "junio 30, 2027"
     es_comma = _SPANISH_DATE_COMMA.search(value)
     if es_comma:
-        result = _parse_spanish_month(text, 1, 2, 3, es_comma)
+        result = _parse_spanish_month(value, 1, 2, 3, es_comma)
         if result:
             return _year_guard(result)
     # 5. Spanish day-month-year with optional "de": "30 de junio de 2027", "30 abril 2026"
     es_flex = _SPANISH_DATE_FLEX.search(value)
     if es_flex:
-        result = _parse_spanish_month(text, 2, 1, 3, es_flex)
+        result = _parse_spanish_month(value, 2, 1, 3, es_flex)
         if result:
             return _year_guard(result)
     return None
@@ -630,6 +658,8 @@ def extract_funding_amount(text: str) -> str | None:
         r"(COP\s*[\d.,]{3,})",
         r"(BRL\s*[\d.,]{3,})",
         r"(GBP\s*[\d.,]{3,})",
+        # E19: Danish krone with optional magnitude ("DKK 10 million per grant").
+        r"(DKK\s*\d[\d.,]*\s*(?:millions?|millones?|mil\b|m\b|k\b)?)",
         r"(€\s*[\d.,]{3,})",
         r"(£\s*[\d.,]{3,})",
         r"(R\$\s*[\d.,]{3,})",
@@ -646,7 +676,7 @@ def extract_funding_amount(text: str) -> str | None:
             if (
                 digits_only
                 and int(digits_only) < 500
-                and not re.search(r"(?:USD|EUR|COP|BRL|GBP)", result, re.IGNORECASE)
+                and not re.search(r"(?:USD|EUR|COP|BRL|GBP|DKK)", result, re.IGNORECASE)
             ):
                 continue
             return result
@@ -677,6 +707,8 @@ _FUNDING_CURRENCIES: tuple[tuple[str, str], ...] = (
     ("PEN", r"\bsoles\b|\bpen\b|s/\."),
     ("EUR", r"€|\beuros?\b|\beur\b"),
     ("GBP", r"£|\blibras?\b|\bgbp\b"),
+    # E19: Danish krone (Novo Nordisk Foundation sidebar "DKK 10 million").
+    ("DKK", r"\bdkk\b|danish\s+kroner?|danish\s+crowns?"),
     ("USD", r"\busd\b|us\$|\bdolares?\b|\bdollars?\b"),
 )
 
@@ -789,6 +821,61 @@ def extract_funding_details(text: str) -> tuple[str | None, float | None, str | 
     ]
     value = _apply_funding_magnitude(max(numbers), normalized) if numbers else None
     return raw, value, _detect_funding_currency(normalized)
+
+
+# ── E19 targeted detail parsers (host-gated, zero blast radius) ─────────────
+
+_NOVO_HOST_MARKER = "novonordiskfonden.dk"
+_FONDO_HOST_MARKER = "fondoemprender.com"
+
+
+def extract_fondo_detail_fields(html: str) -> dict[str, object]:
+    """Parse a Fondo Emprender call page (``fondoemprender.com`` SSR HTML).
+
+    The ficha carries an ``h2`` ``Fechas`` block whose rows read
+    ``Apertura: 20 de mayo de 2026`` / ``Cierre: 19 de junio de 2026``,
+    plus a ``Recursos Asignados`` heading whose next ``h2`` sibling holds
+    the amount (``$1.050.000.000`` — bare ``$``, so currency stays None and
+    Colombia resolves it downstream). Returns the five field keys with
+    ``None`` defaults; merging stays gap-fill-only in the callers (mirror
+    of ``_update_opportunity``). Never raises.
+    """
+    result: dict[str, object] = {
+        "open_date": None,
+        "close_date": None,
+        "funding_amount_raw": None,
+        "funding_amount_value": None,
+        "funding_amount_currency": None,
+    }
+    if not html or not isinstance(html, str):
+        return result
+    try:
+        from selectolax.lexbor import LexborHTMLParser as HTMLParser
+
+        heads = [clean_text(node.text()) for node in HTMLParser(html).css("h2")]
+        for index, head in enumerate(heads):
+            lowered = normalize_text(head)
+            if "apertura" in lowered and result["open_date"] is None:
+                date_part = head.split(":", 1)[1] if ":" in head else head
+                parsed = parse_date_text(date_part)
+                if parsed is not None:
+                    result["open_date"] = parsed
+            elif "cierre" in lowered and result["close_date"] is None:
+                date_part = head.split(":", 1)[1] if ":" in head else head
+                parsed = parse_date_text(date_part)
+                if parsed is not None:
+                    result["close_date"] = parsed
+            elif "recursos asignados" in lowered and result["funding_amount_value"] is None:
+                sibling = heads[index + 1] if index + 1 < len(heads) else ""
+                if sibling.strip():
+                    _, value, currency = extract_funding_details(sibling)
+                    if value is not None:
+                        result["funding_amount_raw"] = sibling.strip()[:200]
+                        result["funding_amount_value"] = value
+                        result["funding_amount_currency"] = currency
+    except Exception:
+        return result
+    return result
 
 
 # ── Narrative section extraction ──────────────────────────────────────────
@@ -1503,6 +1590,36 @@ def extract_page_fields(
         except Exception:
             if not page_text:
                 page_text = html
+
+    # E19 targeted detail parsers (host-gated): higher precision than the
+    # generic sweep for fichas with known structure, gap-fill only — a slot
+    # already filled above (JSON-LD/microdata) is never overwritten, and
+    # non-matching hosts skip this entirely.
+    if html and isinstance(html, str) and page_url:
+        try:
+            host = (urlparse(page_url).hostname or "").lower()
+        except ValueError:
+            host = ""
+        targeted: dict[str, object] | None = None
+        if _NOVO_HOST_MARKER in host:
+            try:
+                from app.connectors.wordpress_grants import extract_novo_detail_fields
+
+                targeted = extract_novo_detail_fields(html)
+            except Exception:
+                targeted = None
+        elif _FONDO_HOST_MARKER in host:
+            targeted = extract_fondo_detail_fields(html)
+        if targeted:
+            for key in (
+                "open_date",
+                "close_date",
+                "funding_amount_raw",
+                "funding_amount_value",
+                "funding_amount_currency",
+            ):
+                if result[key] is None and targeted.get(key) is not None:
+                    result[key] = targeted[key]
 
     if page_text:
         if result["open_date"] is None:
@@ -2287,6 +2404,13 @@ DETAIL_ENRICHMENT_PILOT_KEYS: frozenset[str] = frozenset(
         # them, no connector change.
         "secihti-mexico-ciencias",
         "universidad-nacional-colombia",
+        # E19: novo-nordisk-grants. The WP JSON list carries ``acf: []``
+        # always (no deadline anywhere), but each grant links to a full SSR
+        # detail page whose header/sidebar structure is parsed by the
+        # host-gated targeted extractor (``extract_novo_detail_fields`` via
+        # ``extract_page_fields``) — the existing SSR batch path covers it,
+        # no connector fetch change.
+        "novo-nordisk-grants",
     }
 )
 
@@ -2525,6 +2649,10 @@ async def enrich_grants_gov_render_llm(
 #   pages are full SSR text and the deterministic extractors already yield
 #   open/close dates from it (live-verified), so the key just joins
 #   DETAIL_ENRICHMENT_PILOT_KEYS and the existing SSR batch path covers it.
+#   E19: the 77 open rows are bolsas whose ficha states a MONTHLY stipend
+#   ("Valor da bolsa: R$ 12.570,00" / "Value: R$ 12.570,00" → 12570.0 BRL
+#   via the PT bolsa pattern). The batch gap-fills that figure as-is, never
+#   annualized — duration is unknown, so scaling would fabricate.
 # - developmentaid-tenders: plain fetch hits a Cloudflare challenge
 #   ("Just a moment"), but a bounded Chromium render passes it
 #   (live-verified), so it gets a key-gated render-based detail step below

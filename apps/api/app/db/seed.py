@@ -627,7 +627,9 @@ def seed_default_sources(
                 "title_selectors": ["a", "h2", "h3"],
                 "link_selectors": ["a[href*='Conv']"],
                 "content_selectors": ["article", ".page-content", "main"],
-                "date_labels": ["Fecha de cierre:", "Cierre:", "Deadline:"],
+                # E19: the ficha opens with "Apertura: <date>" and closes
+                # with "Cierre: <date>" inside the h2 Fechas block.
+                "date_labels": ["Fecha de cierre:", "Cierre:", "Apertura:", "Deadline:"],
                 "detail_enrichment": True,
             },
         },
