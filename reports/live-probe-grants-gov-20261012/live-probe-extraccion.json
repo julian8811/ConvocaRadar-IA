@@ -1,0 +1,30 @@
+{
+  "http_status": 200,
+  "latency_ms": 421,
+  "content_type": "application/json",
+  "body_bytes": 18952,
+  "items": 5,
+  "sample": [
+    {
+      "title": "Carcinogen Hazard Assessment Monographs Program (CHAMP) (R01 Clinical Trial Not Allowed)",
+      "url": "https://www.grants.gov/search-results-detail/360905"
+    },
+    {
+      "title": "Improved quality of life of persons with disabilities in provinces heavily sprayed with agent orange in Ca Mau and Quang Ngai",
+      "url": "https://www.grants.gov/search-results-detail/364047"
+    },
+    {
+      "title": "NIJ FY 2026 Research and Evaluation on School Safety",
+      "url": "https://www.grants.gov/search-results-detail/364048"
+    },
+    {
+      "title": "Cellular Senescence Network (SenNet): SenNet Technology Projects (SenTecs) (UG3/UH3 Clinical Trial Not Allowed)",
+      "url": "https://www.grants.gov/search-results-detail/359168"
+    },
+    {
+      "title": "NIAMS P30 Centers Program (P30 - Clinical Trial Not Allowed)",
+      "url": "https://www.grants.gov/search-results-detail/359152"
+    }
+  ],
+  "sanitized_url": "https://api.grants.gov/v1/api/search2"
+}
