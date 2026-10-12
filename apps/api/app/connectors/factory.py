@@ -1,7 +1,10 @@
 from app.connectors.configurable_html import ConfigurableHtmlConnector
 from app.connectors.registry import get_connector
 from app.connectors.generic_html import GenericHtmlConnector
-from app.connectors.grants_gov import GrantsGovConnector  # noqa: F401 — @register side effect
+from app.connectors.grants_gov import (  # noqa: F401 — @register side effect
+    GrantsGovConnector,
+    GrantsGovForecastConnector,
+)
 from app.connectors.grants_gov_rss import GrantsGovRssConnector
 from app.connectors.apc_colombia import ApcColombiaConnector  # noqa: F401 — @register side effect
 from app.connectors.api import ApiConnector
@@ -198,7 +201,7 @@ def connector_for(
         return DevelopmentAidConnector(
             source_key, base_url or "", connector_config=connector_config
         )
-    if source_key in {"grants-gov-rss", "grants-gov-forecast"}:
+    if source_key == "grants-gov-rss":
         return GrantsGovRssConnector(source_key, base_url or "")
     if source_key == "nsf-funding-rss":
         return NSFFundingRssConnector(source_key, base_url or "")

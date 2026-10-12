@@ -80,14 +80,19 @@ def seed_default_sources(
         },
         {
             "key": "grants-gov-forecast",
-            "name": "Grants.gov Forecast Feed",
-            "base_url": "https://www.grants.gov/rss/GG_ForecastOpportunities.xml",
+            "name": "Grants.gov Forecast Search API",
+            "base_url": "https://api.grants.gov/v1/api/search2",
             "country": "United States",
             "region": "North America",
-            "source_type": "rss",
+            "source_type": "api",
             "category": ["grants", "federal funding"],
-            "allowed_domains": ["www.grants.gov"],
+            "allowed_domains": ["api.grants.gov"],
             "scraping_frequency": "daily",
+            "connector_config": {
+                "oppStatuses": "forecasted",
+                "note": "Via A: keyless search2 with oppStatuses=forecasted; "
+                "replaces the RSS forecast feed (session-gated).",
+            },
         },
         {
             "key": "grants-gov",
