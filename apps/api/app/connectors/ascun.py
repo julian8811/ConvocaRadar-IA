@@ -12,6 +12,7 @@ import html
 import json
 import re
 import unicodedata
+from datetime import UTC, datetime
 
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
 from app.connectors.common import clean_text, is_allowed_host, thin_fill_candidates
@@ -244,6 +245,9 @@ class AscunConnector:
             return ValidationResult(ok=False, reason="Missing title or URL")
         if not is_allowed_host(candidate.official_url, ASCUN_ALLOWED_HOSTS):
             return ValidationResult(ok=False, reason="URL outside ASCUN allowed domains")
+        # An explicitly extracted past closing date must not be re-labelled as an active opportunity.
+        if candidate.close_date and candidate.close_date.date() < datetime.now(UTC).date():
+            return ValidationResult(ok=False, reason="Closing date is in the past")
         accepted, reason = _title_decision(candidate.title)
         if not accepted:
             return ValidationResult(ok=False, reason=reason)
