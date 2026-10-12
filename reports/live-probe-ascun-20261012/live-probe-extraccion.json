@@ -1,0 +1,31 @@
+{
+  "http_status": 200,
+  "latency_ms": 909,
+  "content_type": "application/json; charset=UTF-8",
+  "body_bytes": 173677,
+  "items_json": 20,
+  "candidates": 20,
+  "candidates_ascun_url": 20,
+  "sample": [
+    {
+      "title": "La educación superior en Colombia creció 7,5 % en 2025, de acuerdo con las cifras del SNIES a 2025, ",
+      "url": "https://ascun.org.co/universidades-del-pais-se-unen-entorno-a-la-democracia-y-la-cultura-de-paz-en-encuentro-nacional/la-educacion-superior-en-colombia-crecio-75-en-2025-de-acuerdo-con-las-cifras-del-snies-a-2025-presentadas-por-ascun-y-benchlab/"
+    },
+    {
+      "title": "ASCUN acompañó el lanzamiento de Helix-A, el campus de ciencia, tecnología e innovación de la Escuel",
+      "url": "https://ascun.org.co/universidades-del-pais-se-unen-entorno-a-la-democracia-y-la-cultura-de-paz-en-encuentro-nacional/ascun-acompano-el-lanzamiento-de-helix-a-el-campus-de-ciencia-tecnologia-e-innovacion-de-la-escuela-colombiana-de-ingenieria-julio-garavito/"
+    },
+    {
+      "title": "Investigación como motor estratégico para el desarrollo territorial: así se desarrolló el Encuentro ",
+      "url": "https://ascun.org.co/universidades-del-pais-se-unen-entorno-a-la-democracia-y-la-cultura-de-paz-en-encuentro-nacional/investigacion-como-motor-estrategico-para-el-desarrollo-territorial-asi-se-desarrollo-el-encuentro-nacional-de-vicerrectorias-y-direcciones-de-investigacion-ascun-2026/"
+    },
+    {
+      "title": "Totto abre convocatoria nacional que llevará a estudiantes colombianos a estudiar en Europa",
+      "url": "https://ascun.org.co/noticias-ies/totto-abre-convocatoria-nacional-que-llevara-a-estudiantes-colombianos-a-estudiar-en-europa/"
+    },
+    {
+      "title": "Convocatoria profesoral UIS 2026: mañana vence el plazo para inscribirse",
+      "url": "https://ascun.org.co/noticias-ies/convocatoria-profesoral-uis-2026-manana-vence-el-plazo-para-inscribirse/"
+    }
+  ]
+}
