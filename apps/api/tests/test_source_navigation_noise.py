@@ -57,3 +57,7 @@ def test_missing_or_unexpected_urls_are_handled_by_normal_validation():
 def test_news_and_historical_procurement_not_broadly_auto_rejected():
     assert reason("idt-noticias", "Some article", "https://www.idt.gov.co/noticias/story") is None
     assert reason("findeter-convocatorias", "PAF 2023", "https://www.findeter.gov.co/convocatorias/paf-2023") is None
+
+
+def test_malformed_url_does_not_abort_scraping():
+    assert reason("cost-open-calls", "Navigation", "http://[malformed") is None
