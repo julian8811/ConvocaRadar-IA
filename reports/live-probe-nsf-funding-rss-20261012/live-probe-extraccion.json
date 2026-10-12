@@ -1,0 +1,30 @@
+{
+  "http_status": 200,
+  "latency_ms": 223,
+  "content_type": "application/rss+xml; charset=utf-8",
+  "body_bytes": 13127,
+  "items": 15,
+  "sample": [
+    {
+      "title": "NSF Graduate Research Fellowship Program (GRFP)",
+      "url": "https://www.nsf.gov/funding/opportunities/grfp-nsf-graduate-research-fellowship-program/nsf26-526/solicitation"
+    },
+    {
+      "title": "Expeditions in Computing (Expeditions)",
+      "url": "https://www.nsf.gov/funding/opportunities/expeditions-expeditions-computing/nsf26-525/solicitation"
+    },
+    {
+      "title": "Emerging Frontiers in Research and Innovation (EFRI): Wave-Based Computing (WBC) (EFRI-WBC)",
+      "url": "https://www.nsf.gov/funding/opportunities/efri-wbc-emerging-frontiers-research-innovation-efri-wave-based/nsf26-524/solicitation"
+    },
+    {
+      "title": "MPS Physics Research Programs (MPS Physics)",
+      "url": "https://www.nsf.gov/funding/opportunities/mps-physics-mps-physics-research-programs/nsf26-523/solicitation"
+    },
+    {
+      "title": "MPS Astronomical Sciences Research Programs (MPS Astro)",
+      "url": "https://www.nsf.gov/funding/opportunities/mps-astro-mps-astronomical-sciences-research-programs/nsf26-522/solicitation"
+    }
+  ],
+  "sanitized_url": "https://www.nsf.gov/rss/rss_www_funding_pgm_annc_inf.xml"
+}
