@@ -122,6 +122,8 @@ export function PipelineZone() {
     queryKey: ["dashboard-pipeline"],
     queryFn: api.dashboardPipeline,
     placeholderData: keepPreviousData,
+    refetchInterval: 60_000,
+    staleTime: 30_000,
   });
 
   // The review queue is a slice of /dashboard/triage (not /dashboard/pipeline).
@@ -131,6 +133,8 @@ export function PipelineZone() {
     queryKey: ["dashboard-triage"],
     queryFn: api.dashboardTriage,
     placeholderData: keepPreviousData,
+    refetchInterval: 60_000,
+    staleTime: 30_000,
   });
 
   if (pipelineQuery.isLoading && triageQuery.isLoading) return <PipelineSkeleton />;

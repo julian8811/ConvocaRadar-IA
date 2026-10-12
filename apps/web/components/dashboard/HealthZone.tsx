@@ -210,6 +210,8 @@ export function HealthZone() {
     queryKey: ["dashboard-health"],
     queryFn: api.dashboardHealth,
     placeholderData: keepPreviousData,
+    refetchInterval: 60_000,
+    staleTime: 60_000,
   });
 
   if (query.isLoading) return <HealthSkeleton />;

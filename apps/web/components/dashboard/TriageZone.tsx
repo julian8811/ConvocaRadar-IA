@@ -222,6 +222,8 @@ export function TriageZone() {
     queryKey: ["dashboard-triage"],
     queryFn: api.dashboardTriage,
     placeholderData: keepPreviousData,
+    refetchInterval: 60_000,
+    staleTime: 30_000,
   });
 
   if (query.isLoading) return <TriageSkeleton />;
