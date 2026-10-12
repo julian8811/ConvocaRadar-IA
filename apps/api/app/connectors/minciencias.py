@@ -155,7 +155,7 @@ class MincienciasConnector:
         for link in container.css("a[href]"):
             href = link.attributes.get("href") or ""
             text = clean_text(link.text())
-            if href and "/convocatorias/" in href and _is_candidate_text(text):
+            if href and ("/convocatorias/" in href or "/node/" in href) and _is_candidate_text(text):
                 anchor = link
                 break
         if not anchor:
@@ -215,7 +215,7 @@ class MincienciasConnector:
                     not title
                     or not href
                     or not _is_candidate_text(title)
-                    or "/convocatorias/" not in href
+                    or ("/convocatorias/" not in href and "/node/" not in href)
                 ):
                     continue
                 official_url = urljoin(page_url, href)
