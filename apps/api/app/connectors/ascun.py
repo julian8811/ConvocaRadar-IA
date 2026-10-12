@@ -12,8 +12,6 @@ import html
 import json
 import re
 import unicodedata
-from datetime import datetime
-from urllib.parse import urlparse
 
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
 from app.connectors.common import clean_text, is_allowed_host, thin_fill_candidates
@@ -58,7 +56,7 @@ def _title_decision(title: str) -> tuple[bool, str]:
         return False, "Employment posting, outside funding opportunities"
     if re.search(
         r"\b(ganaron|ganadores?|ganadoras?|gano|ganan|recibio|"
-        r"seleccionad[oa]s?|seleccion(?:aron|o)|premiad[oa]s?|"
+        r"seleccionad[oa]s?|seleccion(?:aron|o)?|premiad[oa]s?|"
         r"se\s+llevo|otorgaron|se\s+otorgaron|entregaron|"
         r"se\s+cerro|cerrada|finalizo|finalizaron)\b",
         text,
