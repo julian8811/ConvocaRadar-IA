@@ -1,0 +1,36 @@
+{
+  "source_key": "idrc-funding",
+  "status": "live_ok",
+  "http_status": 200,
+  "latency_ms": 589,
+  "requests_made": 2,
+  "probe_requests": 1,
+  "extraction_requests": 1,
+  "bytes_truncated": false,
+  "ttl_s": 86400,
+  "pending_manual_review": true,
+  "evidence": {
+    "source_key": "idrc-funding",
+    "duration_ms": 672,
+    "requests_made": 1,
+    "urls": [
+      "https://idrc-crdi.ca/en/funding"
+    ],
+    "policy": {
+      "max_requests_per_source": 1,
+      "timeout_s": 15,
+      "total_budget_s": 60,
+      "max_concurrency_global": 2,
+      "max_concurrency_per_host": 1,
+      "max_bytes_per_page": 2000000,
+      "max_pages_per_source": 10,
+      "max_redirects": 3,
+      "retry_max": 2
+    },
+    "pending_manual_review": false,
+    "http_status": 200,
+    "bytes_truncated": false,
+    "retry_after_s": null,
+    "reason": null
+  }
+}

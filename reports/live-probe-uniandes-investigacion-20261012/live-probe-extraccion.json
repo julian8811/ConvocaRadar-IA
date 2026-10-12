@@ -1,0 +1,30 @@
+{
+  "http_status": 200,
+  "latency_ms": 273,
+  "content_type": "application/xml; charset=utf-8",
+  "body_bytes": 1814683,
+  "items": 100,
+  "sample": [
+    {
+      "title": "www.uniandes.edu.co",
+      "url": "https://www.uniandes.edu.co/"
+    },
+    {
+      "title": "natalia-pardo-continua-en-la-direccion-de-geociencias",
+      "url": "https://www.uniandes.edu.co/es/noticias/geologia/natalia-pardo-continua-en-la-direccion-de-geociencias"
+    },
+    {
+      "title": "un-buen-maestro-deja-la-piel-en-el-aula-nancy-palacios",
+      "url": "https://www.uniandes.edu.co/es/noticias/educacion/un-buen-maestro-deja-la-piel-en-el-aula-nancy-palacios"
+    },
+    {
+      "title": "renuevan-nombramiento-en-admisiones-y-registro",
+      "url": "https://www.uniandes.edu.co/es/noticias/en-el-campus/renuevan-nombramiento-en-admisiones-y-registro"
+    },
+    {
+      "title": "la-homosexualidad-no-es-aprendida",
+      "url": "https://www.uniandes.edu.co/es/noticias/gobierno-y-politica/la-homosexualidad-no-es-aprendida"
+    }
+  ],
+  "sanitized_url": "https://www.uniandes.edu.co/sitemap.xml"
+}
