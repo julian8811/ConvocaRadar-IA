@@ -21,7 +21,7 @@ Encargo #59 con gate NO-GO para red. Rama/worktree aislados desde fase 4.
 - [x] **L1 (P1 writer)** ✅ 2026-10-12 Transporte instrumentado en CLI + 1 GET reutilizado + `blocked_by_policy`. Spot-check padre OK, rama pusheada.
 - [x] **L2 (P1 writer)** ✅ 2026-10-12 5 fuentes (novo WP, grants-gov-forecast RSS, minciencias HTML, ukri HTML, innpulsa API) + pertinencia + manifest + dry-runs + comando exacto. 49 passed + diff limpio.
 - [x] **L3 (gate)** ✅ 2026-10-12 Piloto ejecutado (5 GET, presupuestos cumplidos): novo GO + innpulsa GO, grants-gov BLOCKED (gate de sesión), minciencias/ukri HOLD (JS/chrome). Veredicto: GO parcial 2/5. Evidencia commiteada + pusheada.
-- [ ] **L4 (P1)** Mini-backfill 51 filas NULL + extractor JS (minciencias/ukri): forense de endpoint/descubrimiento + fix si es barato. Ruta: delegada.
+- [ ] **L4 (P1)** Mini-backfill 51 filas NULL (en curso en servidor) + fix minciencias/ukri ✅ deployado y verificado (cherry `924be84`, healthy): minciencias 1→19 (18 ap/ci/mo), ukri 6→14 (9 ci, 6 mo).
 
 ## Acceptance
 - Criterio gate #59: manifest + dry-run 5 fuentes verificadas, e2e verde, ≤5 requests planeadas, muestras, políticas STOP, `git diff --check` limpio.
