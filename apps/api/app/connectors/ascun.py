@@ -51,13 +51,15 @@ def _title_decision(title: str) -> tuple[bool, str]:
     # The employment notice and the adjudication/recap are not fresh funding.
     if re.search(
         r"\b(convocatoria\s+(?:profesoral|docente|laboral)|vacantes?|"
-        r"oferta\s+laboral|contratacion\s+docente|plazas?\s+docentes?)\b",
+        r"oferta\s+laboral|contratacion\s+docente|plazas?\s+docentes?|"
+        r"mentores?\s+voluntarios?|voluntariado|veedores?)\b",
         text,
     ):
         return False, "Employment posting, outside funding opportunities"
     if re.search(
         r"\b(ganaron|ganadores?|ganadoras?|gano|ganan|recibio|"
-        r"seleccionad[oa]s?|seleccion(?:aron|o)?|premiad[oa]s?|"
+        r"seleccionad[oa]s?|seleccionaron|anunciamos\s+la\s+seleccion|"
+        r"premiad[oa]s?|"
         r"se\s+llevo|otorgaron|se\s+otorgaron|entregaron|"
         r"se\s+cerro|cerrada|finalizo|finalizaron)\b",
         text,
