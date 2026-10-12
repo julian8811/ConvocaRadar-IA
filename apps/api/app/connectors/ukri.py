@@ -53,7 +53,20 @@ class UKRIConnector:
             "competition",
         )
 
-        for selector in ("article", ".card", ".cards__item", ".list-item", "li", "section", "tr"):
+        for selector in (
+            # WordPress listing shape (live): one div.opportunity / div#post-<id>
+            # per item, carrying status + Publication/Opening/Closing dates.
+            # Amounts are detail-only (out of scope for the listing parse).
+            "div.opportunity",
+            'div[id^="post-"]',
+            "article",
+            ".card",
+            ".cards__item",
+            ".list-item",
+            "li",
+            "section",
+            "tr",
+        ):
             for container in tree.css(selector):
                 anchor = container.css_first("a[href]")
                 if not anchor:
