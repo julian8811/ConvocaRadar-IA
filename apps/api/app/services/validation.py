@@ -238,10 +238,20 @@ async def async_url_is_reachable(url: str) -> bool:
 
         client = await http_client()
         headers = {"User-Agent": "ConvocaRadar/1.0"}
-        response = await client.head(url, follow_redirects=True, timeout=5.0, headers=headers)
-        if response.status_code in {405, 501}:
-            response = await client.get(url, follow_redirects=True, timeout=5.0, headers=headers)
-        result = 200 <= response.status_code < 400
+        hostname = (urlparse(url).hostname or "").lower()
+        if hostname in {"ascun.org.co", "www.ascun.org.co"}:
+            # ASCUN: HEAD often takes >5s while GET succeeds faster. Send one
+            # streamed GET (headers only, no article download) with a bounded
+            # 10-second timeout instead of marking valid links as dead.
+            async with client.stream(
+                "GET", url, follow_redirects=True, timeout=10.0, headers=headers
+            ) as response:
+                result = 200 <= response.status_code < 400
+        else:
+            response = await client.head(url, follow_redirects=True, timeout=5.0, headers=headers)
+            if response.status_code in {405, 501}:
+                response = await client.get(url, follow_redirects=True, timeout=5.0, headers=headers)
+            result = 200 <= response.status_code < 400
         _set_cached_url(url, result)
         return result
     except httpx.HTTPError:
