@@ -9,15 +9,7 @@ from types import ModuleType
 from sqlalchemy import DateTime, ForeignKey, Integer, String, create_engine
 from sqlalchemy.orm import DeclarativeBase, Mapped, Session, mapped_column
 
-from importlib.util import module_from_spec, spec_from_file_location
-from pathlib import Path
-
-_script_path = Path(__file__).resolve().parents[3] / "scripts" / "reconcile_expired_status.py"
-_script_spec = spec_from_file_location("reconcile_expired_status", _script_path)
-_script = module_from_spec(_script_spec)
-_script_spec.loader.exec_module(_script)
-reconcile = _script.reconcile
-cutoff_for_previous_dates = _script.cutoff_for_previous_dates
+from app.db.reconcile_expired_status import reconcile, cutoff_for_previous_dates
 
 
 class Base(DeclarativeBase):
