@@ -1,0 +1,31 @@
+{
+  "http_status": 200,
+  "latency_ms": 517,
+  "content_type": "text/html; charset=UTF-8",
+  "body_bytes": 159297,
+  "kind": "html",
+  "n_items": 8,
+  "sample": [
+    {
+      "title": "Facultad de Emprendimiento",
+      "url": ""
+    },
+    {
+      "title": "Fondos Concursables UR",
+      "url": ""
+    },
+    {
+      "title": "CONVOCATORIAS 2026",
+      "url": ""
+    },
+    {
+      "title": "CONVOCATORIA CONJUNTA Conectando Territorios: Caminos para el Desarrollo.",
+      "url": "#convocatoria-conjunta-conectando-territorios-caminos-para-el-desarrollo"
+    },
+    {
+      "title": "CONVOCATORIA ACELERADOR DE LA INVESTIGACIÓN HACIA LA FRONTERA DEL CONOCIMIENTO.",
+      "url": "#convocatoria-acelerador-de-la-investigación-hacia-la-frontera-del-conocimiento"
+    }
+  ],
+  "sanitized_url": "https://urosario.edu.co/investigacion-y-extension/apoyo-e-infraestructura/fondos-concursables"
+}
