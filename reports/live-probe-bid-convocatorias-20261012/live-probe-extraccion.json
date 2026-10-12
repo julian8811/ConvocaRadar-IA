@@ -1,0 +1,31 @@
+{
+  "http_status": 200,
+  "latency_ms": 112,
+  "content_type": "text/html; charset=UTF-8",
+  "body_bytes": 65415,
+  "kind": "html",
+  "n_items": 2,
+  "sample": [
+    {
+      "title": "Procurement for Projects",
+      "url": ""
+    },
+    {
+      "title": "Search for opportunities",
+      "url": ""
+    },
+    {
+      "title": "Project Procurement",
+      "url": "/en/how-we-can-work-together/procurement/procurement-projects"
+    },
+    {
+      "title": "Corporate Procurement",
+      "url": "/en/how-we-can-work-together/procurement/corporate-procurement"
+    },
+    {
+      "title": "Calls for Proposals",
+      "url": "/en/how-we-can-work-together/calls-proposals"
+    }
+  ],
+  "sanitized_url": "https://www.iadb.org/en/how-we-can-work-together/procurement/procurement-projects"
+}

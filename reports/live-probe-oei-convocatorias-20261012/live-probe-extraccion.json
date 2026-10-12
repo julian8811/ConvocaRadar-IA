@@ -1,0 +1,23 @@
+{
+  "http_status": 404,
+  "latency_ms": 1390,
+  "content_type": "text/html; charset=UTF-8",
+  "body_bytes": 230849,
+  "kind": "html",
+  "n_items": 5,
+  "sample": [
+    {
+      "title": "Menu",
+      "url": ""
+    },
+    {
+      "title": "Menu",
+      "url": ""
+    },
+    {
+      "title": "404",
+      "url": ""
+    }
+  ],
+  "sanitized_url": "https://oei.int/oficinas/secretaria-general/convocatorias"
+}
