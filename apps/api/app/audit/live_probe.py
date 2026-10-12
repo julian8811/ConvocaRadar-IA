@@ -7,8 +7,10 @@ equivalente CLI a `--allow-network` + `--source-key`) y el preflight
 
 Resguardos (siempre activos, tambien con stubs en tests):
 - Bloqueo SSRF: hosts/IP privados, localhost, red interna, link-local.
-- Redirects SOLO a hosts autorizados; redirect a privado o a host no
-  autorizado => `blocked_by_policy` (STOP, sin seguir).
+- Redirects a hosts autorizados o de MISMO DUEÑO verificable
+  (mismo host/subdominio, mismo dominio registrable, o mapeo explícito
+  documentado); redirect a privado o a externo real => `blocked_by_policy`
+  (STOP, sin seguir).
 - Presupuestos auditables: <=10 req/fuente, timeout <=15s c/u, total <=60s,
   concurrencia global <=2 y por host <=1, tope bytes/pagina, tope paginas.
   429 respeta Retry-After (backoff); STOP ante WAF/CAPTCHA (403 con marcas).
@@ -35,7 +37,7 @@ import time
 import xml.etree.ElementTree as _ET
 from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable
-from urllib.parse import urlparse
+from urllib.parse import urljoin, urlparse
 
 # ── Presupuestos auditables (techos, no objetivos) ────────────────────
 PROBE_BUDGET_DEFAULTS: dict[str, Any] = {
@@ -84,6 +86,107 @@ def is_prohibited_host(host: str) -> bool:
         return ip_is_private(h)
     except ValueError:
         return False  # nombre publico aparente; se valida tras resolver
+
+
+# ── R-A: redirects mismo-dueño ──────────────────────────────────────
+# Un redirect a host fuera de `authorized_hosts` se permite SOLO si el
+# destino comparte dueño verificable con el origen que redirige:
+#  1. mismo host o subdominio (www.uniandes.edu.co, betowa.sena.edu.co);
+#  2. mismo dominio registrable/eTLD+1 (apex <-> www, mismo sitio);
+#  3. mapeo explícito documentado (renombres, absorciones, CDN estatal).
+# Huespedes multi-inquilino (drive.google.com, ...) NUNCA heredan dueño
+# por sufijo/subdominio: el mismo host sirve a millones de dueños
+# distintos. Solo un mapeo explícito los habilitaría, y se decidió NO
+# incluir ninguno: una carpeta de Drive es otro tipo de contenido sin
+# señal de propiedad en la URL (caso procolombia: blocked_by_policy).
+_MULTI_LABEL_SUFFIXES = (
+    "edu.co", "com.co", "gov.co", "org.co", "net.co",
+    "gob.mx", "com.mx", "edu.mx", "org.mx",
+    "gob.pe", "com.pe", "org.pe", "edu.pe",
+    "gov.py", "org.py", "edu.py", "com.py",
+    "gob.pa", "edu.pa",
+    "ac.nz", "co.nz", "org.nz", "govt.nz",
+    "ac.uk", "co.uk", "org.uk", "gov.uk",
+)
+
+# Pares de dominios registrables del MISMO dueño (simétrico, minúsculas).
+# Origen documentado en cada par (seed app/db/seed.py + evidencia 2026-10-12):
+# - CONAHCYT (conahcyt.mx, antes conacyt.mx) absorbido por SECIHTI (secihti.mx).
+# - Mozilla (mozilla.org) <-> Mozilla Foundation (mozillafoundation.org).
+# - Colombia Productiva (colombiaproductiva.com) absorbida por
+#   iNNpulsa Colombia (innpulsacolombia.com).
+# - SENA: senasofiaplus.edu.co <-> sena.edu.co (ambos oficiales SENA).
+# - ProInnóvate (proinnovate.gob.pe) sirve estáticos desde el CDN del
+#   Estado peruano (cdn.gob.pe).
+SAME_OWNER_REGISTRABLE_PAIRS: frozenset[frozenset[str]] = frozenset({
+    frozenset({"conahcyt.mx", "secihti.mx"}),
+    frozenset({"conacyt.mx", "secihti.mx"}),
+    frozenset({"mozilla.org", "mozillafoundation.org"}),
+    frozenset({"colombiaproductiva.com", "innpulsacolombia.com"}),
+    frozenset({"senasofiaplus.edu.co", "sena.edu.co"}),
+    frozenset({"proinnovate.gob.pe", "cdn.gob.pe"}),
+})
+
+# Huespedes multi-inquilino: jamas heredan dueño por sufijo/subdominio.
+SHARED_TENANT_HOSTS: frozenset[str] = frozenset({
+    "drive.google.com",
+    "docs.google.com",
+})
+
+
+def registrable_domain(host: str) -> str:
+    """Dominio registrable (eTLD+1) con lista mínima de sufijos públicos.
+
+    Sufijos de una etiqueta caen al fallback de 2 etiquetas; IPs y hosts
+    de una sola etiqueta se devuelven tal cual (nunca fingen parentesco).
+    """
+    h = (host or "").strip().lower().rstrip(".")
+    if not h:
+        return ""
+    try:
+        ipaddress.ip_address(h)
+        return h  # una IP solo es "pariente" de si misma (regla 1)
+    except ValueError:
+        pass
+    labels = h.split(".")
+    if len(labels) < 2:
+        return h
+    tail2 = ".".join(labels[-2:])
+    if tail2 in _MULTI_LABEL_SUFFIXES and len(labels) >= 3:
+        return ".".join(labels[-3:])
+    return tail2
+
+
+def _is_shared_tenant(host: str) -> bool:
+    h = (host or "").strip().lower().rstrip(".")
+    return any(h == t or h.endswith("." + t) for t in SHARED_TENANT_HOSTS)
+
+
+def same_owner_reason(origin_host: str, target_host: str) -> str | None:
+    """Motivo que habilita el redirect, o None si son dueños distintos.
+
+    Orden: huesped multi-inquilino (veto) -> mismo host -> subdominio ->
+    mismo registrable -> mapeo explícito.
+    """
+    o = (origin_host or "").strip().lower().rstrip(".")
+    t = (target_host or "").strip().lower().rstrip(".")
+    if not o or not t:
+        return None
+    if _is_shared_tenant(t) or _is_shared_tenant(o):
+        ro, rt = registrable_domain(o), registrable_domain(t)
+        if ro and rt and frozenset({ro, rt}) in SAME_OWNER_REGISTRABLE_PAIRS:
+            return "mapeo explícito documentado (huesped multi-inquilino)"
+        return None
+    if o == t:
+        return "mismo host"
+    if t.endswith("." + o) or o.endswith("." + t):
+        return "subdominio del mismo sitio"
+    ro, rt = registrable_domain(o), registrable_domain(t)
+    if ro and ro == rt:
+        return "mismo dominio registrable"
+    if frozenset({ro, rt}) in SAME_OWNER_REGISTRABLE_PAIRS:
+        return "mapeo explícito documentado"
+    return None
 
 
 def sanitize_url(url: str) -> str:
@@ -174,7 +277,7 @@ def build_dry_run_plan(source_key: str,
     risks = [
         "red real solo con --allow-network + --source-key explicitos",
         "bloqueo SSRF activo: privados/localhost/red interna denegados",
-        "redirects solo a hosts autorizados; otros => blocked_by_policy",
+        "redirects a hosts autorizados o mismo-dueño; otros => blocked_by_policy",
         "presupuesto: <=10 req/fuente, timeout <=15s c/u, total <=60s",
         "STOP ante WAF/CAPTCHA con pending_manual_review",
         "sin escrituras SQL, sin envios, sin embeddings, sin side effects",
@@ -336,8 +439,8 @@ def build_httpx_transport(
 ) -> Transport:
     """Transporte HTTPS instrumentado real (unico punto con red del CLI).
 
-    - httpx con `follow_redirects=False` (redirects los decide el probe,
-      solo mismo host autorizado) y `trust_env=False` (sin proxies del
+    - httpx con `follow_redirects=False` (redirects los decide el probe:
+      host autorizado o mismo-dueño verificado) y `trust_env=False` (sin proxies del
       entorno que cambien el destino efectivo).
     - Streaming con tope: aborta ANTES de completar si excede `max_bytes`
       (eleva `BodyTooLargeError`, sin descargar el resto).
@@ -443,6 +546,7 @@ async def run_live_probe(
     seen_urls: list[str] = []
     pending = list(urls)
     redirects = 0
+    redirect_chain: list[dict[str, str]] = []
     truncated = False
     last_status: int | None = None
     last_error: str | None = None
@@ -527,30 +631,51 @@ async def run_live_probe(
             if not loc:
                 last_error = "redirect sin location"
                 break
-            lmotive = check_url_policy(loc)
+            # Location relativa ("/final") se resuelve contra la URL actual;
+            # solo entonces se aplican politica de URL y de dueño.
+            target = loc if urlparse(loc).scheme else urljoin(url, loc)
+            lmotive = check_url_policy(target)
             if lmotive is not None:
                 return _ev("blocked_by_policy", requests_made=made,
                            pending_manual_review=True,
                            extra={"reason": f"redirect bloqueado por politica: {lmotive}",
                                   "urls": seen_urls})
             try:
-                nhost = (urlparse(loc).hostname or "").lower()
+                nhost = (urlparse(target).hostname or "").lower()
             except ValueError:
                 return _ev("blocked_by_policy", requests_made=made,
                            pending_manual_review=True,
                            extra={"reason": "redirect no parseable", "urls": seen_urls})
-            # Redirects SOLO a hosts autorizados y nunca a privados.
-            if is_prohibited_host(nhost) or (allowed and nhost not in allowed):
+            # Redirects: host autorizado, o mismo-dueño verificable con el
+            # origen que redirige; nunca a privados. El destino reingresa a
+            # `pending`, asi que cada salto revalida esquema, allowlist de
+            # entrada, DNS y SSRF antes de pedir (anti-rebinding).
+            hop_reason: str | None = None
+            if is_prohibited_host(nhost):
+                hop_reason = None
+            elif nhost in allowed:
+                hop_reason = "host autorizado"
+            else:
+                hop_reason = same_owner_reason(host, nhost)
+            if hop_reason is None:
                 return _ev("blocked_by_policy", requests_made=made,
                            pending_manual_review=True,
                            extra={"reason": f"redirect a host no autorizado/privado: {nhost}",
-                                  "urls": seen_urls})
+                                  "urls": seen_urls,
+                                  "redirect_chain": redirect_chain})
             redirects += 1
             if redirects > policy["max_redirects"]:
                 return _ev("over_budget", requests_made=made,
                            pending_manual_review=True,
-                           extra={"reason": "exceso de redirects", "urls": seen_urls})
-            pending.insert(0, loc)
+                           extra={"reason": "exceso de redirects", "urls": seen_urls,
+                                  "redirect_chain": redirect_chain})
+            redirect_chain.append({"from": sanitize_url(url),
+                                   "to": sanitize_url(target),
+                                   "reason": hop_reason})
+            # El destino verificado entra al set autorizado: en la proxima
+            # iteracion igual revalida esquema, DNS y SSRF antes de pedir.
+            allowed.add(nhost)
+            pending.insert(0, target)
             continue
         break  # respuesta final (no redirect)
 
@@ -583,6 +708,7 @@ async def run_live_probe(
                   "titles_count": len(titles),
                   "single_get_reused": True,
                   "retry_after_s": retry_after,
+                  "redirect_chain": redirect_chain,
                   "reason": last_error},
     )
     return out
