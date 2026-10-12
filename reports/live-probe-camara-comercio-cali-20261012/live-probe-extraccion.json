@@ -1,0 +1,23 @@
+{
+  "http_status": 404,
+  "latency_ms": 670,
+  "content_type": "text/html; charset=UTF-8",
+  "body_bytes": 84330,
+  "kind": "html",
+  "n_items": 7,
+  "sample": [
+    {
+      "title": "Atención virtual",
+      "url": ""
+    },
+    {
+      "title": "¿Qué estás buscando?",
+      "url": ""
+    },
+    {
+      "title": "Estas son las búsquedas más populares",
+      "url": ""
+    }
+  ],
+  "sanitized_url": "https://www.ccc.org.co/convocatorias/"
+}
