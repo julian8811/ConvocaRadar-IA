@@ -53,6 +53,8 @@ async def test_parse_and_validate_real_world_title_cases():
         ("Inscríbete a la Beca Alberto Assa para futuros licenciados", True),
         ("Escuela de Verano ofrece 20 becas para explorar el Caribe", True),
         ("Convocatoria profesoral UIS 2026: mañana vence el plazo", False),
+        ("Convocatoria abierta para mentores voluntarios de Sinapsis Nitro", False),
+        ("Convocatoria pública para veedores ciudadanos", False),
         ("Cuatro proyectos seleccionados en la convocatoria nacional Orquídeas 2025", False),
         ("Anunciamos la selección del proyecto GLOSOUTH en la convocatoria ICETEX 2024", False),
         ("Instituciones colombianas se preparan para las convocatorias Horizon Europe", False),
@@ -103,6 +105,22 @@ async def test_validate_rejects_domain_spoofing():
     )
     assert not (await AscunConnector().validate(candidate)).ok
 
+
+
+@pytest.mark.asyncio
+async def test_explicitly_expired_close_date_is_not_actionable():
+    from datetime import datetime
+
+    candidate = OpportunityCandidate(
+        title="Abierta la convocatoria a las Becas CAPES para movilidad",
+        entity="ASCUN Colombia",
+        country="Colombia",
+        official_url="https://ascun.org.co/noticias-ies/becas-capes/",
+        close_date=datetime(2024, 8, 8),
+    )
+    validation = await AscunConnector().validate(candidate)
+    assert not validation.ok
+    assert "past" in validation.reason.lower()
 
 def test_unknown_scholarship_headline_is_not_assumed_open():
     accepted, reason = _title_decision("Beca Hospital Universidad del Norte")
