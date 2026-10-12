@@ -1,0 +1,8 @@
+{
+  "http_status": null,
+  "latency_ms": 64,
+  "kind": "error",
+  "n_items": -1,
+  "sample": [],
+  "error": "[SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: unable to get local issuer certificate (_ssl.c:1000)"
+}

@@ -1,0 +1,23 @@
+{
+  "http_status": 200,
+  "latency_ms": 140,
+  "content_type": "text/html; charset=utf-8",
+  "body_bytes": 38157,
+  "kind": "html",
+  "n_items": 8,
+  "sample": [
+    {
+      "title": "Este Sitio Utiliza Cookies",
+      "url": ""
+    },
+    {
+      "title": "Ecosistema Internacional de Innovación Empresarial y Startups",
+      "url": ""
+    },
+    {
+      "title": "¿Cuál es el programa para mi?",
+      "url": ""
+    }
+  ],
+  "sanitized_url": "https://www.hubbog.com/"
+}

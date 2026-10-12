@@ -1,0 +1,23 @@
+{
+  "http_status": 200,
+  "latency_ms": 2416,
+  "content_type": "text/html; charset=ISO-8859-1",
+  "body_bytes": 100422,
+  "kind": "html",
+  "n_items": 1,
+  "sample": [
+    {
+      "title": "Ayuda menú de accesibilidad",
+      "url": ""
+    },
+    {
+      "title": "Ofertas para proveedores",
+      "url": "https://proveedores.camaradirecta.com/Home/ModulosTipoConvocatoria#"
+    },
+    {
+      "title": "Ofertas para proveedores",
+      "url": "https://proveedores.camaradirecta.com/Home/ModulosTipoConvocatoria#"
+    }
+  ],
+  "sanitized_url": "https://www.camaradirecta.com/programas-para-empresarios/"
+}
