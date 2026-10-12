@@ -1,0 +1,31 @@
+{
+  "http_status": 200,
+  "latency_ms": 782,
+  "content_type": "text/html; charset=UTF-8",
+  "body_bytes": 114867,
+  "kind": "html",
+  "n_items": 8,
+  "sample": [
+    {
+      "title": "Social menu",
+      "url": ""
+    },
+    {
+      "title": "Private area menu",
+      "url": ""
+    },
+    {
+      "title": "Main navigation",
+      "url": ""
+    },
+    {
+      "title": "Photography Award",
+      "url": "https://southernlenses.org"
+    },
+    {
+      "title": "Research and Project Grants",
+      "url": "/opportunities/research-and-project-grants"
+    }
+  ],
+  "sanitized_url": "https://twas.org/opportunities"
+}
