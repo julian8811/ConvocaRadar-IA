@@ -1,0 +1,30 @@
+{
+  "http_status": 200,
+  "latency_ms": 844,
+  "content_type": "text/html; charset=UTF-8",
+  "body_bytes": 128673,
+  "items": 7,
+  "sample": [
+    {
+      "title": "ANII | Agencia Nacional de Investigación e Innovación",
+      "url": ""
+    },
+    {
+      "title": "-INVESTIGACIÓN-",
+      "url": ""
+    },
+    {
+      "title": "Conocé nuestros instrumentos",
+      "url": ""
+    },
+    {
+      "title": "BECAS DE INVESTIGACIÓN CLÍNICA - ACADEMIA NACIONAL DE MEDICINA 11.06.2025 - 30.06.2026",
+      "url": "https://anii.org.uy/apoyos/investigacion/513/becas-de-investigacion-clinica--academia-nacional-de-medicina"
+    },
+    {
+      "title": "CONVOCATORIA PILAR EN RESISTENCIA ANTIMICROBIANA 02.02.2026 - 30.04.2026",
+      "url": "https://anii.org.uy/apoyos/investigacion/529/convocatoria-pilar-en-resistencia-antimicrobiana"
+    }
+  ],
+  "sanitized_url": "https://anii.org.uy/apoyos/investigacion/"
+}
