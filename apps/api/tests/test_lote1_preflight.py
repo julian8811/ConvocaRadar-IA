@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import asyncio
 
+from app.audit import live_probe
 from app.audit.cli import main as cli_main
 from app.audit.live_probe import (
     classify_http,
@@ -268,3 +269,212 @@ def test_global_request_limit_stops():
         authorized_hosts=["public.example"],
         resolve=lambda h: ["93.184.216.34"], max_requests=1))
     assert out.status == "over_budget" and out.requests_made == 1
+
+
+# ── R-A: redirects mismo-dueño (issue remediacion-post-certificacion) ──
+# Cero red: stubs en memoria. Origenes tomados del seed (app/db/seed.py).
+
+RSS_1 = "<rss><channel><item><title>Convocatoria T</title></item></channel></rss>"
+
+
+def _chain_transport(route: dict[str, str], final_body: str = RSS_1):
+    """Stub: URLs en `route` responden 302 a su destino; el resto 200."""
+    async def transport(url, timeout_s):
+        if url in route:
+            return {"status": 302, "headers": {"location": route[url]},
+                    "body": "", "latency_ms": 1}
+        return {"status": 200, "headers": {}, "body": final_body,
+                "latency_ms": 2}
+    return transport
+
+
+def test_same_owner_registrable_detected():
+    assert live_probe.same_owner_reason(
+        "www.uniandes.edu.co", "uniandes.edu.co") is not None
+
+
+def test_same_owner_subdomain_detected():
+    assert live_probe.same_owner_reason(
+        "www.sena.edu.co", "betowa.sena.edu.co") is not None
+
+
+def test_same_owner_explicit_mapping_conahcyt_secihti():
+    assert live_probe.same_owner_reason("conahcyt.mx", "secihti.mx") is not None
+
+
+def test_same_owner_explicit_mapping_mozilla():
+    assert live_probe.same_owner_reason(
+        "mozilla.org", "mozillafoundation.org") is not None
+
+
+def test_same_owner_explicit_mapping_colombiaproductiva_innpulsa():
+    assert live_probe.same_owner_reason(
+        "www.colombiaproductiva.com",
+        "convocatorias.innpulsacolombia.com") is not None
+
+
+def test_same_owner_explicit_mapping_proinnovate_cdn_gobpe():
+    assert live_probe.same_owner_reason(
+        "calendario.proinnovate.gob.pe", "cdn.gob.pe") is not None
+
+
+def test_same_owner_external_returns_none():
+    assert live_probe.same_owner_reason(
+        "public.example", "evil.com") is None
+
+
+def test_same_owner_shared_tenant_drive_returns_none():
+    assert live_probe.same_owner_reason(
+        "www.procolombia.co", "drive.google.com") is None
+
+
+def test_redirect_same_registrable_followed_uniandes_style():
+    out = asyncio.run(run_live_probe(
+        "demo", allow_network=True,
+        start_urls=["https://www.uniandes.edu.co/sitemap.xml"],
+        transport=_chain_transport(
+            {"https://www.uniandes.edu.co/sitemap.xml":
+             "https://uniandes.edu.co/sitemap.xml"}),
+        authorized_hosts=["www.uniandes.edu.co"],
+        resolve=lambda h: ["93.184.216.34"]))
+    assert out.status == "live_ok" and out.requests_made == 2
+
+
+def test_redirect_subdomain_followed_sena_style():
+    out = asyncio.run(run_live_probe(
+        "demo", allow_network=True,
+        start_urls=["https://www.sena.edu.co/convocatorias"],
+        transport=_chain_transport(
+            {"https://www.sena.edu.co/convocatorias":
+             "https://betowa.sena.edu.co/oferta"}),
+        authorized_hosts=["www.sena.edu.co"],
+        resolve=lambda h: ["93.184.216.34"]))
+    assert out.status == "live_ok" and out.requests_made == 2
+
+
+def test_redirect_explicit_mapping_followed_conahcyt_secihti():
+    out = asyncio.run(run_live_probe(
+        "demo", allow_network=True,
+        start_urls=["https://conahcyt.mx/convocatorias/"],
+        transport=_chain_transport(
+            {"https://conahcyt.mx/convocatorias/":
+             "https://secihti.mx/convocatorias/"}),
+        authorized_hosts=["conahcyt.mx"],
+        resolve=lambda h: ["93.184.216.34"]))
+    assert out.status == "live_ok" and out.requests_made == 2
+
+
+def test_redirect_explicit_mapping_followed_mozilla():
+    out = asyncio.run(run_live_probe(
+        "demo", allow_network=True,
+        start_urls=["https://mozilla.org/fellowships"],
+        transport=_chain_transport(
+            {"https://mozilla.org/fellowships":
+             "https://mozillafoundation.org/fellowships"}),
+        authorized_hosts=["mozilla.org"],
+        resolve=lambda h: ["93.184.216.34"]))
+    assert out.status == "live_ok" and out.requests_made == 2
+
+
+def test_redirect_explicit_mapping_followed_innpulsa():
+    out = asyncio.run(run_live_probe(
+        "demo", allow_network=True,
+        start_urls=["https://www.colombiaproductiva.com/convocatorias"],
+        transport=_chain_transport(
+            {"https://www.colombiaproductiva.com/convocatorias":
+             "https://convocatorias.innpulsacolombia.com/api/convocatorias"}),
+        authorized_hosts=["www.colombiaproductiva.com"],
+        resolve=lambda h: ["93.184.216.34"]))
+    assert out.status == "live_ok" and out.requests_made == 2
+
+
+def test_redirect_external_still_blocked():
+    seen: list[str] = []
+
+    async def transport(url, timeout_s):
+        seen.append(url)
+        return {"status": 302, "headers": {"location": "https://evil.com/x"},
+                "body": "", "latency_ms": 1}
+    out = asyncio.run(run_live_probe(
+        "demo", allow_network=True, start_urls=[PUB], transport=transport,
+        authorized_hosts=["public.example"],
+        resolve=lambda h: ["93.184.216.34"]))
+    assert out.status == "blocked_by_policy"
+    assert seen == [PUB]
+
+
+def test_redirect_private_ip_literal_blocked():
+    seen: list[str] = []
+
+    async def transport(url, timeout_s):
+        seen.append(url)
+        return {"status": 302, "headers": {"location": "https://10.0.0.9/admin"},
+                "body": "", "latency_ms": 1}
+    out = asyncio.run(run_live_probe(
+        "demo", allow_network=True, start_urls=[PUB], transport=transport,
+        authorized_hosts=["public.example"],
+        resolve=lambda h: ["93.184.216.34"]))
+    assert out.status == "blocked_by_policy"
+    assert seen == [PUB]
+
+
+def test_redirect_shared_tenant_drive_blocked():
+    seen: list[str] = []
+
+    async def transport(url, timeout_s):
+        seen.append(url)
+        return {"status": 302, "headers": {
+            "location": "https://drive.google.com/drive/folders/xyz"},
+            "body": "", "latency_ms": 1}
+    out = asyncio.run(run_live_probe(
+        "demo", allow_network=True,
+        start_urls=["https://www.procolombia.co/convocatorias"],
+        transport=transport,
+        authorized_hosts=["www.procolombia.co"],
+        resolve=lambda h: ["93.184.216.34"]))
+    assert out.status == "blocked_by_policy"
+    assert len(seen) == 1
+
+
+def test_redirect_chain_over_limit_is_over_budget():
+    base = "https://public.example"
+    route = {f"{base}/p{i}": f"{base}/p{i + 1}" for i in range(5)}
+    out = asyncio.run(run_live_probe(
+        "demo", allow_network=True, start_urls=[f"{base}/p0"],
+        transport=_chain_transport(route),
+        authorized_hosts=["public.example"],
+        resolve=lambda h: ["93.184.216.34"]))
+    assert out.status == "over_budget"
+    assert out.requests_made == 4  # 1 inicial + 3 redirects (tope max_redirects)
+
+
+def test_redirect_target_dns_revalidated_per_hop():
+    def resolve(host):
+        if host == "uniandes.edu.co":
+            return ["10.9.9.9"]  # el destino se volvio privado: STOP
+        return ["93.184.216.34"]
+    seen: list[str] = []
+
+    async def transport(url, timeout_s):
+        seen.append(url)
+        if url == "https://www.uniandes.edu.co/sitemap.xml":
+            return {"status": 302,
+                    "headers": {"location": "https://uniandes.edu.co/sitemap.xml"},
+                    "body": "", "latency_ms": 1}
+        raise AssertionError(f"no debe pedir al destino con DNS privada: {url}")
+    out = asyncio.run(run_live_probe(
+        "demo", allow_network=True,
+        start_urls=["https://www.uniandes.edu.co/sitemap.xml"],
+        transport=transport,
+        authorized_hosts=["www.uniandes.edu.co"], resolve=resolve))
+    assert out.status == "blocked_by_policy"
+    assert seen == ["https://www.uniandes.edu.co/sitemap.xml"]
+
+
+def test_redirect_relative_location_followed():
+    out = asyncio.run(run_live_probe(
+        "demo", allow_network=True, start_urls=[PUB],
+        transport=_chain_transport({PUB: "/final"}),
+        authorized_hosts=["public.example"],
+        resolve=lambda h: ["93.184.216.34"]))
+    assert out.status == "live_ok" and out.requests_made == 2
