@@ -26,8 +26,13 @@ nivel de import: el transporte real se inyecta (tests usan stubs).
 
 from __future__ import annotations
 
+import html as _html
 import ipaddress
+import json as _json
+import re as _re
+import socket
 import time
+import xml.etree.ElementTree as _ET
 from dataclasses import dataclass, field
 from typing import Any, Awaitable, Callable
 from urllib.parse import urlparse
@@ -104,11 +109,16 @@ def classify_http(status: int | None, error: str | None,
     """
     err = (error or "").lower()
     blob = f"{err} {body[:2000].lower()}"
+    waf = any(m in blob for m in WAF_MARKERS)
     if status == 200:
+        # Un 200 con marcas de challenge/CAPTCHA/WAF NO es live_ok: el cuerpo
+        # es un muro, no la fuente. STOP con revision humana.
+        if waf:
+            return ("live_blocked", TTL_NEGATIVE_S, True)
         return ("live_ok", TTL_POSITIVE_S, False)
     if status in (404, 410):
         return ("live_dead", TTL_NEGATIVE_S, False)
-    if status == 403 or any(m in blob for m in WAF_MARKERS):
+    if status == 403 or waf:
         return ("live_blocked", TTL_NEGATIVE_S, True)
     if status == 429:
         return ("live_transient", TTL_TRANSIENT_S, True)
@@ -122,12 +132,37 @@ def classify_http(status: int | None, error: str | None,
 
 
 # ── Plan dry-run (cero red) ───────────────────────────────────────────
+# URLs tomadas del seed real (app/db/seed.py): no inventar IDs ni URLs.
 KNOWN_START_URLS: dict[str, list[str]] = {
     "ascun-convocatorias": [
         "https://ascun.org.co/wp-json/wp/v2/posts?search=convocatoria&per_page=20",
     ],
     "generic-rss-sample": ["https://example.org/grants/feed.xml"],
+    # Lote 1 (issue #59): 5 fuentes habilitadas no-ASCUN, hosts distintos.
+    "novo-nordisk-grants": [
+        "https://novonordiskfonden.dk/wp-json/wp/v2/grant?per_page=100&status=publish",
+    ],
+    "grants-gov-forecast": [
+        "https://www.grants.gov/rss/GG_ForecastOpportunities.xml",
+    ],
+    "minciencias": [
+        "https://minciencias.gov.co/convocatorias/todas",
+    ],
+    "ukri-opportunities": [
+        "https://www.ukri.org/opportunity/",
+    ],
+    "innpulsa": [
+        "https://convocatorias.innpulsacolombia.com/api/convocatorias?active_only=true&include_private=false&include_archive=false",
+    ],
 }
+
+LOTE1_SOURCES: tuple[str, ...] = (
+    "novo-nordisk-grants",
+    "grants-gov-forecast",
+    "minciencias",
+    "ukri-opportunities",
+    "innpulsa",
+)
 
 
 def build_dry_run_plan(source_key: str,
@@ -174,6 +209,178 @@ Transport = Callable[[str, float], Awaitable[dict[str, Any]]]
 Resolver = Callable[[str], list[str]]
 
 
+class BodyTooLargeError(Exception):
+    """El cuerpo supero el tope ANTES de completar la recepcion (streaming).
+
+    Lo eleva el transporte instrumentado cuando el acumulado supera
+    `max_bytes_per_page` a mitad del stream: se aborta la conexion sin
+    descargar el resto.
+    """
+
+    def __init__(self, bytes_seen: int):
+        super().__init__(f"cuerpo > tope ({bytes_seen} bytes vistos, recepcion abortada)")
+        self.bytes_seen = bytes_seen
+
+
+def default_resolve(host: str) -> list[str]:
+    """Resolutor DNS del sistema (socket, sin red HTTP). Siempre consultado.
+
+    `run_live_probe` NUNCA omite la resolucion: si no se inyecta `resolve`,
+    usa este. Las IPs resultantes se verifican contra SSRF (privadas =>
+    bloqueo) justo antes de pedir, mitigando DNS rebinding por cercania
+    temporal entre resolucion y request.
+    """
+    infos = socket.getaddrinfo(host, 443, type=socket.SOCK_STREAM)
+    return sorted({info[4][0] for info in infos})
+
+
+def check_url_policy(url: str) -> str | None:
+    """Valida la politica dura de URL. Retorna motivo de bloqueo o None si ok.
+
+    - Solo HTTPS (nada de HTTP plano: credenciales y contenido en claro).
+    - Sin credenciales embebidas (user:pass@host).
+    - Solo puerto estandar 443 (implicito o explicito); otros puertos, fuera.
+    """
+    try:
+        p = urlparse(url)
+    except ValueError:
+        return "url no parseable"
+    if p.scheme != "https":
+        return f"esquema no permitido (solo https): {p.scheme or '?'}"
+    if p.username or p.password:
+        return "url con credenciales embebidas"
+    if p.port is not None and p.port != 443:
+        return f"puerto no estandar: {p.port}"
+    if not p.hostname:
+        return "url sin host"
+    return None
+
+
+def extract_titles(body: str, content_type: str = "") -> list[str]:
+    """Extrae los titulos del UNICO cuerpo descargado (sin mas GET).
+
+    Retorna la lista completa (tope de seguridad 500); el llamador publica
+    los primeros 10 como muestra. RSS/Atom/XML, JSON (WP/API) y HTML.
+    """
+    titles: list[str] = []
+    text = body or ""
+    ctype = (content_type or "").lower()
+
+    def _clean(s: str) -> str:
+        return _html.unescape(_re.sub(r"\s+", " ", s or "").strip())
+
+    if ("xml" in ctype or "rss" in ctype or "atom" in ctype
+            or text.lstrip().startswith("<")):
+        try:
+            root = _ET.fromstring(text[:2_000_000])
+            for tag in ("item", "entry"):
+                for node in root.iter(tag):
+                    t = node.find("title")
+                    if t is not None and t.text and t.text.strip():
+                        titles.append(_clean(t.text))
+                        if len(titles) >= 500:
+                            return titles
+            if not titles:
+                for t in root.iter("title"):
+                    if t.text and t.text.strip():
+                        titles.append(_clean(t.text))
+                        if len(titles) >= 500:
+                            break
+            if titles:
+                return titles
+        except _ET.ParseError:
+            pass
+    stripped = text.lstrip()
+    if stripped.startswith(("[", "{")) or "application/json" in ctype:
+        try:
+            data = _json.loads(text[:2_000_000])
+            items = data if isinstance(data, list) else data.get("items", data)
+            if isinstance(items, dict):
+                items = [items]
+            for it in (items or [])[:10]:
+                if not isinstance(it, dict):
+                    continue
+                t = it.get("title")
+                if isinstance(t, dict):
+                    t = t.get("rendered", "")
+                titles.append(_clean(str(t or it.get("name", ""))))
+            titles = [t for t in titles if t]
+            if titles:
+                return titles
+        except (_json.JSONDecodeError, AttributeError):
+            pass
+    articles = _re.findall(r"<article\b[^>]*>(.*?)</article>", text,
+                           _re.I | _re.S)
+    for art in articles:
+        m = _re.search(r"<h[12]\b[^>]*>(.*?)</h[12]>", art, _re.I | _re.S)
+        if m:
+            t = _clean(_re.sub(r"<[^>]+>", "", m.group(1)))
+            if t:
+                titles.append(t)
+        if len(titles) >= 500:
+            return titles
+    for m in _re.finditer(r"<h[12]\b[^>]*>(.*?)</h[12]>", text, _re.I | _re.S):
+        t = _clean(_re.sub(r"<[^>]+>", "", m.group(1)))
+        if t and t not in titles:
+            titles.append(t)
+        if len(titles) >= 500:
+            break
+    return titles
+
+
+def build_httpx_transport(
+    *,
+    timeout_s: float = 15,
+    max_bytes: int = 2_000_000,
+    deadline_s: float = 60,
+) -> Transport:
+    """Transporte HTTPS instrumentado real (unico punto con red del CLI).
+
+    - httpx con `follow_redirects=False` (redirects los decide el probe,
+      solo mismo host autorizado) y `trust_env=False` (sin proxies del
+      entorno que cambien el destino efectivo).
+    - Streaming con tope: aborta ANTES de completar si excede `max_bytes`
+      (eleva `BodyTooLargeError`, sin descargar el resto).
+    - Deadline extremo a extremo + timeout por solicitud.
+    La verificacion DNS/SSRF, esquema, credenciales y puertos la hace
+    `run_live_probe` ANTES de llamar a este transporte.
+    """
+    import httpx as _httpx
+
+    t0 = time.monotonic()
+
+    async def transport(url: str, timeout: float) -> dict[str, Any]:
+        remaining = deadline_s - (time.monotonic() - t0)
+        if remaining <= 0:
+            raise TimeoutError("deadline extremo a extremo agotado (60s)")
+        per_req = min(timeout, timeout_s, remaining)
+        started = time.monotonic()
+        async with _httpx.AsyncClient(follow_redirects=False,
+                                      trust_env=False,
+                                      timeout=per_req) as client:
+            async with client.stream("GET", url,
+                                     headers={"User-Agent": "ConvocaRadar-preflight/1.0"}) as resp:
+                seen = 0
+                chunks: list[bytes] = []
+                async for chunk in resp.aiter_bytes(65536):
+                    seen += len(chunk)
+                    if seen > max_bytes:
+                        raise BodyTooLargeError(seen)
+                    chunks.append(chunk)
+                raw = b"".join(chunks)
+        try:
+            body = raw.decode("utf-8", errors="replace")
+        except ValueError:
+            body = ""
+        return {"status": resp.status_code,
+                "headers": dict(resp.headers),
+                "body": body,
+                "latency_ms": int((time.monotonic() - started) * 1000),
+                "bytes_received": len(raw)}
+
+    return transport
+
+
 async def run_live_probe(
     source_key: str,
     *,
@@ -184,7 +391,20 @@ async def run_live_probe(
     resolve: Resolver | None = None,
     max_requests: int | None = None,
 ) -> LiveOutcome:
-    """Ejecuta el probe real con presupuestos. Sin flags => rechazo, 0 red."""
+    """Ejecuta el probe real con presupuestos. Sin flags => rechazo, 0 red.
+
+    UN solo GET por fuente, reutilizado para conectividad + parse +
+    validacion + muestra de titulos + metricas. Si un conector necesitara N
+    llamadas no instrumentables, no se llama: `blocked_by_policy`.
+
+    Resguardos duros (issue #59):
+    - `authorized_hosts` es EXIGIDO con red: vacio/ausente => bloqueo, 0 red.
+    - DNS se resuelve SIEMPRE: `resolve=None` usa `default_resolve`, nunca
+      se omite en silencio (rebinding: resolucion justo antes de pedir).
+    - URLs con credenciales, HTTP plano o puertos no estandar => bloqueo.
+    - El tamanio se verifica ANTES de completar (streaming del transporte
+      + backstop aqui para transports stub en tests).
+    """
     policy = dict(PROBE_BUDGET_DEFAULTS)
     if max_requests is not None:
         policy["max_requests_per_source"] = min(max_requests, policy["max_requests_per_source"])
@@ -204,6 +424,10 @@ async def run_live_probe(
     if not allow_network:
         return _ev("refused_missing_flags", pending_manual_review=False,
                    extra={"reason": "requiere --allow-network + --source-key"})
+    if not authorized_hosts:
+        return _ev("blocked_by_policy", requests_made=0,
+                   pending_manual_review=True,
+                   extra={"reason": "authorized_hosts exigido con red: sin lista, 0 requests"})
     urls = list(start_urls or KNOWN_START_URLS.get(source_key, []))
     if not urls:
         return _ev("refused_missing_flags",
@@ -212,7 +436,8 @@ async def run_live_probe(
         return _ev("refused_missing_flags",
                    extra={"reason": "sin transporte: red real no disponible aqui"})
 
-    allowed = {h.lower() for h in (authorized_hosts or [])}
+    resolver = resolve if resolve is not None else default_resolve
+    allowed = {h.lower() for h in authorized_hosts}
     t0 = time.monotonic()
     made = 0
     seen_urls: list[str] = []
@@ -223,11 +448,20 @@ async def run_live_probe(
     last_error: str | None = None
     last_latency = 0
     retry_after: int | None = None
+    last_body = ""
+    last_ctype = ""
+    last_bytes = 0
 
     while pending and made < budget:
         if time.monotonic() - t0 > policy["total_budget_s"]:
             break
         url = pending.pop(0)
+        motive = check_url_policy(url)
+        if motive is not None:
+            return _ev("blocked_by_policy", requests_made=made,
+                       pending_manual_review=True,
+                       extra={"reason": f"politica de URL: {motive}",
+                              "urls": seen_urls})
         try:
             host = (urlparse(url).hostname or "").lower()
         except ValueError:
@@ -239,20 +473,28 @@ async def run_live_probe(
                        pending_manual_review=True,
                        extra={"reason": f"host no autorizado o privado: {host}",
                               "urls": seen_urls})
-        if resolve is not None:
-            try:
-                ips = resolve(host)
-            except Exception as exc:
-                return _ev("blocked_by_policy", requests_made=made,
-                           pending_manual_review=True,
-                           extra={"reason": f"DNS fallo: {exc}", "urls": seen_urls})
-            if any(ip_is_private(ip) for ip in ips):
-                return _ev("blocked_by_policy", requests_made=made,
-                           pending_manual_review=True,
-                           extra={"reason": f"DNS resuelve a IP privada: {host}",
-                                  "urls": seen_urls})
+        try:
+            ips = resolver(host)
+        except Exception as exc:
+            return _ev("blocked_by_policy", requests_made=made,
+                       pending_manual_review=True,
+                       extra={"reason": f"DNS fallo: {exc}", "urls": seen_urls})
+        if any(ip_is_private(ip) for ip in ips):
+            return _ev("blocked_by_policy", requests_made=made,
+                       pending_manual_review=True,
+                       extra={"reason": f"DNS resuelve a IP privada: {host}",
+                              "urls": seen_urls})
         try:
             resp = await transport(url, policy["timeout_s"])
+        except BodyTooLargeError as exc:
+            made += 1
+            out = _ev("over_budget", requests_made=made,
+                      pending_manual_review=True,
+                      extra={"reason": f"tamanio excedido, recepcion abortada: {exc}",
+                             "urls": seen_urls,
+                             "bytes_seen": exc.bytes_seen})
+            out.evidence["duration_ms"] = int((time.monotonic() - t0) * 1000)
+            return out
         except TimeoutError as exc:
             last_error, last_status = f"timeout: {exc}", None
             made += 1
@@ -274,14 +516,23 @@ async def run_live_probe(
             except ValueError:
                 retry_after = None
         body = str(resp.get("body") or "")
+        last_ctype = headers.get("content-type", "")
+        last_bytes = int(resp.get("bytes_received", len(body.encode("utf-8"))))
         if len(body.encode("utf-8")) > policy["max_bytes_per_page"]:
             truncated = True
             body = body[: policy["max_bytes_per_page"]]
+        last_body = body
         if last_status is not None and 300 <= last_status <= 399:
             loc = headers.get("location", "")
             if not loc:
                 last_error = "redirect sin location"
                 break
+            lmotive = check_url_policy(loc)
+            if lmotive is not None:
+                return _ev("blocked_by_policy", requests_made=made,
+                           pending_manual_review=True,
+                           extra={"reason": f"redirect bloqueado por politica: {lmotive}",
+                                  "urls": seen_urls})
             try:
                 nhost = (urlparse(loc).hostname or "").lower()
             except ValueError:
@@ -311,8 +562,10 @@ async def run_live_probe(
         return out
 
     state, ttl, review = classify_http(last_status, last_error,
-                                       retry_after_s=retry_after, body="")
-    # Re-clasificar WAF con cuerpo cuando aplique (marcas en body).
+                                       retry_after_s=retry_after, body=last_body)
+    # El UNICO GET se reutiliza: del mismo cuerpo salen conectividad, parse,
+    # validacion, muestra de titulos y metricas. Sin llamadas extra.
+    titles = extract_titles(last_body, last_ctype) if last_body else []
     out = LiveOutcome(
         source_key=source_key, status=state, http_status=last_status,
         latency_ms=last_latency, requests_made=made,
@@ -324,6 +577,11 @@ async def run_live_probe(
                   "policy": policy, "pending_manual_review": review,
                   "http_status": last_status,
                   "bytes_truncated": truncated,
+                  "bytes_received": last_bytes,
+                  "content_type": last_ctype,
+                  "titles_sample": titles[:10],
+                  "titles_count": len(titles),
+                  "single_get_reused": True,
                   "retry_after_s": retry_after,
                   "reason": last_error},
     )
