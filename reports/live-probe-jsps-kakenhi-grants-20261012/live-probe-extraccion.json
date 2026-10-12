@@ -1,0 +1,31 @@
+{
+  "http_status": 200,
+  "latency_ms": 223,
+  "content_type": "text/html; charset=UTF-8",
+  "body_bytes": 34516,
+  "kind": "html",
+  "n_items": 2,
+  "sample": [
+    {
+      "title": "Grants-in-Aid for Scientific Research",
+      "url": ""
+    },
+    {
+      "title": "Outline of Grants-in-Aid for Scientific Research ＜KAKENHI＞",
+      "url": ""
+    },
+    {
+      "title": "Grants-in-Aid for Scientific Research",
+      "url": "/english/e-grants/"
+    },
+    {
+      "title": "Research Fellowships for Young Scientists",
+      "url": "/english/e-pd/"
+    },
+    {
+      "title": "Overseas Research Fellowships",
+      "url": "/english/e-ab/"
+    }
+  ],
+  "sanitized_url": "https://www.jsps.go.jp/english/e-grants/"
+}

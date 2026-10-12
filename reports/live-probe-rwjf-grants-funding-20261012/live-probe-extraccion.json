@@ -1,0 +1,31 @@
+{
+  "http_status": 200,
+  "latency_ms": 419,
+  "content_type": "text/html;charset=utf-8",
+  "body_bytes": 122377,
+  "kind": "html",
+  "n_items": 8,
+  "sample": [
+    {
+      "title": "Leveraging the strengths of communities and institutions",
+      "url": ""
+    },
+    {
+      "title": "Community Development",
+      "url": ""
+    },
+    {
+      "title": "Economic Inclusion for Families",
+      "url": ""
+    },
+    {
+      "title": "Grants Overview",
+      "url": "/en/grants.html"
+    },
+    {
+      "title": "Active Funding Opportunities",
+      "url": "/en/grants/active-funding-opportunities.html"
+    }
+  ],
+  "sanitized_url": "https://www.rwjf.org/en/grants.html"
+}
