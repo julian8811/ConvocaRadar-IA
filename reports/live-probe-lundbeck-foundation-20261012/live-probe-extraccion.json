@@ -1,0 +1,15 @@
+{
+  "http_status": 301,
+  "latency_ms": 1019,
+  "content_type": "text/html; charset=utf-8",
+  "body_bytes": 458,
+  "kind": "html",
+  "n_items": 0,
+  "sample": [
+    {
+      "title": "https://lundbeckfonden.com/grants-prizes/apply-grants",
+      "url": "https://lundbeckfonden.com/grants-prizes/apply-grants"
+    }
+  ],
+  "sanitized_url": "https://lundbeckfonden.com/en/grants-prizes/apply-grants"
+}

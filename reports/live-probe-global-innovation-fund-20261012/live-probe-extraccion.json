@@ -1,0 +1,31 @@
+{
+  "http_status": 200,
+  "latency_ms": 985,
+  "content_type": "text/html; charset=UTF-8",
+  "body_bytes": 45269,
+  "kind": "html",
+  "n_items": 8,
+  "sample": [
+    {
+      "title": "Apply for funding",
+      "url": ""
+    },
+    {
+      "title": "Applying for Funding",
+      "url": ""
+    },
+    {
+      "title": "Funding Guidelines",
+      "url": ""
+    },
+    {
+      "title": "Stages of Funding",
+      "url": "https://www.globalinnovation.fund/funding-stages"
+    },
+    {
+      "title": "funding guidance",
+      "url": "https://www.globalinnovation.fund/apply-for-funding"
+    }
+  ],
+  "sanitized_url": "https://www.globalinnovation.fund/apply-for-funding/"
+}

@@ -1,0 +1,31 @@
+{
+  "http_status": 200,
+  "latency_ms": 269,
+  "content_type": "text/html; charset=UTF-8",
+  "body_bytes": 79940,
+  "kind": "html",
+  "n_items": 8,
+  "sample": [
+    {
+      "title": "Funding at NSF",
+      "url": ""
+    },
+    {
+      "title": "Funding at NSF",
+      "url": ""
+    },
+    {
+      "title": "Share",
+      "url": ""
+    },
+    {
+      "title": "Funding Search",
+      "url": "/funding/opportunities"
+    },
+    {
+      "title": "NSF-wide Initiatives",
+      "url": "/funding/initiatives"
+    }
+  ],
+  "sanitized_url": "https://www.nsf.gov/funding"
+}
