@@ -11,19 +11,19 @@ confirmation of closure by the funder; check official extensions separately.
 from __future__ import annotations
 
 import argparse
-from datetime import datetime, time
-from zoneinfo import ZoneInfo
+from datetime import UTC, datetime, time
 
 from sqlalchemy import func, select, update
 
-BOGOTA = ZoneInfo("America/Bogota")
 TARGET_STATUSES = ("open", "closing_soon")
 
 
 def cutoff_for_previous_dates(now: datetime | None = None) -> datetime:
-    """Exclude all deadlines dated today to avoid time-zone ambiguity."""
-    local = (now or datetime.now(BOGOTA)).astimezone(BOGOTA)
-    return datetime.combine(local.date(), time.min)
+    """Exclude all deadlines dated today UTC (stored datetimes are naive UTC)."""
+    observed = now or datetime.now(UTC)
+    if observed.tzinfo is None:
+        raise ValueError("A timezone-aware instant is required")
+    return datetime.combine(observed.astimezone(UTC).date(), time.min)
 
 
 def candidate_filter(model, cutoff: datetime):
@@ -53,7 +53,7 @@ def reconcile(
         .limit(20)
     ).all()
     result = {
-        "cutoff_local_date": cutoff.date().isoformat(),
+        "cutoff_utc_date": cutoff.date().isoformat(),
         "candidates": count,
         "top_sources": [(key, qty) for key, qty in groups],
         "applied": False,
@@ -101,7 +101,7 @@ def main() -> None:
             db, apply=args.apply, expected_count=args.expected_count,
             max_changes=args.max_changes,
         )
-    print("Deadline boundary (Bogotá date):", result["cutoff_local_date"])
+    print("Deadline boundary (UTC date):", result["cutoff_utc_date"])
     print("Candidates:", result["candidates"])
     for source, qty in result["top_sources"]:
         print(f"  {source:<36} {qty:>5}")
