@@ -1,7 +1,8 @@
 "use client";
 
 import { useQuery } from "@tanstack/react-query";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { EmptyState, ErrorState } from "@/components/ui/state";
 import { api } from "@/lib/api";
 
 type Cell = { faculty_id: string; axis_id: string; count: number };
@@ -11,19 +12,40 @@ export function FacultyMatrix() {
   const axes = useQuery({ queryKey: ["axes"], queryFn: () => api.axes() });
   const matrix = useQuery({ queryKey: ["faculty-matrix"], queryFn: () => api.facultyMatrix() });
 
-  if (faculties.isLoading || axes.isLoading || matrix.isLoading) {
-    return <Card><CardContent className="p-6">Cargando matriz 4×6...</CardContent></Card>;
-  }
   const facList = (faculties.data as any)?.faculties ?? [];
   const axisList = (axes.data as any)?.axes ?? [];
+  const dimsLabel = `${facList.length}×${axisList.length}`;
+
+  if (faculties.isLoading || axes.isLoading || matrix.isLoading) {
+    return <Card><CardContent className="p-6">Cargando matriz…</CardContent></Card>;
+  }
+  const firstError = faculties.error ?? axes.error ?? matrix.error;
+  if (firstError) {
+    return <ErrorState message={firstError instanceof Error ? firstError.message : "No se pudo cargar la matriz"} />;
+  }
   const cells: Cell[] = (matrix.data as any)?.cells ?? [];
   const maxCount = Math.max(1, ...cells.map((c) => c.count));
+
+  // R3: sin matching ejecutado (todo en 0) la matriz es decorativa → empty-state.
+  if (cells.length === 0 || cells.every((c) => c.count === 0)) {
+    return (
+      <Card>
+        <CardHeader><CardTitle>Matriz Facultades × Ejes ({dimsLabel})</CardTitle></CardHeader>
+        <CardContent className="p-6">
+          <EmptyState title="Matching aún no ejecutado" detail="Ejecutá el matching facultad × eje para ver la distribución de oportunidades." />
+        </CardContent>
+      </Card>
+    );
+  }
 
   const getCount = (fid: string, aid: string) => cells.find((c) => c.faculty_id === fid && c.axis_id === aid)?.count ?? 0;
 
   return (
     <Card>
-      <CardHeader><CardTitle>Matriz Facultades × Ejes (4×6)</CardTitle></CardHeader>
+      <CardHeader>
+        <CardTitle>Matriz Facultades × Ejes ({dimsLabel})</CardTitle>
+        <CardDescription>Distribución de matches por facultad y eje institucional.</CardDescription>
+      </CardHeader>
       <CardContent>
         <div className="overflow-x-auto">
             <table className="w-full text-sm border-collapse">

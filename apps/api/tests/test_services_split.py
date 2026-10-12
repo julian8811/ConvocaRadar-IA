@@ -1065,7 +1065,8 @@ class TestScoringModule:
         from app.services.scoring import priority_for_score
 
         assert priority_for_score(80) == "high"
-        assert priority_for_score(65) == "medium"
+        assert priority_for_score(60) == "high"
+        assert priority_for_score(58) == "medium"
         assert priority_for_score(40) == "low"
         assert priority_for_score(20) == "not_recommended"
 

@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from datetime import UTC, datetime
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.core.ai import build_embedding, cosine_similarity
@@ -125,8 +126,11 @@ def priority_for_score(score: float) -> str:
 
     Thresholds adjusted for real-world data where most scraped
     opportunities lack funding amounts and detailed eligibility.
+    High starts at 60 (not 75): with sparse data the practical score
+    ceiling is ~70 (no amount/date bonuses apply), so 75 was
+    unreachable and high_match stayed at 0.
     """
-    if score >= 75:
+    if score >= 60:
         return Priority.high.value
     if score >= 55:
         return Priority.medium.value
@@ -320,13 +324,46 @@ def _compute_score(opportunity: Opportunity, profile: OrganizationProfile) -> di
 def calculate_score(
     db: Session, opportunity: Opportunity, profile: OrganizationProfile
 ) -> OpportunityScore:
-    """Calculate and persist an OpportunityScore for the given opportunity and profile."""
+    """Calculate and persist an OpportunityScore for the given opportunity and profile.
+
+    Upsert on ``(opportunity_id, organization_id)``: a UNIQUE constraint
+    (``uq_opportunity_scores_opp_org``) allows only one row per pair, so a
+    second scoring updates the existing row in place instead of inserting
+    a duplicate (same pattern as ``rescore_all_opportunities`` in genai.py).
+    """
     score = _compute_score(opportunity, profile)
+    value = min(round(score["raw"], 1), 100)
+    # NOTE: SessionLocal uses autoflush=False, so a score added earlier in
+    # the same unit of work (e.g. create + merge-score before commit) is
+    # invisible to the SELECT below. Check session-local pending rows
+    # first to avoid a duplicate INSERT against uq_opportunity_scores_opp_org.
+    existing = None
+    for pending in db.new:
+        if (
+            isinstance(pending, OpportunityScore)
+            and pending.opportunity_id == opportunity.id
+            and pending.organization_id == profile.organization_id
+        ):
+            existing = pending
+            break
+    if existing is None:
+        existing = db.scalar(
+            select(OpportunityScore).where(
+                OpportunityScore.opportunity_id == opportunity.id,
+                OpportunityScore.organization_id == profile.organization_id,
+            )
+        )
+    if existing is not None:
+        existing.score = value
+        existing.priority = priority_for_score(value)
+        existing.reasons = score["reasons"]
+        existing.warnings = score["warnings"]
+        return existing
     result = OpportunityScore(
         opportunity_id=opportunity.id,
         organization_id=profile.organization_id,
-        score=min(round(score["raw"], 1), 100),
-        priority=priority_for_score(min(score["raw"], 100)),
+        score=value,
+        priority=priority_for_score(value),
         reasons=score["reasons"],
         warnings=score["warnings"],
     )

@@ -9,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { EmptyState, ErrorState, LoadingState } from "@/components/ui/state";
 import { api, downloadReport } from "@/lib/api";
+import { FacultyMatrix } from "@/components/faculty/FacultyMatrix";
 import type { Report, ReportFormat } from "@/lib/types";
 
 const BOGOTA_TIMEZONE = "America/Bogota";
@@ -138,6 +139,10 @@ export default function ReportsPage() {
       </div>
       {reports.isLoading ? <LoadingState label="Cargando reportes" /> : null}
       {reports.error ? <ErrorState message={reports.error.message} /> : null}
+      {/* R3: la matriz vive acá, no en el home */}
+      <div id="faculty-matrix">
+        <FacultyMatrix />
+      </div>
       {reports.data && reports.data.length === 0 ? (
         <EmptyState title="No hay reportes" detail="Genera un reporte HTML, PDF, CSV o Excel." />
       ) : null}

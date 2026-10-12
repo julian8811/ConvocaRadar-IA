@@ -496,15 +496,15 @@ export default function SourcesPage() {
         </Card>
       ) : null}
 
-      {(sourceHealth.data ?? []).some((item) => item.status !== "healthy") ? (
+      {(sourceHealth.data ?? []).some((item) => item.status === "degraded" || item.status === "failing") ? (
         <Card>
           <CardHeader className="border-b border-slate-200 dark:border-slate-700 pb-4">
             <CardTitle className="text-slate-950 dark:text-white">Fuentes que requieren atención</CardTitle>
-            <CardDescription>Prioriza las fuentes con fallas recientes, degradación o poca actividad.</CardDescription>
+            <CardDescription>Solo fuentes degradadas o en falla — mismo criterio que el panel (sin inactivas).</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-3 pt-5 md:grid-cols-2">
             {healthItems
-              .filter((item) => item.status !== "healthy")
+              .filter((item) => item.status === "degraded" || item.status === "failing")
               .map((item) => (
                 <div key={item.source_id} className="rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4">
                   <div className="flex items-start justify-between gap-3">
