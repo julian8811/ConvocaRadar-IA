@@ -1,0 +1,31 @@
+{
+  "http_status": 200,
+  "latency_ms": 280,
+  "content_type": "text/html; charset=utf-8",
+  "body_bytes": 98891,
+  "kind": "html",
+  "n_items": 2,
+  "sample": [
+    {
+      "title": "Grants",
+      "url": ""
+    },
+    {
+      "title": "Programming periods 2021 - 2027 2014-2020 © Gorodenkoff, stock.adobe.com Managing your grant Important steps to follow How to manage a grant Visual identity",
+      "url": ""
+    },
+    {
+      "title": "nl Nederlands",
+      "url": "https://www.eacea.ec.europa.eu/grants_nl"
+    },
+    {
+      "title": "sk slovenčina",
+      "url": "https://www.eacea.ec.europa.eu/grants_sk"
+    },
+    {
+      "title": "sl slovenščina",
+      "url": "https://www.eacea.ec.europa.eu/grants_sl"
+    }
+  ],
+  "sanitized_url": "https://www.eacea.ec.europa.eu/grants_en"
+}
