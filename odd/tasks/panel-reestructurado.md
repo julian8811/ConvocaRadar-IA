@@ -38,7 +38,8 @@ Pedido explícito: el panel no actualiza (ya resuelto con T2) y muestra informac
 - [x] **R1 (P1 writer)** ✅ 2026-10-12 DISTINCT en KPIs + unique scores (migración 0018, sin borrado) + scopes consistentes con clamp + banner sin deshabilitadas. 6 passed + vecinas 35; spot-check padre 6 passed. Gap: `calculate_score` hace blind-insert → 500 con el constraint (va en R2 como upsert).
 - [x] **R2 (P1 writer)** ✅ 2026-10-12 Upsert en `calculate_score` (con `db.new` por autoflush off) + umbral high 60. 63 + 239 passed; 2 pines viejos ajustados por el padre; spot-check 284 passed. Score-all masivo queda para R4.
 - [x] **R3 (P1 writer)** ✅ 2026-10-12 Home reestructurado (sin duplicadas, Matrix→reports con empty-state, tabs condicionales, criterio único). Matrix removido del home por el padre. Suite 108 passed + tsc/eslint limpios.
-- [ ] **R4 (P1)** Deploy + verify (cleanup duplicados → migración 0018 → score-all → números reales antes/después).
+- [x] **R4 (P1)** ✅ 2026-10-12 Deploy (cherry `e75cac4`, healthy). Dup-check: 35907 filas extra eliminadas → 3172 únicas; migración 0018 OK; rescore 3172/3172. Verificado: total sin ×9, embeddings 100.0%, high_match 0 legítimo (únicos 2 high están cerrados, fuera de scope).
+- **Cierre feature**: panel con números reales + layout aprobado en producción. Pendiente: verificación visual del usuario.
 - [ ] **R4 (P1)** Deploy + verify en servidor con números reales antes/después.
 
 ## Acceptance
