@@ -39,7 +39,7 @@ D gana: reglas gratis para lo obvio (ej. "turismo", "posdoctorado"), embeddings 
 - [x] **T4 (P1 writer)** ✅ 2026-10-11 Juez LLM + migración 0017 + `scripts/backfill_sector.py` (dry-run default, pacing 3s, gap-fill). Accuracy 0.900 pineada (stub; Groq real pendiente T7). 76 passed + 23 triangulación; spot-check padre 76 passed.
 - [x] **T5 (P1 writer)** ✅ 2026-10-11 Informe agrupado por sector (HTML secciones por taxonomía + XLSX con columna Sector + PDF por mismo pipeline). Compatibilidad byte-idéntica sin sectores. 7 passed + vecinas 19/210; spot-check padre 31 passed.
 - [x] **T6 (P1)** ✅ 2026-10-11 Línea Colmayor (tokens extraídos de píxeles del escudo — el docx no trae tokens; assets 800px/64px <150KB; reemplazo directo en `export.py` con fallback). 16 passed + vecinas 217; spot-check padre 16 passed.
-- 2026-10-11: T7 deployado (cherry `2c0439d`, migración 0017 OK, marca Colmayor verificada en PDF muestra) pero backfill ABORTADO limpio: `asyncio.run()` dentro del loop + falta `embed_fn`. DB intacta (0 con sector).
+- [x] **T7 (P1)** ✅ 2026-10-11 Re-deploy (cherry `2881575`, healthy, migración ya en head). Backfill real 200/200 con juez vivo (llm en 14 filas); informe muestra con 8 grupos OK. Gaps: embeddings 0, `otros` 46%, restan 2906 (~12h).
 - [x] **T8 (P1 writer)** ✅ 2026-10-11 Juez async-safe (`agroq_sector_judge` + `aclassify_sector`, `to_thread` para embeddings) + `embed_fn`/`llm_client` en backfill. TDD RED con forma exacta del bug → GREEN 81 passed (29 sin RuntimeWarnings); spot-check padre 29 passed.
 - [ ] **T7 (P1)** Deploy + verify en servidor (patrón E19–E24) + medición de cobertura de sectorización.
 
