@@ -1,0 +1,11 @@
+[Unit]
+Description=ConvocaRadar - conciliacion diaria de vencimientos (UTC)
+
+[Timer]
+OnCalendar=*-*-* 13:15:00 UTC
+Persistent=true
+AccuracySec=1min
+Unit=convocaradar-status-reconcile.service
+
+[Install]
+WantedBy=timers.target
