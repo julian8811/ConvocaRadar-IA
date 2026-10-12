@@ -1,0 +1,37 @@
+{
+  "source_key": "cundinamarca-convocatorias",
+  "status": "live_ok",
+  "http_status": 200,
+  "latency_ms": 871,
+  "requests_made": 3,
+  "probe_requests": 2,
+  "extraction_requests": 1,
+  "bytes_truncated": false,
+  "ttl_s": 21600,
+  "pending_manual_review": true,
+  "evidence": {
+    "source_key": "cundinamarca-convocatorias",
+    "duration_ms": 1429,
+    "requests_made": 2,
+    "urls": [
+      "https://www.cundinamarca.gov.co/convocatorias",
+      "https://www.cundinamarca.gov.co/home/!ut/p/z1/04_Sj9CPykssy0xPLMnMz0vMAfIjo8zi_QJcPA3d3Q2MApwsDA3MPL09LJ0CPd2djc30wwkpiAJKG-AAjgb6XoQUAF1gVOTr7JuuH1WQWJKhm5mXlq8fkZyfV5afnFiSX5SZWAx0RBQhYwpyI6p80oIdAVOGXi4!/dz/d5/L2dBISEvZ0FBIS9nQSEh/"
+    ],
+    "policy": {
+      "max_requests_per_source": 3,
+      "timeout_s": 15,
+      "total_budget_s": 60,
+      "max_concurrency_global": 2,
+      "max_concurrency_per_host": 1,
+      "max_bytes_per_page": 2000000,
+      "max_pages_per_source": 10,
+      "max_redirects": 3,
+      "retry_max": 2
+    },
+    "pending_manual_review": false,
+    "http_status": 200,
+    "bytes_truncated": false,
+    "retry_after_s": null,
+    "reason": null
+  }
+}

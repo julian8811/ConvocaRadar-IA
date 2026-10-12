@@ -1,0 +1,15 @@
+{
+  "http_status": 301,
+  "latency_ms": 307,
+  "content_type": "text/html",
+  "body_bytes": 98,
+  "kind": "html",
+  "n_items": 1,
+  "sample": [
+    {
+      "title": "Object Moved Permanently",
+      "url": ""
+    }
+  ],
+  "sanitized_url": "https://www.isa.co/es/innovacion/"
+}
