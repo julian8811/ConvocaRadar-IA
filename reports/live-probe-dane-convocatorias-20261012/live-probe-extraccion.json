@@ -1,0 +1,31 @@
+{
+  "http_status": 200,
+  "latency_ms": 226,
+  "content_type": "text/html; charset=utf-8",
+  "body_bytes": 101425,
+  "kind": "html",
+  "n_items": 8,
+  "sample": [
+    {
+      "title": "Economía",
+      "url": ""
+    },
+    {
+      "title": "Sociedad",
+      "url": ""
+    },
+    {
+      "title": "Territorio",
+      "url": ""
+    },
+    {
+      "title": "Convocatorías 2015 - Convocatorias Vigentes",
+      "url": "/index.php/component/content/article/3605-convocatorias-2015-convocatorias-vigentes?catid=276&amp;Itemid=5039"
+    },
+    {
+      "title": "Convocatorias 2015 - Resultados",
+      "url": "/index.php/component/content/article/3606-convocatorias-2015-resultados?catid=276&amp;Itemid=5039"
+    }
+  ],
+  "sanitized_url": "https://www.dane.gov.co/index.php/component/content/category/275-servicios-al-ciudadano/276-convocatorias-y-contratacion"
+}
