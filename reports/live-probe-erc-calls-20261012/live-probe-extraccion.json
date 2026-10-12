@@ -1,0 +1,4 @@
+{
+  "http_status": 405,
+  "stopped": "nota: el conector usa POST; probe GET solo conectividad"
+}

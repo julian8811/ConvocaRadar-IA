@@ -1,0 +1,10 @@
+{
+  "http_status": 404,
+  "latency_ms": 684,
+  "content_type": "application/json",
+  "body_bytes": 26,
+  "kind": "json",
+  "n_items": 0,
+  "sample": [],
+  "sanitized_url": "https://www.gov.br/anp/pt-br/assuntos/pesquisa-desenvolvimento-e-inovacao"
+}
