@@ -118,6 +118,20 @@ export default function OnboardingPage() {
   const [currencies, setCurrencies] = React.useState<string[]>(Array.isArray(profileData.preferred_currencies) ? profileData.preferred_currencies : ["COP", "USD"]);
   const [regions, setRegions] = React.useState<string[]>(Array.isArray(profileData.regions_of_interest) ? profileData.regions_of_interest : ["LatAm"]);
 
+  // profile.data resuelve después del primer render: hidratar los TagSelector
+  // con los valores reales una sola vez (el useState inicial corre con {}).
+  // Ajuste en fase de render (patrón React "adjust state during render"): sin
+  // efecto, sin remount, y no pisa ediciones del usuario en refetches.
+  const [tagsHydrated, setTagsHydrated] = React.useState(false);
+  if (!tagsHydrated && profile.data) {
+    setTagsHydrated(true);
+    const d = profile.data as Record<string, unknown>;
+    if (Array.isArray(d.areas_of_interest)) setAreas(d.areas_of_interest as string[]);
+    if (Array.isArray(d.funding_types)) setFundingTypes(d.funding_types as string[]);
+    if (Array.isArray(d.preferred_currencies)) setCurrencies(d.preferred_currencies as string[]);
+    if (Array.isArray(d.regions_of_interest)) setRegions(d.regions_of_interest as string[]);
+  }
+
   if (profile.isLoading || organization.isLoading) return <LoadingState label="Cargando perfil" />;
   if (profile.error) return <ErrorState message={profile.error.message} />;
 
