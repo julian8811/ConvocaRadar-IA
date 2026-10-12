@@ -1,0 +1,15 @@
+{
+  "http_status": 301,
+  "latency_ms": 630,
+  "content_type": "text/html; charset=iso-8859-1",
+  "body_bytes": 286,
+  "kind": "html",
+  "n_items": 1,
+  "sample": [
+    {
+      "title": "Moved Permanently",
+      "url": ""
+    }
+  ],
+  "sanitized_url": "https://www.dfg.de/en/research_funding/"
+}

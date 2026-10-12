@@ -1,0 +1,31 @@
+{
+  "http_status": 200,
+  "latency_ms": 452,
+  "content_type": "text/html;charset=UTF-8",
+  "body_bytes": 112351,
+  "kind": "html",
+  "n_items": 8,
+  "sample": [
+    {
+      "title": "Inicio",
+      "url": ""
+    },
+    {
+      "title": "Becas y convocatorias",
+      "url": ""
+    },
+    {
+      "title": "inicio acordeón",
+      "url": ""
+    },
+    {
+      "title": "Ir al Contenido principal",
+      "url": "https://www.mineducacion.gov.co/portal/micrositios-institucionales/Cooperacion-Internacional/Becas-convocatorias-y-premios-de-cooperacion-internacional/420940:Becas-y-convocatorias#contenido_principal"
+    },
+    {
+      "title": "Becas, convocatorias y premios de cooperación internacional",
+      "url": "/portal/micrositios-institucionales/Cooperacion-Internacional/Becas-convocatorias-y-premios-de-cooperacion-internacional/"
+    }
+  ],
+  "sanitized_url": "https://www.mineducacion.gov.co/portal/micrositios-institucionales/Cooperacion-Internacional/Becas-convocatorias-y-premios-de-cooperacion-internacional/420940:Becas-y-convocatorias"
+}

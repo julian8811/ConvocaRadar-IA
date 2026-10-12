@@ -1,0 +1,31 @@
+{
+  "http_status": 200,
+  "latency_ms": 189,
+  "content_type": "text/html; charset=UTF-8",
+  "body_bytes": 24803,
+  "kind": "html",
+  "n_items": 0,
+  "sample": [
+    {
+      "title": "Medalla al Mérito Turístico",
+      "url": "https://convocatoriasturismo.mincit.gov.co/listado-convocatorias/1"
+    },
+    {
+      "title": "Mi Primer Viaje",
+      "url": "https://convocatoriasturismo.mincit.gov.co/listado-convocatorias/3"
+    },
+    {
+      "title": "Becas Profesionalizacion Sector Turismo",
+      "url": "https://convocatoriasturismo.mincit.gov.co/listado-convocatorias/6"
+    },
+    {
+      "title": "Calidad Turística",
+      "url": "https://convocatoriasturismo.mincit.gov.co/listado-convocatorias/17"
+    },
+    {
+      "title": "Convocatorias SGR",
+      "url": "https://convocatoriasturismo.mincit.gov.co/listado-convocatorias/19"
+    }
+  ],
+  "sanitized_url": "https://convocatoriasturismo.mincit.gov.co/listado-convocatorias"
+}

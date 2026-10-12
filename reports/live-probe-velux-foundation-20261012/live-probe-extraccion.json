@@ -1,0 +1,31 @@
+{
+  "http_status": 200,
+  "latency_ms": 577,
+  "content_type": "text/html; charset=UTF-8",
+  "body_bytes": 42139,
+  "kind": "html",
+  "n_items": 8,
+  "sample": [
+    {
+      "title": "Current calls",
+      "url": ""
+    },
+    {
+      "title": "Open",
+      "url": ""
+    },
+    {
+      "title": "Books",
+      "url": ""
+    },
+    {
+      "title": "Current calls",
+      "url": "/en/basic-page/current-calls"
+    },
+    {
+      "title": "Current calls",
+      "url": "/en/basic-page/current-calls"
+    }
+  ],
+  "sanitized_url": "https://veluxfonden.dk/en/basic-page/current-calls"
+}

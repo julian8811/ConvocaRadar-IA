@@ -1,0 +1,31 @@
+{
+  "http_status": 200,
+  "latency_ms": 486,
+  "content_type": "text/html; charset=UTF-8",
+  "body_bytes": 80675,
+  "kind": "html",
+  "n_items": 8,
+  "sample": [
+    {
+      "title": "Navegación principal",
+      "url": ""
+    },
+    {
+      "title": "menú - barra superior",
+      "url": ""
+    },
+    {
+      "title": "Navegación principal",
+      "url": ""
+    },
+    {
+      "title": "Acta de selección",
+      "url": "https://aplicaciones.colfuturo.org/descargas/Convocatoria/2026_06_09_Acta_junta.pdf"
+    },
+    {
+      "title": "Tesis y artículos",
+      "url": "/beneficiarios-divulgaci%C3%B3n-tesis-y-articulos-programa-credito-beca"
+    }
+  ],
+  "sanitized_url": "https://www.colfuturo.org/programas/credito-beca"
+}
