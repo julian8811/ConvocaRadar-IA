@@ -1,0 +1,31 @@
+{
+  "http_status": 404,
+  "latency_ms": 138,
+  "content_type": "text/html; charset=UTF-8",
+  "body_bytes": 85970,
+  "kind": "html",
+  "n_items": 7,
+  "sample": [
+    {
+      "title": "Navegación principal",
+      "url": ""
+    },
+    {
+      "title": "Menu second",
+      "url": ""
+    },
+    {
+      "title": "Ruta de Navegación",
+      "url": ""
+    },
+    {
+      "title": "CONCURSO ABIERTO DE MERITOS",
+      "url": "/es/content/concurso-abierto-de-meritos"
+    },
+    {
+      "title": "CONVOCATORIAS SUPERINTENDENCIAS",
+      "url": "/es/content/convocatorias-superintendencias"
+    }
+  ],
+  "sanitized_url": "https://www.supersolidaria.gov.co/es/convocatorias"
+}

@@ -1,0 +1,27 @@
+{
+  "http_status": 404,
+  "latency_ms": 540,
+  "content_type": "text/html; charset=utf-8",
+  "body_bytes": 76620,
+  "kind": "html",
+  "n_items": 6,
+  "sample": [
+    {
+      "title": "Elige tu perfil",
+      "url": ""
+    },
+    {
+      "title": "De interés",
+      "url": ""
+    },
+    {
+      "title": "404",
+      "url": ""
+    },
+    {
+      "title": "Concurso Nacional Novela y Cuento",
+      "url": "https://www.camaramedellin.com.co/cultura-camara/concurso-nacional-novela-y-cuento"
+    }
+  ],
+  "sanitized_url": "https://www.camaramedellin.com.co/convocatorias"
+}

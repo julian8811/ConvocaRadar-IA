@@ -1,0 +1,15 @@
+{
+  "http_status": 302,
+  "latency_ms": 181,
+  "content_type": "text/html; charset=iso-8859-1",
+  "body_bytes": 248,
+  "kind": "html",
+  "n_items": 1,
+  "sample": [
+    {
+      "title": "Found",
+      "url": ""
+    }
+  ],
+  "sanitized_url": "https://www.udea.edu.co/investigacion/convocatorias"
+}
