@@ -1,0 +1,43 @@
+{
+  "status": "live_ok",
+  "evidence": {
+    "source_key": "innpulsa",
+    "duration_ms": 449,
+    "requests_made": 1,
+    "urls": [
+      "https://convocatorias.innpulsacolombia.com/api/convocatorias"
+    ],
+    "policy": {
+      "max_requests_per_source": 1,
+      "timeout_s": 15,
+      "total_budget_s": 60,
+      "max_concurrency_global": 2,
+      "max_concurrency_per_host": 1,
+      "max_bytes_per_page": 2000000,
+      "max_pages_per_source": 10,
+      "max_redirects": 3,
+      "retry_max": 2
+    },
+    "pending_manual_review": false,
+    "http_status": 200,
+    "bytes_truncated": false,
+    "bytes_received": 87646,
+    "content_type": "application/json",
+    "titles_sample": [
+      "Formación y asistencia técnica en calidad para mipymes (Convocatoria Territorial: IATF 16949:2016)",
+      "TCR-2026 - Servicios de consultoría para fortalecimiento de iniciativas clúster",
+      "Centros de Fortalecimiento Productivo | Agroindustria | Tumaco Cacao | Cohorte 4",
+      "Centros de Fortalecimiento Productivo Manufactura | Popayán | Cohorte 4",
+      "Formación y asistencia técnica en calidad para mipymes (estándares: ISO 22716 e ISO 13485)",
+      "ZASCA Jóvenes | Cali | Cierre Cohorte 1",
+      "Centros de Fortalecimiento Productivo | Agroindustria | Piedecuesta | Frutícola | Cohorte 3",
+      "Convocatoria Fortalecimiento Productivo LGBTIQ+",
+      "Transformación de cacao y chocolatería fina – Programa XISQUA",
+      "CENTROS DE FORTALECIMIENTO PRODUCTIVO | TECNOLOGÍAS JÓVENES VALLEDUPAR 2026 | ¡INSCRÍBETE! 65 CUPOS DISPONIBLES"
+    ],
+    "titles_count": 10,
+    "single_get_reused": true,
+    "retry_after_s": null,
+    "reason": null
+  }
+}
