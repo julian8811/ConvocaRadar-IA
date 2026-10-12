@@ -1,0 +1,15 @@
+{
+  "http_status": 302,
+  "latency_ms": 617,
+  "content_type": "text/html; charset=iso-8859-1",
+  "body_bytes": 236,
+  "kind": "html",
+  "n_items": 1,
+  "sample": [
+    {
+      "title": "Found",
+      "url": ""
+    }
+  ],
+  "sanitized_url": "https://www.vliruos.be/en/scholarships"
+}
