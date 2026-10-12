@@ -206,16 +206,25 @@ def _parse_grants_date(value: str | None) -> datetime | None:
 @register("grants-gov")
 class GrantsGovConnector:
     source_key = "grants-gov"
+    # When set, search2 hits whose oppStatus (lowercased) is not in this set
+    # are skipped during parse. None (default) keeps every hit.
+    status_filter: frozenset[str] | None = None
 
-    def __init__(self, base_url: str | None = None, keyword: str = "") -> None:
+    def __init__(
+        self,
+        base_url: str | None = None,
+        keyword: str = "",
+        opp_statuses: str = "forecasted|posted",
+    ) -> None:
         self.base_url = base_url or GRANTS_GOV_SEARCH_URL
         self.keyword = keyword
+        self.opp_statuses = opp_statuses
 
     async def fetch(self) -> RawSourceResult:
         payload = {
             "rows": 25,
             "keyword": self.keyword,
-            "oppStatuses": "forecasted|posted",
+            "oppStatuses": self.opp_statuses,
             "sortBy": "openDate|desc",
         }
         try:
@@ -297,6 +306,8 @@ class GrantsGovConnector:
                 continue
             number = str(hit.get("number") or "").strip()
             status = str(hit.get("oppStatus") or "").strip()
+            if self.status_filter is not None and status.lower() not in self.status_filter:
+                continue
             alns = ", ".join(hit.get("alnist") or [])
             synopsis = str(
                 hit.get("synopsis") or hit.get("description") or hit.get("summary") or ""
@@ -350,3 +361,28 @@ class GrantsGovConnector:
         ):
             return ValidationResult(ok=False, reason="Unexpected official URL")
         return ValidationResult(ok=True)
+
+
+@register("grants-gov-forecast")
+class GrantsGovForecastConnector(GrantsGovConnector):
+    """Forecast-only view of the keyless search2 API (via A).
+
+    Same host/payload as the operative ``grants-gov`` connector but requests
+    ``oppStatuses=forecasted`` and keeps only ``oppStatus==forecasted`` hits.
+    Parse, validation, and the E8 detail-XHR gap-fill are inherited unchanged.
+    """
+
+    source_key = "grants-gov-forecast"
+    status_filter = frozenset({"forecasted"})
+
+    def __init__(
+        self,
+        base_url: str | None = None,
+        keyword: str = "",
+        opp_statuses: str = "forecasted",
+    ) -> None:
+        super().__init__(
+            base_url=base_url or GRANTS_GOV_SEARCH_URL,
+            keyword=keyword,
+            opp_statuses=opp_statuses,
+        )
