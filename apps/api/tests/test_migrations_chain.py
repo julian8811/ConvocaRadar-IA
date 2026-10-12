@@ -3,7 +3,7 @@
 Revision 0008 historically resized an embeddings table that existed on older
 installations. Fresh installations create that table later in revision 0011,
 so 0008 must explicitly tolerate the table being absent while the graph stays
-linear through the current 0016 head. Revision 0013 is the first identifier
+linear through the current 0018 head. Revision 0013 is the first identifier
 that exceeds Alembic's historical VARCHAR(32) metadata default, so it must
 widen that column before Alembic records the new revision on PostgreSQL.
 """
@@ -35,6 +35,8 @@ EXPECTED_CHAIN = [
     "0014_scraper_pipeline_indices",
     "0015_faculty_match",
     "0016_faculty_match_ivfflat",
+    "0017_opportunity_sector",
+    "0018_unique_opportunity_score",
 ]
 
 
@@ -51,7 +53,7 @@ def _function_body(path: Path, name: str) -> str:
 
 
 def test_migration_graph_has_exactly_one_current_head() -> None:
-    assert _script().get_heads() == ["0016_faculty_match_ivfflat"]
+    assert _script().get_heads() == ["0018_unique_opportunity_score"]
 
 
 def test_chain_is_linear_from_base_to_head() -> None:
