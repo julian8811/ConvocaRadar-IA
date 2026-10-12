@@ -24,10 +24,13 @@ def source_non_opportunity_reason(
     """
     if not official_url or not source_key:
         return None
-    parsed = urlsplit(official_url)
+    try:
+        parsed = urlsplit(official_url)
+        host = (parsed.hostname or "").casefold().removeprefix("www.")
+    except ValueError:
+        return None
     if parsed.scheme.lower() not in {"http", "https"}:
         return None
-    host = (parsed.hostname or "").casefold().removeprefix("www.")
     path = parsed.path.casefold().rstrip("/") + "/"
     key = source_key.casefold()
 
