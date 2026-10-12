@@ -85,3 +85,11 @@ class TestConservativeReconciliation(TestCase):
 
     def test_bogota_date_cutoff(self):
         self.assertEqual(datetime(2026, 10, 12), cutoff_for_previous_dates(self.now))
+
+    def test_cutoff_uses_utc_date_even_if_bogota_previous_day(self):
+        at_evening = datetime(2026, 10, 11, 23, 30, tzinfo=ZoneInfo("America/Bogota"))
+        self.assertEqual(datetime(2026, 10, 12), cutoff_for_previous_dates(at_evening))
+
+    def test_naive_now_rejected(self):
+        with self.assertRaises(ValueError):
+            cutoff_for_previous_dates(datetime(2026, 10, 12, 12, 0))
