@@ -1,0 +1,31 @@
+{
+  "http_status": 200,
+  "latency_ms": 829,
+  "content_type": "text/html; charset=UTF-8",
+  "body_bytes": 139541,
+  "kind": "html",
+  "n_items": 2,
+  "sample": [
+    {
+      "title": "Convocatorias",
+      "url": ""
+    },
+    {
+      "title": "Ministerio de Ambiente y Desarrollo Sostenible",
+      "url": ""
+    },
+    {
+      "title": "Convocatoria Externa N° 1",
+      "url": "https://www.minambiente.gov.co/wp-content/uploads/2021/12/Convocatoria-01-de-2021.pdf"
+    },
+    {
+      "title": "Convocatoria Externa N° 2",
+      "url": "https://www.minambiente.gov.co/wp-content/uploads/2021/12/Convocatoria-02-de-2021.pdf"
+    },
+    {
+      "title": "Convocatoria Externa N° 3",
+      "url": "https://www.minambiente.gov.co/wp-content/uploads/2021/12/Convocatoria-03-de-2021.pdf"
+    }
+  ],
+  "sanitized_url": "https://www.minambiente.gov.co/convocatorias/"
+}

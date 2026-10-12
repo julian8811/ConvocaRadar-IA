@@ -1,0 +1,31 @@
+{
+  "http_status": 404,
+  "latency_ms": 810,
+  "content_type": "text/html; charset=utf-8",
+  "body_bytes": 117019,
+  "kind": "html",
+  "n_items": 1,
+  "sample": [
+    {
+      "title": "Otros directorios",
+      "url": ""
+    },
+    {
+      "title": "Buscador de oportunidades",
+      "url": "/es/buscador-oportunidades-inversion"
+    },
+    {
+      "title": "Inversionista",
+      "url": "/es/buscador-oportunidades-inversion/inversionista"
+    },
+    {
+      "title": "Empresario colombiano",
+      "url": "/es/buscador-oportunidades-inversion/empresario-colombiano"
+    },
+    {
+      "title": "Mapa de proyectos por región",
+      "url": "/es/buscador-oportunidades-inversion/inversionista"
+    }
+  ],
+  "sanitized_url": "https://investincolombia.com.co/es/convocatorias"
+}

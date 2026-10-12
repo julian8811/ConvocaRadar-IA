@@ -1,0 +1,31 @@
+{
+  "http_status": 200,
+  "latency_ms": 2394,
+  "content_type": "text/html; charset=utf-8",
+  "body_bytes": 139435,
+  "kind": "html",
+  "n_items": 8,
+  "sample": [
+    {
+      "title": "MinAgricultura anuncia apoyo de FAO a la ganadería regenerativa en Colombia",
+      "url": ""
+    },
+    {
+      "title": "Ministro de Agricultura llegó a Italia con temas fundamentales para participar en el Foro Alimentario Mundial de la FAO",
+      "url": ""
+    },
+    {
+      "title": "Ministro de Agricultura conoce de primera mano, en España, exitoso modelo de seguros agropecuarios",
+      "url": ""
+    },
+    {
+      "title": "Elección del Representante de las Cooperativas de Porcicultores – FNP 2026-2028",
+      "url": "/fileadmin/convocatorias/REGLAMENTO_ELECCION__-__REPRESENTANTE_COOPERATIVAS_-_CORREGIDO__-__14.08.2026_VF_compressed.pdf"
+    },
+    {
+      "title": "Convocatoria y Reglamento – FONAV 2026-2028",
+      "url": "https://www.minagricultura.gov.co/fileadmin/Cadenas_Pecuarias__Pesqueras_y_Acuicolas/4.Fondos_Parafiscales/Fondo_Nacional_Avicola/Convocatoria_y_Reglamento_FONAV_2026-2028.pdf"
+    }
+  ],
+  "sanitized_url": "https://www.minagricultura.gov.co/"
+}
