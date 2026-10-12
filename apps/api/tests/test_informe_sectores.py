@@ -2,8 +2,13 @@
 
 When opportunities carry a ``sector``, ``generate_report_html`` groups cards
 by sector in ``SECTOR_TAXONOMY_V1`` order (``otros`` last) with a per-group
-header (count + top amounts/dates when available). With no sector on any row
-the output stays identical to the legacy flat report (compat pin).
+header (count badge + secondary meta row with top amounts/dates when
+available). With no sector on any row the output keeps STRUCTURAL
+compatibility with the legacy flat report (same data, same order, no
+sector-group markup) — not byte-identity: the visual polish pass
+(brand-bar air, sector band, equal-height cards with clamped summaries,
+print-friendly 1px borders) intentionally changed the CSS/HTML shell, so
+the old byte-identical pin was replaced by this structural contract.
 ``export_xlsx`` keeps the default sheet plus a ``sector`` column and
 ``export_pdf`` still derives from the same HTML pipeline.
 
@@ -100,6 +105,50 @@ class TestSectorCompat:
         assert "sector-group" not in html
         assert "Todas las convocatorias" in html
         assert "Call A" in html and "Call B" in html
+
+    def test_no_sectors_keeps_data_and_order(self):
+        """Structural compat: same cards, same input order, flat grid."""
+        opps = [_opp("Call A"), _opp("Call B")]
+        html = generate_report_html("Report", SimpleNamespace(name="Org"), opps)
+        assert html.find("Call A") < html.find("Call B")
+        assert "story-grid" in html
+        assert "data-sector" not in html
+
+
+class TestReportPolishStructure:
+    """Layout contract for the visual polish pass (structure, not pixels)."""
+
+    def _html(self):
+        return generate_report_html("Report", SimpleNamespace(name="Org"), _sectorized())
+
+    def test_brand_bar_has_air_and_hierarchy(self):
+        html = self._html()
+        assert "brand-bar" in html and "brand-name" in html and "brand-tagline" in html
+        assert "gap:" in html or "gap :" in html  # breathing room by the shield lockup
+
+    def test_sector_header_has_count_badge_and_meta_row(self):
+        html = self._html()
+        assert "sector-group__count" in html
+        assert "2 oportunidades" in html  # salud group count badge
+        assert "sector-group__meta" in html
+
+    def test_cards_pin_footer_and_clamp_summary(self):
+        html = self._html()
+        assert "story-card__foot" in html
+        assert "margin-top: auto" in html or "margin-top:auto" in html  # CTA aligned to foot
+        assert "line-clamp" in html  # long summaries never blow up the card
+
+    def test_meta_grid_and_badges_are_aligned(self):
+        html = self._html()
+        assert "story-card__meta-grid" in html
+        for label in ("Entidad", "Cierre", "Monto"):
+            assert label in html
+        assert "badge--open" in html
+
+    def test_print_is_flat_and_unbroken(self):
+        html = self._html()
+        assert "@media print" in html
+        assert "break-inside: avoid" in html
 
 
 class TestSectorXlsx:

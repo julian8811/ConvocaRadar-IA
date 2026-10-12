@@ -82,8 +82,16 @@ class TestBrandAssets:
 class TestReportCarriesBrand:
     def test_html_embeds_colmayor_logo(self):
         html = generate_report_html("Report", SimpleNamespace(name="Org"), [_opp()])
-        assert "data:image/jpeg;base64," in html
-        assert "Colmayor" in html or "COLEGIO MAYOR" in html
+        # Brand bar uses the square shield (favicon.png, no baked wordmark),
+        # not the wide logo.jpg lockup whose wordmark collided with the title.
+        assert "data:image/png;base64," in html
+        assert "Colegio Mayor de Antioquia" in html
+
+    def test_brand_bar_uses_square_shield_not_wide_lockup(self):
+        html = generate_report_html("Report", SimpleNamespace(name="Org"), [_opp()])
+        assert "data:image/jpeg;base64," not in html
+        assert "height:48px" in html
+        assert "Colegio Mayor de Antioquia" in html
 
     def test_html_uses_brand_colors(self):
         html = generate_report_html("Report", SimpleNamespace(name="Org"), [_opp()])
@@ -95,6 +103,6 @@ class TestReportCarriesBrand:
         assert "fonts.googleapis.com" not in html
         assert "fonts.gstatic.com" not in html
 
-    def test_logo_b64_decodes_to_jpeg(self):
+    def test_logo_b64_decodes_to_png(self):
         raw = base64.b64decode(export_mod._LOGO_B64)
-        assert raw[:2] == b"\xff\xd8"  # JPEG magic bytes
+        assert raw[:8] == b"\x89PNG\r\n\x1a\n"  # PNG magic bytes (square shield)
