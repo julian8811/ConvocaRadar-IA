@@ -1,12 +1,13 @@
 /**
  * PR B-2 (dashboard-redesign): Pipeline zone — the lists lane.
  *
- * Renders 2 widgets (each in its own Card):
- *   1. Top compatibilidad — cards with score badge and reasons
- *   2. Mi cola de revisión — cards with review badge and countdown
+ * Renders 1 widget: "Mi cola de revisión" (from /dashboard/triage).
  *
- * Cierran pronto was removed since Próximos cierres (7 días) in TriageZone
- * already covers the same data with a tighter window.
+ * R3 decision (cheapest): the dead `ClosingSoonGrid` + `top_scored` code was
+ * DELETED, not rendered — rendering it would duplicate TriageZone's
+ * "Cierran en 7 días" (same audit problem #5). The single /dashboard/pipeline
+ * fetch is kept (one endpoint, no per-field fetch exists to remove); the
+ * `top_scored` / `closing_soon` fields are simply ignored.
  */
 "use client";
 
@@ -23,50 +24,6 @@ import { PipelineSkeleton } from "@/components/dashboard/skeletons/PipelineSkele
 
 function formatNumber(value: number) {
   return new Intl.NumberFormat("es-CO", { maximumFractionDigits: 0 }).format(value);
-}
-
-function ClosingSoonGrid({ items }: { items: PipelineOpportunityItem[] }) {
-  if (items.length === 0) {
-    return (
-      <CardContent className="p-6">
-        <EmptyState title="Sin cierres próximos" detail="No hay convocatorias con cierre cercano en este momento." />
-      </CardContent>
-    );
-  }
-  return (
-    <CardContent className="grid gap-4 p-4 sm:grid-cols-2 xl:grid-cols-4">
-      {items.map((item) => {
-        const urgency = item.days_to_close !== null && item.days_to_close <= 3 ? "urgent" : item.days_to_close !== null && item.days_to_close <= 7 ? "soon" : "normal";
-        const borderColor = urgency === "urgent" ? "border-l-rose-500" : urgency === "soon" ? "border-l-amber-500" : "border-l-sky-500";
-        const daysText = item.days_to_close === 0 ? "Hoy" : item.days_to_close === 1 ? "1 día" : `${item.days_to_close} días`;
-        return (
-          <Link key={item.id} href={`/opportunities/${item.id}`} className="group block">
-            <div className={`rounded-lg border border-slate-200 bg-white p-4 transition-all hover:shadow-md dark:border-slate-700 dark:bg-slate-900 border-l-4 ${borderColor}`}>
-              <p className="line-clamp-2 text-sm font-medium text-slate-950 group-hover:text-cyan-700 dark:text-white dark:group-hover:text-cyan-300">
-                {item.title}
-              </p>
-              <div className="mt-2 flex items-center gap-3 text-xs text-slate-500 dark:text-slate-400">
-                <span className="flex items-center gap-1">
-                  <Globe className="h-3 w-3" />
-                  {item.country || "—"}
-                </span>
-                {item.score !== null && <span>Score: {Math.round(item.score)}</span>}
-              </div>
-              <div className="mt-3 flex items-center justify-between">
-                <Badge tone={urgency === "urgent" ? "destructive" : urgency === "soon" ? "medium" : "muted"}>
-                  <Clock className="mr-1 h-3 w-3" />
-                  {daysText}
-                </Badge>
-                <span className="text-xs text-slate-500 dark:text-slate-400">
-                  {item.funding_amount !== null ? `${formatNumber(item.funding_amount)}${item.currency ? ` ${item.currency}` : ""}` : "—"}
-                </span>
-              </div>
-            </div>
-          </Link>
-        );
-      })}
-    </CardContent>
-  );
 }
 
 function ReviewQueueGrid({ items }: { items: PipelineOpportunityItem[] }) {

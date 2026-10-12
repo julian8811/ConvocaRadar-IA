@@ -2,7 +2,18 @@ from datetime import datetime
 from enum import StrEnum
 from uuid import uuid4
 
-from sqlalchemy import Boolean, DateTime, Float, ForeignKey, Index, Integer, String, Text, func
+from sqlalchemy import (
+    Boolean,
+    DateTime,
+    Float,
+    ForeignKey,
+    Index,
+    Integer,
+    String,
+    Text,
+    UniqueConstraint,
+    func,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 from sqlalchemy.types import JSON, TypeDecorator
 
@@ -295,6 +306,13 @@ class OpportunityDocument(Base):
 
 class OpportunityScore(Base):
     __tablename__ = "opportunity_scores"
+    __table_args__ = (
+        UniqueConstraint(
+            "opportunity_id",
+            "organization_id",
+            name="uq_opportunity_scores_opp_org",
+        ),
+    )
 
     id: Mapped[str] = mapped_column(String, primary_key=True, default=uuid)
     opportunity_id: Mapped[str] = mapped_column(ForeignKey("opportunities.id"), index=True)
