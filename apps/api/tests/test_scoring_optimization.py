@@ -15,8 +15,8 @@ def test_priority_thresholds_allow_high():
     """With adjusted thresholds, a mid-range opportunity can reach 'high'."""
     # priority_for_score uses thresholds we can verify
     assert priority_for_score(85) == Priority.high.value
-    assert priority_for_score(75) == Priority.high.value
-    assert priority_for_score(74) == Priority.medium.value
+    assert priority_for_score(60) == Priority.high.value
+    assert priority_for_score(59) == Priority.medium.value
 
 
 class TestComputeScore:

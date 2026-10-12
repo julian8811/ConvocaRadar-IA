@@ -23,7 +23,6 @@ from app.schemas import (
     SourceHealthRead,
     TriageOpportunityItem,
 )
-from app.services.search import build_opportunity_query
 
 
 # ---------------------------------------------------------------------------
@@ -346,19 +345,14 @@ def get_closing_soon(
 # ---------------------------------------------------------------------------
 
 
-def get_health_kpis(db: Session, organization_id: str) -> HealthKpis:
-    """Return the 4 KPI counts that drive the Health zone summary.
+def _opportunity_scope(organization_id: str):
+    """Shared visibility scope for KPI and chart queries (R1).
 
-    * total: every opportunity visible to the org scope.
-    * open: opportunities with status='open'.
-    * closing_soon: opportunities with status='closing_soon'.
-    * high_match: distinct opportunities with an OpportunityScore row
-      marked priority='high' for the current org.
-
-    Uses a single combined query with CASE expressions instead of 4
-    separate ``count_query`` calls.
+    An opportunity is in scope when it belongs to the org (or is global),
+    is not past its deadline, and is not a scraping-noise row. Charts reuse
+    this exact scope so their totals add up to the KPI total.
     """
-    opportunity_scope = and_(
+    return and_(
         or_(Opportunity.organization_id == organization_id, Opportunity.organization_id.is_(None)),
         or_(
             Opportunity.close_date.is_(None),
@@ -376,13 +370,38 @@ def get_health_kpis(db: Session, organization_id: str) -> HealthKpis:
         ~Opportunity.title.ilike("%deadlineDate%"),
         ~Opportunity.title.ilike("%expectedGrants%"),
     )
+
+
+def get_health_kpis(db: Session, organization_id: str) -> HealthKpis:
+    """Return the 4 KPI counts that drive the Health zone summary.
+
+    * total: every opportunity visible to the org scope.
+    * open: opportunities with status='open'.
+    * closing_soon: opportunities with status='closing_soon'.
+    * high_match: distinct opportunities with an OpportunityScore row
+      marked priority='high' for the current org.
+
+    All counts use ``COUNT(DISTINCT Opportunity.id)``: the ``LEFT JOIN``
+    against ``OpportunityScore`` fans out one row per score, and duplicate
+    score rows may still exist from before migration 0018 (unique
+    constraint + server-side cleanup), so a plain ``COUNT(*)`` inflates
+    totals. Uses a single combined query with CASE expressions instead of
+    4 separate ``count_query`` calls.
+    """
+    opportunity_scope = _opportunity_scope(organization_id)
     stmt = (
         select(
-            func.count().label("total"),
-            func.count(Case((Opportunity.status == "open", 1), else_=None)).label("open"),
-            func.count(Case((Opportunity.status == "closing_soon", 1), else_=None)).label(
-                "closing_soon"
-            ),
+            func.count(func.distinct(Opportunity.id)).label("total"),
+            func.count(
+                func.distinct(
+                    Case((Opportunity.status == "open", Opportunity.id), else_=None)
+                )
+            ).label("open"),
+            func.count(
+                func.distinct(
+                    Case((Opportunity.status == "closing_soon", Opportunity.id), else_=None)
+                )
+            ).label("closing_soon"),
             func.count(
                 func.distinct(
                     Case(
@@ -415,18 +434,13 @@ def get_health_kpis(db: Session, organization_id: str) -> HealthKpis:
 def get_status_breakdown(db: Session, organization_id: str) -> list[DashboardBreakdownItem]:
     """Group opportunities by status; return ``[{name, total}, ...]`` sorted desc.
 
-    The same noise filters the legacy /summary used (no @ in title, no
-    "http*" prefix) so the chart counts match what the consultant was
-    already used to seeing.
+    Uses the same ``_opportunity_scope`` as the KPIs (deadline + noise
+    filters) so the breakdown totals add up to the KPI total.
     """
-    opportunity_scope = or_(
-        Opportunity.organization_id == organization_id, Opportunity.organization_id.is_(None)
-    )
+    opportunity_scope = _opportunity_scope(organization_id)
     rows = db.execute(
         select(Opportunity.status, func.count())
         .where(opportunity_scope)
-        .where(~Opportunity.title.ilike("%@%"))
-        .where(~Opportunity.title.ilike("http%"))
         .group_by(Opportunity.status)
     )
     items = [
@@ -440,14 +454,10 @@ def get_status_breakdown(db: Session, organization_id: str) -> list[DashboardBre
 
 def get_country_breakdown(db: Session, organization_id: str) -> list[DashboardBreakdownItem]:
     """Top-8 country counts; rows with empty country bucket under "Sin dato"."""
-    opportunity_scope = or_(
-        Opportunity.organization_id == organization_id, Opportunity.organization_id.is_(None)
-    )
+    opportunity_scope = _opportunity_scope(organization_id)
     rows = db.execute(
         select(Opportunity.country, func.count())
         .where(opportunity_scope)
-        .where(~Opportunity.title.ilike("%@%"))
-        .where(~Opportunity.title.ilike("http%"))
         .group_by(Opportunity.country)
         .order_by(func.count().desc())
         .limit(8)
@@ -462,13 +472,19 @@ def get_country_breakdown(db: Session, organization_id: str) -> list[DashboardBr
 def get_data_coverage(db: Session, organization_id: str) -> DashboardDataCoverage:
     """Build the data-coverage strip; ``embeddings_coverage`` is now nullable.
 
+    Scope choice (R1): numerator and denominator share the plain org scope
+    with NO deadline filter, matching ``GET /admin/metrics``
+    (``admin.py``). Coverage measures catalog completeness, not the
+    open/visible set the KPIs use — applying the KPI deadline filter to
+    only one side is what produced >100% values. The ratio is defensively
+    clamped at 100.0 (Python ``min``, equivalent to SQL ``LEAST``, kept
+    DB-agnostic since SQLite has no ``LEAST``).
+
     The embeddings field is ``None`` (not 0.0) when there are zero
     opportunities so a fresh org does not look "broken" — the frontend
     renders "Sin datos aún" for the None case. When opportunities exist
     but none have embeddings, the value is the real zero (``0.0``).
     """
-    # Lazy import: avoid circular dep during init
-    from app.services.opportunity import count_query
 
     opportunity_scope = or_(
         Opportunity.organization_id == organization_id, Opportunity.organization_id.is_(None)
@@ -511,7 +527,12 @@ def get_data_coverage(db: Session, organization_id: str) -> DashboardDataCoverag
         )
         or 0
     )
-    total_opportunities = count_query(db, build_opportunity_query(organization_id))
+    total_opportunities = (
+        db.scalar(
+            select(func.count()).select_from(Opportunity).where(opportunity_scope)
+        )
+        or 0
+    )
     embeddings_total = (
         db.scalar(
             select(func.count())
@@ -522,7 +543,9 @@ def get_data_coverage(db: Session, organization_id: str) -> DashboardDataCoverag
         or 0
     )
     embeddings_coverage: float | None = (
-        round((embeddings_total / total_opportunities) * 100, 1) if total_opportunities else None
+        min(round((embeddings_total / total_opportunities) * 100, 1), 100.0)
+        if total_opportunities
+        else None
     )
     return DashboardDataCoverage(
         with_summary=with_summary,
@@ -552,6 +575,16 @@ def get_source_health_summaries(
 ) -> tuple[int, int, list[DashboardSourceAlert]]:
     """Return (degraded_count, failing_count, top-5 alerts) for the org's sources.
 
+    Only ENABLED sources are counted: a disabled source cannot produce new
+    data, so its stale/failed state is not actionable and must not inflate
+    the banner. Unifying this count with ``GET /sources/health`` (which
+    also surfaces ``idle``) is R3 scope and intentionally untouched here.
+
+    Stale criterion (from ``admin._source_health_status``): a source is
+    stale when days since last success >= its frequency window
+    (hourly→1d, daily→3d, weekly→10d, monthly→40d, default→7d);
+    ``failing`` at 2x the window or when the latest run failed.
+
     Mirrors the legacy /summary's source-health counts. The alerts list
     is capped at 5 entries per the original contract so the e2e and any
     client still consuming the merged summary see the same shape.
@@ -559,7 +592,7 @@ def get_source_health_summaries(
     from app.api.v1.admin import _source_health_status  # lazy: avoid circular import
 
     source_scope = or_(Source.organization_id == organization_id, Source.organization_id.is_(None))
-    sources = list(db.scalars(select(Source).where(source_scope)))
+    sources = list(db.scalars(select(Source).where(source_scope, Source.enabled.is_(True))))
 
     # Batch-load the latest 10 SourceRun per source (single query instead of N+1)
     if sources:

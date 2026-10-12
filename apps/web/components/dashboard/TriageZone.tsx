@@ -1,11 +1,10 @@
 /**
  * PR B-2 (dashboard-redesign): Triage zone — the "Qué hago hoy" hero.
  *
- * Renders:
- *   1. <ClosingSoon7dWidget> — Próximos cierres (7 días) at the TOP of the zone
- *   2. <HeroActionList> — a 1-3 item numbered list of concrete actions
- *   3. <details> KPI footer — the 4 legacy stat cards demoted into a collapse
- *   4. <ProfileIncompleteBanner> — if completeness < 80
+ * Renders (R3: sin KPIs duplicados — los 4 KPIs reales viven en HealthZone):
+ *   1. <ClosingSoon7dWidget> — "Cierran en 7 días" (ÚNICA definición: ventana
+ *      de 7 días por close_date, calculada en /dashboard/triage)
+ *   2. <HeroActionList> — "Qué hago hoy" (cola En revisión + cierres 7d)
  *
  * Each zone owns its own useQuery call so a slow endpoint cannot block
  * the others. The page paints incrementally.
@@ -45,9 +44,9 @@ function ClosingSoon7dWidget({ items }: { items: TriageOpportunityItem[] }) {
           <div>
             <CardTitle className="flex items-center gap-2 text-slate-950 dark:text-white">
               <CalendarClock className="h-5 w-5 text-cyan-600 dark:text-cyan-400" />
-              Próximos cierres
+              Cierran en 7 días
             </CardTitle>
-            <CardDescription>Convocatorias que cierran esta semana.</CardDescription>
+            <CardDescription>Ventana de 7 días por fecha de cierre (close_date).</CardDescription>
           </div>
           <span className="inline-flex h-8 w-8 items-center justify-center rounded-full bg-cyan-100 text-sm font-bold text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200">
             {items.length}
@@ -119,7 +118,7 @@ function HeroActionList({ count, hasClosingSoon7d, hasReviewQueue }: {
   if (hasClosingSoon7d) {
     items.push({
       kind: "deadline",
-      label: `${count.closing_soon_7d} convocatoria${count.closing_soon_7d === 1 ? "" : "s"} cierra${count.closing_soon_7d === 1 ? "" : "n"} esta semana`,
+      label: `${count.closing_soon_7d} convocatoria${count.closing_soon_7d === 1 ? "" : "s"} cierran en 7 días`,
       cta_href: "#closing-soon-7d",
       cta_label: "Ver",
       icon: Target,
@@ -191,32 +190,6 @@ function HeroActionList({ count, hasClosingSoon7d, hasReviewQueue }: {
   );
 }
 
-const KPI_ACCENTS = [
-  { border: "border-t-[#005652]" },
-  { border: "border-t-[#00a6a1]" },
-  { border: "border-t-[#bed630]" },
-  { border: "border-t-[#6f7f1f]" },
-];
-
-function KpiFooter({ kpis }: { kpis: { total_opportunities: number; open_opportunities: number; closing_soon_opportunities: number; high_match_opportunities: number } }) {
-  const items = [
-    { label: "Prioridades visibles", value: kpis.total_opportunities, accent: KPI_ACCENTS[0] },
-    { label: "Cierres en 7 días", value: kpis.open_opportunities, accent: KPI_ACCENTS[1] },
-    { label: "Atención inmediata", value: kpis.closing_soon_opportunities, accent: KPI_ACCENTS[2] },
-    { label: "En seguimiento", value: kpis.high_match_opportunities, accent: KPI_ACCENTS[3] },
-  ];
-  return (
-    <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-      {items.map((item) => (
-        <div key={item.label} className={`rounded-2xl border border-[#005652]/10 bg-white p-5 shadow-[0_12px_35px_-28px_rgba(0,86,82,.8)] transition-all hover:-translate-y-0.5 hover:shadow-lg dark:border-white/10 dark:bg-slate-900 border-t-4 ${item.accent.border}`}>
-          <p className="text-xs uppercase tracking-[0.18em] text-slate-500 dark:text-slate-400">{item.label}</p>
-          <p className="mt-1 text-2xl font-bold text-slate-950 dark:text-white">{formatNumber(item.value)}</p>
-        </div>
-      ))}
-    </div>
-  );
-}
-
 export function TriageZone() {
   const query = useQuery<TriageRead>({
     queryKey: ["dashboard-triage"],
@@ -240,14 +213,6 @@ export function TriageZone() {
 
   return (
     <div className="space-y-4" data-zone="triage">
-      <KpiFooter
-        kpis={{
-          total_opportunities: closingSoonCount + reviewCount,
-          open_opportunities: closingSoonCount,
-          closing_soon_opportunities: closingSoonCount,
-          high_match_opportunities: reviewCount,
-        }}
-      />
       <div id="closing-soon-7d">
         <ClosingSoon7dWidget items={closingSoon} />
       </div>

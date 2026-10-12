@@ -1,16 +1,16 @@
 /**
  * PR B-2 (dashboard-redesign): Health zone — sources + data quality.
  *
- * Renders:
- *   1. Source health banner (degraded + failing alerts)
- *   2. 4 KPI cards in a row (Total / Abiertas / Cierran pronto / Alta compatibilidad)
- *   3. Status breakdown donut chart (Plotly interactive)
- *   4. Country breakdown horizontal bar chart (Plotly interactive)
- *   5. Data coverage strip — 5 mini-stats, with "Sin datos aún" UX for null embeddings
+ * Renders (R3 layout):
+ *   1. Source health banner — count only (degraded + failing activas, R1 ya
+ *      excluye disabled en backend); el detalle vive en la tabla de abajo
+ *   2. 4 KPI cards (Total / Abiertas / Cierran en 7 días / Alta compatibilidad)
+ *   3. Analítica: tabs Estado / País siempre; Score / Financiación / Fuentes /
+ *      Categorías solo si tienen datos (render condicional, código intacto)
+ *   4. "Salud de fuentes" — solo degraded/failing (mismo criterio que /sources)
+ *   5. "Calidad de datos" strip
  *
- * All charts are rendered client-side with Plotly via dynamic import
- * (SSR-safe, ~3.6 MB bundle loaded on-demand). Hover, click, and zoom
- * are interactive out of the box.
+ * Charts are rendered client-side with Plotly via dynamic import (SSR-safe).
  */
 "use client";
 
@@ -39,10 +39,9 @@ function formatNumber(value: number) {
   return new Intl.NumberFormat("es-CO", { maximumFractionDigits: 0 }).format(value);
 }
 
-function SourceHealthBanner({ degraded, failing, sourceAlerts }: {
+function SourceHealthBanner({ degraded, failing }: {
   degraded: number;
   failing: number;
-  sourceAlerts: HealthRead["source_alerts"];
 }) {
   const total = degraded + failing;
   if (total === 0) return null;
@@ -56,7 +55,7 @@ function SourceHealthBanner({ degraded, failing, sourceAlerts }: {
               {total} fuente{total === 1 ? "" : "s"} requiere{total === 1 ? "" : "n"} atención
             </p>
             <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-              {sourceAlerts.map((item) => item.name).join(", ") || "Revisa el estado operativo de tus conectores."}
+              Solo fuentes activas degradadas o en falla. El detalle está abajo.
             </p>
           </div>
         </div>
@@ -80,9 +79,9 @@ const KPI_ACCENTS = [
 
 function KpiCards({ kpis }: { kpis: HealthRead["kpis"] }) {
   const items = [
-    { label: "Total convocatorias", value: kpis.total, accent: KPI_ACCENTS[0] },
-    { label: "Convocatorias abiertas", value: kpis.open, accent: KPI_ACCENTS[1] },
-    { label: "Cierran pronto", value: kpis.closing_soon, accent: KPI_ACCENTS[2] },
+    { label: "Total", value: kpis.total, accent: KPI_ACCENTS[0] },
+    { label: "Abiertas", value: kpis.open, accent: KPI_ACCENTS[1] },
+    { label: "Cierran en 7 días", value: kpis.closing_soon, accent: KPI_ACCENTS[2] },
     { label: "Alta compatibilidad", value: kpis.high_match, accent: KPI_ACCENTS[3] },
   ];
   return (
@@ -157,8 +156,11 @@ function healthLabel(status: string): string {
 }
 
 function SourceHealthTable({ sources }: { sources: SourceHealth[] }) {
-  if (!sources.length) return null;
-  const sorted = [...sources].sort((a, b) => (a.health_score ?? 0) - (b.health_score ?? 0)).slice(0, 8);
+  // R3: mismo criterio que /sources — solo degraded/failing activas.
+  // El backend (R1) ya excluye disabled; aquí se excluye idle/sanas.
+  const unhealthy = sources.filter((s) => s.status === "degraded" || s.status === "failing");
+  if (!unhealthy.length) return null;
+  const sorted = [...unhealthy].sort((a, b) => (a.health_score ?? 0) - (b.health_score ?? 0)).slice(0, 8);
   return (
     <Card>
       <CardHeader className="border-b border-slate-200 pb-4 dark:border-slate-700">
@@ -166,7 +168,7 @@ function SourceHealthTable({ sources }: { sources: SourceHealth[] }) {
           <Activity className="h-4 w-4" />
           Salud de fuentes
         </CardTitle>
-        <CardDescription>Las ocho fuentes con menor puntaje para priorizar acciones de mantenimiento.</CardDescription>
+        <CardDescription>Solo fuentes activas degradadas o en falla, ordenadas por puntaje.</CardDescription>
       </CardHeader>
       <CardContent className="p-0">
         <div className="divide-y divide-slate-200 dark:divide-slate-800">
@@ -219,22 +221,24 @@ export function HealthZone() {
   if (!query.data) return null;
 
   const data = query.data;
+  // R3: tabs Estado / País siempre visibles; el resto solo con datos
+  // (flag simple por longitud — código de charts intacto).
   const chartOptions = [
-    { id: "status", label: "Estado", title: "Estado de convocatorias", description: "Distribución general según vigencia.", content: <StatusChart data={data.status_breakdown} /> },
-    { id: "country", label: "País", title: "Cobertura geográfica", description: "Países con mayor volumen detectado.", content: <CountryChart data={data.country_breakdown} /> },
-    { id: "score", label: "Compatibilidad", title: "Distribución de compatibilidad", description: "Convocatorias agrupadas por rango de afinidad.", content: <ScoreChart data={data.score_distribution} /> },
-    { id: "funding", label: "Financiación", title: "Rangos de financiación", description: "Distribución según monto reportado.", content: <FundingChart data={data.funding_ranges} /> },
-    { id: "source", label: "Fuentes", title: "Contribución por fuente", description: "Conectores que más oportunidades aportan.", content: <SourceChart data={data.source_contribution} /> },
-    { id: "category", label: "Categorías", title: "Áreas de oportunidad", description: "Distribución temática de las convocatorias.", content: <CategoryChart data={data.category_distribution} /> },
+    { id: "status", label: "Estado", title: "Estado de convocatorias", description: "Distribución general según vigencia.", content: <StatusChart data={data.status_breakdown} />, always: true },
+    { id: "country", label: "País", title: "Cobertura geográfica", description: "Países con mayor volumen detectado.", content: <CountryChart data={data.country_breakdown} />, always: true },
+    { id: "score", label: "Compatibilidad", title: "Distribución de compatibilidad", description: "Convocatorias agrupadas por rango de afinidad.", content: <ScoreChart data={data.score_distribution} />, always: false, hasData: (data.score_distribution ?? []).length > 0 },
+    { id: "funding", label: "Financiación", title: "Rangos de financiación", description: "Distribución según monto reportado.", content: <FundingChart data={data.funding_ranges} />, always: false, hasData: (data.funding_ranges ?? []).length > 0 },
+    { id: "source", label: "Fuentes", title: "Contribución por fuente", description: "Conectores que más oportunidades aportan.", content: <SourceChart data={data.source_contribution} />, always: false, hasData: (data.source_contribution ?? []).length > 0 },
+    { id: "category", label: "Categorías", title: "Áreas de oportunidad", description: "Distribución temática de las convocatorias.", content: <CategoryChart data={data.category_distribution} />, always: false, hasData: (data.category_distribution ?? []).length > 0 },
   ];
-  const selectedChart = chartOptions.find((item) => item.id === activeChart) ?? chartOptions[0];
+  const visibleCharts = chartOptions.filter((item) => item.always || item.hasData);
+  const selectedChart = visibleCharts.find((item) => item.id === activeChart) ?? visibleCharts[0];
 
   return (
     <div className="space-y-4" data-zone="health">
       <SourceHealthBanner
         degraded={data.degraded_sources}
         failing={data.failing_sources}
-        sourceAlerts={data.source_alerts}
       />
       <KpiCards kpis={data.kpis} />
       <Card className="overflow-hidden border-[#005652]/15 shadow-[0_20px_50px_-35px_rgba(0,86,82,.8)]">
@@ -248,7 +252,7 @@ export function HealthZone() {
               <CardDescription>Selecciona una dimensión para explorar los datos consolidados.</CardDescription>
             </div>
             <div className="flex max-w-full gap-1 overflow-x-auto rounded-xl border border-[#005652]/10 bg-white p-1 dark:bg-slate-900" role="tablist" aria-label="Dimensión del gráfico">
-              {chartOptions.map((option) => (
+              {visibleCharts.map((option) => (
                 <button
                   key={option.id}
                   type="button"
