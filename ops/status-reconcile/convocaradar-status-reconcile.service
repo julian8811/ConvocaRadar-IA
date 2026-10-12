@@ -1,0 +1,12 @@
+[Unit]
+Description=ConvocaRadar - conciliacion de estados vencidos en PostgreSQL
+Wants=network-online.target
+After=network-online.target docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/sbin/convocaradar-reconcile-expired.sh apply
+TimeoutStartSec=90
+StandardOutput=journal
+StandardError=journal
