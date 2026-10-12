@@ -1,0 +1,19 @@
+{
+  "http_status": 404,
+  "latency_ms": 743,
+  "content_type": "text/html; charset=UTF-8",
+  "body_bytes": 62618,
+  "kind": "html",
+  "n_items": 1,
+  "sample": [
+    {
+      "title": "Welcome to the GIZ website!",
+      "url": ""
+    },
+    {
+      "title": "Receive funding",
+      "url": "/en/partner/funding"
+    }
+  ],
+  "sanitized_url": "https://www.giz.de/en/html/ausschreibungen.html"
+}

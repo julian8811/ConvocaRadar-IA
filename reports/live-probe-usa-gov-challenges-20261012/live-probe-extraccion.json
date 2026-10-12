@@ -1,0 +1,27 @@
+{
+  "http_status": 200,
+  "latency_ms": 252,
+  "content_type": "text/html",
+  "body_bytes": 45098,
+  "kind": "html",
+  "n_items": 8,
+  "sample": [
+    {
+      "title": "Browse active challenges from the government",
+      "url": ""
+    },
+    {
+      "title": "DARPA Surgical Competition",
+      "url": ""
+    },
+    {
+      "title": "Documentation and Decision Support Sprint",
+      "url": ""
+    },
+    {
+      "title": "Call us at 1-844-USAGOV1",
+      "url": "/phone"
+    }
+  ],
+  "sanitized_url": "https://www.usa.gov/find-active-challenge"
+}

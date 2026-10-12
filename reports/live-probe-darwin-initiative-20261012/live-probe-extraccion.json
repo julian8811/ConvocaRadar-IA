@@ -1,0 +1,31 @@
+{
+  "http_status": 200,
+  "latency_ms": 719,
+  "content_type": "text/html; charset=utf-8",
+  "body_bytes": 40578,
+  "kind": "html",
+  "n_items": 8,
+  "sample": [
+    {
+      "title": "Search",
+      "url": ""
+    },
+    {
+      "title": "How to apply",
+      "url": ""
+    },
+    {
+      "title": "Introduction",
+      "url": ""
+    },
+    {
+      "title": "Darwin Initiative Round 32 Funding Update Webinar, May 2026",
+      "url": "/resources/workshops-and-webinars/darwin-initiative-round-32-funding-update-webinar-may-2026/"
+    },
+    {
+      "title": "Flexi-Grant application portal",
+      "url": "https://bcfs.flexigrant.com/"
+    }
+  ],
+  "sanitized_url": "https://www.darwininitiative.org.uk/how-to-apply/"
+}
