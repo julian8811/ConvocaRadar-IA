@@ -27,8 +27,8 @@ Pedido explícito: revisar qué es mock y conectar lo que no sirve (alertas, per
 ## Tasks
 - [x] **T1 (P0)** ✅ 2026-10-12 Resend configurado + envío real + **confirmación visual en bandeja por el usuario** (screenshot). Criterio cumplido.
 - [ ] **T2 (P1 writer)**
-- [x] **T2 (P1 writer)** ✅ 2026-10-12 Auto-refresh: `refetchInterval: 60s` + `staleTime` en Triage/Pipeline/Health (Health alineado al TTL server). Suite web 99 passed + tsc/eslint limpios.
-- [x] **T3 (P1 writer)** ✅ 2026-10-12 Tags hidratados con valores reales (patrón render-phase; `useEffect` lo rechaza el lint). Misma verificación verde.
+- [x] **T2 (P1 writer)** ✅ 2026-10-12 Auto-refresh + deployado (cherry `22af30c`, web healthy). Verificación visual pendiente por el usuario.
+- [x] **T3 (P1 writer)** ✅ 2026-10-12 Tags hidratados + deployado. Verificación visual pendiente por el usuario.
 - [ ] **T4 (P2, solo si se pide)** Gestión de usuarios / perfil propio: propuesta antes de código.
 
 ## Acceptance
