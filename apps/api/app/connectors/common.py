@@ -2591,6 +2591,14 @@ DETAIL_ENRICHMENT_PILOT_KEYS: frozenset[str] = frozenset(
         # ``extract_unitar_detail_fields`` via ``extract_page_fields`` —
         # the existing SSR batch path covers it, no connector change.
         "unitar-courses",
+        # E25: ascun-convocatorias + cost-open-calls +
+        # sdde-bogota-convocatorias. Top unknown-sin-close sources
+        # (67/58/48); sdde already gains +4 closes from the listing, so
+        # its detail pages may yield even more — the existing SSR batch
+        # path covers all three, no connector change.
+        "ascun-convocatorias",
+        "cost-open-calls",
+        "sdde-bogota-convocatorias",
     }
 )
 
