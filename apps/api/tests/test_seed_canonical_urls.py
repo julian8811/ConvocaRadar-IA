@@ -66,15 +66,38 @@ CANONICAL_SEEDS = {
         "https://www.giz.de/en/partner/funding",
         ["giz.de", "www.giz.de", "ausschreibungen.giz.de"],
     ),
+    "anp-brasil": (
+        # Forensic R-B follow-up (Oct 2026, <=2 GETs, repo UA): the
+        # P&D&I path appears verbatim in the gov.br/anp home nav and
+        # returns HTTP 200.
+        "https://www.gov.br/anp/pt-br/assuntos/tecnologia-meio-ambiente/pesquisa-desenvolvimento-inovacao",
+        ["gov.br", "anp.gov.br"],
+    ),
+    "procolombia-inversion": (
+        # Forensic R-B follow-up (Oct 2026, <=2 GETs, repo UA): the
+        # /es/convocatorias seed path returns 404; the investment
+        # opportunities finder appears verbatim in the /es home nav
+        # and returns HTTP 200.
+        "https://investincolombia.com.co/es/buscador-oportunidades-inversion",
+        ["investincolombia.com.co"],
+    ),
 }
 
 # Seeds left intact because no canonical path surfaced within budget.
+# R-B follow-up (Oct 2026, <=2 GETs each, repo UA, 12 total):
+# - camara-comercio-cali: seed /convocatorias/ is HTTP 404; home (200)
+#   exposes only /portafolio/* hubs with no calls listing.
+# - flacso-convocatorias: home 200 (x2 scans); only cursos/programas
+#   hubs, no calls path.
+# - rutann-convocatorias: home 200 (x2 scans); /ofertas and
+#   /retosciudad exist but neither is a clear convocatorias canonical,
+#   so no guess is pinned.
+# - sgc-convocatorias: home fetch failed on TLS (curl exit 60, local
+#   issuer missing); no verified sgc.gov.co path within budget.
 PENDING_SEEDS = {
-    "anp-brasil": "https://www.gov.br/anp/pt-br/assuntos/pesquisa-desenvolvimento-e-inovacao",
     "camara-comercio-cali": "https://www.ccc.org.co/convocatorias/",
     "flacso-convocatorias": "https://www.flacso.org/convocatorias",
     "rutann-convocatorias": "https://www.rutanmedellin.org/convocatorias",
-    "procolombia-inversion": "https://investincolombia.com.co/es/convocatorias",
     # SGC decision: real source is Servicio Geologico Colombiano, but the
     # seed URL points at segib.org (wrong org). No verified sgc.gov.co
     # canonical path within budget, so it stays intact as PENDING.
