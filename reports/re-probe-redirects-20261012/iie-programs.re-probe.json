@@ -1,0 +1,59 @@
+{
+  "source_key": "iie-programs",
+  "status": "live_ok",
+  "http_status": 200,
+  "latency_ms": 240,
+  "requests_made": 2,
+  "bytes_truncated": false,
+  "ttl_s": 86400,
+  "pending_manual_review": false,
+  "evidence": {
+    "source_key": "iie-programs",
+    "duration_ms": 631,
+    "requests_made": 2,
+    "urls": [
+      "https://www.iie.org/programs/",
+      "https://www.iie.org/scholarships-programs/"
+    ],
+    "policy": {
+      "max_requests_per_source": 2,
+      "timeout_s": 15,
+      "total_budget_s": 60,
+      "max_concurrency_global": 2,
+      "max_concurrency_per_host": 1,
+      "max_bytes_per_page": 2000000,
+      "max_pages_per_source": 10,
+      "max_redirects": 3,
+      "retry_max": 2
+    },
+    "pending_manual_review": false,
+    "http_status": 200,
+    "bytes_truncated": false,
+    "bytes_received": 371331,
+    "content_type": "text/html; charset=UTF-8",
+    "titles_sample": [
+      "Find a Scholarship or Program",
+      "The Language Flagship",
+      "All Programs",
+      "Not sure where to start? Check out our Study Abroad Resources.",
+      "Energizing the Next Generation",
+      "IIE’s Scholar Rescue Fund Expands Support for Threatened Scholars",
+      "Career Pathways in a Global Workforce: Why International Experiences Matter",
+      "Determined to Learn: IIE Odyssey Scholarship Graduates Reflect How Education Can Transform Adversity into Opportunity",
+      "Partnerships Are Everywhere, But How Can We Measure Them?",
+      "QSAP Celebrates 2025/2026 Graduations in Virtual Ceremony"
+    ],
+    "titles_count": 12,
+    "single_get_reused": true,
+    "retry_after_s": null,
+    "redirect_chain": [
+      {
+        "from": "https://www.iie.org/programs/",
+        "to": "https://www.iie.org/scholarships-programs/",
+        "reason": "host autorizado"
+      }
+    ],
+    "reason": null
+  },
+  "predicted": "pasa (mismo registrable iie.org)"
+}

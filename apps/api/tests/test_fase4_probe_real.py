@@ -169,7 +169,8 @@ def test_redirect_to_private_is_blocked_by_policy():
         raise AssertionError(f"no debe seguir redirect a privado: {url}")
     outcome = asyncio.run(run_live_probe(
         "demo", allow_network=True, start_urls=["https://public.example/feed"],
-        transport=transport, authorized_hosts=["public.example"]))
+        transport=transport, authorized_hosts=["public.example"],
+        resolve=lambda host: ["93.184.216.34"]))
     assert outcome.status == "blocked_by_policy"
     assert outcome.requests_made == 1
 
@@ -180,7 +181,8 @@ def test_redirect_cross_host_unauthorized_stops():
                 "body": "", "latency_ms": 5}
     outcome = asyncio.run(run_live_probe(
         "demo", allow_network=True, start_urls=["https://public.example/feed"],
-        transport=transport, authorized_hosts=["public.example"]))
+        transport=transport, authorized_hosts=["public.example"],
+        resolve=lambda host: ["93.184.216.34"]))
     assert outcome.status == "blocked_by_policy"
 
 
@@ -230,7 +232,8 @@ def test_oversize_response_truncated_and_flagged():
         return {"status": 200, "headers": {}, "body": big, "latency_ms": 5}
     outcome = asyncio.run(run_live_probe(
         "demo", allow_network=True, start_urls=["https://public.example/feed"],
-        transport=transport, authorized_hosts=["public.example"]))
+        transport=transport, authorized_hosts=["public.example"],
+        resolve=lambda host: ["93.184.216.34"]))
     assert outcome.bytes_truncated is True
     assert outcome.requests_made == 1
 
@@ -243,7 +246,7 @@ def test_over_budget_stops_with_error():
         "demo", allow_network=True,
         start_urls=["https://public.example/p0"],
         transport=transport, authorized_hosts=["public.example"],
-        max_requests=3))
+        resolve=lambda host: ["93.184.216.34"], max_requests=3))
     assert outcome.status == "over_budget"
     assert outcome.requests_made == 3
 
@@ -273,7 +276,8 @@ def test_rss_single_fetch_ok_with_stub():
     outcome = asyncio.run(run_live_probe(
         "generic-rss-sample", allow_network=True,
         start_urls=["https://public.example/feed.xml"],
-        transport=transport, authorized_hosts=["public.example"]))
+        transport=transport, authorized_hosts=["public.example"],
+        resolve=lambda host: ["93.184.216.34"]))
     assert outcome.status == "live_ok"
     assert outcome.evidence["requests_made"] == 1
     assert outcome.evidence["urls"][0].startswith("https://public.example/")
@@ -307,7 +311,8 @@ def test_evidence_has_source_duration_sanitized_urls_and_policy():
     outcome = asyncio.run(run_live_probe(
         "demo", allow_network=True,
         start_urls=["https://public.example/conv?token=SECRET-should-not-appear"],
-        transport=transport, authorized_hosts=["public.example"]))
+        transport=transport, authorized_hosts=["public.example"],
+        resolve=lambda host: ["93.184.216.34"]))
     ev = outcome.evidence
     assert ev["source_key"] == "demo"
     assert ev["duration_ms"] >= 0

@@ -1,0 +1,33 @@
+{
+  "source_key": "mintic-convocatorias",
+  "status": "over_budget",
+  "http_status": null,
+  "latency_ms": 0,
+  "requests_made": 2,
+  "bytes_truncated": false,
+  "ttl_s": 900,
+  "pending_manual_review": true,
+  "evidence": {
+    "source_key": "mintic-convocatorias",
+    "duration_ms": 882,
+    "requests_made": 2,
+    "urls": [
+      "https://www.mintic.gov.co/portal/inicio/Convocatorias/",
+      "https://www.mintic.gov.co/portal/715/w3-propertyvalue-111099.html"
+    ],
+    "policy": {
+      "max_requests_per_source": 2,
+      "timeout_s": 15,
+      "total_budget_s": 60,
+      "max_concurrency_global": 2,
+      "max_concurrency_per_host": 1,
+      "max_bytes_per_page": 2000000,
+      "max_pages_per_source": 10,
+      "max_redirects": 3,
+      "retry_max": 2
+    },
+    "pending_manual_review": true,
+    "reason": "presupuesto de requests agotado"
+  },
+  "predicted": "pasa (mismo registrable mintic.gov.co)"
+}

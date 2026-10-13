@@ -1,0 +1,33 @@
+{
+  "source_key": "proinnovate-calendario",
+  "status": "blocked_by_policy",
+  "http_status": null,
+  "latency_ms": 0,
+  "requests_made": 1,
+  "bytes_truncated": false,
+  "ttl_s": 900,
+  "pending_manual_review": true,
+  "evidence": {
+    "source_key": "proinnovate-calendario",
+    "duration_ms": 0,
+    "requests_made": 1,
+    "urls": [
+      "https://calendario.proinnovate.gob.pe/"
+    ],
+    "policy": {
+      "max_requests_per_source": 2,
+      "timeout_s": 15,
+      "total_budget_s": 60,
+      "max_concurrency_global": 2,
+      "max_concurrency_per_host": 1,
+      "max_bytes_per_page": 2000000,
+      "max_pages_per_source": 10,
+      "max_redirects": 3,
+      "retry_max": 2
+    },
+    "pending_manual_review": true,
+    "reason": "redirect a host no autorizado/privado: cdn.www.gob.pe",
+    "redirect_chain": []
+  },
+  "predicted": "pasa (CDN estatal cdn.gob.pe; incierto si target es cdn.www.gob.pe)"
+}
