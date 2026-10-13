@@ -1,0 +1,15 @@
+{
+  "http_status": 302,
+  "latency_ms": 2720,
+  "content_type": "text/html;charset=ISO-8859-1",
+  "body_bytes": 208,
+  "kind": "html",
+  "n_items": 1,
+  "sample": [
+    {
+      "title": "Document moved",
+      "url": ""
+    }
+  ],
+  "sanitized_url": "https://artesaniasdecolombia.com.co/PortalAC/C_convocatorias/"
+}

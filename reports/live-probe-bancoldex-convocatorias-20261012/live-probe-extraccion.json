@@ -1,0 +1,31 @@
+{
+  "http_status": 200,
+  "latency_ms": 396,
+  "content_type": "text/html; charset=UTF-8",
+  "body_bytes": 182890,
+  "kind": "html",
+  "n_items": 7,
+  "sample": [
+    {
+      "title": "Navegación principal",
+      "url": ""
+    },
+    {
+      "title": "Contratación",
+      "url": ""
+    },
+    {
+      "title": "Invitaciones a Contratar",
+      "url": ""
+    },
+    {
+      "title": "Aviso Adjudicación Convocatoria 2026067.pdf",
+      "url": "/sites/default/files/2026-06/Aviso%20Adjudicaci%C3%B3n%20Convocatoria%202026067.pdf"
+    },
+    {
+      "title": "Aviso Importante Convocatoria 00190.pdf",
+      "url": "/sites/default/files/2026-05/Aviso%20Importante%20Convocatoria%2000190_0.pdf"
+    }
+  ],
+  "sanitized_url": "https://www.bancoldex.com/sobre-bancoldex/contrataciones/invitaciones-contratar"
+}

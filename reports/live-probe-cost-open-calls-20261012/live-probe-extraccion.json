@@ -1,0 +1,30 @@
+{
+  "http_status": 200,
+  "latency_ms": 2178,
+  "content_type": "application/json; charset=UTF-8",
+  "body_bytes": 1174672,
+  "items": 20,
+  "sample": [
+    {
+      "title": "Anti-fraud policy",
+      "url": "https://www.cost.eu/legal/anti-fraud-policy/"
+    },
+    {
+      "title": "Cross-Cutting Activities",
+      "url": "https://www.cost.eu/about/strategy/cross-cutting-activities/"
+    },
+    {
+      "title": "Am I eligible?",
+      "url": "https://www.cost.eu/am-i-eligible/"
+    },
+    {
+      "title": "COST Actions",
+      "url": "https://www.cost.eu/cost-actions-event/"
+    },
+    {
+      "title": "COST global networking",
+      "url": "https://www.cost.eu/about/strategy/cost-global-networking/"
+    }
+  ],
+  "sanitized_url": "https://www.cost.eu/wp-json/wp/v2/pages"
+}

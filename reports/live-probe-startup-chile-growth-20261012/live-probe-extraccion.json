@@ -1,0 +1,23 @@
+{
+  "http_status": 200,
+  "latency_ms": 464,
+  "content_type": "text/html; charset=UTF-8",
+  "body_bytes": 56185,
+  "kind": "html",
+  "n_items": 8,
+  "sample": [
+    {
+      "title": "Sé parte de Growth",
+      "url": ""
+    },
+    {
+      "title": "¿QUÉ ES GROWTH?",
+      "url": ""
+    },
+    {
+      "title": "¡CONOCE LA ÚLTIMA GENERACIÓN DE GROWTH!",
+      "url": ""
+    }
+  ],
+  "sanitized_url": "https://startupchile.org/postula/growth/"
+}

@@ -1,0 +1,31 @@
+{
+  "http_status": 200,
+  "latency_ms": 293,
+  "content_type": "text/html; charset=UTF-8",
+  "body_bytes": 40697,
+  "kind": "html",
+  "n_items": 6,
+  "sample": [
+    {
+      "title": "Subscribe to updates about Open Society’s work around the world",
+      "url": ""
+    },
+    {
+      "title": "Grants and Fellowships",
+      "url": ""
+    },
+    {
+      "title": "Open Society Fellowship",
+      "url": ""
+    },
+    {
+      "title": "Grants and Fellowships",
+      "url": "https://www.opensocietyfoundations.org/grants"
+    },
+    {
+      "title": "Awarded Grants",
+      "url": "https://www.opensocietyfoundations.org/grants/past"
+    }
+  ],
+  "sanitized_url": "https://www.opensocietyfoundations.org/grants"
+}

@@ -1,0 +1,33 @@
+{
+  "source_key": "mozilla-foundation",
+  "status": "blocked_by_policy",
+  "http_status": null,
+  "latency_ms": 0,
+  "requests_made": 1,
+  "probe_requests": 1,
+  "extraction_requests": 0,
+  "bytes_truncated": false,
+  "ttl_s": 21600,
+  "pending_manual_review": true,
+  "evidence": {
+    "source_key": "mozilla-foundation",
+    "duration_ms": 0,
+    "requests_made": 1,
+    "urls": [
+      "https://foundation.mozilla.org/en/what-we-fund/awards/"
+    ],
+    "policy": {
+      "max_requests_per_source": 3,
+      "timeout_s": 15,
+      "total_budget_s": 60,
+      "max_concurrency_global": 2,
+      "max_concurrency_per_host": 1,
+      "max_bytes_per_page": 2000000,
+      "max_pages_per_source": 10,
+      "max_redirects": 3,
+      "retry_max": 2
+    },
+    "pending_manual_review": true,
+    "reason": "redirect a host no autorizado/privado: www.mozillafoundation.org"
+  }
+}

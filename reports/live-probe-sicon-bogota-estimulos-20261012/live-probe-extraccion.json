@@ -1,0 +1,15 @@
+{
+  "http_status": 200,
+  "latency_ms": 113,
+  "content_type": "text/html",
+  "body_bytes": 2033,
+  "kind": "html",
+  "n_items": 1,
+  "sample": [
+    {
+      "title": "La oferta de convocatorias ahora se consulta en CultuRed",
+      "url": ""
+    }
+  ],
+  "sanitized_url": "https://sicon.scrd.gov.co/"
+}

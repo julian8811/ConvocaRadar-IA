@@ -1,0 +1,36 @@
+{
+  "source_key": "camara-comercio-bogota",
+  "status": "live_blocked",
+  "http_status": 403,
+  "latency_ms": 109,
+  "requests_made": 1,
+  "probe_requests": 1,
+  "extraction_requests": 0,
+  "bytes_truncated": false,
+  "ttl_s": 21600,
+  "pending_manual_review": true,
+  "evidence": {
+    "source_key": "camara-comercio-bogota",
+    "duration_ms": 234,
+    "requests_made": 1,
+    "urls": [
+      "https://www.ccb.org.co/camara-comercio-bogota/nosotros/convocatorias"
+    ],
+    "policy": {
+      "max_requests_per_source": 1,
+      "timeout_s": 15,
+      "total_budget_s": 60,
+      "max_concurrency_global": 2,
+      "max_concurrency_per_host": 1,
+      "max_bytes_per_page": 2000000,
+      "max_pages_per_source": 10,
+      "max_redirects": 3,
+      "retry_max": 2
+    },
+    "pending_manual_review": true,
+    "http_status": 403,
+    "bytes_truncated": false,
+    "retry_after_s": null,
+    "reason": null
+  }
+}

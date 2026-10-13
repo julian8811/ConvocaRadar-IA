@@ -1,0 +1,23 @@
+{
+  "http_status": 200,
+  "latency_ms": 660,
+  "content_type": "text/html; charset=UTF-8",
+  "body_bytes": 261364,
+  "kind": "html",
+  "n_items": 5,
+  "sample": [
+    {
+      "title": "Fondo para el financiamiento del sector agropecuario",
+      "url": ""
+    },
+    {
+      "title": "Beneficiarios",
+      "url": ""
+    },
+    {
+      "title": "Preguntas frecuentes",
+      "url": ""
+    }
+  ],
+  "sanitized_url": "https://www.finagro.com.co/beneficiarios"
+}

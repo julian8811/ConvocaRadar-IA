@@ -1,0 +1,31 @@
+{
+  "http_status": 200,
+  "latency_ms": 142,
+  "content_type": "text/html;charset=UTF-8",
+  "body_bytes": 286417,
+  "kind": "html",
+  "n_items": 2,
+  "sample": [
+    {
+      "title": "Amazon Research Awards",
+      "url": ""
+    },
+    {
+      "title": "Work with us",
+      "url": ""
+    },
+    {
+      "title": "Call for proposals",
+      "url": "https://www.amazon.science/research-awards/call-for-proposals"
+    },
+    {
+      "title": "Research stories",
+      "url": "https://www.amazon.science/research-awards/success-stories"
+    },
+    {
+      "title": "Call for proposals",
+      "url": "https://www.amazon.science/research-awards/call-for-proposals"
+    }
+  ],
+  "sanitized_url": "https://www.amazon.science/research-awards"
+}

@@ -1,0 +1,31 @@
+{
+  "http_status": 200,
+  "latency_ms": 975,
+  "content_type": "text/html; charset=UTF-8",
+  "body_bytes": 128739,
+  "kind": "html",
+  "n_items": 3,
+  "sample": [
+    {
+      "title": "LISTA DE EDITAIS / CHAMADAS (2026)",
+      "url": ""
+    },
+    {
+      "title": "Sumário: 1) EDITAIS LANÇADOS EM 2026 2) OUTROS PROGRAMAS E CHAMADAS – COOPERAÇÃO 3) EDITAIS LANÇADOS EM 2025 (ou anteriormente) COM RESULTADOS AINDA POR DIVULGA",
+      "url": ""
+    },
+    {
+      "title": "3) EDITAIS LANÇADOS EM 2025 (ou anteriormente) COM RESULTADOS POR DIVULGAR EM 2026",
+      "url": ""
+    },
+    {
+      "title": "Edital FAPERJ Nº 01/2026 - Apoio à Recuperação e Modernização da Infraestrutura de Hospitais Universitários Sediados no Estado do Rio de Janeiro",
+      "url": "rp/downloads/Edital_FAPERJ_N&ordm;_01_2026_-_Apoio_&agrave;_Recupera&ccedil;&atilde;o_e_Moderniza&ccedil;&atilde;o_da_Infraestrutura_de_Hospitais_Universit&aacute;rios_Sediados_no_RJ.pdf"
+    },
+    {
+      "title": "veja a lista das propostas selecionadas",
+      "url": "rp/downloads/Edital_FAPERJ_N&ordm;_01_2026_-_Programa_de_Apoio_&agrave;_Recupera&ccedil;&atilde;o_e_Moderniza&ccedil;&atilde;o_da_Infraestrutura_de_Hospitais_Universit&aacute;rios_Sediados_no_RJ.pdf"
+    }
+  ],
+  "sanitized_url": "https://www.faperj.br/"
+}

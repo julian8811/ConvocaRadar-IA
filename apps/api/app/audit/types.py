@@ -42,6 +42,8 @@ class Verdict(StrEnum):
 
 Severity = Literal["P0", "P1", "P2", "P3"]
 DataState = Literal["ok", "blocked_by_source", "not_applicable", "not_checked"]
+#: Alcance de la verificacion: el modo history nunca verifica en vivo.
+VerificationScope = Literal["historical_only", "live_checked"]
 
 
 class AuditEvidence(BaseModel):
@@ -73,6 +75,13 @@ class SourceAuditResult(BaseModel):
     checks: dict[str, AuditCheckResult]
     reasons: list[str] = Field(default_factory=list)
     needs_human_review: bool = False
+    #: Alcance de verificacion. History siempre es historical_only y nunca
+    #: certifica en vivo: conectividad UNKNOWN puede dar `operativa`
+    #: historico pero NUNCA viva. Solo un probe real puede poner live_checked.
+    verification_scope: VerificationScope = "historical_only"
+    #: Certificacion viva: exige criterios de meets_live_certification().
+    #: Nada historico preexistente se retro-certifica: default False.
+    live_certified: bool = False
     evaluated_at: datetime = Field(
         default_factory=lambda: datetime.now(UTC).replace(tzinfo=None)
     )

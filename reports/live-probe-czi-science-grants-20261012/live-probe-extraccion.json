@@ -1,0 +1,31 @@
+{
+  "http_status": 200,
+  "latency_ms": 279,
+  "content_type": "text/html; charset=UTF-8",
+  "body_bytes": 56396,
+  "kind": "html",
+  "n_items": 5,
+  "sample": [
+    {
+      "title": "Grants",
+      "url": ""
+    },
+    {
+      "title": "About Us",
+      "url": ""
+    },
+    {
+      "title": "What We Do",
+      "url": ""
+    },
+    {
+      "title": "See additional information below",
+      "url": "#grants-disclaimer"
+    },
+    {
+      "title": "Grants & Ventures",
+      "url": "https://chanzuckerberg.com/grants-ventures/"
+    }
+  ],
+  "sanitized_url": "https://chanzuckerberg.com/grants-ventures/grants/"
+}

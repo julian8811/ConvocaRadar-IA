@@ -1,0 +1,30 @@
+{
+  "http_status": 200,
+  "latency_ms": 111,
+  "content_type": "text/html; charset=utf-8",
+  "body_bytes": 159707,
+  "items": 8,
+  "sample": [
+    {
+      "title": "Find a funding opportunity",
+      "url": ""
+    },
+    {
+      "title": "Refine results",
+      "url": ""
+    },
+    {
+      "title": "Lead applicant career stage",
+      "url": ""
+    },
+    {
+      "title": "Research funding overview",
+      "url": "/research-funding"
+    },
+    {
+      "title": "Find a funding opportunity",
+      "url": "/research-funding/schemes"
+    }
+  ],
+  "sanitized_url": "https://wellcome.org/research-funding/schemes"
+}

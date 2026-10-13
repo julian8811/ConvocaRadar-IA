@@ -1,0 +1,9 @@
+{
+  "http_status": 200,
+  "latency_ms": 2268,
+  "content_type": "application/json",
+  "body_bytes": 9534,
+  "items": 15,
+  "sample": [],
+  "sanitized_url": "https://www.infosubvenciones.es/bdnstrans/api/convocatorias/busqueda"
+}

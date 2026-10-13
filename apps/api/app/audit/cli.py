@@ -19,13 +19,17 @@ from app.audit.probe import run_simulated_probe
 
 def build_parser() -> argparse.ArgumentParser:
     p = argparse.ArgumentParser(description="Auditor historico de fuentes (solo lectura)")
-    p.add_argument("--mode", choices=["history", "probe"], default="history")
+    p.add_argument("--mode", choices=["history", "probe", "live-probe"],
+                   default="history")
     p.add_argument("--output", required=True, help="directorio de reportes")
     p.add_argument("--input", default=None, help="snapshot JSON sanitizado")
     p.add_argument("--source-key", default=None)
     p.add_argument("--limit", type=int, default=None)
     p.add_argument("--dry-run", action="store_true",
                    help="solo en probe: describe el plan sin tocar red (aqui: simulado)")
+    p.add_argument("--allow-network", action="store_true",
+                   help="solo en live-probe: autoriza red real con presupuestos "
+                        "(exige tambien --source-key)")
     return p
 
 
@@ -33,6 +37,43 @@ def main(argv: list[str] | None = None) -> int:
     args = build_parser().parse_args(argv)
     out = Path(args.output)
     out.mkdir(parents=True, exist_ok=True)
+
+    if args.mode == "live-probe":
+        # Aislamiento total del modo history: no toca DB ni snapshots.
+        import asyncio
+        import json as _json
+
+        from app.audit.live_probe import build_dry_run_plan, run_live_probe
+        from app.audit.live_probe import KNOWN_START_URLS
+
+        if not args.source_key:
+            print("live-probe exige --source-key (opt-in por fuente)", file=sys.stderr)
+            return 2
+        urls = KNOWN_START_URLS.get(args.source_key, [])
+        if args.dry_run or not args.allow_network:
+            plan = build_dry_run_plan(args.source_key, urls or None)
+            print(f"[dry-run] probe real {args.source_key}: "
+                  f"{plan['estimated_requests']} requests estimadas, "
+                  f"hosts={', '.join(plan['hosts']) or '?'}")
+            print(f"[dry-run] riesgos: {'; '.join(plan['risks'][:3])}")
+            if not args.allow_network:
+                print("[dry-run] red NO autorizada: faltan --allow-network "
+                      "(preflight, 0 red real). Piloto real requiere "
+                      "autorizacion expresa posterior.")
+            (out / "live-probe-plan.json").write_text(
+                _json.dumps(plan, ensure_ascii=False, indent=2), encoding="utf-8")
+            return 0
+        outcome = asyncio.run(run_live_probe(
+            args.source_key, allow_network=True, start_urls=urls or None,
+            transport=None))  # sin transporte inyectado: rechazo seguro
+        print(f"{outcome.source_key}: {outcome.status} "
+              f"req={outcome.requests_made} evidencia en live-probe-plan.json")
+        (out / "live-probe-plan.json").write_text(
+            _json.dumps({"status": outcome.status,
+                         "evidence": outcome.evidence},
+                        ensure_ascii=False, indent=2, default=str),
+            encoding="utf-8")
+        return 0 if outcome.status == "live_ok" else 1
 
     if args.mode == "probe":
         keys = [args.source_key] if args.source_key else None

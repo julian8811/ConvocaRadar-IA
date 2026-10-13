@@ -1,0 +1,30 @@
+{
+  "http_status": 200,
+  "latency_ms": 321,
+  "content_type": "application/json",
+  "body_bytes": 87646,
+  "items": 75,
+  "sample": [
+    {
+      "title": "Formación y asistencia técnica en calidad para mipymes (Convocatoria Territorial: IATF 16949:2016)",
+      "url": "formacion-y-asistencia-tecnica-en-calidad-para-mipymes-convocatoria-territorial--o2q9yw"
+    },
+    {
+      "title": "TCR-2026 - Servicios de consultoría para fortalecimiento de iniciativas clúster",
+      "url": "tcr-2026-servicios-de-consultoria-para-fortalecimiento-de-iniciativas-cluster-rvjefa"
+    },
+    {
+      "title": "Centros de Fortalecimiento Productivo | Agroindustria | Tumaco Cacao | Cohorte 4",
+      "url": "centros-de-fortalecimiento-productivo-agroindustria-tumaco-cacao-cohorte-4-6atp9q"
+    },
+    {
+      "title": "Centros de Fortalecimiento Productivo Manufactura | Popayán | Cohorte 4",
+      "url": "centros-de-fortalecimiento-productivo-popayan-cohorte-4-66uzna"
+    },
+    {
+      "title": "Formación y asistencia técnica en calidad para mipymes (estándares: ISO 22716 e ISO 13485)",
+      "url": "formacion-y-asistencia-tecnica-en-calidad-para-mipymes-estandares-iso-22716-e-is-ktf9hw"
+    }
+  ],
+  "sanitized_url": "https://convocatorias.innpulsacolombia.com/api/convocatorias"
+}

@@ -1,0 +1,31 @@
+{
+  "http_status": 200,
+  "latency_ms": 353,
+  "content_type": "text/html; charset=UTF-8",
+  "body_bytes": 127065,
+  "kind": "html",
+  "n_items": 8,
+  "sample": [
+    {
+      "title": "Convocatoria Experiencias Turísticas Bogotá 2026",
+      "url": ""
+    },
+    {
+      "title": "Ruta de navegación",
+      "url": ""
+    },
+    {
+      "title": "¿En qué consiste?",
+      "url": ""
+    },
+    {
+      "title": "Convocatorias",
+      "url": "/la-entidad/convocatorias"
+    },
+    {
+      "title": "Convocatorias",
+      "url": "/la-entidad/convocatorias"
+    }
+  ],
+  "sanitized_url": "https://www.idt.gov.co/convocatoria-experiencias-bogota-2026"
+}

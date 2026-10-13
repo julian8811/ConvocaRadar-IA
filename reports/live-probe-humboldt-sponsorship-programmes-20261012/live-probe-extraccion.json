@@ -1,0 +1,31 @@
+{
+  "http_status": 200,
+  "latency_ms": 820,
+  "content_type": "text/html; charset=utf-8",
+  "body_bytes": 68496,
+  "kind": "html",
+  "n_items": 8,
+  "sample": [
+    {
+      "title": "Alexander von Humboldt Professorship",
+      "url": ""
+    },
+    {
+      "title": "Humboldtian Nobel laureates",
+      "url": ""
+    },
+    {
+      "title": "AI and Us – what artificial intelligence means for our lives",
+      "url": ""
+    },
+    {
+      "title": "Awards and fellowships",
+      "url": "/en/apply/sponsorship-programmes/programmes-a-to-z"
+    },
+    {
+      "title": "The Humboldt Research Fellowship for researchers of all nationalities and research areas: We support you – postdoctoral and experienced researchers – with your ",
+      "url": "/en/apply/sponsorship-programmes/humboldt-research-fellowship"
+    }
+  ],
+  "sanitized_url": "https://www.humboldt-foundation.de/en/apply/sponsorship-programmes"
+}
