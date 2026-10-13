@@ -1,0 +1,30 @@
+[
+ {
+  "fuente": "cinea",
+  "url_pedida": "https://cinea.ec.europa.eu/life-calls-proposals-2026_en",
+  "ok": true,
+  "status": 200,
+  "url_final": "https://cinea.ec.europa.eu/life-calls-proposals-2026_en",
+  "redirect_chain": [
+   "https://cinea.ec.europa.eu/life-calls-proposals-2026_en"
+  ],
+  "content_type": "text/html; charset=utf-8",
+  "bytes": 107558,
+  "elapsed_s": 0.95,
+  "error": null
+ },
+ {
+  "fuente": "fundacion-biodiversidad",
+  "url_pedida": "https://fundacion-biodiversidad.es/buscador-de-convocatorias/",
+  "ok": true,
+  "status": 200,
+  "url_final": "https://fundacion-biodiversidad.es/buscador-de-convocatorias/",
+  "redirect_chain": [
+   "https://fundacion-biodiversidad.es/buscador-de-convocatorias/"
+  ],
+  "content_type": "text/html; charset=UTF-8",
+  "bytes": 176282,
+  "elapsed_s": 2.4,
+  "error": null
+ }
+]

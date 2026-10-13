@@ -1,0 +1,114 @@
+{
+ "antiruido_keywords": [
+  "empleo",
+  "empleos",
+  "job",
+  "jobs",
+  "hiring",
+  "vacante",
+  "vacantes",
+  "noticia",
+  "noticias",
+  "news",
+  "press release",
+  "blog post",
+  "oferta laboral",
+  "bolsa de trabajo"
+ ],
+ "catalogo_203_keys": 203,
+ "dedup_203_casos": [
+  {
+   "caso": "LIFE vs eu-funding-portal-international",
+   "conclusion": "dominios disjuntos, sin solape",
+   "dominios_agregador": "eufundingportal.eu (agregador, segun matriz X1)",
+   "dominios_life": [
+    "cinea.ec.europa.eu"
+   ]
+  },
+  {
+   "caso": "NIH",
+   "conclusion": "filtro agencia sobre grants-gov, sin key nueva"
+  },
+  {
+   "caso": "Innovate UK",
+   "conclusion": "solapa ukri-opportunities, sin key nueva"
+  },
+  {
+   "caso": "SENNOVA",
+   "conclusion": "solape parcial sena-convocatorias, sin key nueva"
+  }
+ ],
+ "duplicados_contra_203": 0,
+ "duplicados_entre_cinco": 0,
+ "fecha_testigo": "2026-10-13",
+ "fuentes": [
+  {
+   "base_url": "https://cinea.ec.europa.eu/life-calls-proposals-2026_en",
+   "clasificacion": "GO",
+   "decision": "INCLUIR (X1/X2)",
+   "dominios": [
+    "cinea.ec.europa.eu"
+   ],
+   "ejemplo_cierre_documentado": "2026-09-22 (SAPs; vencido al 2026-10-13)",
+   "ejemplo_titulo": "LIFE 2026 Standard Action Projects - Circular Economy and Zero Pollution",
+   "ejemplo_url": "https://cinea.ec.europa.eu/life-calls-proposals-2026/sap-circular-economy",
+   "key": "eu-life-calls-cinea",
+   "nota_fecha": "el deadline documentado Sep-2026 ya vencio; la card del fixture declara cierre unknown (etapa 0: fecha sintetica futura eliminada, revalidar contra el portal)"
+  },
+  {
+   "base_url": "https://fundacion-biodiversidad.es/buscador-de-convocatorias/",
+   "clasificacion": "GO parcial (elegibilidad ES/UE)",
+   "decision": "INCLUIR (X1/X2)",
+   "dominios": [
+    "fundacion-biodiversidad.es"
+   ],
+   "ejemplo_cierre_documentado": "2026 (ver BOE/bases); cards del fixture con cierre unknown (etapa 0: fechas sinteticas eliminadas)",
+   "ejemplo_titulo": "Convocatoria proyectos Educacion Ambiental y desinformacion climatica 2026",
+   "ejemplo_url": "https://fundacion-biodiversidad.es/otras_convocatorias/convocatoria-para-proyectos-de-educacion-ambiental-para-la-sostenibilidad-e-investigacion-sobre-desinformacion-climatica-2",
+   "key": "fundacion-biodiversidad-convocatorias",
+   "senales_vigencia": [
+    "4 convocatorias 2026 activas",
+    "7M EUR educacion",
+    "9M EUR ciudades FEDER",
+    "800k EUR ONG"
+   ]
+  },
+  {
+   "base_url": "https://fondoaccion.org/convocatorias/",
+   "clasificacion": "GO con nota (mezcla proyecto/procurement)",
+   "decision": "INCLUIR-con-riesgo (X1/X2); X4 = revision humana, sin conector",
+   "dominios": [
+    "fondoaccion.org"
+   ],
+   "ejemplo_cierre_documentado": "2025-03 (TMS cerrada; patron anual)",
+   "ejemplo_titulo": "Convocatoria Territorios Mas Sostenibles (11 iniciativas)",
+   "ejemplo_url": "https://fondoaccion.org/2025/03/03/seleccionados-tms",
+   "key": "fondo-accion-convocatorias"
+  },
+  {
+   "base_url": "https://fontagro.org/es/iniciativas/convocatorias",
+   "clasificacion": "HOLD (X4: sin codigo)",
+   "decision": "INCLUIR (X1/X2); X4 HOLD intacto",
+   "dominios": [
+    "fontagro.org"
+   ],
+   "ejemplo_titulo": "Convocatoria 2027 FONTAGRO I+D+i",
+   "ejemplo_url": "https://fontagro.org/es/iniciativas/convocatorias/convocatoria-2027",
+   "key": "fontagro-convocatorias"
+  },
+  {
+   "base_url": "https://www.biodiversa.eu/research-funding/upcoming-calls",
+   "clasificacion": "HOLD (X4: sin codigo)",
+   "decision": "INCLUIR (X1/X2); X4 HOLD intacto",
+   "dominios": [
+    "biodiversa.eu"
+   ],
+   "ejemplo_cierre_documentado": "2026-11-10 (pre-proposals BiodivFuture)",
+   "ejemplo_titulo": "BiodivFuture 2026-2027 Joint Call",
+   "ejemplo_url": "https://www.biodiversa.eu/2026/06/09/2026-2027-joint-call",
+   "key": "biodiversa-calls"
+  }
+ ],
+ "origen": "reconstruccion offline desde test_041_batch_pilot.py + test_041_batch_parse.py + matriz-041-candidatos.json + seed.py (cero red en X4)",
+ "tanda": "041"
+}
