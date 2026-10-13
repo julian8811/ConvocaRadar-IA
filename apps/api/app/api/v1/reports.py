@@ -18,6 +18,10 @@ from app.services import (
 
 router = APIRouter()
 
+# Max opportunities included in a report. Must cover the whole open
+# catalog (hundreds) instead of truncating it.
+REPORT_MAX_ITEMS = 5000
+
 
 def _report_opportunities(db: Session, report: Report) -> list[Opportunity]:
     filters = report.filters or {}
@@ -30,7 +34,7 @@ def _report_opportunities(db: Session, report: Report) -> list[Opportunity]:
         priority=filters.get("priority") or None,
         search=filters.get("search") or None,
     )
-    return list(db.scalars(stmt.limit(200)))
+    return list(db.scalars(stmt.limit(REPORT_MAX_ITEMS)))
 
 
 def _safe_report_name(title: str, *, prefix: str = "reporte-convocatorias") -> str:
@@ -81,7 +85,7 @@ def create_report(
         priority=filters.get("priority") or None,
         search=filters.get("search") or None,
     )
-    opportunities = list(db.scalars(stmt.limit(200)))
+    opportunities = list(db.scalars(stmt.limit(REPORT_MAX_ITEMS)))
     html = generate_report_html(payload.title, organization, opportunities)
     report = Report(
         organization_id=organization.id,
