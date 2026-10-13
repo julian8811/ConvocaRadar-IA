@@ -923,7 +923,11 @@ def extract_unitar_detail_fields(html: str) -> dict[str, object]:
     ``Duration 3 Weeks`` and ``Price $600.00`` (forensic E21, stable
     across sampled fichas). ``Deadline`` maps to ``close_date``; the
     ``Date`` range start/end map to ``open_date``/``close_date`` but
-    gap-fill only, so an explicit Deadline keeps ``close_date``;
+    gap-fill only, so an explicit Deadline keeps ``close_date``. Older
+    fichas carry the deadline in a ``field-event-deadline-regist``
+    container instead (past values like ``27 Apr 2020``, parsed with
+    ``allow_past`` so a real past close recalculates to closed) —
+    likewise gap-fill only.
     ``Price`` maps to funding via ``extract_funding_details``; a parsed
     bare ``$`` (value set, currency None) records as USD — product
     decision: UNITAR bills in dollars, strictly scoped to this host
@@ -962,6 +966,28 @@ def extract_unitar_detail_fields(html: str) -> dict[str, object]:
             parsed = parse_date_text(deadline.group(1))
             if parsed is not None:
                 result["close_date"] = parsed
+        if result["close_date"] is None:
+            # Drupal container fallback: older fichas carry the deadline in
+            # a field-event-deadline-regist node whose label/value live in
+            # separate divs (flat sweep misses it) with past values such as
+            # "27 Apr 2020", optionally with a trailing hour. Parsed with
+            # allow_past so a real past close recalculates to closed;
+            # gap-fill only, never overwrites an explicit Deadline.
+            try:
+                from selectolax.lexbor import LexborHTMLParser as HTMLParser
+
+                reg_node = HTMLParser(html).css_first('[class*="field-event-deadline-regist"]')
+                if reg_node is not None:
+                    raw_value = re.sub(
+                        r"(?i)^deadline\s*:?\s*",
+                        "",
+                        clean_text(reg_node.text()),
+                    ).strip()
+                    parsed = parse_date_text(raw_value, allow_past=True)
+                    if parsed is not None:
+                        result["close_date"] = parsed
+            except Exception:
+                pass
         date_range = _UNITAR_DATE_RANGE_RE.search(visible)
         if date_range:
             start = parse_date_text(date_range.group(1))

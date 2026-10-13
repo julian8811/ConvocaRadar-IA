@@ -63,6 +63,36 @@ UNITAR_NO_DATES_HTML = """<html><body><main>
 
 UNITAR_URL = "https://event.unitar.org/full-catalog/international-law-2026"
 
+# ── field-event-deadline-regist container (Drupal field markup) ──────────────
+# Older event.unitar.org fichas carry the deadline in a dedicated container
+# (field-event-deadline-regist) whose label/value live in separate divs, so
+# the flat "Deadline <date>" sweep misses it and past values (e.g. 2020)
+# fall outside the default extraction year window.
+
+UNITAR_DEADLINE_REGIST_HTML = """<html><body><main>
+<h1>Trade Policy Course</h1>
+<div class="field field-name-field-event-deadline-regist field-type-datetime field-label-inline clearfix">
+<div class="field-label">Deadline:&nbsp;</div>
+<div class="field-items"><div class="field-item even">27 Apr 2020</div></div>
+</div>
+</main></body></html>"""
+
+UNITAR_DEADLINE_REGIST_TIME_HTML = """<html><body><main>
+<h1>Trade Policy Course</h1>
+<div class="field field-name-field-event-deadline-regist field-type-datetime field-label-inline clearfix">
+<div class="field-label">Deadline:&nbsp;</div>
+<div class="field-items"><div class="field-item even">27 Apr 2020 18:00</div></div>
+</div>
+</main></body></html>"""
+
+UNITAR_DEADLINE_REGIST_GARBAGE_HTML = """<html><body><main>
+<h1>Trade Policy Course</h1>
+<div class="field field-name-field-event-deadline-regist field-type-datetime field-label-inline clearfix">
+<div class="field-label">Deadline:&nbsp;</div>
+<div class="field-items"><div class="field-item even">To be announced</div></div>
+</div>
+</main></body></html>"""
+
 
 def _candidate(url: str, **overrides) -> OpportunityCandidate:
     base = {
@@ -170,6 +200,49 @@ class TestUnitarDetailFields:
             assert fields["open_date"] is None
             assert fields["close_date"] is None
             assert fields["funding_amount_value"] is None
+
+
+class TestUnitarDeadlineRegistContainer:
+    def test_regist_container_maps_to_close(self):
+        """RED: the field-event-deadline-regist value parses into close_date."""
+        from app.connectors.common import extract_unitar_detail_fields
+
+        fields = extract_unitar_detail_fields(UNITAR_DEADLINE_REGIST_HTML)
+
+        assert fields["close_date"] is not None
+        assert (fields["close_date"].year, fields["close_date"].month, fields["close_date"].day) == (
+            2020, 4, 27,
+        )
+
+    def test_regist_container_with_time_maps_to_close(self):
+        """RED: a trailing hour on the container value still parses the date."""
+        from app.connectors.common import extract_unitar_detail_fields
+
+        fields = extract_unitar_detail_fields(UNITAR_DEADLINE_REGIST_TIME_HTML)
+
+        assert fields["close_date"] is not None
+        assert (fields["close_date"].year, fields["close_date"].month, fields["close_date"].day) == (
+            2020, 4, 27,
+        )
+
+    def test_regist_container_garbage_yields_none(self):
+        """Non-date container values stay None (gap-fill, never fabricated)."""
+        from app.connectors.common import extract_unitar_detail_fields
+
+        fields = extract_unitar_detail_fields(UNITAR_DEADLINE_REGIST_GARBAGE_HTML)
+
+        assert fields["close_date"] is None
+        assert fields["open_date"] is None
+
+    def test_regist_container_does_not_overwrite_explicit_deadline(self):
+        """Gap-fill pin: an explicit flat Deadline keeps close_date."""
+        from app.connectors.common import extract_unitar_detail_fields
+
+        fields = extract_unitar_detail_fields(UNITAR_DETAIL_HTML)
+
+        assert (fields["close_date"].year, fields["close_date"].month, fields["close_date"].day) == (
+            2026, 10, 7,
+        )
 
 
 # ── Dispatch (host-gated in extract_page_fields) ──────────────────────────────
