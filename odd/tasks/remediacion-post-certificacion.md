@@ -22,8 +22,8 @@ Cierre del ciclo auditoría→remediación; el mapa sin fixes no sirve.
 - 404 del probe nunca es veredicto final sin forense.
 
 ## Tasks
-- [ ] **R-A (P1 writer)** Política redirects mismo-dueño + re-probe 15. Ruta: delegada (lote1 worktree).
-- [ ] **R-B (P1)** Forense 16×404 + fixes seed o cuarentena. Ruta: delegada (main).
+- [x] **R-A (P1 writer)** ✅ Política mismo-dueño + re-probe 15 (8 plenos + 4 parciales) + ajustes (pares gob.pe/NZ, evidencia over_budget, decisión Drive). Pusheado. Pendiente manual: uniandes TLS+WAF.
+- [ ] **R-B (P1)** Forense 16×404 + fixes seed o cuarentena. Ruta: delegada (main). ✅ 8 re-mapeadas deployadas y verificadas (cherry `bdfa07c`, todas rinden, 0 failed); 6 pendientes de descubrimiento; unal intacta.
 - [ ] **R-C (P1)** Documentar 7 WAF en fuentes-todas-on/cuarentenas.
 - [ ] **R-D (P1)** Re-probe 8 transient + 2 SSL, documentar.
 

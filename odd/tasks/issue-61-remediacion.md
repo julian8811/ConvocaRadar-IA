@@ -30,7 +30,8 @@ Encargo #61 del dueño; backlog preparado sin ejecutar. Parte ya corre bajo docs
 - [x] **M1** ✅ Workers cerrados: re-mapeo 8 + re-probe 15 + discovery (2 canónicas aplicadas, 4 PENDIENTE honestos).
 - [x] **Frente B** ✅ 7 WAF documentadas (cuarentena/contacto/pausa, sin bypass; ANID+Fondecyt candidatas a fusión).
 - [x] **Frente C** ✅ Re-probe único (8 GETs): gates-cambridge RECUPERADA; 4 UE POST-only (1 fix las resuelve); 2 TLS persisten; idartes inconclusa (egress IPv6 local).
-- [ ] **M2** Matriz de remediación CSV/JSON/XLSX + resumen (en curso).
+- [x] **M2** ✅ 2026-10-13 Matriz `matriz-remediacion.{csv,json,xlsx}` (203 filas, conteos reconcilian) commiteada y pusheada.
+- [ ] **M3** Fix conector POST UE (4 fuentes) + matriz lista.
 - [ ] **M3** Fix conector POST UE (4 fuentes) + matriz lista.
 - [ ] **M2** Matriz de remediación CSV/JSON/XLSX + resumen con decisiones aprobadas/pendientes.
 - [ ] **M3** Frentes B y C (documentar WAF, re-probe transient) + etapa calidad live_ok (gate separado).
