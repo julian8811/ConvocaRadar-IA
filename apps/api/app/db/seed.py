@@ -1098,7 +1098,7 @@ def seed_default_sources(
         {
             "key": "procolombia-inversion",
             "name": "ProColombia — Oportunidades de Inversión",
-            "base_url": "https://investincolombia.com.co/es/convocatorias",
+            "base_url": "https://investincolombia.com.co/es/buscador-oportunidades-inversion",
             "country": "Colombia",
             "region": "LatAm",
             "source_type": "html",
@@ -1201,7 +1201,7 @@ def seed_default_sources(
         {
             "key": "anp-brasil",
             "name": "ANP Brasil — Investigación en Energía",
-            "base_url": "https://www.gov.br/anp/pt-br/assuntos/pesquisa-desenvolvimento-e-inovacao",
+            "base_url": "https://www.gov.br/anp/pt-br/assuntos/tecnologia-meio-ambiente/pesquisa-desenvolvimento-inovacao",
             "country": "Brazil",
             "region": "LatAm",
             "source_type": "html",
