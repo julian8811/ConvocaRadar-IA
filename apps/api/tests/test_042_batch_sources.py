@@ -1,14 +1,23 @@
 """042 X4 batch sources (issue #62): EU LIFE (CINEA) + Fundacion Biodiversidad.
 
 Offline total: parse contra HTML versionado en
-`docs/expansion-catalogo-041/piloto-041/fixture-*.html` (reconstruidos desde lo
-documentado, SIN fetch real — ver `piloto-041/README.md`). Cero red, cero
-escrituras DB (pines por AST sobre `seed.py`, solo lectura).
+`docs/expansion-catalogo-041/piloto-041/fixture-*.html` (etapa 0: fechas
+sinteticas eliminadas; cierres no documentados declarados `unknown`, SIN
+fetch real — ver `piloto-041/README.md`). Cero red, cero escrituras DB
+(pines por AST sobre `seed.py`, solo lectura).
+
+Reglas del gate (etapa 0):
+- Sin fechas inventadas: ningun fixture/doc/test presenta un cierre no
+  documentado como real; lo desconocido es `close_date None` + marca
+  explicita `unknown` (nunca `open` por defecto).
+- Dedup por oportunidad: (titulo normalizado, organismo, fecha), no solo
+  dominio/URL; intra-pagina y contra snapshot offline del catalogo.
 """
 
 from __future__ import annotations
 
 import ast
+import json
 import re
 from datetime import UTC, datetime
 from pathlib import Path
@@ -43,30 +52,33 @@ def _seed_definitions_by_key() -> dict[str, dict]:
     raise AssertionError("source_definitions not found")
 
 
-def test_042_life_parse_real_html_yields_only_open_call() -> None:
-    """Fixture LIFE: 1 abierta (Nature, 2027-01-20); SAP Circular vencida,
-    vacante y noticia filtradas."""
+def test_042_life_parse_marks_unknown_close_not_open() -> None:
+    """Fixture LIFE etapa 0: la card Circular vencida (2026-09-22 real
+    documentada) se filtra; la card Nature declara cierre `unknown` (el
+    piloto la marco unknown y la etapa 0 elimino la fecha sintetica):
+    se emite con close_date None + marca unknown, NUNCA como abierta."""
     connector = EuLifeCineaConnector()
     candidates = connector.parse_html(LIFE_HTML, EuLifeCineaConnector.BASE_URL)
     assert len(candidates) == 1, [c.title for c in candidates]
     cand = candidates[0]
     assert "nature and biodiversity" in cand.title.lower()
     assert cand.official_url.endswith("/sap-nature-biodiversity")
-    assert cand.close_date is not None and cand.close_date.date() >= datetime.now(UTC).date()
-    assert cand.close_date.date().isoformat() == "2027-01-20"
+    assert cand.close_date is None
+    assert "close-date-unknown" in (cand.topics or [])
+    assert "unknown" in cand.summary.lower()
 
 
-def test_042_fb_parse_real_html_yields_only_open_call() -> None:
-    """Fixture FB: 1 abierta (Educacion Ambiental, 2026-12-15); ciudades
-    vencida, empleo y noticia filtradas."""
+def test_042_fb_parse_marks_unknown_close_not_open() -> None:
+    """Fixture FB etapa 0: ambas cards relevantes declaran cierre `unknown`
+    (matriz: `2026 (ver BOE/bases)`; fechas sinteticas eliminadas). Empleo
+    y noticia siguen filtradas."""
     connector = FundacionBiodiversidadConnector()
     candidates = connector.parse_html(FB_HTML, FundacionBiodiversidadConnector.BASE_URL)
-    assert len(candidates) == 1, [c.title for c in candidates]
-    cand = candidates[0]
-    assert "educacion ambiental" in cand.title.lower()
-    assert "desinformacion-climatica" in cand.official_url
-    assert cand.close_date is not None and cand.close_date.date() >= datetime.now(UTC).date()
-    assert cand.close_date.date().isoformat() == "2026-12-15"
+    assert len(candidates) == 2, [c.title for c in candidates]
+    for cand in candidates:
+        assert cand.close_date is None
+        assert "close-date-unknown" in (cand.topics or [])
+        assert "unknown" in cand.summary.lower()
 
 
 @pytest.mark.parametrize("connector_cls", [EuLifeCineaConnector, FundacionBiodiversidadConnector])
@@ -79,6 +91,82 @@ def test_042_expired_close_date_discarded(connector_cls) -> None:
         "</h2><p>Deadline: 15 March 2024. Closed call.</p></article></main></body></html>"
     )
     assert connector.parse_html(html, connector.BASE_URL) == []
+
+
+@pytest.mark.parametrize("connector_cls", [EuLifeCineaConnector, FundacionBiodiversidadConnector])
+def test_042_unknown_close_never_published_as_open(connector_cls) -> None:
+    """Sin evidencia de vigencia: el parse emite UN candidato marcado
+    unknown/sin-fecha (no se inventa `open`), y `validate` lo rechaza para
+    que el runner jamas lo publique como abierto. La razon NO debe contener
+    'closed'/'cerrad' (el runner hace soft-pass de esos a publicado)."""
+    connector = connector_cls()
+    html = (
+        "<html><body><main><article><h2>"
+        f"<a href='{connector.BASE_URL}/convocatoria-ejemplo-sin-fecha'>Convocatoria ejemplo call for proposals</a>"
+        "</h2><p>Texto sin fecha de cierre. Ver bases en la pagina oficial.</p></article></main></body></html>"
+    )
+    candidates = connector.parse_html(html, connector.BASE_URL)
+    assert len(candidates) == 1
+    cand = candidates[0]
+    assert cand.close_date is None
+    assert "close-date-unknown" in (cand.topics or [])
+    assert "unknown" in cand.summary.lower()
+    assert "abierta" not in cand.summary.lower() and "open" not in cand.summary.lower().replace("unknown", "")
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize("connector_cls", [EuLifeCineaConnector, FundacionBiodiversidadConnector])
+async def test_042_validate_rejects_unknown_close(connector_cls) -> None:
+    from app.connectors.base import OpportunityCandidate
+
+    connector = connector_cls()
+    cand = OpportunityCandidate(
+        title="Convocatoria ejemplo call for proposals",
+        entity="X",
+        country="Y",
+        official_url=f"{connector.BASE_URL}/convocatoria-ejemplo-sin-fecha",
+        close_date=None,
+    )
+    result = await connector.validate(cand)
+    assert result.ok is False
+    assert "unknown" in result.reason.lower()
+    # Pin anti-soft-pass: el runner publica los rechazos cuya razon menciona
+    # cierre ("closed"/"cerrad"); un cierre desconocido no debe colarse ahi.
+    assert "closed" not in result.reason.lower()
+    assert "cerrad" not in result.reason.lower()
+
+
+@pytest.mark.parametrize("connector_cls", [EuLifeCineaConnector, FundacionBiodiversidadConnector])
+def test_042_opp_key_unit(connector_cls) -> None:
+    """La llave de oportunidad distingue (titulo, organismo, fecha):
+    normaliza mayusculas/espacios y agrupa lo sin-fecha en 'unknown'."""
+    assert connector_cls.opp_key("  LIFE 2026 — Nature! ", "CINEA / EC", None) == connector_cls.opp_key(
+        "life 2026 nature", "cinea / ec", None
+    )
+    dated = connector_cls.opp_key("T", "E", datetime(2027, 1, 20))
+    assert dated != connector_cls.opp_key("T", "E", None)
+    assert dated != connector_cls.opp_key("T", "E", datetime(2027, 1, 21))
+    assert dated != connector_cls.opp_key("T", "Otra Entidad", datetime(2027, 1, 20))
+    assert connector_cls.opp_key("T", "E", None)[2] == "unknown"
+
+
+@pytest.mark.parametrize("connector_cls", [EuLifeCineaConnector, FundacionBiodiversidadConnector])
+def test_042_opp_dedup_intra_page_per_opportunity(connector_cls) -> None:
+    """Dedup por oportunidad, no solo por URL: misma card republicada bajo
+    dos paths distintos (sin fecha) colapsa a 1 candidato."""
+    connector = connector_cls()
+    html = (
+        "<html><body><main>"
+        "<article><h2>"
+        f"<a href='{connector.BASE_URL}/convocatoria-ejemplo'>Convocatoria ejemplo call for proposals</a>"
+        "</h2><p>Ver bases en la pagina oficial.</p></article>"
+        "<article><h2>"
+        f"<a href='{connector.BASE_URL}/convocatoria-ejemplo-duplicada'>Convocatoria ejemplo call for proposals</a>"
+        "</h2><p>Ver bases en la pagina oficial.</p></article>"
+        "</main></body></html>"
+    )
+    candidates = connector.parse_html(html, connector.BASE_URL)
+    assert len(candidates) == 1, [(c.title, c.official_url) for c in candidates]
 
 
 @pytest.mark.asyncio
@@ -136,6 +224,15 @@ async def test_042_validate_open_candidate_ok() -> None:
     assert (await connector.validate(missing)).ok is False
 
 
+def _opp_keys(connector, html: str) -> set[tuple[str, str, str]]:
+    """Llaves de oportunidad (titulo, organismo, fecha) vía el helper del
+    propio conector — la misma funcion que usa el parse para dedup."""
+    return {
+        connector.opp_key(c.title, c.entity, c.close_date)
+        for c in connector.parse_html(html, connector.BASE_URL)
+    }
+
+
 def test_042_semantic_dedup_against_catalog_203() -> None:
     """Dedup semántica contra el catálogo: dominios/URLs/títulos disjuntos;
     pin LIFE vs agregador eu-funding-portal (X1/X3)."""
@@ -153,11 +250,32 @@ def test_042_semantic_dedup_against_catalog_203() -> None:
     # Hosts disjuntos entre las dos prioritarias.
     assert urlparse(life["base_url"]).netloc != urlparse(fb["base_url"]).netloc
 
-    # Títulos de los fixtures: sin solapamiento entre fuentes.
-    life_titles = {c.title.lower() for c in EuLifeCineaConnector().parse_html(LIFE_HTML, EuLifeCineaConnector.BASE_URL)}
-    fb_titles = {c.title.lower() for c in FundacionBiodiversidadConnector().parse_html(FB_HTML, FundacionBiodiversidadConnector.BASE_URL)}
-    assert life_titles and fb_titles
+    # Títulos de los fixtures: sin solapamiento entre fuentes — ahora a
+    # nivel oportunidad (titulo + organismo + fecha), no solo texto.
+    life_keys = _opp_keys(EuLifeCineaConnector(), LIFE_HTML)
+    fb_keys = _opp_keys(FundacionBiodiversidadConnector(), FB_HTML)
+    assert life_keys and fb_keys
+    assert life_keys.isdisjoint(fb_keys)
+    life_titles = {key[0] for key in life_keys}
+    fb_titles = {key[0] for key in fb_keys}
     assert life_titles.isdisjoint(fb_titles)
+
+    # Snapshot offline del catalogo (matriz X1, solo lectura): ningun
+    # ejemplo documentado de otra fuente colisiona con las oportunidades
+    # parseadas. Limite documentado: la matriz trae titulos, no llaves
+    # completas, asi que se compara la parte titulo de la llave.
+    matriz = json.loads((REPO_ROOT / "docs" / "expansion-catalogo-041" / "matriz-041-candidatos.json").read_text(encoding="utf-8"))
+    catalog_titles = {
+        EuLifeCineaConnector.title_key(fila["ejemplo_titulo"])
+        for fila in matriz["filas"]
+        if fila.get("ejemplo_titulo") not in (None, "", "n/a")
+    }
+    assert catalog_titles, "el snapshot offline no debe estar vacio"
+    parsed_titles = life_titles | fb_titles
+    assert not (parsed_titles & catalog_titles), (
+        "colision de oportunidad contra el snapshot del catalogo: "
+        f"{parsed_titles & catalog_titles}"
+    )
 
     # Helpers de dedup: misma URL con/sin barra y mayúsculas normaliza igual.
     assert EuLifeCineaConnector.normalize_url("https://CINEA.ec.europa.eu/a/b/") == EuLifeCineaConnector.normalize_url(
