@@ -40,7 +40,7 @@ D gana: reglas gratis para lo obvio (ej. "turismo", "posdoctorado"), embeddings 
 - [x] **T5 (P1 writer)** ✅ 2026-10-11 Informe agrupado por sector (HTML secciones por taxonomía + XLSX con columna Sector + PDF por mismo pipeline). Compatibilidad byte-idéntica sin sectores. 7 passed + vecinas 19/210; spot-check padre 31 passed.
 - [x] **T6 (P1)** ✅ 2026-10-11 Línea Colmayor (tokens extraídos de píxeles del escudo — el docx no trae tokens; assets 800px/64px <150KB; reemplazo directo en `export.py` con fallback). 16 passed + vecinas 217; spot-check padre 16 passed.
 - [x] **T7 (P1)** ✅ 2026-10-12 Deploy final (cherry `5983f7d`, healthy). Backfill total 3078/3078. Cobertura: 3106/3157 (98.4%). Informe muestra con 9 grupos + marca OK.
-- **Cierre feature**: sectorización híbrida (rules 93.3% + llm 5.1%) con accuracy 0.900 pineada; informe agrupado + línea Colmayor en producción. Pendiente menor: 51 filas nuevas sin sector (ingesta posterior) + `otros` en ~42%.
+- **Cierre feature**: sectorización híbrida (rules 93.3% + llm 5.1%) con accuracy 0.900 pineada; informe agrupado + línea Colmayor en producción. Cobertura final 3231/3232 (99.97%); `otros` ~40% ACEPTADO como perfil del catálogo (decisión usuario 2026-10-13).
 - [x] **T8 (P1 writer)** ✅ 2026-10-11 Juez async-safe (`agroq_sector_judge` + `aclassify_sector`, `to_thread` para embeddings) + `embed_fn`/`llm_client` en backfill. TDD RED con forma exacta del bug → GREEN 81 passed (29 sin RuntimeWarnings); spot-check padre 29 passed.
 - [ ] **T7 (P1)** Deploy + verify en servidor (patrón E19–E24) + medición de cobertura de sectorización.
 

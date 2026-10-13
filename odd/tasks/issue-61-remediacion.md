@@ -30,11 +30,9 @@ Encargo #61 del dueño; backlog preparado sin ejecutar. Parte ya corre bajo docs
 - [x] **M1** ✅ Workers cerrados: re-mapeo 8 + re-probe 15 + discovery (2 canónicas aplicadas, 4 PENDIENTE honestos).
 - [x] **Frente B** ✅ 7 WAF documentadas (cuarentena/contacto/pausa, sin bypass; ANID+Fondecyt candidatas a fusión).
 - [x] **Frente C** ✅ Re-probe único (8 GETs): gates-cambridge RECUPERADA; 4 UE POST-only (1 fix las resuelve); 2 TLS persisten; idartes inconclusa (egress IPv6 local).
+- [x] **Deploy 2 canónicas** ✅ 2026-10-13 (cherry `b99f21b`): anp +1 sin 404; procolombia 200 sin 404 pero 0 ítems → DICTAMEN pausa con motivo JS-app.
 - [x] **M2** ✅ 2026-10-13 Matriz `matriz-remediacion.{csv,json,xlsx}` (203 filas, conteos reconcilian) commiteada y pusheada.
-- [ ] **M3** Fix conector POST UE (4 fuentes) + matriz lista.
-- [ ] **M3** Fix conector POST UE (4 fuentes) + matriz lista.
-- [ ] **M2** Matriz de remediación CSV/JSON/XLSX + resumen con decisiones aprobadas/pendientes.
-- [ ] **M3** Frentes B y C (documentar WAF, re-probe transient) + etapa calidad live_ok (gate separado).
+- [x] **M3** ✅ 2026-10-13 Conector POST UE verificado (ya existía `ft_search_v2`, cableado correcto) + alias + 14 tests. Sin cambio runtime → sin deploy. Pusheado.
 
 ## Acceptance
 - Criterios #61: inventario 46 con P0-P3, investigación sin red masiva, propuestas por fuente, gate respetado, matriz exportada, diferencia reachable vs verificada documentada.
