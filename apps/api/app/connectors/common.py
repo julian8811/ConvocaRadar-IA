@@ -320,7 +320,14 @@ def safe_urljoin(base_url: str, href: str | None) -> str:
     return urljoin(base_url, href or "")
 
 
-def _year_guard(dt: datetime | None) -> datetime | None:
+def _year_guard(dt: datetime | None, allow_past: bool = False) -> datetime | None:
+    """Drop dates outside the configured extraction window.
+
+    With ``allow_past=True`` genuinely extracted past dates pass through
+    (merge/backfill path, so a real 2020 close recalculates to closed)
+    while far-future noise is still rejected. Live scraping keeps the
+    default: both sides guarded.
+    """
     if dt is None:
         return None
     try:
@@ -329,18 +336,24 @@ def _year_guard(dt: datetime | None) -> datetime | None:
         y_max = int(s.extraction_year_max)
     except Exception:
         y_min, y_max = 2024, 2028
-    if dt.year < y_min or dt.year > y_max:
+    if dt.year > y_max:
+        return None
+    if dt.year < y_min and not allow_past:
         return None
     return dt
 
 
-def extract_dates(text: str) -> tuple[datetime | None, datetime | None]:
+def extract_dates(
+    text: str, allow_past: bool = False
+) -> tuple[datetime | None, datetime | None]:
     """Extract (open_date, close_date) from text using tier fallback + dateparser.
 
     Finds all date candidates via keyword-prefixed tiers and generic sweep,
     parses each with ``parse_date_text`` (dateparser DMY), filters by year
     window 2024-2028, then assigns earliest→open, latest→close. Single
-    candidate → (None, that). No candidates → (None, None).
+    candidate → (None, that). No candidates → (None, None). With
+    ``allow_past=True`` the past side of the window opens (merge/backfill);
+    the future side stays guarded.
     """
     if not text:
         return None, None
@@ -378,8 +391,8 @@ def extract_dates(text: str) -> tuple[datetime | None, datetime | None]:
             if raw.lower() in seen:
                 continue
             seen.add(raw.lower())
-            parsed = parse_date_text(raw)
-            parsed = _year_guard(parsed)
+            parsed = parse_date_text(raw, allow_past=allow_past)
+            parsed = _year_guard(parsed, allow_past=allow_past)
             if parsed and parsed not in candidates:
                 candidates.append(parsed)
 
@@ -392,7 +405,7 @@ def extract_dates(text: str) -> tuple[datetime | None, datetime | None]:
     if hasta_match:
         for idx in (1, 2):
             raw = hasta_match.group(idx).strip()
-            p = _year_guard(parse_date_text(raw))
+            p = _year_guard(parse_date_text(raw, allow_past=allow_past), allow_past=allow_past)
             if p and p not in candidates:
                 candidates.append(p)
 
@@ -404,8 +417,12 @@ def extract_dates(text: str) -> tuple[datetime | None, datetime | None]:
     return candidates[0], candidates[-1]
 
 
-def extract_close_date(text: str) -> datetime | None:
-    """Wrapper over extract_dates — returns close_date (latest)."""
+def extract_close_date(text: str, allow_past: bool = False) -> datetime | None:
+    """Wrapper over extract_dates — returns close_date (latest).
+
+    ``allow_past`` opens only the past side of the year window (merge /
+    backfill path); live scraping keeps the default guard on both sides.
+    """
     if not text:
         return None
     # Fast tier-1 path preserved for backward compat precision, then fallback to tuple
@@ -416,7 +433,7 @@ def extract_close_date(text: str) -> datetime | None:
         flags=re.IGNORECASE,
     )
     if labeled:
-        parsed = _year_guard(parse_date_text(labeled.group(1)))
+        parsed = _year_guard(parse_date_text(labeled.group(1), allow_past=allow_past), allow_past=allow_past)
         if parsed:
             return parsed
     tier1 = [
@@ -436,20 +453,21 @@ def extract_close_date(text: str) -> datetime | None:
     for pattern in tier1:
         match = re.search(pattern, _text, flags=re.IGNORECASE)
         if match:
-            parsed = _year_guard(parse_date_text(match.group(1)))
+            parsed = _year_guard(parse_date_text(match.group(1), allow_past=allow_past), allow_past=allow_past)
             if parsed:
                 return parsed
     # fallback to tuple
-    _, close = extract_dates(text)
+    _, close = extract_dates(text, allow_past=allow_past)
     return close
 
 
-def extract_open_date(text: str) -> datetime | None:
+def extract_open_date(text: str, allow_past: bool = False) -> datetime | None:
     """Extract the opening/publication date of a call.
 
     Mirrors :func:`extract_close_date`: tier-1 labelled Spanish/English/
     Portuguese opening patterns first (higher precision), then falls back to
-    the earliest candidate found by :func:`extract_dates`.
+    the earliest candidate found by :func:`extract_dates`. ``allow_past``
+    opens only the past side of the year window (merge/backfill path).
     """
     if not text:
         return None
@@ -457,10 +475,10 @@ def extract_open_date(text: str) -> datetime | None:
     for pattern in _OPEN_DATE_PATTERNS:
         match = pattern.search(_text)
         if match:
-            parsed = _year_guard(parse_date_text(match.group(1)))
+            parsed = _year_guard(parse_date_text(match.group(1), allow_past=allow_past), allow_past=allow_past)
             if parsed:
                 return parsed
-    open_date, _ = extract_dates(text)
+    open_date, _ = extract_dates(text, allow_past=allow_past)
     return open_date
 
 
@@ -515,33 +533,36 @@ _DATE_TIME_SUFFIX = re.compile(
 _PAREN_SUFFIX = re.compile(r"\s*\([^)]*\)\s*$")
 
 
-def parse_date_text(text: str | None) -> datetime | None:
+def parse_date_text(text: str | None, allow_past: bool = False) -> datetime | None:
     """Parse a date, tolerating a trailing time/parenthetical suffix.
 
     The full value is tried first (unchanged behavior); when it yields no
     date, one retry runs on the value with a trailing ``2:00pm
     (Copenhagen time)``-style suffix removed, so detail lines that append
-    the hour to the date still fill open/close.
+    the hour to the date still fill open/close. ``allow_past`` opens only
+    the past side of the year window (merge/backfill path).
     """
     value = clean_text(text)
     if not value:
         return None
-    parsed = _parse_date_text_value(value)
+    parsed = _parse_date_text_value(value, allow_past=allow_past)
     if parsed is not None:
         return parsed
     stripped = _PAREN_SUFFIX.sub("", _DATE_TIME_SUFFIX.sub("", value)).strip()
     if stripped and stripped != value:
-        return _parse_date_text_value(stripped)
+        return _parse_date_text_value(stripped, allow_past=allow_past)
     return None
 
 
-def _parse_date_text_value(value: str) -> datetime | None:
+def _parse_date_text_value(value: str, allow_past: bool = False) -> datetime | None:
     # Unambiguous ISO (YYYY-MM-DD) first: dateparser with DATE_ORDER=DMY
     # otherwise reads "2026-04-01" as 4 January.
     iso_match = _ISO_DATE.search(value)
     if iso_match and iso_match.start() <= 1:
         try:
-            parsed = _year_guard(datetime.strptime(iso_match.group(1), "%Y-%m-%d"))
+            parsed = _year_guard(
+                datetime.strptime(iso_match.group(1), "%Y-%m-%d"), allow_past=allow_past
+            )
             if parsed:
                 return parsed
         except ValueError:
@@ -560,13 +581,11 @@ def _parse_date_text_value(value: str) -> datetime | None:
         if dp is not None:
             # normalize to naive datetime, guard year
             dp_naive = dp.replace(tzinfo=None) if dp.tzinfo else dp
-            guarded = _year_guard(dp_naive)
+            guarded = _year_guard(dp_naive, allow_past=allow_past)
             if guarded:
                 return guarded
             # year outside window → fall through to allow None, don't return unguarded
-            if dp.year < 2024 or dp.year > 2028:
-                return None
-            return dp_naive
+            return None
     except Exception:
         pass
     # Fallback regex (kept for deterministic offline path)
@@ -574,7 +593,9 @@ def _parse_date_text_value(value: str) -> datetime | None:
     iso_match = _ISO_DATE.search(value)
     if iso_match:
         try:
-            return _year_guard(datetime.strptime(iso_match.group(1), "%Y-%m-%d"))
+            return _year_guard(
+                datetime.strptime(iso_match.group(1), "%Y-%m-%d"), allow_past=allow_past
+            )
         except ValueError:
             pass
     # 2. Slash format: 30/06/2027 or 06/30/2027.
@@ -584,7 +605,9 @@ def _parse_date_text_value(value: str) -> datetime | None:
     if slash_match:
         for fmt in ("%d/%m/%Y", "%m/%d/%Y"):
             try:
-                return _year_guard(datetime.strptime(slash_match.group(1), fmt))
+                return _year_guard(
+                    datetime.strptime(slash_match.group(1), fmt), allow_past=allow_past
+                )
             except ValueError:
                 continue
     # 2b. Dash format read as DMY: 15-03-2026 (MDY only as a salvage pass)
@@ -592,7 +615,9 @@ def _parse_date_text_value(value: str) -> datetime | None:
     if dash_match:
         for fmt in ("%d-%m-%Y", "%m-%d-%Y"):
             try:
-                return _year_guard(datetime.strptime(dash_match.group(1), fmt))
+                return _year_guard(
+                    datetime.strptime(dash_match.group(1), fmt), allow_past=allow_past
+                )
             except ValueError:
                 continue
     # 3. English: "June 30, 2027" or "Jun 30, 2027"
@@ -601,7 +626,9 @@ def _parse_date_text_value(value: str) -> datetime | None:
         candidate = f"{eng_match.group(1).title()} {eng_match.group(2)}, {eng_match.group(3)}"
         for fmt in ("%B %d, %Y", "%b %d, %Y"):
             try:
-                return _year_guard(datetime.strptime(candidate, fmt))
+                return _year_guard(
+                    datetime.strptime(candidate, fmt), allow_past=allow_past
+                )
             except ValueError:
                 continue
     # 4. Spanish comma: "junio 30, 2027"
@@ -609,13 +636,13 @@ def _parse_date_text_value(value: str) -> datetime | None:
     if es_comma:
         result = _parse_spanish_month(value, 1, 2, 3, es_comma)
         if result:
-            return _year_guard(result)
+            return _year_guard(result, allow_past=allow_past)
     # 5. Spanish day-month-year with optional "de": "30 de junio de 2027", "30 abril 2026"
     es_flex = _SPANISH_DATE_FLEX.search(value)
     if es_flex:
         result = _parse_spanish_month(value, 2, 1, 3, es_flex)
         if result:
-            return _year_guard(result)
+            return _year_guard(result, allow_past=allow_past)
     return None
 
 
