@@ -34,7 +34,7 @@ BATCH_URLS = {
     ),
     "idt-noticias": "https://www.idt.gov.co/noticias",
     "finagro-lec-2026": (
-        "https://www.finagro.com.co/lineas-especiales-credito-lec-finagro-2026"
+        "https://www.finagro.com.co/"
     ),
     "finagro-beneficiarios": "https://www.finagro.com.co/beneficiarios",
     "bogota-cultura-recreacion": (

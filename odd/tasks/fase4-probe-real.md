@@ -23,6 +23,7 @@ Encargo ordenado del usuario (5 pasos) + issue #58. Rama de trabajo separada des
 - [x] **F2 (P1 writer)** ✅ 2026-10-12 Probe real opt-in (`--allow-network` + `--source-key` + dry-run, SSRF, budgets, adapter/`blocked_by_policy`, TTLs).
 - [x] **F3 (P1 writer)** ✅ 2026-10-12 27 tests seguridad offline. Spot-check padre: 54 passed + diff limpio. Rama pusheada `fase4-probe-real-20261012`.
 - [x] **F4 (operador)** ✅ 2026-10-12 Piloto ASCUN ejecutado (2/10 requests, 200 OK, 20/20 URLs; pertinencia con caveat: mayormente noticias). Veredicto: CONTINUAR A 5 condicional (con muestra de títulos). Evidencia commiteada + pusheada.
+- **Cierre 2026-10-12**: escalado completo **203/203** (157 live_ok, 8 transient, 16 dead, 7 blocked, 15 blocked_by_policy). Rama pusheada. Remediation fuente por fuente = trabajo futuro fuera de este encargo.
 
 ## Acceptance
 - Criterios #58: history read-only, tests sin red, budgets efectivos, faltantes expresos, piloto NO ejecutado, `git diff --check` limpio, ramas/PRs separados.
