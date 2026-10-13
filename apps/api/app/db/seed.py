@@ -4021,7 +4021,7 @@ def seed_default_sources(
         {
             "key": "fontagro-convocatorias",
             "name": "FONTAGRO — Convocatorias I+D+i agroalimentaria",
-            "enabled": True,
+            "enabled": False,
             "base_url": "https://fontagro.org/es/iniciativas/convocatorias",
             "country": "International",
             "region": "LatAm",
@@ -4042,7 +4042,7 @@ def seed_default_sources(
         {
             "key": "fundacion-biodiversidad-convocatorias",
             "name": "Fundacion Biodiversidad — Buscador de convocatorias",
-            "enabled": True,
+            "enabled": False,
             "base_url": "https://fundacion-biodiversidad.es/buscador-de-convocatorias/",
             "country": "Spain",
             "region": "Europe",
@@ -4063,7 +4063,7 @@ def seed_default_sources(
         {
             "key": "eu-life-calls-cinea",
             "name": "EU LIFE (CINEA) — Calls for proposals",
-            "enabled": True,
+            "enabled": False,
             "base_url": "https://cinea.ec.europa.eu/life-calls-proposals-2026_en",
             "country": "European Union",
             "region": "Europe",
@@ -4084,7 +4084,7 @@ def seed_default_sources(
         {
             "key": "biodiversa-calls",
             "name": "Biodiversa+ — Joint calls for biodiversity research",
-            "enabled": True,
+            "enabled": False,
             "base_url": "https://www.biodiversa.eu/research-funding/upcoming-calls",
             "country": "European Union",
             "region": "Europe",
@@ -4105,7 +4105,7 @@ def seed_default_sources(
         {
             "key": "fondo-accion-convocatorias",
             "name": "Fondo Accion — Convocatorias ambientales Colombia",
-            "enabled": True,
+            "enabled": False,
             "base_url": "https://fondoaccion.org/convocatorias/",
             "country": "Colombia",
             "region": "LatAm",

@@ -57,12 +57,16 @@ def _seed_definitions_by_key() -> dict[str, dict]:
     raise AssertionError("source_definitions not found")
 
 
-def test_041_keys_enabled_and_configurable():
+def test_041_keys_disabled_and_configurable():
+    """X3 gate: las 5 seeds 041 deben permanecer deshabilitadas.
+
+    Pin por key: enabled debe ser False literal en seed.py.
+    """
     defs = _seed_definitions_by_key()
     for key in BATCH_KEYS:
         assert key in defs, f"missing {key}"
         definition = defs[key]
-        assert definition.get("enabled", True) is True, f"{key} not enabled"
+        assert definition.get("enabled") is False, f"{key} must be disabled (enabled is False)"
         if "connector_type" in definition:
             assert definition["connector_type"] == "configurable_html"
         assert definition["source_type"] == "html"
@@ -123,6 +127,49 @@ def test_041_allowed_domains_families():
             connector_config=defs[key]["connector_config"],
         )
         assert connector.__class__.__name__ == "ConfigurableHtmlConnector"
+
+
+def test_041_activation_gate_explicit():
+    """X3 gate: falla si alguna 041 pasa a enabled sin gate explícito.
+
+    Exige el conjunto (tier experimental + enabled False) para las 5 keys.
+    Activar requiere: (1) borrar/actualizar este test de forma explícita y
+    (2) autorización expresa del dueño (issue #62). Ningún cambio lateral
+    (p.ej. default True, omisión del campo, tier distinto) puede activar.
+    """
+    import uuid
+
+    from sqlalchemy import select
+
+    from app.db.seed import seed_default_sources
+    from app.db.session import SessionLocal, create_all
+    from app.models import Organization, Source
+
+    create_all()
+    db = SessionLocal()
+    try:
+        slug = f"pr041-gate-{uuid.uuid4().hex[:6]}"
+        org = Organization(slug=slug, name="Gate Check 041", type="university", country="Colombia")
+        db.add(org)
+        db.commit()
+        db.refresh(org)
+        seed_default_sources(db, org)
+        db.commit()
+        for key in BATCH_KEYS:
+            src = db.scalar(select(Source).where(Source.key == key))
+            assert src is not None, f"source {key} not in DB after seed"
+            assert src.enabled is False, (
+                f"GATE X3: {key} enabled={src.enabled} — activación requiere "
+                "autorización expresa (issue #62) y actualización explícita de este test"
+            )
+            assert src.tier == "experimental", (
+                f"GATE X3: {key} tier={src.tier} — las 041 deben ser experimental"
+            )
+        db.execute(Source.__table__.delete().where(Source.key.in_(list(BATCH_KEYS))))
+        db.delete(org)
+        db.commit()
+    finally:
+        db.close()
 
 
 def test_041_tier_experimental():
