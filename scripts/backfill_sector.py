@@ -19,6 +19,7 @@ Usage:
     python scripts/backfill_sector.py --dry-run [--limit 100]
     python scripts/backfill_sector.py --no-dry-run --limit 200 --sleep 1.0
     python scripts/backfill_sector.py --no-dry-run --force --limit 500
+    python scripts/backfill_sector.py --no-dry-run --null-only --limit 200
 
 Exit codes: 0 ok (per-row classifier failures degrade to failed/skipped),
 1 on DB failure.
@@ -51,14 +52,21 @@ def build_sector_text(opp: Opportunity) -> str:
     return "\n\n".join(part for part in parts if part.strip())
 
 
-def needs_sector(opp: Opportunity, *, force: bool = False) -> bool:
+def needs_sector(opp: Opportunity, *, force: bool = False, null_only: bool = False) -> bool:
     """Pure gap-fill predicate mirroring the backfill contract.
 
     Without ``--force`` a stored sector with confidence >=
     ``SECTOR_HIGH_CONFIDENCE_KEEP`` is kept; missing sectors and
     low-confidence ones are (re)classified. Single source of truth for
     both target selection and dry-run reporting.
+
+    With ``null_only`` only rows with a missing (NULL or blank) sector
+    qualify — low-confidence and confidence-less stored sectors are
+    ignored so NULL backlogs are reachable without draining the wider
+    low-confidence pool first.
     """
+    if null_only:
+        return not (opp.sector or "").strip()
     if force:
         return True
     if not (opp.sector or "").strip():
@@ -71,14 +79,26 @@ def needs_sector(opp: Opportunity, *, force: bool = False) -> bool:
         return True
 
 
-def fetch_targets(db, limit: int, *, force: bool = False) -> list[Opportunity]:
+def fetch_targets(
+    db, limit: int, *, force: bool = False, null_only: bool = False
+) -> list[Opportunity]:
     """Rows needing sectorization, oldest-first.
 
     ``updated_at`` ASC (not DESC) so repeated runs progress through the
     backlog instead of re-hitting the same recently-touched rows.
+    ``null_only`` narrows selection to rows with a missing (NULL or
+    blank) sector, ignoring the low-confidence pool (and winning over
+    ``force`` so the NULL backlog stays reachable).
     """
     stmt = select(Opportunity)
-    if not force:
+    if null_only:
+        stmt = stmt.where(
+            or_(
+                Opportunity.sector.is_(None),
+                Opportunity.sector == "",
+            )
+        )
+    elif not force:
         stmt = stmt.where(
             or_(
                 Opportunity.sector.is_(None),
@@ -125,6 +145,7 @@ async def run_backfill(
     sleep_seconds: float = DEFAULT_SLEEP_SECONDS,
     dry_run: bool = True,
     force: bool = False,
+    null_only: bool = False,
     batch_size: int = BACKFILL_BATCH_SIZE,
     classify_fn=None,
     sleep_fn=None,
@@ -146,7 +167,7 @@ async def run_backfill(
     maps text -> vector; ``llm_client`` is
     ``(system_prompt, user_text) -> dict | None`` (sync or async).
     Returns ``{"scanned", "filled", "skipped", "high_conf_skipped",
-    "failed", "dry_run", "force"}``.
+    "failed", "dry_run", "force", "null_only"}``.
     """
     sleep = sleep_fn or asyncio.sleep
     if classify_fn is not None:
@@ -159,7 +180,7 @@ async def run_backfill(
             return await aclassify_sector(text, embed_fn=_embed, llm_client=_llm)
 
         classify = _default_classify
-    targets = fetch_targets(db, limit, force=force)
+    targets = fetch_targets(db, limit, force=force, null_only=null_only)
     summary: dict = {
         "scanned": len(targets),
         "filled": 0,
@@ -168,6 +189,7 @@ async def run_backfill(
         "failed": 0,
         "dry_run": dry_run,
         "force": force,
+        "null_only": null_only,
     }
     print(f"Found {len(targets)} opportunities needing sectorization")
     if not targets:
@@ -179,7 +201,7 @@ async def run_backfill(
         sources: set[str] = set()
         batch_filled = 0
         for pos, opp in enumerate(batch):
-            if not needs_sector(opp, force=force):
+            if not needs_sector(opp, force=force, null_only=null_only):
                 summary["skipped"] += 1
                 summary["high_conf_skipped"] += 1
                 print(f"  keep high-confidence sector: {(opp.title or '')[:50]}")
@@ -267,6 +289,14 @@ def main(argv: list[str] | None = None) -> int:
         default=False,
         help="Reclassify even high-confidence (>= 0.8) stored sectors",
     )
+    parser.add_argument(
+        "--null-only",
+        dest="null_only",
+        action="store_true",
+        default=False,
+        help="Only classify rows with a missing (NULL or blank) sector, "
+        "ignoring the low-confidence pool",
+    )
     args = parser.parse_args(argv)
     if args.limit < 0:
         parser.error("--limit must be >= 0")
@@ -289,6 +319,7 @@ def main(argv: list[str] | None = None) -> int:
                     sleep_seconds=args.sleep_seconds,
                     dry_run=args.dry_run,
                     force=args.force,
+                    null_only=args.null_only,
                 )
             )
         except Exception as exc:
@@ -304,7 +335,7 @@ def main(argv: list[str] | None = None) -> int:
             f"skipped={summary['skipped']} "
             f"high_conf_skipped={summary['high_conf_skipped']} "
             f"failed={summary['failed']} "
-            f"dry_run={args.dry_run} force={args.force}"
+            f"dry_run={args.dry_run} force={args.force} null_only={args.null_only}"
         )
         return 0
     finally:
