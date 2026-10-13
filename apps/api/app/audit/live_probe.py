@@ -117,7 +117,12 @@ _MULTI_LABEL_SUFFIXES = (
 #   iNNpulsa Colombia (innpulsacolombia.com).
 # - SENA: senasofiaplus.edu.co <-> sena.edu.co (ambos oficiales SENA).
 # - ProInnóvate (proinnovate.gob.pe) sirve estáticos desde el CDN del
-#   Estado peruano (cdn.gob.pe).
+#   Estado peruano. Re-probe 2026-10-12: el target real observado es
+#   `cdn.www.gob.pe` (registrable `www.gob.pe`), no `cdn.gob.pe`
+#   (se conserva el par viejo como documentado).
+# - NZ (re-probe 2026-10-12): MFAT (mfat.govt.nz) deriva al portal de
+#   becas nzscholarships.govt.nz (mismo programa, otro host; `govt.nz`
+#   no hereda por sufijo por diseño, requiere par explícito).
 SAME_OWNER_REGISTRABLE_PAIRS: frozenset[frozenset[str]] = frozenset({
     frozenset({"conahcyt.mx", "secihti.mx"}),
     frozenset({"conacyt.mx", "secihti.mx"}),
@@ -125,7 +130,20 @@ SAME_OWNER_REGISTRABLE_PAIRS: frozenset[frozenset[str]] = frozenset({
     frozenset({"colombiaproductiva.com", "innpulsacolombia.com"}),
     frozenset({"senasofiaplus.edu.co", "sena.edu.co"}),
     frozenset({"proinnovate.gob.pe", "cdn.gob.pe"}),
+    frozenset({"proinnovate.gob.pe", "www.gob.pe"}),
+    frozenset({"mfat.govt.nz", "nzscholarships.govt.nz"}),
 })
+
+# Huespedes multi-inquilino: jamas heredan dueño por sufijo/subdominio.
+# DECISION (re-probe 2026-10-12, procolombia): el veto multi-inquilino
+# rige SOLO la inferencia mismo-dueño (`same_owner_reason` retorna None
+# para drive.google.com). NO rige la allowlist explícita: si el host
+# figura en `authorized_hosts` (allowlist del seed), el redirect es
+# "host autorizado" y se sigue. `drive.google.com` está en el seed de
+# procolombia-convocatorias (seed.py) => `live_ok` con muestra nula
+# (0 títulos, página Drive JS): cuestión de PERTINENCIA para revisión
+# humana, no de bloqueo de política. Sacar Drive de la allowlist es
+# decisión de curaduría del seed, no de este módulo (allowlist intacta).
 
 # Huespedes multi-inquilino: jamas heredan dueño por sufijo/subdominio.
 SHARED_TENANT_HOSTS: frozenset[str] = frozenset({
@@ -681,8 +699,31 @@ async def run_live_probe(
 
     if made >= budget and (pending or (last_status is not None
                                        and 300 <= last_status <= 399)):
+        # Disciplina de budget: el cap NO se sube (cadenas > cap como
+        # mintic/camara/mozilla quedan en `over_budget`). Lo que sí se
+        # mejora es la evidencia: `redirect_chain` reconstruida desde lo
+        # observado (pares consecutivos de `urls` con su motivo verificado
+        # cuando existe, más el siguiente salto pendiente no seguido).
+        chain: list[dict[str, str]] = []
+        for prev, nxt in zip(seen_urls, seen_urls[1:]):
+            reason = next((h["reason"] for h in redirect_chain
+                           if h["from"] == prev and h["to"] == nxt),
+                          "reconstruida desde evidence.urls (presupuesto agotado)")
+            chain.append({"from": prev, "to": nxt, "reason": reason})
+        if pending:
+            last = seen_urls[-1] if seen_urls else ""
+            for nxt in pending:
+                tgt = sanitize_url(nxt)
+                if (last and tgt != last
+                        and not any(h["from"] == last and h["to"] == tgt
+                                    for h in chain)):
+                    chain.append({"from": last, "to": tgt,
+                                  "reason": ("pendiente: salto no seguido "
+                                             "(presupuesto agotado)")})
+                    last = tgt
         out = _ev("over_budget", requests_made=made, pending_manual_review=True,
-                  extra={"reason": "presupuesto de requests agotado", "urls": seen_urls})
+                  extra={"reason": "presupuesto de requests agotado", "urls": seen_urls,
+                         "redirect_chain": chain})
         out.evidence["duration_ms"] = int((time.monotonic() - t0) * 1000)
         return out
 

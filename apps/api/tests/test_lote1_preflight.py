@@ -478,3 +478,89 @@ def test_redirect_relative_location_followed():
         authorized_hosts=["public.example"],
         resolve=lambda h: ["93.184.216.34"]))
     assert out.status == "live_ok" and out.requests_made == 2
+
+
+# ── Post re-probe 2026-10-12 (stubs, cero red) ───────────────────────
+# Pares reales observados: proinnovate -> cdn.www.gob.pe (registrable
+# www.gob.pe) y mfat.govt.nz -> www.nzscholarships.govt.nz.
+
+def test_same_owner_proinnovate_real_cdn_www_gob_pe():
+    assert live_probe.same_owner_reason(
+        "calendario.proinnovate.gob.pe", "cdn.www.gob.pe") is not None
+
+
+def test_same_owner_nz_mfat_scholarships():
+    assert live_probe.same_owner_reason(
+        "www.mfat.govt.nz", "www.nzscholarships.govt.nz") is not None
+
+
+def test_redirect_followed_proinnovate_real_cdn():
+    out = asyncio.run(run_live_probe(
+        "demo", allow_network=True,
+        start_urls=["https://calendario.proinnovate.gob.pe/"],
+        transport=_chain_transport(
+            {"https://calendario.proinnovate.gob.pe/":
+             "https://cdn.www.gob.pe/portal/"}),
+        authorized_hosts=["calendario.proinnovate.gob.pe"],
+        resolve=lambda h: ["93.184.216.34"]))
+    assert out.status == "live_ok" and out.requests_made == 2
+
+
+def test_redirect_followed_nz_scholarships():
+    out = asyncio.run(run_live_probe(
+        "demo", allow_network=True,
+        start_urls=["https://www.mfat.govt.nz/scholarships"],
+        transport=_chain_transport(
+            {"https://www.mfat.govt.nz/scholarships":
+             "https://www.nzscholarships.govt.nz/scholarships"}),
+        authorized_hosts=["www.mfat.govt.nz"],
+        resolve=lambda h: ["93.184.216.34"]))
+    assert out.status == "live_ok" and out.requests_made == 2
+
+
+def test_explicit_allowlist_beats_shared_tenant_veto_drive():
+    """Pin decision procolombia: veto multi-tenant solo rige inferencia.
+
+    `drive.google.com` en `authorized_hosts` (allowlist explicita del
+    seed) => "host autorizado", se sigue. 0 titulos (pagina Drive JS) es
+    PERTINENCIA para revision humana, no bloqueo de politica.
+    """
+    out = asyncio.run(run_live_probe(
+        "demo", allow_network=True,
+        start_urls=["https://www.procolombia.co/convocatorias-exportaciones"],
+        transport=_chain_transport(
+            {"https://www.procolombia.co/convocatorias-exportaciones":
+             "https://drive.google.com/drive/folders/xyz"},
+            final_body="<html><body><script>drive js</script></body></html>"),
+        authorized_hosts=["www.procolombia.co", "drive.google.com"],
+        resolve=lambda h: ["93.184.216.34"]))
+    assert out.status == "live_ok" and out.requests_made == 2
+    assert out.evidence["titles_count"] == 0
+    assert out.evidence["redirect_chain"][0]["reason"] == "host autorizado"
+
+
+def test_over_budget_includes_redirect_chain_rebuilt_from_urls():
+    """Pin gap re-probe: cadenas > cap (mintic-style) sin subir el cap.
+
+    `over_budget` por presupuesto agotado debe incluir `redirect_chain`
+    (saltos verificados + siguiente salto pendiente no seguido).
+    """
+    u1 = "https://www.mintic.gov.co/portal/inicio/Convocatorias/"
+    u2 = "https://www.mintic.gov.co/portal/715/w3-propertyvalue-111099.html"
+    u3 = "https://www.mintic.gov.co/portal/715/otro.html"
+
+    async def transport(url, timeout_s):
+        if url == u1:
+            return {"status": 302, "headers": {"location": u2},
+                    "body": "", "latency_ms": 1}
+        return {"status": 302, "headers": {"location": u3},
+                "body": "", "latency_ms": 1}
+    out = asyncio.run(run_live_probe(
+        "demo", allow_network=True, start_urls=[u1], transport=transport,
+        authorized_hosts=["www.mintic.gov.co"],
+        resolve=lambda h: ["93.184.216.34"], max_requests=2))
+    assert out.status == "over_budget" and out.requests_made == 2
+    chain = out.evidence["redirect_chain"]
+    assert [(c["from"], c["to"]) for c in chain] == [(u1, u2), (u2, u3)]
+    assert chain[0]["reason"] == "host autorizado"
+    assert "presupuesto agotado" in chain[1]["reason"]
