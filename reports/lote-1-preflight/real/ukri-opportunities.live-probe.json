@@ -1,0 +1,43 @@
+{
+  "status": "live_ok",
+  "evidence": {
+    "source_key": "ukri-opportunities",
+    "duration_ms": 1554,
+    "requests_made": 1,
+    "urls": [
+      "https://www.ukri.org/opportunity/"
+    ],
+    "policy": {
+      "max_requests_per_source": 1,
+      "timeout_s": 15,
+      "total_budget_s": 60,
+      "max_concurrency_global": 2,
+      "max_concurrency_per_host": 1,
+      "max_bytes_per_page": 2000000,
+      "max_pages_per_source": 10,
+      "max_redirects": 3,
+      "retry_max": 2
+    },
+    "pending_manual_review": false,
+    "http_status": 200,
+    "bytes_truncated": false,
+    "bytes_received": 105835,
+    "content_type": "text/html; charset=UTF-8",
+    "titles_sample": [
+      "Funding finder",
+      "Funding opportunity sorting options",
+      "Funding opportunity list",
+      "Funding opportunity filter options",
+      "RSS feed",
+      "Subscribe to UKRI emails",
+      "Older funding opportunities",
+      "Our councils",
+      "Useful links",
+      "Connect with us"
+    ],
+    "titles_count": 11,
+    "single_get_reused": true,
+    "retry_after_s": null,
+    "reason": null
+  }
+}

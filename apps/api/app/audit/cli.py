@@ -44,7 +44,7 @@ def main(argv: list[str] | None = None) -> int:
         import json as _json
 
         from app.audit.live_probe import build_dry_run_plan, run_live_probe
-        from app.audit.live_probe import KNOWN_START_URLS
+        from app.audit.live_probe import KNOWN_START_URLS, build_httpx_transport
 
         if not args.source_key:
             print("live-probe exige --source-key (opt-in por fuente)", file=sys.stderr)
@@ -63,9 +63,16 @@ def main(argv: list[str] | None = None) -> int:
             (out / "live-probe-plan.json").write_text(
                 _json.dumps(plan, ensure_ascii=False, indent=2), encoding="utf-8")
             return 0
+        # Red real: UN solo GET (max_requests=1) via transporte instrumentado.
+        # hosts autorizados = hosts de las start_urls conocidas de la fuente.
+        from urllib.parse import urlparse as _urlparse
+        authorized = sorted({(_urlparse(u).hostname or "").lower()
+                             for u in urls} - {""})
+        transport = build_httpx_transport()
         outcome = asyncio.run(run_live_probe(
             args.source_key, allow_network=True, start_urls=urls or None,
-            transport=None))  # sin transporte inyectado: rechazo seguro
+            transport=transport, authorized_hosts=authorized,
+            max_requests=1))
         print(f"{outcome.source_key}: {outcome.status} "
               f"req={outcome.requests_made} evidencia en live-probe-plan.json")
         (out / "live-probe-plan.json").write_text(

@@ -1,0 +1,59 @@
+{
+  "source_key": "eu-culture-moves-europe",
+  "status": "live_ok",
+  "http_status": 200,
+  "latency_ms": 336,
+  "requests_made": 2,
+  "bytes_truncated": false,
+  "ttl_s": 86400,
+  "pending_manual_review": false,
+  "evidence": {
+    "source_key": "eu-culture-moves-europe",
+    "duration_ms": 1142,
+    "requests_made": 2,
+    "urls": [
+      "https://culture.ec.europa.eu/creative-europe/creative-europe-culture-strand/culture-moves-europe",
+      "https://culture.ec.europa.eu/culture-moves-europe/home"
+    ],
+    "policy": {
+      "max_requests_per_source": 2,
+      "timeout_s": 15,
+      "total_budget_s": 60,
+      "max_concurrency_global": 2,
+      "max_concurrency_per_host": 1,
+      "max_bytes_per_page": 2000000,
+      "max_pages_per_source": 10,
+      "max_redirects": 3,
+      "retry_max": 2
+    },
+    "pending_manual_review": false,
+    "http_status": 200,
+    "bytes_truncated": false,
+    "bytes_received": 108571,
+    "content_type": "text/html; charset=utf-8",
+    "titles_sample": [
+      "About this mobility scheme",
+      "Eligible sectors",
+      "Culture Moves Europe Map",
+      "Discover the stories of Culture Moves Europe",
+      "Give your feedback about this page",
+      "Share this page",
+      "EAC Footer",
+      "Culture in the EU",
+      "Resources",
+      "Contact points"
+    ],
+    "titles_count": 13,
+    "single_get_reused": true,
+    "retry_after_s": null,
+    "redirect_chain": [
+      {
+        "from": "https://culture.ec.europa.eu/creative-europe/creative-europe-culture-strand/culture-moves-europe",
+        "to": "https://culture.ec.europa.eu/culture-moves-europe/home",
+        "reason": "host autorizado"
+      }
+    ],
+    "reason": null
+  },
+  "predicted": "pasa (mismo registrable ec.europa.eu)"
+}

@@ -1,0 +1,52 @@
+{
+  "source_key": "rhodes-scholarship",
+  "status": "live_ok",
+  "http_status": 200,
+  "latency_ms": 512,
+  "requests_made": 2,
+  "bytes_truncated": false,
+  "ttl_s": 86400,
+  "pending_manual_review": false,
+  "evidence": {
+    "source_key": "rhodes-scholarship",
+    "duration_ms": 1539,
+    "requests_made": 2,
+    "urls": [
+      "https://www.rhodeshouse.ox.ac.uk/apply/",
+      "https://www.rhodeshouse.ox.ac.uk/scholarships/applications/"
+    ],
+    "policy": {
+      "max_requests_per_source": 2,
+      "timeout_s": 15,
+      "total_budget_s": 60,
+      "max_concurrency_global": 2,
+      "max_concurrency_per_host": 1,
+      "max_bytes_per_page": 2000000,
+      "max_pages_per_source": 10,
+      "max_redirects": 3,
+      "retry_max": 2
+    },
+    "pending_manual_review": false,
+    "http_status": 200,
+    "bytes_truncated": false,
+    "bytes_received": 43969,
+    "content_type": "text/html; charset=utf-8",
+    "titles_sample": [
+      "Check Your Eligibility and Apply",
+      "More information",
+      "Your country"
+    ],
+    "titles_count": 3,
+    "single_get_reused": true,
+    "retry_after_s": null,
+    "redirect_chain": [
+      {
+        "from": "https://www.rhodeshouse.ox.ac.uk/apply/",
+        "to": "https://www.rhodeshouse.ox.ac.uk/scholarships/applications/",
+        "reason": "host autorizado"
+      }
+    ],
+    "reason": null
+  },
+  "predicted": "pasa (mismo registrable rhodeshouse.ox.ac.uk)"
+}

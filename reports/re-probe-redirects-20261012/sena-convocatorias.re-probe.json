@@ -1,0 +1,59 @@
+{
+  "source_key": "sena-convocatorias",
+  "status": "live_ok",
+  "http_status": 200,
+  "latency_ms": 199,
+  "requests_made": 2,
+  "bytes_truncated": false,
+  "ttl_s": 86400,
+  "pending_manual_review": false,
+  "evidence": {
+    "source_key": "sena-convocatorias",
+    "duration_ms": 400,
+    "requests_made": 2,
+    "urls": [
+      "https://oferta.senasofiaplus.edu.co/sofia-oferta/buscar-oferta-educativa.html",
+      "https://betowa.sena.edu.co/oferta"
+    ],
+    "policy": {
+      "max_requests_per_source": 2,
+      "timeout_s": 15,
+      "total_budget_s": 60,
+      "max_concurrency_global": 2,
+      "max_concurrency_per_host": 1,
+      "max_bytes_per_page": 2000000,
+      "max_pages_per_source": 10,
+      "max_redirects": 3,
+      "retry_max": 2
+    },
+    "pending_manual_review": false,
+    "http_status": 200,
+    "bytes_truncated": false,
+    "bytes_received": 376810,
+    "content_type": "text/html; charset=utf-8",
+    "titles_sample": [
+      "ABORDAJE DE PERSONAS CON DISCAPACIDAD",
+      "ABORDAJE DE PERSONAS EN RIESGO DE CONSUMO DE SUSTANCIAS PSICOACTIVAS",
+      "ABORDAJE DE PERSONAS EN RIESGO DE CONSUMO DE SUSTANCIAS PSICOACTIVAS",
+      "ACABADOS DEL PRODUCTO ARTESANAL EN MADERA",
+      "ACABADOS PARA PIEZAS TEXTILES ARTESANALES",
+      "ACCESO A LA TIERRA Y TERRITORIALIDAD",
+      "ACCIONES BASICAS PARA LA ATENCION DE UNA PERSONA CON AFECTACION DE LA SALUD",
+      "ACCIONES DE PREVENCION EN SALUD MENTAL",
+      "ACCIONES DE PREVENCION EN SALUD MENTAL",
+      "ACCIONES DE PREVENCION Y MANEJO DE LAS VIOLENCIAS DE GENERO"
+    ],
+    "titles_count": 24,
+    "single_get_reused": true,
+    "retry_after_s": null,
+    "redirect_chain": [
+      {
+        "from": "https://oferta.senasofiaplus.edu.co/sofia-oferta/buscar-oferta-educativa.html",
+        "to": "https://betowa.sena.edu.co/oferta",
+        "reason": "mapeo explícito documentado"
+      }
+    ],
+    "reason": null
+  },
+  "predicted": "pasa (mapeo explicito betowa.sena.edu.co)"
+}
