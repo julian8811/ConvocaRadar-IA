@@ -1,0 +1,31 @@
+{
+  "http_status": 200,
+  "latency_ms": 263,
+  "content_type": "text/html; charset=utf-8",
+  "body_bytes": 68318,
+  "kind": "html",
+  "n_items": 6,
+  "sample": [
+    {
+      "title": "Programs",
+      "url": ""
+    },
+    {
+      "title": "Big Bets",
+      "url": ""
+    },
+    {
+      "title": "Awards",
+      "url": ""
+    },
+    {
+      "title": "Grantee Publications",
+      "url": "/whatsnew/latest-news?content_type=grantee_publications"
+    },
+    {
+      "title": "Grantee Stories",
+      "url": "/whatsnew/grantee-stories?content_type=grantee_stories"
+    }
+  ],
+  "sanitized_url": "https://www.macfound.org/programs/"
+}

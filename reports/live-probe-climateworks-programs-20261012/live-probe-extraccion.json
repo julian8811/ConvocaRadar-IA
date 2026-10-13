@@ -1,0 +1,31 @@
+{
+  "http_status": 200,
+  "latency_ms": 136,
+  "content_type": "text/html; charset=UTF-8",
+  "body_bytes": 131036,
+  "kind": "html",
+  "n_items": 8,
+  "sample": [
+    {
+      "title": "ClimateWorks global programs",
+      "url": ""
+    },
+    {
+      "title": "We drive innovation and climate solutions that scale.",
+      "url": ""
+    },
+    {
+      "title": "Through our portfolio of global and transnational climate strategies and grantmaking, we help funders maximize their philanthropic impact.",
+      "url": ""
+    },
+    {
+      "title": "insights from ClimateWorks’ 2024 Grantee Perception Report",
+      "url": "/blog/listening-to-lead-insights-from-climateworks-2024-grantee-perception-report/"
+    },
+    {
+      "title": "GranteeFeedback@ClimateWorks.org",
+      "url": "mailto:GranteeFeedback@ClimateWorks.org"
+    }
+  ],
+  "sanitized_url": "https://www.climateworks.org/programs/"
+}

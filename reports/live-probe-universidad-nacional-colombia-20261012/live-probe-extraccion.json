@@ -1,0 +1,31 @@
+{
+  "http_status": 404,
+  "latency_ms": 662,
+  "content_type": "text/html; charset=utf-8",
+  "body_bytes": 1594579,
+  "kind": "html",
+  "n_items": 1,
+  "sample": [
+    {
+      "title": "404",
+      "url": ""
+    },
+    {
+      "title": "Plan Bienal de Convocatorias de CTeI 2023-2024 (SGR/Minciencias)",
+      "url": "/vicerrectoría-de-investigación/plan-bienal-2023-2024-sgr-minciencias"
+    },
+    {
+      "title": "Convocatoria 33",
+      "url": "/vicerrectoría-de-investigación/plan-bienal-2023-2024-sgr-minciencias/conv33"
+    },
+    {
+      "title": "Convocatoria 34",
+      "url": "/vicerrectoría-de-investigación/plan-bienal-2023-2024-sgr-minciencias/conv34"
+    },
+    {
+      "title": "Convocatoria 35",
+      "url": "/vicerrectoría-de-investigación/plan-bienal-2023-2024-sgr-minciencias/conv35"
+    }
+  ],
+  "sanitized_url": "https://investigacion.unal.edu.co/convocatorias/"
+}

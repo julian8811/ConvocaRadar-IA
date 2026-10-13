@@ -1,0 +1,23 @@
+{
+  "http_status": 200,
+  "latency_ms": 325,
+  "content_type": "text/html; charset=UTF-8",
+  "body_bytes": 27983,
+  "kind": "html",
+  "n_items": 3,
+  "sample": [
+    {
+      "title": "Desarrollo Económico",
+      "url": ""
+    },
+    {
+      "title": "Información",
+      "url": ""
+    },
+    {
+      "title": "¿Tienes algún comentario sobre este contenido?",
+      "url": ""
+    }
+  ],
+  "sanitized_url": "https://bogota.gov.co/mi-ciudad/desarrollo-economico"
+}

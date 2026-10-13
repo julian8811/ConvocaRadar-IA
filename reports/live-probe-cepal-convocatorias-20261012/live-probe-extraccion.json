@@ -1,0 +1,31 @@
+{
+  "http_status": 404,
+  "latency_ms": 914,
+  "content_type": "text/html; charset=UTF-8",
+  "body_bytes": 86395,
+  "kind": "html",
+  "n_items": 8,
+  "sample": [
+    {
+      "title": "Preheader external links",
+      "url": ""
+    },
+    {
+      "title": "Social Media",
+      "url": ""
+    },
+    {
+      "title": "Buscar",
+      "url": ""
+    },
+    {
+      "title": "Empleo: trabaja con nosotros",
+      "url": "/es/oportunidades-empleo"
+    },
+    {
+      "title": "Empleo: trabaja con nosotros",
+      "url": "/es/oportunidades-empleo"
+    }
+  ],
+  "sanitized_url": "https://www.cepal.org/es/convocatorias"
+}

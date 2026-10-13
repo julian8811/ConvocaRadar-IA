@@ -1,0 +1,31 @@
+{
+  "http_status": 200,
+  "latency_ms": 1086,
+  "content_type": "text/html;charset=utf-8",
+  "body_bytes": 72868,
+  "kind": "html",
+  "n_items": 8,
+  "sample": [
+    {
+      "title": "Sida’s international work",
+      "url": ""
+    },
+    {
+      "title": "Countries and regions",
+      "url": ""
+    },
+    {
+      "title": "Humanitarian aid",
+      "url": ""
+    },
+    {
+      "title": "Research calls and grants",
+      "url": "/en/for-partners/research-partners/research-calls-and-grants"
+    },
+    {
+      "title": "Calls and announcements",
+      "url": "/en/for-partners/calls-and-announcements"
+    }
+  ],
+  "sanitized_url": "https://www.sida.se/en/for-partners/calls-and-announcements"
+}

@@ -1,0 +1,31 @@
+{
+  "http_status": 200,
+  "latency_ms": 136,
+  "content_type": "text/html; charset=UTF-8",
+  "body_bytes": 98832,
+  "kind": "html",
+  "n_items": 8,
+  "sample": [
+    {
+      "title": "Grants",
+      "url": ""
+    },
+    {
+      "title": "The Registered Trustees of Women Fund Tanzania",
+      "url": ""
+    },
+    {
+      "title": "Search for Common Ground",
+      "url": ""
+    },
+    {
+      "title": "Grantee Center",
+      "url": "https://grantees.hewlett.org"
+    },
+    {
+      "title": "Grantee Center",
+      "url": "https://grantees.hewlett.org"
+    }
+  ],
+  "sanitized_url": "https://hewlett.org/grants/"
+}

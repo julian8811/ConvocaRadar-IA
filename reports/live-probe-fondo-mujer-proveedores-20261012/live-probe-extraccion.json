@@ -1,0 +1,31 @@
+{
+  "http_status": 200,
+  "latency_ms": 685,
+  "content_type": "text/html; charset=UTF-8",
+  "body_bytes": 232207,
+  "kind": "html",
+  "n_items": 8,
+  "sample": [
+    {
+      "title": "Descubre la oferta que el Fondo Mujer Libre y Productiva tiene para proveedores y proveedoras",
+      "url": ""
+    },
+    {
+      "title": "Invitación Abierta No. 1049-FM-2026",
+      "url": ""
+    },
+    {
+      "title": "Invitación Abierta No. 1041-FM-INTVICHEHILD-2026",
+      "url": ""
+    },
+    {
+      "title": "Convocatorias para mujeres",
+      "url": "https://fondomujer.gov.co/convocatorias-beneficiarias-fondo-mujer-libre-y-productiva/"
+    },
+    {
+      "title": "Convocatorias para proveedoras/es",
+      "url": "https://fondomujer.gov.co/convocatorias-proveedores/"
+    }
+  ],
+  "sanitized_url": "https://fondomujer.gov.co/convocatorias-proveedores/"
+}

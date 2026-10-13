@@ -1,0 +1,31 @@
+{
+  "http_status": 200,
+  "latency_ms": 568,
+  "content_type": "text/html; charset=UTF-8",
+  "body_bytes": 181446,
+  "kind": "html",
+  "n_items": 5,
+  "sample": [
+    {
+      "title": "Categoría (Convocatorias): Ciencias y Humanidades",
+      "url": ""
+    },
+    {
+      "title": "Categoría",
+      "url": ""
+    },
+    {
+      "title": "Estatus",
+      "url": ""
+    },
+    {
+      "title": "Convocatorias Ciencia y Humanidades",
+      "url": "https://secihti.mx/convocatoria_categoria/ciencias-y-humanidades/"
+    },
+    {
+      "title": "Convocatorias Desarrollo Tecnológico, Vinculación e Innovación",
+      "url": "https://secihti.mx/convocatoria_categoria/desarrollo-tecnologico-vinculacion-e-innovacion/"
+    }
+  ],
+  "sanitized_url": "https://secihti.mx/convocatoria_categoria/ciencias-y-humanidades/"
+}

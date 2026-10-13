@@ -1,0 +1,23 @@
+{
+  "http_status": 200,
+  "latency_ms": 482,
+  "content_type": "text/html; charset=UTF-8",
+  "body_bytes": 58779,
+  "kind": "html",
+  "n_items": 8,
+  "sample": [
+    {
+      "title": "Sé parte de Ignite",
+      "url": ""
+    },
+    {
+      "title": "¿QUÉ ES IGNITE?",
+      "url": ""
+    },
+    {
+      "title": "¡CONOCE LA ÚLTIMA GENERACIÓN DE IGNITE!",
+      "url": ""
+    }
+  ],
+  "sanitized_url": "https://startupchile.org/postula/ignite/"
+}

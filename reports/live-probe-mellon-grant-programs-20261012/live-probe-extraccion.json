@@ -1,0 +1,19 @@
+{
+  "http_status": 200,
+  "latency_ms": 1056,
+  "content_type": "text/html; charset=utf-8",
+  "body_bytes": 178871,
+  "kind": "html",
+  "n_items": 1,
+  "sample": [
+    {
+      "title": "Grantmaking Areas",
+      "url": ""
+    },
+    {
+      "title": "About our grantmaking process",
+      "url": "/resources"
+    }
+  ],
+  "sanitized_url": "https://www.mellon.org/grant-programs"
+}

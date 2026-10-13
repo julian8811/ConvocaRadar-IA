@@ -13,7 +13,8 @@ from openpyxl import Workbook
 from app.audit.types import DIMENSIONS, SourceAuditResult
 
 COLUMNS = (["source_key", "name", "enabled", "source_type", "verdict", "severity",
-            "confidence", "evaluated_at", "needs_human_review"]
+            "confidence", "evaluated_at", "needs_human_review",
+            "verification_scope", "live_certified"]
            + list(DIMENSIONS) + ["reasons"])
 
 
@@ -22,7 +23,9 @@ def _row(r: SourceAuditResult) -> dict:
            "source_type": r.source_type, "verdict": r.verdict.value,
            "severity": r.severity, "confidence": r.confidence,
            "evaluated_at": r.evaluated_at.isoformat(),
-           "needs_human_review": r.needs_human_review}
+           "needs_human_review": r.needs_human_review,
+           "verification_scope": r.verification_scope,
+           "live_certified": r.live_certified}
     for d in DIMENSIONS:
         c = r.checks.get(d)
         row[d] = c.status.value if c else "UNKNOWN"
@@ -98,7 +101,9 @@ def write_markdown(results: list[SourceAuditResult], path: str | Path,
         lines.append(f"### [{r.severity}] {r.source_key} — {r.verdict.value}")
         lines.append("")
         lines.append(f"Habilitada: {r.enabled}. Confianza: {r.confidence}. "
-                     f"Revision humana: {r.needs_human_review}.")
+                     f"Revision humana: {r.needs_human_review}. "
+                     f"Alcance: {r.verification_scope}. "
+                     f"Certificada en vivo: {r.live_certified}.")
         for reason in r.reasons:
             lines.append(f"- {reason}")
         for dim, c in r.checks.items():
@@ -120,6 +125,7 @@ def write_markdown(results: list[SourceAuditResult], path: str | Path,
         "## Limitaciones",
         "",
         "- Modo history: sin medicion directa de red; conectividad nunca PASS sin probe.",
+        "- Alcance history: historical_only, live_certified=false (nunca viva sin probe real).",
         "- Cuarentena topada a 100 por run: el total real es desconocido (censurado).",
         "- Heuristicas de pertinencia/duplicados marcan revision, no borran ni fusionan.",
     ]

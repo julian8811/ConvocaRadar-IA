@@ -1,0 +1,31 @@
+{
+  "http_status": 200,
+  "latency_ms": 165,
+  "content_type": "text/html;charset=utf-8",
+  "body_bytes": 54330,
+  "kind": "html",
+  "n_items": 7,
+  "sample": [
+    {
+      "title": "World Bank Scholarships Program",
+      "url": ""
+    },
+    {
+      "title": "Japanese Nationals",
+      "url": ""
+    },
+    {
+      "title": "JJ/WBGSP 2027 Application Cycle",
+      "url": ""
+    },
+    {
+      "title": "Japanese Nationals",
+      "url": "/en/programs/scholarships/japanese-nationals"
+    },
+    {
+      "title": "JJ/WBGSP - Reports",
+      "url": "/en/programs/scholarships/jj-wbgsp-reports"
+    }
+  ],
+  "sanitized_url": "https://www.worldbank.org/en/programs/scholarships"
+}

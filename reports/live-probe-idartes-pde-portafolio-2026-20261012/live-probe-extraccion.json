@@ -1,0 +1,31 @@
+{
+  "http_status": 200,
+  "latency_ms": 13201,
+  "content_type": "text/html; charset=UTF-8",
+  "body_bytes": 76236,
+  "kind": "html",
+  "n_items": 6,
+  "sample": [
+    {
+      "title": "Ruta de navegación",
+      "url": ""
+    },
+    {
+      "title": "Consulte aquí las convocatorias:",
+      "url": ""
+    },
+    {
+      "title": "¿Cómo participar? - PDE 2026",
+      "url": ""
+    },
+    {
+      "title": "Proyecto Calle 13",
+      "url": "#"
+    },
+    {
+      "title": "Sobre las convocatorias",
+      "url": "/es/convocatorias"
+    }
+  ],
+  "sanitized_url": "https://www.idartes.gov.co/es/convocatorias/estimulos/portafolio-2026"
+}

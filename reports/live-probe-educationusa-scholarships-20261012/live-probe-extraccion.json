@@ -1,0 +1,31 @@
+{
+  "http_status": 200,
+  "latency_ms": 339,
+  "content_type": "text/html; charset=utf-8",
+  "body_bytes": 64246,
+  "kind": "html",
+  "n_items": 8,
+  "sample": [
+    {
+      "title": "United States Department of State",
+      "url": ""
+    },
+    {
+      "title": "Search form",
+      "url": ""
+    },
+    {
+      "title": "Special Opportunities And Financial Aid * Some countries offer government sponsored scholarships. Filtering by country only shows these scholarships. 278 Result",
+      "url": ""
+    },
+    {
+      "title": "Leveraging Scholarships",
+      "url": "/us-higher-education-professionals/recruitment-resources/leveraging-scholarships"
+    },
+    {
+      "title": "Nonresident Tuition Waiver (NTW) Scholarships",
+      "url": "/scholarships/nonresident-tuition-waiver-ntw-scholarships"
+    }
+  ],
+  "sanitized_url": "https://educationusa.state.gov/find-financial-aid"
+}

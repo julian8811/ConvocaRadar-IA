@@ -1,0 +1,27 @@
+{
+  "http_status": 200,
+  "latency_ms": 985,
+  "content_type": "text/html; charset=UTF-8",
+  "body_bytes": 26948,
+  "kind": "html",
+  "n_items": 6,
+  "sample": [
+    {
+      "title": "FAPESP destina R$ 25 milhões ao desenvolvimento tecnológico da indústria do futuro",
+      "url": ""
+    },
+    {
+      "title": "FAPESP simplifica submissão de propostas do PIPE",
+      "url": ""
+    },
+    {
+      "title": "Empresas buscam parcerias com universidades para enfrentar mercados competitivos",
+      "url": ""
+    },
+    {
+      "title": "Com recursos de até R$ 500 mil por projeto, nova chamada do Programa PIPE financiará pesquisas em manufatura avançada, inteligência artificial, novos materiais ",
+      "url": "/pipe/Control/../fapesp_destina_r$_25_milhoes_ao_desenvolvimento_tecnologico_da_industria_do_futuro/336/"
+    }
+  ],
+  "sanitized_url": "https://fapesp.br/pipe/"
+}

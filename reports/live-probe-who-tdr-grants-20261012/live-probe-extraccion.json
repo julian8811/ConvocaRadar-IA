@@ -1,0 +1,31 @@
+{
+  "http_status": 200,
+  "latency_ms": 132,
+  "content_type": "text/html; charset=utf-8",
+  "body_bytes": 63941,
+  "kind": "html",
+  "n_items": 5,
+  "sample": [
+    {
+      "title": "Grants and other funding activities",
+      "url": ""
+    },
+    {
+      "title": "Vacancy Notices",
+      "url": ""
+    },
+    {
+      "title": "TDR Postgraduate Scholarship in Implementation Research",
+      "url": ""
+    },
+    {
+      "title": "Clinical Research Leadership fellowship",
+      "url": "/redirect-pages/navigation/our-work/strengthening-research-capacity/clinical-research-and-development-fellowship"
+    },
+    {
+      "title": "TDR impact research grants scheme",
+      "url": "/redirect-pages/navigation/our-work/global-engagement/tdr-impact-research-grants-scheme"
+    }
+  ],
+  "sanitized_url": "https://tdr.who.int/grants"
+}

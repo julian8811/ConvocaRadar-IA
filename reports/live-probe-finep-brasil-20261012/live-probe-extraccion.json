@@ -1,0 +1,31 @@
+{
+  "http_status": 200,
+  "latency_ms": 527,
+  "content_type": "application/json",
+  "body_bytes": 205287,
+  "kind": "json",
+  "n_items": 20,
+  "sample": [
+    {
+      "title": "Programa de Cooperação para Inovação da Rede EUREKA",
+      "url": ""
+    },
+    {
+      "title": "COOPERAMAIS Tecnologia - ICT",
+      "url": ""
+    },
+    {
+      "title": "Finep COOPERAMAIS Brasil Tecnologias – Empresas",
+      "url": ""
+    },
+    {
+      "title": "Programa Nacional de Incubadoras Tecnológicas de Cooperativas Populares (Proninc) / 2026",
+      "url": ""
+    },
+    {
+      "title": "5ª Chamada Pública Conjunta - Finep e Conselho Norueguês de Pesquisa (RCN)",
+      "url": ""
+    }
+  ],
+  "sanitized_url": "https://www.finep.gov.br/o/c/chamadapublicas"
+}

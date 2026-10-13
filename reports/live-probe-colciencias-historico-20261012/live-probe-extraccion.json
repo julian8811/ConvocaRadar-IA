@@ -1,0 +1,31 @@
+{
+  "http_status": 200,
+  "latency_ms": 1016,
+  "content_type": "text/html; charset=utf-8",
+  "body_bytes": 54066,
+  "kind": "html",
+  "n_items": 6,
+  "sample": [
+    {
+      "title": "Cabecera",
+      "url": ""
+    },
+    {
+      "title": "Usted está aquí",
+      "url": ""
+    },
+    {
+      "title": "Convocatorias",
+      "url": ""
+    },
+    {
+      "title": "Contenido: Convocatorias",
+      "url": "#block-system-main"
+    },
+    {
+      "title": "Convocatorias de otras vigencias cierre en 2020",
+      "url": "/convocatorias/cierre-2018"
+    }
+  ],
+  "sanitized_url": "https://minciencias.gov.co/convocatorias"
+}

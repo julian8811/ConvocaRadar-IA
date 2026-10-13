@@ -1,0 +1,23 @@
+{
+  "http_status": 404,
+  "latency_ms": 544,
+  "content_type": "text/html; charset=UTF-8",
+  "body_bytes": 158412,
+  "kind": "html",
+  "n_items": 4,
+  "sample": [
+    {
+      "title": "Fondo para el financiamiento del sector agropecuario",
+      "url": ""
+    },
+    {
+      "title": "Ruta de navegación",
+      "url": ""
+    },
+    {
+      "title": "Whooops!",
+      "url": ""
+    }
+  ],
+  "sanitized_url": "https://www.finagro.com.co/lineas-especiales-credito-lec-finagro-2026"
+}

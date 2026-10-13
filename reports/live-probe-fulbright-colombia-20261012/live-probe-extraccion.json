@@ -1,0 +1,30 @@
+{
+  "http_status": 200,
+  "latency_ms": 467,
+  "content_type": "text/html; charset=UTF-8",
+  "body_bytes": 235088,
+  "items": 8,
+  "sample": [
+    {
+      "title": "Excelentes noticias",
+      "url": ""
+    },
+    {
+      "title": "Convocatoria para estancias posdoctorales en Estados Unidos de América",
+      "url": ""
+    },
+    {
+      "title": "Convocatoria para estancias doctorales en Estados Unidos de América",
+      "url": ""
+    },
+    {
+      "title": "Otras becas 0",
+      "url": "#"
+    },
+    {
+      "title": "Convocatoria Cerrada Hubert H. Humphrey Fellowship Program Estancias de desarrollo profesional y liderazgo en Estados Unidos para profesionales colombianos comp",
+      "url": "https://fulbright.edu.co/portfolio-academico/hubert-h-humphrey-fellowship-program/"
+    }
+  ],
+  "sanitized_url": "https://fulbright.edu.co/"
+}

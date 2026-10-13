@@ -1,0 +1,30 @@
+{
+  "http_status": 200,
+  "latency_ms": 365,
+  "content_type": "text/html",
+  "body_bytes": 161803,
+  "items": 5,
+  "sample": [
+    {
+      "title": "DHDEE",
+      "url": ""
+    },
+    {
+      "title": "Study Opportunities",
+      "url": ""
+    },
+    {
+      "title": "Institutional Partners",
+      "url": ""
+    },
+    {
+      "title": "Consortium of Universities",
+      "url": "http://www.oas.org/en/scholarships/regularprogram/consortium.asp"
+    },
+    {
+      "title": "Scholarships for Academic Studies",
+      "url": "https://www.oas.org/en/scholarships/default.asp"
+    }
+  ],
+  "sanitized_url": "https://www.oas.org/en/scholarships/"
+}

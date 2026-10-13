@@ -1,0 +1,30 @@
+{
+  "http_status": 200,
+  "latency_ms": 2123,
+  "content_type": "text/html;charset=UTF-8",
+  "body_bytes": 968650,
+  "items": 1,
+  "sample": [
+    {
+      "title": "PROCUREMENT NOTICES",
+      "url": ""
+    },
+    {
+      "title": "Procurement Notices",
+      "url": "index.cfm?cur_lang=en"
+    },
+    {
+      "title": "Procurement at UNDP",
+      "url": "https://www.undp.org/procurement"
+    },
+    {
+      "title": "UNDP Office of Procurement",
+      "url": "https://www.undp.org/procurement/undp-office-procurement"
+    },
+    {
+      "title": "Our Guiding Principles",
+      "url": "https://www.undp.org/procurement/our-guiding-principles"
+    }
+  ],
+  "sanitized_url": "https://procurement-notices.undp.org/"
+}

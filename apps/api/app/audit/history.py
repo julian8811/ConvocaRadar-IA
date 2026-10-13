@@ -258,11 +258,11 @@ def check_persistencia(runs: list[dict]) -> AuditCheckResult:
                    data_state="not_checked")
     skipped = 0
     cap_reason: str | None = None
-    q_entries = 0
-    censored = False
+    per_run: list[int] = []
     failed_items = 0
     for r in runs:
         failed_items += int(r.get("items_failed") or 0)
+        n_q = 0
         for log in r.get("logs") or []:
             if not isinstance(log, dict):
                 continue
@@ -270,18 +270,23 @@ def check_persistencia(runs: list[dict]) -> AuditCheckResult:
                 skipped += int(log.get("items_skipped") or 0)
                 cap_reason = str(log.get("reason") or cap_reason or "unknown")
             if log.get("level") == "quarantine":
-                q_entries += 1
-    if q_entries >= QUARANTINE_CAP:
-        censored = True
+                n_q += 1
+        per_run.append(n_q)
+    # Censura SOLO si alguna ejecucion INDIVIDUAL alcanzo el tope: el runner
+    # topa por run (QUARANTINE_CAP_PER_RUN=100), nunca por suma acumulada.
+    max_per_run = max(per_run) if per_run else 0
+    censored = max_per_run >= QUARANTINE_CAP
     counters = {"runs": len(runs), "items_skipped": skipped,
-                "cap_reason": cap_reason, "quarantine_entries": q_entries,
+                "cap_reason": cap_reason, "quarantine_entries": sum(per_run),
+                "quarantine_per_run": per_run,
+                "quarantine_max_per_run": max_per_run,
                 "quarantine_censored": censored,
                 "quarantine_cap": QUARANTINE_CAP,
                 "items_failed": failed_items}
     if skipped > 0:
         return _mk("persistencia", CheckStatus.FAIL,
                    f"persistencia truncada: {skipped} omitidos ({cap_reason}); "
-                   f"cuarentena {'censurada a 100 (total real desconocido)' if censored else f'{q_entries}'}",
+                   f"cuarentena {'censurada (un run alcanzo el tope 100: total real desconocido)' if censored else f'max {max_per_run}/run'}",
                    counters=counters,
                    examples=["cuarentena truncada a 100: el total real es desconocido"]
                    if censored else [])
@@ -327,6 +332,39 @@ def check_estabilidad(source: dict, runs: list[dict]) -> AuditCheckResult:
     return _mk("estabilidad", CheckStatus.PASS,
                f"estable: {rate:.0%} fallos en {len(window)} runs",
                counters=counters)
+
+
+# ── Certificacion viva (separada del historico) ───────────────────────
+#: Criterios EXACTOS de certificacion viva. Ningun resultado history los
+#: cumple (conectividad nunca es PASS sin probe): no hay retro-certificacion.
+LIVE_CERTIFICATION_CRITERIA: dict[str, object] = {
+    "requires_scope_live_checked": True,
+    "requires_live_conectividad_pass": True,
+    "requires_pass": ("extraccion", "persistencia", "estabilidad"),
+    "requires_live_probe_evidence": True,
+    "max_probe_age_hours": 72,
+}
+
+
+def meets_live_certification(result: SourceAuditResult) -> bool:
+    """True solo si el resultado trae verificacion en vivo valida.
+
+    Exige: scope live_checked + conectividad PASS con evidencia de probe
+    real (no simulado) + dimensiones criticas en PASS. Todo lo historico
+    (scope historical_only) devuelve False: sin retro-certificacion.
+    """
+    if result.verification_scope != "live_checked":
+        return False
+    conn = result.checks.get("conectividad")
+    if conn is None or conn.status != CheckStatus.PASS:
+        return False
+    for dim in ("extraccion", "persistencia", "estabilidad"):
+        c = result.checks.get(dim)
+        if c is None or c.status != CheckStatus.PASS:
+            return False
+    ev = conn.evidence
+    return bool(ev.counters.get("live_probe") is True
+                and ev.counters.get("simulated") is not True)
 
 
 # ── Veredicto global ─────────────────────────────────────────────────

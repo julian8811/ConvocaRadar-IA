@@ -1,0 +1,27 @@
+{
+  "http_status": 200,
+  "latency_ms": 271,
+  "content_type": "text/html; charset=UTF-8",
+  "body_bytes": 922830,
+  "kind": "html",
+  "n_items": 4,
+  "sample": [
+    {
+      "title": "ASOCIADOS",
+      "url": ""
+    },
+    {
+      "title": "subir",
+      "url": ""
+    },
+    {
+      "title": "Síguenos",
+      "url": ""
+    },
+    {
+      "title": "OPORTUNIDADES",
+      "url": "https://www.creame.com.co/oportunidades"
+    }
+  ],
+  "sanitized_url": "https://www.creame.com.co/oportunidades"
+}

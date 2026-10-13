@@ -1,0 +1,15 @@
+{
+  "http_status": 302,
+  "latency_ms": 458,
+  "content_type": "text/html",
+  "body_bytes": 8549,
+  "kind": "html",
+  "n_items": 1,
+  "sample": [
+    {
+      "title": "302 Found",
+      "url": ""
+    }
+  ],
+  "sanitized_url": "https://www.findeter.gov.co/convocatorias"
+}

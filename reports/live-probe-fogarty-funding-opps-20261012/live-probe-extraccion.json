@@ -1,0 +1,31 @@
+{
+  "http_status": 200,
+  "latency_ms": 619,
+  "content_type": "text/html; charset=utf-8",
+  "body_bytes": 61137,
+  "kind": "html",
+  "n_items": 3,
+  "sample": [
+    {
+      "title": "Fogarty Funding Opportunities - Dates and Deadlines",
+      "url": ""
+    },
+    {
+      "title": "Important Notice Reminders",
+      "url": ""
+    },
+    {
+      "title": "More Funding Opportunities",
+      "url": ""
+    },
+    {
+      "title": "Funding (current section)",
+      "url": "/Funding/Pages/default.aspx"
+    },
+    {
+      "title": "Fogarty Funding",
+      "url": "/Funding/Pages/Fogarty-Funding-Opps.aspx"
+    }
+  ],
+  "sanitized_url": "https://www.fic.nih.gov/Funding/Pages/Fogarty-Funding-Opps.aspx"
+}

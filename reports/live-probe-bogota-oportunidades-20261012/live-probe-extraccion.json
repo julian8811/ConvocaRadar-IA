@@ -1,0 +1,23 @@
+{
+  "http_status": 200,
+  "latency_ms": 345,
+  "content_type": "text/html; charset=utf-8",
+  "body_bytes": 36373,
+  "kind": "html",
+  "n_items": 4,
+  "sample": [
+    {
+      "title": "ALCALDÍA DE BOGOTÁ",
+      "url": ""
+    },
+    {
+      "title": "NAVEGA POR PORTAL",
+      "url": ""
+    },
+    {
+      "title": "BOGOTA TE ESCUCHA",
+      "url": ""
+    }
+  ],
+  "sanitized_url": "https://bogota.gov.co/servicios/oportunidades-y-apoyos"
+}

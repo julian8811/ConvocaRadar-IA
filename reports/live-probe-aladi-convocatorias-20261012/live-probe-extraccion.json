@@ -1,0 +1,15 @@
+{
+  "http_status": 301,
+  "latency_ms": 464,
+  "content_type": "text/html",
+  "body_bytes": 178,
+  "kind": "html",
+  "n_items": 1,
+  "sample": [
+    {
+      "title": "301 Moved Permanently",
+      "url": ""
+    }
+  ],
+  "sanitized_url": "https://www.aladi.org/sitioaladi/convocatorias/"
+}

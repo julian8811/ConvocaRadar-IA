@@ -1,0 +1,31 @@
+{
+  "http_status": 200,
+  "latency_ms": 160,
+  "content_type": "text/html; charset=UTF-8",
+  "body_bytes": 333616,
+  "kind": "html",
+  "n_items": 8,
+  "sample": [
+    {
+      "title": "Navegación principal",
+      "url": ""
+    },
+    {
+      "title": "Modalidades de Cooperación",
+      "url": ""
+    },
+    {
+      "title": "Convocatoria para el acompañamiento a organizaciones de la sociedad civil colombianas en la construcción de estrategias de recaudación de fondos (fundraising) d",
+      "url": ""
+    },
+    {
+      "title": "Convocatorias",
+      "url": "/modalidades-de-cooperacion/convocatorias"
+    },
+    {
+      "title": "Convocatoria para el acompañamiento a organizaciones de la sociedad civil colombianas en la construcción de estrategias de recaudación de fondos (fundraising) d",
+      "url": "/modalidades-de-cooperacion/convocatorias/otras-convocatorias/convocatoria-para-el-acompanamiento"
+    }
+  ],
+  "sanitized_url": "https://www.apccolombia.gov.co/seccion/modalidades-de-cooperacion"
+}

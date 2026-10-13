@@ -1,0 +1,31 @@
+{
+  "http_status": 200,
+  "latency_ms": 971,
+  "content_type": "text/html; charset=UTF-8",
+  "body_bytes": 69096,
+  "kind": "html",
+  "n_items": 8,
+  "sample": [
+    {
+      "title": "Service Links Menu - en",
+      "url": ""
+    },
+    {
+      "title": "Social Links",
+      "url": ""
+    },
+    {
+      "title": "Applying for a scholarship",
+      "url": ""
+    },
+    {
+      "title": "Application for a graduate scholarship",
+      "url": "https://www.boell.de/de/stipendium-studium"
+    },
+    {
+      "title": "Scholarship Application for international undergraduate or graduate students",
+      "url": "https://www.boell.de/sites/default/files/2026-04/2-a1-1b-info_checklist_application_stud_june_2025.pdf"
+    }
+  ],
+  "sanitized_url": "https://www.boell.de/en/applying-scholarship"
+}

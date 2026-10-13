@@ -1,0 +1,26 @@
+{
+  "http_status": 200,
+  "latency_ms": 378,
+  "content_type": "application/json; charset=UTF-8",
+  "body_bytes": 50216,
+  "items": 4,
+  "sample": [
+    {
+      "title": "CHAMADA FAPEMIG - SEDE 018/2026 HUBMG GOV - RESOLUÇÃO DE DESAFIOS PÚBLICOS POR MEIO DE INOVAÇÃO ABERTA",
+      "url": "chamada-fapemig-sede-018-2026-hubmg-gov-resolucao-de-desafios-publicos-por-meio-de-inovacao-aberta"
+    },
+    {
+      "title": "CHAMADA PÚBLICA FAPEMIG/CNPQ/CAPES N. 17/2026 PROGRAMA DE APOIO À FIXAÇÃO DE DOUTORES NO BRASIL – PROFIX-CB",
+      "url": "chamada-publica-fapemig-cnpq-capes-n-17-2026-programa-de-apoio-a-fixacao-de-doutores-no-brasil-profix-cb"
+    },
+    {
+      "title": "Chamada FAPEMIG 004/2026 - Participação Coletiva em Eventos Técnicos no País - 3ª Entrada",
+      "url": "chamada-fapemig-004-2026-participacao-coletiva-em-eventos-tecnicos-no-pais-3a-entrada"
+    },
+    {
+      "title": "CHAMADA FAPEMIG 007/2026 - Organização de Eventos de Caráter Técnico-Científico - OET 2ª Entrada",
+      "url": "chamada-fapemig-007-2026-organizacao-de-eventos-de-carater-tecnico-cientifico-oet-2a-entrada"
+    }
+  ],
+  "sanitized_url": "https://api.site.fapemig.br/wp-json/fapemig-chamadas-e-editais/v1/chamadas"
+}

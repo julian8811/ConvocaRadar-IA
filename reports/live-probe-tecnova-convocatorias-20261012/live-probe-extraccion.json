@@ -1,0 +1,31 @@
+{
+  "http_status": 200,
+  "latency_ms": 1188,
+  "content_type": "text/html; charset=UTF-8",
+  "body_bytes": 603122,
+  "kind": "html",
+  "n_items": 8,
+  "sample": [
+    {
+      "title": "Descubre el mundo de la innovación",
+      "url": ""
+    },
+    {
+      "title": "A través de voces especializadas te entregamos datos, tendencias, información, historias, opiniones y experiencias para que tomes decisiones basadas en la cienc",
+      "url": ""
+    },
+    {
+      "title": "Conoce las oportunidades de CTI",
+      "url": ""
+    },
+    {
+      "title": "Convocatorias",
+      "url": "https://tecnnova.org/convocatorias/"
+    },
+    {
+      "title": "Convocatorias",
+      "url": "https://tecnnova.org/category/convocatorias/"
+    }
+  ],
+  "sanitized_url": "https://tecnnova.org/convocatorias/"
+}

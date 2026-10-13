@@ -1,0 +1,31 @@
+{
+  "http_status": 200,
+  "latency_ms": 261,
+  "content_type": "text/html; charset=UTF-8",
+  "body_bytes": 86407,
+  "kind": "html",
+  "n_items": 2,
+  "sample": [
+    {
+      "title": "Breadcrumb",
+      "url": ""
+    },
+    {
+      "title": "Apply for a grant",
+      "url": ""
+    },
+    {
+      "title": "Apply for a grant",
+      "url": "https://erc.europa.eu/apply-grant"
+    },
+    {
+      "title": "Starting Grant",
+      "url": "/apply-grant/starting-grant"
+    },
+    {
+      "title": "Consolidator Grant",
+      "url": "/apply-grant/consolidator-grant"
+    }
+  ],
+  "sanitized_url": "https://erc.europa.eu/apply-grant"
+}
