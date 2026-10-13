@@ -86,7 +86,8 @@ class TestPilotGateBatch3:
 
         assert "fapesp-brasil" in DETAIL_ENRICHMENT_PILOT_KEYS
         assert "developmentaid-tenders" in DETAIL_ENRICHMENT_PILOT_KEYS
-        assert "cost-open-calls" not in DETAIL_ENRICHMENT_PILOT_KEYS
+        # E25: cost-open-calls joined the gate (top unknown-sin-close).
+        assert "cost-open-calls" in DETAIL_ENRICHMENT_PILOT_KEYS
         # Earlier pilots unchanged.
         assert "grants-gov" in DETAIL_ENRICHMENT_PILOT_KEYS
         assert "innpulsa" in DETAIL_ENRICHMENT_PILOT_KEYS
@@ -115,23 +116,23 @@ class TestPilotGateBatch3:
 
     @pytest.mark.asyncio
     async def test_cost_passthrough_makes_no_fetch_and_no_render(self, monkeypatch):
-        """DICTAMEN pin: cost-open-calls skips enrichment entirely (parse-quality issue)."""
+        """DICTAMEN pin: non-pilot sources skip enrichment entirely (parse-quality issue)."""
         from app.connectors.common import enrich_pilot_candidates
 
         mock_fetch = AsyncMock()
         monkeypatch.setattr("app.connectors.common.fetch_httpx_text", mock_fetch)
         mock_render = _mock_render(monkeypatch)
         candidate = OpportunityCandidate(
-            title="COST Open Call",
-            entity="COST Association",
-            country="European Union",
-            official_url="https://www.cost.eu/am-i-eligible/",
-            summary="COST Open Call",
-            raw_text="COST Open Call",
+            title="Danida call",
+            entity="Danida Denmark",
+            country="Denmark",
+            official_url="https://um.dk/en/danida/calls-for-proposals/item-1/",
+            summary="Danida call",
+            raw_text="Danida call",
             confidence_score=0.55,
         )
 
-        result = await enrich_pilot_candidates("cost-open-calls", [candidate])
+        result = await enrich_pilot_candidates("danida-denmark", [candidate])
 
         assert result == [candidate]
         mock_fetch.assert_not_awaited()

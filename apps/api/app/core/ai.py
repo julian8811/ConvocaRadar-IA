@@ -425,6 +425,31 @@ def _normalize_remote_extraction(payload: dict[str, Any]) -> dict[str, Any]:
     return mapped
 
 
+# E25: bounded 429 retry for the remote LLM client (Groq free-tier
+# rate limits). Initial attempt + up to 3 retries with exponential backoff
+# (5s/15s/30s, or the server's Retry-After when present); when 429 persists
+# the call degrades to None so the caller falls back to the local heuristic
+# instead of raising. Non-429 failures keep the old raise path.
+_LLM_429_MAX_RETRIES: int = 3
+_LLM_429_BACKOFF_SECONDS: tuple[float, ...] = (5.0, 15.0, 30.0)
+_LLM_429_RETRY_AFTER_CAP: float = 60.0
+
+
+def _retry_after_delay(response: Any) -> float | None:
+    """Return the server's Retry-After delay in seconds, or None if absent."""
+    try:
+        headers = getattr(response, "headers", None) or {}
+        raw = headers.get("retry-after")
+        if raw is None:
+            return None
+        delay = float(str(raw).strip())
+    except (TypeError, ValueError):
+        return None
+    if delay < 0:
+        return None
+    return min(delay, _LLM_429_RETRY_AFTER_CAP)
+
+
 async def _call_llm(text: str) -> dict[str, Any] | None:
     settings = get_settings()
     provider = effective_llm_provider(settings.llm_provider)
@@ -455,16 +480,35 @@ async def _call_llm(text: str) -> dict[str, Any] | None:
         "response_format": {"type": "json_object"},
     }
     client = await http_client()
-    response = await client.post(
-        f"{settings.llm_api_base.rstrip('/')}/chat/completions",
-        headers={
-            "Authorization": f"Bearer {settings.llm_api_key}",
-            "Content-Type": "application/json",
-        },
-        json=payload,
-        timeout=settings.llm_timeout_seconds,
-    )
-    response.raise_for_status()
+    response = None
+    for attempt in range(_LLM_429_MAX_RETRIES + 1):
+        try:
+            response = await client.post(
+                f"{settings.llm_api_base.rstrip('/')}/chat/completions",
+                headers={
+                    "Authorization": f"Bearer {settings.llm_api_key}",
+                    "Content-Type": "application/json",
+                },
+                json=payload,
+                timeout=settings.llm_timeout_seconds,
+            )
+            response.raise_for_status()
+        except Exception as exc:
+            status = getattr(getattr(exc, "response", None), "status_code", None)
+            if status != 429 or attempt >= _LLM_429_MAX_RETRIES:
+                if status == 429:
+                    # 429 persists after all retries: degrade to the local
+                    # fallback instead of raising.
+                    return None
+                raise
+            delay = _retry_after_delay(getattr(exc, "response", None))
+            if delay is None:
+                delay = _LLM_429_BACKOFF_SECONDS[min(attempt, len(_LLM_429_BACKOFF_SECONDS) - 1)]
+            await asyncio.sleep(delay)
+            continue
+        break
+    if response is None:
+        return None
     data = response.json()
     content = (((data.get("choices") or [{}])[0]).get("message") or {}).get("content")
     if not content:
