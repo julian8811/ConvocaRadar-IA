@@ -645,6 +645,36 @@ def _update_opportunity(
         opportunity.open_date = data.open_date
     if data.close_date is not None and opportunity.close_date is None:
         opportunity.close_date = data.close_date
+    # Merge-path backfill: live scraping keeps the year-guard (bare date
+    # mentions from other years stay noise), so a genuinely extracted past
+    # close (e.g. "hasta el 17 de julio de 2020") arrives here as None on
+    # both sides. Re-extract with the past side open — gap-fill only, never
+    # overwriting a stored close and never inventing dates — so the status
+    # recalculation below can close the row instead of leaving it open
+    # without a close forever.
+    if opportunity.close_date is None and data.close_date is None:
+        try:
+            from app.connectors.common import extract_close_date as _extract_close_date
+
+            combined = " ".join(
+                part
+                for part in [
+                    data.title,
+                    data.summary,
+                    data.description,
+                    data.raw_text,
+                    opportunity.title,
+                    opportunity.summary,
+                    opportunity.description,
+                    opportunity.raw_text,
+                ]
+                if part
+            )
+            past_close = _extract_close_date(combined, allow_past=True)
+            if past_close is not None:
+                opportunity.close_date = past_close
+        except Exception:
+            pass
     opportunity.eligible_applicants = list(data.eligible_applicants)
     opportunity.requirements = list(data.requirements)
     opportunity.documents_required = list(data.documents_required)
