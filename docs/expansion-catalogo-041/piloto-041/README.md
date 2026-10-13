@@ -21,21 +21,29 @@ desviación respecto a lo documentado.
 
 ### `fixture-eu-life-calls-cinea.html` (reconstruido, NO fetch real)
 
+Etapa 0 (gate): cero fechas inventadas. Solo la card 1 trae fecha (real
+documentada); el resto declara cierre `unknown` (cards sin linea de fecha;
+el parse emite `close_date None` + marca unknown, nunca `open`).
+
 | # | Título en fixture | Fuente documentada | Fecha en fixture | Declaración |
 |---|---|---|---|---|
 | 1 | LIFE 2026 Standard Action Projects - Circular Economy and Zero Pollution | matriz `ejemplo_titulo` + pilot fixture `sap-circular-economy` | Deadline 22 September 2026 | Fecha real documentada (matriz `ejemplo_cierre` 2026-09-22). Al 2026-10-13 está **vencida**: sirve de pin de filtro de vencidas. |
-| 2 | LIFE 2026 Nature and Biodiversity Standard Action Projects call for proposals | pilot fixture `sap-nature-biodiversity` (deadline unknown) | Deadline 20 January 2027 | **Fecha sintética futura**: el piloto la marcó `unknown`. Se inventa solo la fecha para ejercitar la rama "abierta"; título/URL son los documentados. Revalidar contra el portal en el gate de activación. |
-| 3 | CINEA is hiring: Project Officer (job vacancy) | patrón anti-ruido X3 (`NOISE_KEYWORDS`: empleo/jobs) | 30 November 2026 | **Card sintética** que instancia el ruido documentado (la fuente real mezcla vacantes). Pin de pertinencia. |
-| 4 | News: LIFE Awards 2026 winners announced | patrón anti-ruido X3 (noticias/press) | 5 October 2026 | **Card sintética** de ruido editorial. Pin de pertinencia. |
+| 2 | LIFE 2026 Nature and Biodiversity Standard Action Projects call for proposals | pilot fixture `sap-nature-biodiversity` (deadline unknown) | `unknown` (sin fecha) | Título/URL documentados; el piloto la marcó `unknown` y la etapa 0 eliminó la fecha sintética futura que traía el fixture X4. Revalidar contra el portal en el gate de activación. |
+| 3 | CINEA is hiring: Project Officer (job vacancy) | patrón anti-ruido X3 (`NOISE_KEYWORDS`: empleo/jobs) | sin fecha | **Card sintética** que instancia el ruido documentado (la fuente real mezcla vacantes). Pin de pertinencia. |
+| 4 | News: LIFE Awards 2026 winners announced | patrón anti-ruido X3 (noticias/press) | sin fecha | **Card sintética** de ruido editorial. Pin de pertinencia. |
 
 ### `fixture-fundacion-biodiversidad.html` (reconstruido, NO fetch real)
 
+Etapa 0 (gate): cero fechas inventadas. Las cards relevantes declaran
+cierre `unknown` (sin linea de fecha; el parse emite `close_date None` +
+marca unknown, nunca `open`).
+
 | # | Título en fixture | Fuente documentada | Fecha en fixture | Declaración |
 |---|---|---|---|---|
-| 1 | Convocatoria para proyectos de Educacion Ambiental ... desinformacion climatica | matriz `ejemplo_titulo` + pilot fixture | Plazo 15 de diciembre de 2026 | Título/URL documentados (matriz `ejemplo_url`, importe 7M EUR). **Fecha sintética futura**: la matriz dice `ejemplo_cierre: 2026 (ver BOE/bases)`. Revalidar fecha real en el gate. |
-| 2 | Convocatoria renaturalizacion y resiliencia de ciudades 2026 | pilot fixture `convocatoria-infraestructura-verde-ciudades-2026` (unknown) | Plazo 30 de septiembre de 2026 | Título/URL documentados (importe 9M EUR FEDER). **Fecha sintética pasada** para ejercitar el filtro de vencidas. |
-| 3 | Oferta de empleo: tecnico de proyectos | patrón anti-ruido (oferta laboral) | 30 noviembre 2026 | **Card sintética** de ruido. Pin de pertinencia. |
-| 4 | Noticia: memoria anual 2025 | patrón anti-ruido (noticias/prensa) | 5 octubre 2026 | **Card sintética** de ruido. Pin de pertinencia. |
+| 1 | Convocatoria para proyectos de Educacion Ambiental ... desinformacion climatica | matriz `ejemplo_titulo` + pilot fixture | `unknown` (sin fecha) | Título/URL documentados (matriz `ejemplo_url`, importe 7M EUR). La matriz dice `ejemplo_cierre: 2026 (ver BOE/bases)`; la etapa 0 eliminó la fecha sintética futura del fixture X4. Revalidar fecha real en el gate. |
+| 2 | Convocatoria renaturalizacion y resiliencia de ciudades 2026 | pilot fixture `convocatoria-infraestructura-verde-ciudades-2026` (unknown) | `unknown` (sin fecha) | Título/URL documentados (importe 9M EUR FEDER). La etapa 0 eliminó la fecha sintética pasada del fixture X4 (el filtro de vencidas queda pineado por la card LIFE 2026-09-22 + test inline). |
+| 3 | Oferta de empleo: tecnico de proyectos | patrón anti-ruido (oferta laboral) | sin fecha | **Card sintética** de ruido. Pin de pertinencia. |
+| 4 | Noticia: memoria anual 2025 | patrón anti-ruido (noticias/prensa) | sin fecha | **Card sintética** de ruido. Pin de pertinencia. |
 
 ## Evidencia consolidada del piloto (`evidencia-piloto-041.json`)
 
