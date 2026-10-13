@@ -609,7 +609,7 @@ def seed_default_sources(
         {
             "key": "supersolidaria-convocatorias",
             "name": "SuperSolidaria — Convocatorias",
-            "base_url": "https://www.supersolidaria.gov.co/es/convocatorias",
+            "base_url": "https://www.supersolidaria.gov.co/es/content/convocatorias-superintendencias",
             "country": "Colombia",
             "region": "LatAm",
             "source_type": "html",
@@ -947,7 +947,7 @@ def seed_default_sources(
         {
             "key": "oei-convocatorias",
             "name": "OEI — Convocatorias Iberoamericanas",
-            "base_url": "https://oei.int/oficinas/secretaria-general/convocatorias",
+            "base_url": "https://oei.int/licitaciones-y-convocatorias/",
             "country": "International",
             "region": "LatAm",
             "source_type": "html",
@@ -958,7 +958,7 @@ def seed_default_sources(
         {
             "key": "cepal-convocatorias",
             "name": "CEPAL — Convocatorias",
-            "base_url": "https://www.cepal.org/es/convocatorias",
+            "base_url": "https://www.cepal.org/es",
             "country": "International",
             "region": "LatAm",
             "source_type": "html",
@@ -1190,12 +1190,12 @@ def seed_default_sources(
         {
             "key": "inct-brasil",
             "name": "INCT Brasil — Institutos de Ciencia y Tecnología",
-            "base_url": "https://www.gov.br/cnpq/pt-br/assuntos/institutos-nacionais-de-ciencia-e-tecnologia",
+            "base_url": "https://www.gov.br/cnpq/pt-br/chamadas/abertas-para-submissao",
             "country": "Brazil",
             "region": "LatAm",
             "source_type": "html",
             "category": ["convocatorias", "ciencia", "investigacion"],
-            "allowed_domains": ["gov.br"],
+            "allowed_domains": ["gov.br", "www.gov.br"],
             "scraping_frequency": "weekly",
         },
         {
@@ -1295,7 +1295,7 @@ def seed_default_sources(
         {
             "key": "global-environment-facility",
             "name": "GEF — Global Environment Facility",
-            "base_url": "https://www.thegef.org/projects-operations/calls-for-proposals",
+            "base_url": "https://www.thegef.org/who-we-are/funding",
             "country": "International",
             "region": "Global",
             "source_type": "html",
@@ -1306,7 +1306,7 @@ def seed_default_sources(
         {
             "key": "green-climate-fund",
             "name": "GCF — Green Climate Fund",
-            "base_url": "https://www.greenclimate.fund/projects/call-for-proposals",
+            "base_url": "https://www.greenclimate.fund/access-funding",
             "country": "International",
             "region": "Global",
             "source_type": "html",
@@ -1358,12 +1358,12 @@ def seed_default_sources(
         {
             "key": "giz-alemania",
             "name": "GIZ Alemania — Licitaciones",
-            "base_url": "https://www.giz.de/en/html/ausschreibungen.html",
+            "base_url": "https://www.giz.de/en/partner/funding",
             "country": "Germany",
             "region": "Europe",
             "source_type": "html",
             "category": ["convocatorias", "cooperacion", "desarrollo"],
-            "allowed_domains": ["giz.de", "www.giz.de"],
+            "allowed_domains": ["giz.de", "www.giz.de", "ausschreibungen.giz.de"],
             "scraping_frequency": "daily",
         },
         {
@@ -3304,7 +3304,7 @@ def seed_default_sources(
             "key": "finagro-lec-2026",
             "name": "FINAGRO — Líneas Especiales de Crédito 2026",
             "enabled": True,
-            "base_url": "https://www.finagro.com.co/lineas-especiales-credito-lec-finagro-2026",
+            "base_url": "https://www.finagro.com.co/",
             "country": "Colombia",
             "region": "LatAm",
             "source_type": "html",
