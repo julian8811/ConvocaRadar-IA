@@ -2556,6 +2556,17 @@ async def enrich_candidates_batch(
 #   dates at all.
 # Gating by source key leaves every non-pilot source byte-identical.
 
+# Per-run cap on SSR detail fetches inside ``enrich_pilot_candidates``.
+# Server evidence (E25 verification): detail fetches run inside the 90s
+# per-source scrape budget, so sources with many missing fichas
+# (ascun/cost/sdde) time out with 0 items. Capping the missing window to
+# the first 5 candidates per run lets the listing always complete while
+# detail coverage progresses run by run (stable order: the missing filter
+# below re-selects the same way every run, so skipped fichas are retried
+# on later runs). Applies ONLY to the SSR detail fetch — the listing,
+# gap-fill merge, and the <=5-candidate path are byte-identical to before.
+DETAIL_ENRICHMENT_MAX_FETCHES_PER_RUN: int = 5
+
 DETAIL_ENRICHMENT_PILOT_KEYS: frozenset[str] = frozenset(
     {
         "grants-gov",
@@ -2626,6 +2637,10 @@ async def enrich_pilot_candidates(
     reuses the 15s detail timeout and ``extraction_detail_limit`` cap and
     merges via :func:`apply_extracted_fields` (gap-fill only — existing
     dates/funding are never overwritten). Order and count are preserved.
+
+    At most ``DETAIL_ENRICHMENT_MAX_FETCHES_PER_RUN`` missing candidates
+    are fetched per run (first in stable order); the rest pass through
+    untouched and are retried on later runs.
     """
     if source_key not in DETAIL_ENRICHMENT_PILOT_KEYS:
         return candidates
@@ -2639,7 +2654,9 @@ async def enrich_pilot_candidates(
             return await enrich_developmentaid_render(candidates)
         except Exception:
             return candidates
-    enriched = await enrich_candidates_batch(missing)
+    enriched = await enrich_candidates_batch(
+        missing[:DETAIL_ENRICHMENT_MAX_FETCHES_PER_RUN]
+    )
     if not enriched:
         return candidates
     by_url: dict[str, OpportunityCandidate] = {}
