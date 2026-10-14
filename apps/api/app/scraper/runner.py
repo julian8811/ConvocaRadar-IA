@@ -67,6 +67,12 @@ PROGRESS_STEPS = ["fetch", "parse", "persist"]
 # binds when items are cheap. Both paths log a "persist capped" entry.
 PERSIST_MAX_ITEMS_PER_RUN = 50
 PERSIST_TIME_RESERVE_SECONDS = 5.0
+# Floor for the per-item persist await: an item started just before the
+# deadline still gets a minimal chance to finish fast work (a 50ms write
+# straddling the boundary completes instead of failing). Bounded and
+# covered by PERSIST_TIME_RESERVE_SECONDS, so the outer wait_for(remaining)
+# in run_source_inline can never fire because of one item.
+PERSIST_MIN_ITEM_SECONDS = 2.0
 URL_CHECK_WARMUP_CONCURRENCY = 16
 URL_CHECK_WARMUP_TIMEOUT_SECONDS = 15.0
 
@@ -473,11 +479,29 @@ async def _persist_opportunities(
             opportunity_result = create_opportunity(
                 db, opportunity_data, organization_id=organization_id
             )
-            opportunity = (
-                await opportunity_result
-                if inspect.isawaitable(opportunity_result)
-                else opportunity_result
-            )
+            if inspect.isawaitable(opportunity_result):
+                if deadline is not None:
+                    # One slow item (serial LLM enrich at llm_timeout 45s
+                    # + 2x HEAD url-check + gateway embedding) must never
+                    # consume more than the remaining persist budget: the
+                    # loop-top deadline check alone cannot stop an already
+                    # started item, and the outer wait_for(remaining) would
+                    # then raise TimeoutError -> failed run with 0 items
+                    # (ascun/cost ~90s evidence). Clip the single await to
+                    # the remainder; on timeout the generic handler below
+                    # records the item as failed and the loop moves on.
+                    item_timeout = deadline - time.monotonic()
+                    if item_timeout <= 0:
+                        skip_reason = "time_budget"
+                        break
+                    opportunity = await asyncio.wait_for(
+                        opportunity_result,
+                        timeout=max(item_timeout, PERSIST_MIN_ITEM_SECONDS),
+                    )
+                else:
+                    opportunity = await opportunity_result
+            else:
+                opportunity = opportunity_result
             if opportunity.first_seen_at == opportunity.last_seen_at:
                 created += 1
             else:
