@@ -131,6 +131,94 @@ class TestGateE25:
         mock_fetch.assert_not_awaited()
 
 
+class TestDetailFetchCapPerRun:
+    """Per-run detail-fetch cap: at most 5 fichas per run.
+
+    Server evidence (E25 verification): detail fetches run inside the 90s
+    scrape budget, so ascun/cost/sdde time out with 0 items. The SSR batch
+    takes the first 5 candidates needing detail per run; the rest wait for
+    later runs (stable order, same selection rules, only truncated).
+    """
+
+    def _missing(self, index: int) -> OpportunityCandidate:
+        return _candidate(f"https://example.com/cost/call-{index}")
+
+    @pytest.mark.asyncio
+    async def test_window_capped_at_five_per_run(self, monkeypatch):
+        """RED: 8 missing candidates -> exactly the first 5 are fetched."""
+        from datetime import datetime
+
+        from app.connectors.common import enrich_pilot_candidates
+
+        fetched: list[str] = []
+
+        async def _ok_fetch(url, **kwargs):
+            fetched.append(url)
+            return (url, _DETAIL_HTML, "text/html")
+
+        monkeypatch.setattr("app.connectors.common.fetch_httpx_text", _ok_fetch)
+
+        candidates = [self._missing(i) for i in range(8)]
+        results = await enrich_pilot_candidates("cost-open-calls", candidates)
+
+        assert fetched == [f"https://example.com/cost/call-{i}" for i in range(5)]
+        assert [r.official_url for r in results] == [c.official_url for c in candidates]
+        assert all(r.close_date is not None for r in results[:5])
+        assert all(r.close_date is None for r in results[5:])
+        assert isinstance(results[0].close_date, datetime)
+
+    @pytest.mark.asyncio
+    async def test_five_or_fewer_behaves_as_before(self, monkeypatch):
+        """Pin: with <=5 missing candidates every one is fetched (as today)."""
+        from app.connectors.common import enrich_pilot_candidates
+
+        fetched: list[str] = []
+
+        async def _ok_fetch(url, **kwargs):
+            fetched.append(url)
+            return (url, _DETAIL_HTML, "text/html")
+
+        monkeypatch.setattr("app.connectors.common.fetch_httpx_text", _ok_fetch)
+
+        candidates = [self._missing(i) for i in range(5)]
+        results = await enrich_pilot_candidates("sdde-bogota-convocatorias", candidates)
+
+        assert len(fetched) == 5
+        assert all(r.close_date is not None for r in results)
+
+    @pytest.mark.asyncio
+    async def test_complete_candidates_never_fetched_and_order_stable(self, monkeypatch):
+        """Pin: gap-fill filter still applies first; the cap truncates only
+        the missing window, keeping stable order for later runs."""
+        from datetime import datetime
+
+        from app.connectors.common import enrich_pilot_candidates
+
+        fetched: list[str] = []
+
+        async def _ok_fetch(url, **kwargs):
+            fetched.append(url)
+            return (url, _DETAIL_HTML, "text/html")
+
+        monkeypatch.setattr("app.connectors.common.fetch_httpx_text", _ok_fetch)
+
+        complete = _candidate(
+            "https://example.com/ascun/complete",
+            open_date=datetime(2026, 1, 10),
+            close_date=datetime(2026, 12, 15),
+            funding_amount_raw="USD 10,000",
+            funding_amount_value=10000.0,
+        )
+        candidates = [complete] + [self._missing(i) for i in range(6)]
+        results = await enrich_pilot_candidates("ascun-convocatorias", candidates)
+
+        assert fetched == [f"https://example.com/cost/call-{i}" for i in range(5)]
+        assert results[0].official_url == "https://example.com/ascun/complete"
+        assert results[0].funding_amount_value == 10000.0
+        assert results[6].close_date is None
+        assert [r.official_url for r in results] == [c.official_url for c in candidates]
+
+
 def _groq_settings(**overrides):
     settings = MagicMock()
     settings.llm_api_key = "test-key"
