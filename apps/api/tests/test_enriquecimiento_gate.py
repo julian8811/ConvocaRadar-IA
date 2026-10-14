@@ -1,9 +1,10 @@
 """E25: detail-enrichment gate extension + Groq/LLM 429 backoff.
 
-- Gate: ``ascun-convocatorias``, ``cost-open-calls`` and
-  ``sdde-bogota-convocatorias`` join ``DETAIL_ENRICHMENT_PILOT_KEYS`` so the
-  runner-level SSR batch enriches them; non-pilot keys still pass through
-  untouched (zero network: the fetch helper is stubbed or asserted uncalled).
+- Gate: ``cost-open-calls`` and ``sdde-bogota-convocatorias`` join
+  ``DETAIL_ENRICHMENT_PILOT_KEYS`` so the runner-level SSR batch enriches
+  them; non-pilot keys still pass through untouched (zero network: the
+  fetch helper is stubbed or asserted uncalled). E27: ``ascun-convocatorias``
+  was removed again (news feed, details never yield call dates).
 - Backoff: ``_call_llm`` retries 429 with exponential backoff (honouring
   ``Retry-After``) and degrades to the existing fallback (returns None, never
   raises) when 429 persists.
@@ -46,10 +47,10 @@ _DETAIL_HTML = """<html><body><main>
 
 class TestGateE25:
     def test_gate_includes_new_keys(self):
-        """RED E25: the three new sources join the pilot gate."""
+        """RED E25: the new sources join the pilot gate (E27: ascun removed again)."""
         from app.connectors.common import DETAIL_ENRICHMENT_PILOT_KEYS
 
-        assert "ascun-convocatorias" in DETAIL_ENRICHMENT_PILOT_KEYS
+        assert "ascun-convocatorias" not in DETAIL_ENRICHMENT_PILOT_KEYS
         assert "cost-open-calls" in DETAIL_ENRICHMENT_PILOT_KEYS
         assert "sdde-bogota-convocatorias" in DETAIL_ENRICHMENT_PILOT_KEYS
 
@@ -92,7 +93,6 @@ class TestGateE25:
     @pytest.mark.parametrize(
         "source_key,url",
         [
-            ("ascun-convocatorias", "https://example.com/ascun/conv-1"),
             ("cost-open-calls", "https://example.com/cost/call-1"),
             ("sdde-bogota-convocatorias", "https://example.com/sdde/conv-1"),
         ],
@@ -203,17 +203,17 @@ class TestDetailFetchCapPerRun:
         monkeypatch.setattr("app.connectors.common.fetch_httpx_text", _ok_fetch)
 
         complete = _candidate(
-            "https://example.com/ascun/complete",
+            "https://example.com/cost/complete",
             open_date=datetime(2026, 1, 10),
             close_date=datetime(2026, 12, 15),
             funding_amount_raw="USD 10,000",
             funding_amount_value=10000.0,
         )
         candidates = [complete] + [self._missing(i) for i in range(6)]
-        results = await enrich_pilot_candidates("ascun-convocatorias", candidates)
+        results = await enrich_pilot_candidates("cost-open-calls", candidates)
 
         assert fetched == [f"https://example.com/cost/call-{i}" for i in range(5)]
-        assert results[0].official_url == "https://example.com/ascun/complete"
+        assert results[0].official_url == "https://example.com/cost/complete"
         assert results[0].funding_amount_value == 10000.0
         assert results[6].close_date is None
         assert [r.official_url for r in results] == [c.official_url for c in candidates]

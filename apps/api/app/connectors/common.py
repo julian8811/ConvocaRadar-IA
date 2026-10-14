@@ -2607,7 +2607,10 @@ DETAIL_ENRICHMENT_PILOT_KEYS: frozenset[str] = frozenset(
         # (67/58/48); sdde already gains +4 closes from the listing, so
         # its detail pages may yield even more — the existing SSR batch
         # path covers all three, no connector change.
-        "ascun-convocatorias",
+        # E27: ascun-convocatorias REMOVED again — its feed returns NEWS
+        # (/noticias-ies/), detail fetches can never yield call dates and
+        # waste the 90s scrape budget (45s fetch + details overflows it).
+        # cost-open-calls + sdde-bogota-convocatorias stay in.
         "cost-open-calls",
         "sdde-bogota-convocatorias",
     }

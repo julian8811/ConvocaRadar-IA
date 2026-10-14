@@ -112,30 +112,30 @@ class TestPilotGateSwap:
         from app.connectors.common import DETAIL_ENRICHMENT_PILOT_KEYS
 
         assert "grants-gov" in DETAIL_ENRICHMENT_PILOT_KEYS
-        # E25: ascun-convocatorias rejoined the gate (top unknown-sin-close).
-        assert "ascun-convocatorias" in DETAIL_ENRICHMENT_PILOT_KEYS
+        # E25 briefly added ascun; E27 removed it again (news feed, details useless).
+        assert "ascun-convocatorias" not in DETAIL_ENRICHMENT_PILOT_KEYS
         assert "innpulsa" in DETAIL_ENRICHMENT_PILOT_KEYS
         assert "minciencias" in DETAIL_ENRICHMENT_PILOT_KEYS
 
     @pytest.mark.asyncio
     async def test_ascun_passthrough_makes_no_fetch(self, monkeypatch):
-        """RED E4: non-pilot candidates must skip detail fetch entirely."""
+        """RED E4: ascun candidates must skip detail fetch entirely."""
         from app.connectors.common import enrich_pilot_candidates
 
         mock_fetch = AsyncMock()
         mock_fetch.return_value = ("https://detail.example/item", "<html></html>", "text/html")
         monkeypatch.setattr("app.connectors.common.fetch_httpx_text", mock_fetch)
         candidate = OpportunityCandidate(
-            title="Danida call",
-            entity="Danida Denmark",
-            country="Denmark",
-            official_url="https://um.dk/en/danida/calls-for-proposals/item-1/",
-            summary="Call",
-            raw_text="Call",
+            title="Noticia ASCUN",
+            entity="ASCUN Colombia",
+            country="Colombia",
+            official_url="https://ascun.org.co/noticias-ies/nota-1/",
+            summary="Noticia",
+            raw_text="Noticia",
             confidence_score=0.55,
         )
 
-        result = await enrich_pilot_candidates("danida-denmark", [candidate])
+        result = await enrich_pilot_candidates("ascun-convocatorias", [candidate])
 
         assert result == [candidate]
         mock_fetch.assert_not_awaited()
