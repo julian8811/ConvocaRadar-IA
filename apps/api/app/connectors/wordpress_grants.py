@@ -161,6 +161,7 @@ class WordPressGrantsConnector:
         all_items: list[dict[str, object]] = []
         final_url = self.base_url
         total_pages = 1
+        pages_fetched = 0
         client = await http_client()
         # Cap per-page timeout to 15s so a single slow page doesn't stall
         # the entire connector. The WordPress REST API with per_page=100
@@ -185,6 +186,7 @@ class WordPressGrantsConnector:
             if not isinstance(payload, list) or not payload:
                 break
             all_items.extend(item for item in payload if isinstance(item, dict))
+            pages_fetched += 1
             if page >= total_pages:
                 break
         content = json.dumps(all_items, ensure_ascii=False)
@@ -193,7 +195,7 @@ class WordPressGrantsConnector:
             url=final_url,
             content=content,
             content_type="application/json",
-            metadata={"pages_fetched": min(total_pages, self.max_pages), "items_fetched": len(all_items)},
+            metadata={"pages_fetched": pages_fetched, "items_fetched": len(all_items)},
         )
 
     async def parse(self, raw: RawSourceResult) -> list[OpportunityCandidate]:
