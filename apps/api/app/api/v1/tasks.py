@@ -12,19 +12,25 @@ from app.schemas import TaskRead
 
 router = APIRouter()
 
+# Boot del proceso actual (UTC naive, como el resto del módulo). Un sweep
+# sin terminar creado ANTES de este instante es huérfano por restart y se
+# libera; uno creado DESPUÉS vive en este proceso y nunca es stale, tenga
+# la edad que tenga (un barrido completo tarda 25-40 min). Vale porque api
+# corre single-process (uvicorn sin --workers): con N workers habría que
+# revisarlo (un worker marcaría como rancios los sweeps de otro).
+_PROCESS_BOOTED_AT = datetime.now(UTC).replace(tzinfo=None)
+
 
 def _mark_stale_source_sweeps(db: Session, organization_id: str) -> None:
     """Release UI locks left by a process restart during a source sweep."""
-    settings = get_settings()
-    stale_after = max(settings.per_connector_timeout_seconds * 3, 600)
-    cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(seconds=stale_after)
     stale = list(
         db.scalars(
             select(Task).where(
                 Task.organization_id == organization_id,
                 Task.task_type == "source_sweep",
                 Task.status.in_(("queued", "running")),
-                Task.created_at < cutoff,
+                Task.finished_at.is_(None),
+                Task.created_at < _PROCESS_BOOTED_AT,
             )
         )
     )
