@@ -837,6 +837,9 @@ def seed_default_sources(
         {
             "key": "cnpq-brasil",
             "name": "CNPq Brasil — Chamadas",
+            # Deshabilitada 2026-10-15: la base apunta a un noticiero y solo
+            # capturó basura de navegación; acuerdo sólo-convocatorias.
+            "enabled": False,
             "base_url": "https://www.gov.br/cnpq/pt-br/assuntos/noticias/cnpq-em-acao",
             "country": "Brazil",
             "region": "LatAm",
@@ -2392,7 +2395,9 @@ def seed_default_sources(
         {
             "key": "segib-noticias",
             "name": "SEGIB — Noticias y Programas Iberoamericanos",
-            "enabled": True,
+            # Deshabilitada 2026-10-15: trae eventos/foros, cero llamadas;
+            # acuerdo sólo-convocatorias.
+            "enabled": False,
             "base_url": "https://www.segib.org/",
             "country": "International",
             "region": "LatAm",
