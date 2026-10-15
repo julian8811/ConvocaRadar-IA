@@ -45,6 +45,12 @@ BATCH_COUNTRIES = {
     "senacyt-panama": "Panama",
 }
 
+# Acuerdo sólo-convocatorias 2026-10-15: segib-noticias trae eventos/foros
+# (33 filas en prod, cero llamadas) y cnpq-brasil apunta a un noticiero con
+# solo basura de navegación (3 filas). Ninguna de las dos se elimina del
+# catálogo para no perder trazabilidad; quedan deshabilitadas.
+EXPECTED_DISABLED_BY_POLICY = ("segib-noticias", "cnpq-brasil")
+
 
 def _seed_definitions_by_key() -> dict[str, dict]:
     seed_path = Path(__file__).resolve().parents[1] / "app" / "db" / "seed.py"
@@ -66,17 +72,24 @@ def test_034_keys_enabled_latam():
     for key in BATCH_KEYS:
         assert key in defs, f"missing {key}"
         definition = defs[key]
-        assert definition.get("enabled", True) is True
+        expected = key not in EXPECTED_DISABLED_BY_POLICY
+        assert definition.get("enabled", True) is expected, f"{key} enabled={not expected}"
         assert definition["country"] == BATCH_COUNTRIES[key]
         assert definition["region"] == "LatAm"
         assert definition["base_url"] == BATCH_URLS[key]
         HtmlConnectorConfig.from_dict(definition["connector_config"])
 
 
+def test_noticias_disabled_newsroom_policy():
+    defs = _seed_definitions_by_key()
+    assert defs["segib-noticias"].get("enabled", True) is False
+    assert defs["cnpq-brasil"].get("enabled", True) is False
+
+
 def test_catalog_fully_enabled():
     defs = _seed_definitions_by_key()
     # Deshabilitadas por dictamen: 5 de la tanda 041 (gate X3, issue #62) +
-    # idt-noticias (dictamen E13, sólo-convocatorias; ver test_038_batch_seeds.py).
+    # idt-noticias (E13) + segib-noticias y cnpq-brasil (auditoría noticieros 2026-10-15; ver test_038/test_034).
     assert {k for k, d in defs.items() if d.get("enabled", True) is False} == {
         "idt-noticias",
         "fontagro-convocatorias",
@@ -84,6 +97,8 @@ def test_catalog_fully_enabled():
         "eu-life-calls-cinea",
         "biodiversa-calls",
         "fondo-accion-convocatorias",
+        "segib-noticias",
+        "cnpq-brasil",
     }
     assert len(defs) >= 152
 
