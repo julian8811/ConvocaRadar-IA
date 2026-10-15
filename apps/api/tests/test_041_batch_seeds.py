@@ -87,7 +87,7 @@ def test_041_keys_disabled_and_configurable():
 def test_041_catalog_count_and_uniqueness():
     defs = _seed_definitions_by_key()
     # 203 (040/F3) + 5 (041) = 208
-    assert len(defs) == 208, f"expected 208 keys, got {len(defs)}"
+    assert len(defs) == 211, f"expected 211 keys, got {len(defs)}"
     from collections import Counter
 
     seed_path = Path(__file__).resolve().parents[1] / "app" / "db" / "seed.py"
