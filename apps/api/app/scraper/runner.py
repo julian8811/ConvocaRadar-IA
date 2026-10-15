@@ -18,7 +18,7 @@ from app.models import Source, SourceRun, Task
 
 _struct_logger = structlog.get_logger(__name__)
 from app.schemas import OpportunityCreate
-from app.scraper.dom_monitor import compute_dom_hash
+from app.scraper.dom_monitor import compute_listing_hash
 from app.scraper.errors import ErrorType, classify_error
 from app.services import (
     candidate_external_id,
@@ -129,24 +129,36 @@ async def _scrape_candidates(
         connector_config=source.connector_config,
     )
     raw = await connector.fetch()
+    # Fingerprint skip (captura-fingerprint): identical page ⇒ no parse.
+    # The stored hash migrates transparently (one extra full scrape).
+    listing_hash = compute_listing_hash(raw.content or "")
     if stats is not None:
         stats["raw_url"] = raw.url
         stats["raw_content_type"] = raw.content_type
         stats["raw_content_length"] = len(raw.content or "")
-        # Change D: compute DOM hash from raw page content
-        stats["dom_hash"] = compute_dom_hash(raw.content or "")
+        stats["dom_hash"] = listing_hash
+    if getattr(source, "dom_hash", None) is not None and source.dom_hash == listing_hash:
+        if stats is not None:
+            stats["dom_unchanged_skipped"] = True
+        _struct_logger.info("dom_unchanged_skip", source_key=source.key)
+        return []
     candidates = await connector.parse(raw)
     # Persist connector state (processed_urls, last_sitemap_fetch)
     # for connectors that track incremental progress across runs.
     updated_config = getattr(connector, "get_updated_config", lambda: None)()
     if updated_config is not None:
         source.connector_config = updated_config
-    if not candidates and source.key in {
-        "grants-gov",
-        "grants-gov-rss",
-        "grants-gov-forecast",
-        "simpler-grants",
-    }:
+    if (
+        not candidates
+        and not (stats is not None and stats.get("dom_unchanged_skipped"))
+        and source.key
+        in {
+            "grants-gov",
+            "grants-gov-rss",
+            "grants-gov-forecast",
+            "simpler-grants",
+        }
+    ):
         fallback_connector = connector_for(source.key, None, source.source_type)
         fallback_raw = await fallback_connector.fetch()
         fallback_candidates = await fallback_connector.parse(fallback_raw)
@@ -586,7 +598,11 @@ def _finalize_run(
 ) -> None:
     """Update SourceRun, Task, and Source with final status after successful scrape."""
     finished_at = datetime.now(UTC).replace(tzinfo=None)
-    run.status = "degraded" if len(opportunities) == 0 else "success"
+    # Fingerprint skip: identical page is a successful monitoring tick, not
+    # degradation — there is simply nothing new. It also refreshes
+    # last_success_at so steadily static sources don't drift stale.
+    skipped_unchanged = bool(scrape_stats.get("dom_unchanged_skipped"))
+    run.status = "success" if (len(opportunities) > 0 or skipped_unchanged) else "degraded"
     run.finished_at = finished_at
     run.items_found = len(opportunities)
     run.items_created = created
@@ -603,6 +619,11 @@ def _finalize_run(
             "items_failed": failed_items,
         },
     ]
+    if skipped_unchanged:
+        run.logs = [
+            *run.logs,
+            {"level": "info", "message": "DOM unchanged since last scrape, parse skipped"},
+        ]
     task.status = run.status
     task.finished_at = finished_at
     task.result = {
@@ -610,10 +631,10 @@ def _finalize_run(
         "items_created": created,
         "items_updated": updated,
     }
-    if len(opportunities) > 0:
+    if len(opportunities) > 0 or skipped_unchanged:
         source.last_success_at = finished_at
         source.last_error = None
-    if len(opportunities) == 0:
+    if len(opportunities) == 0 and not skipped_unchanged:
         create_source_health_alert(
             db,
             source,
