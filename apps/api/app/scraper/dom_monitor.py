@@ -16,6 +16,15 @@ from typing import TYPE_CHECKING
 if TYPE_CHECKING:
     pass
 
+# Embedded data payloads (JSON-LD, __NEXT_DATA__) that parse Step 1
+# consumes as highest-confidence extraction. normalize_html strips ALL
+# scripts, so these must be hashed separately or a data-only change would
+# be invisible to the fingerprint (blind spot).
+_EMBEDDED_JSON_RE = re.compile(
+    r"<script\b[^>]*?(?:type\s*=\s*[\"'](?:application/ld\+json|application/json)[\"']"
+    r"|id\s*=\s*[\"']__NEXT_DATA__[\"'])[^>]*>(.*?)</script>",
+    re.DOTALL | re.IGNORECASE,
+)
 # Patterns for content to strip during normalization
 _SCRIPT_RE = re.compile(r"<script[^>]*>.*?</script>", re.DOTALL | re.IGNORECASE)
 _STYLE_RE = re.compile(r"<style[^>]*>.*?</style>", re.DOTALL | re.IGNORECASE)
@@ -80,6 +89,37 @@ def compute_dom_hash(html_content: str) -> str:
     return hashlib.sha256(normalized.encode("utf-8")).hexdigest()
 
 
+def extract_embedded_payloads(html_content: str | None) -> str:
+    """Extract embedded data payloads (JSON-LD, __NEXT_DATA__) as text.
+
+    Parse Step 1 consumes these as highest-confidence extraction, but
+    :func:`normalize_html` strips every script tag — so data-only changes
+    would be invisible to :func:`compute_dom_hash`. Plain scripts/styles
+    are ignored here; only data payloads count.
+    """
+    if not html_content:
+        return ""
+    parts = []
+    for match in _EMBEDDED_JSON_RE.finditer(html_content):
+        payload = _WHITESPACE_RE.sub(" ", match.group(1) or "").strip()
+        if payload:
+            parts.append(payload)
+    return "\n".join(parts)
+
+
+def compute_listing_hash(html_content: str | None) -> str:
+    """Fingerprint for the unchanged-page skip: visible DOM + embedded data.
+
+    Same 64-hex shape as :func:`compute_dom_hash` so stored values migrate
+    transparently (one extra full scrape per source after deploy, then
+    stable). A change in EITHER layer alters the hash; pure script/style
+    noise alters NEITHER.
+    """
+    visible = normalize_html(html_content or "")
+    embedded = extract_embedded_payloads(html_content or "")
+    return hashlib.sha256((visible + "\x00" + embedded).encode("utf-8")).hexdigest()
+
+
 def detect_structural_change(
     old_hash: str | None,
     new_hash: str,
@@ -107,7 +147,6 @@ def detect_structural_change(
 
     if old_hash is None:
         return True
-
     return old_hash != new_hash
 
 
