@@ -76,7 +76,8 @@ def test_039_keys_enabled_and_configurable():
         assert definition.get("enabled", True) is True, f"{key} not enabled"
         assert definition["connector_type"] == "configurable_html" if "connector_type" in definition else definition["source_type"] == "html"
         assert definition["source_type"] == "html"
-        assert definition["scraping_frequency"] == "weekly"
+        # Monitoreo diario total 2026-10-15: todas las habilitadas a daily.
+        assert definition["scraping_frequency"] == "daily"
         assert definition["base_url"] == BATCH_URLS[key]
         assert definition["country"] == BATCH_COUNTRIES[key]
         # connector_config must have required selectors

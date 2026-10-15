@@ -169,7 +169,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["becas", "cooperacion", "educacion"],
             "allowed_domains": ["web.icetex.gov.co"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
         },
         {
             "key": "mineducacion-becas",
@@ -180,7 +180,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["becas", "cooperacion", "educacion"],
             "allowed_domains": ["mineducacion.gov.co", "www.mineducacion.gov.co"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
         },
         {
             "key": "innpulsa",
@@ -202,7 +202,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["convocatorias", "cooperacion", "internacional"],
             "allowed_domains": ["apccolombia.gov.co"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
         },
         {
             "key": "ukri-opportunities",
@@ -224,7 +224,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["cooperation", "research", "innovation"],
             "allowed_domains": ["unesco.org", "www.unesco.org"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": ["article", "main a[href*='call']", "main a[href*='proposal']", "main a[href*='grant']", ".list-view--item", "main li a"],
                 "title_selectors": ["h2", "h3", "a"],
@@ -244,7 +244,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["cooperation", "governance", "funding"],
             "allowed_domains": ["un.org", "www.un.org"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
         },
         {
             "key": "unwomen-innovate",
@@ -255,7 +255,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["innovation", "cooperation", "global"],
             "allowed_domains": ["unwomen.org"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
         },
         {
             "key": "novo-nordisk-grants",
@@ -277,7 +277,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["grants", "health", "research"],
             "allowed_domains": ["wellcome.org", "www.wellcome.org"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
         },
         {
             "key": "horizon-europe-sedia",
@@ -299,7 +299,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["grants", "health", "development"],
             "allowed_domains": ["gatesfoundation.org", "www.gatesfoundation.org"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
         },
         {
             "key": "dfg-grants",
@@ -310,7 +310,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["grants", "research", "funding"],
             "allowed_domains": ["dfg.de", "www.dfg.de"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
         },
         {
             "key": "colfuturo-convocatorias",
@@ -347,7 +347,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["grants", "health", "neuroscience", "research"],
             "allowed_domains": ["lundbeckfonden.com"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
         },
         {
             "key": "velux-foundation",
@@ -358,7 +358,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["grants", "research", "sustainability"],
             "allowed_domains": ["veluxfonden.dk"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
         },
         {
             "key": "isciii-convocatorias",
@@ -401,7 +401,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["grants", "research", "development"],
             "allowed_domains": ["idrc-crdi.ca", "www.idrc-crdi.ca"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
         },
         {
             "key": "usaid-grants",
@@ -423,7 +423,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["cooperation", "development", "funding"],
             "allowed_domains": ["giz.de", "www.giz.de", "ausschreibungen.giz.de"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
         },
         {
             "key": "eic-accelerator",
@@ -445,7 +445,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["grants", "innovation", "development", "social impact"],
             "allowed_domains": ["globalinnovation.fund", "www.globalinnovation.fund"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
         },
         {
             "key": "procolombia-convocatorias",
@@ -461,7 +461,7 @@ def seed_default_sources(
                 "groovy-hickory-42b.notion.site",
                 "drive.google.com",
             ],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
         },
         {
             "key": "anii-uruguay",
@@ -536,7 +536,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["convocatorias", "financiamiento", "emprendimiento"],
             "allowed_domains": ["bancoldex.com", "www.bancoldex.com"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": ["tbody tr", "table.views-table tbody tr"],
                 "title_selectors": ["td:nth-child(2)", "td:nth-child(2) a"],
@@ -577,7 +577,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["convocatorias", "cultura", "emprendimiento"],
             "allowed_domains": ["artesaniasdecolombia.com.co"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
         },
         {
             "key": "innpulsa-colombia-startup",
@@ -615,7 +615,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["convocatorias", "solidaria", "social"],
             "allowed_domains": ["supersolidaria.gov.co", "www.supersolidaria.gov.co"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
         },
         {
             "key": "fondo-emprender-sena",
@@ -731,7 +731,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["convocatorias", "emprendimiento", "aceleradora"],
             "allowed_domains": ["startupchile.org", "www.startupchile.org"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": ["section", "article", "main"],
                 "title_selectors": ["h1", "h2", "h3", "a"],
@@ -756,7 +756,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["convocatorias", "emprendimiento", "aceleradora"],
             "allowed_domains": ["startupchile.org", "www.startupchile.org"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": ["section", "article", "main"],
                 "title_selectors": ["h1", "h2", "h3", "a"],
@@ -781,7 +781,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["convocatorias", "emprendimiento", "aceleradora"],
             "allowed_domains": ["startupchile.org", "www.startupchile.org"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": ["section", "article", "main"],
                 "title_selectors": ["h1", "h2", "h3", "a"],
@@ -880,7 +880,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["convocatorias", "innovacion", "desarrollo"],
             "allowed_domains": ["iadb.org", "www.iadb.org"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": ["article", ".card", ".views-row", "li.views-row", "main a[href*='convocatoria']", "main a[href*='call']", "main a[href*='grant']"],
                 "title_selectors": ["h2", "h3", "h2 a", "h3 a", "a"],
@@ -908,7 +908,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["becas", "convocatorias", "educacion", "movilidad"],
             "allowed_domains": ["fulbright.edu.co", "www.fulbright.edu.co"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": [
                     ".card",
@@ -978,7 +978,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["convocatorias", "academia", "investigacion"],
             "allowed_domains": ["flacso.org", "www.flacso.org"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
         },
         {
             "key": "aladi-convocatorias",
@@ -989,7 +989,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["convocatorias", "comercio", "cooperacion"],
             "allowed_domains": ["aladi.org", "www.aladi.org"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
         },
         {
             "key": "sgc-convocatorias",
@@ -1000,7 +1000,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["convocatorias", "cooperacion", "desarrollo"],
             "allowed_domains": ["segib.org", "www.segib.org"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
         },
         {
             "key": "parlatino-convocatorias",
@@ -1012,7 +1012,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["convocatorias", "politica", "cooperacion"],
             "allowed_domains": ["parlatino.org", "www.parlatino.org"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": ["article", ".post", "h2"],
                 "title_selectors": ["h2 a", "h3 a", "a", "h2"],
@@ -1074,7 +1074,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["convocatorias", "ambiental", "sostenibilidad"],
             "allowed_domains": ["minambiente.gov.co", "www.minambiente.gov.co"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
         },
         {
             "key": "colciencias-historico",
@@ -1096,7 +1096,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["convocatorias", "social", "infancia"],
             "allowed_domains": ["icbf.gov.co", "www.icbf.gov.co"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
         },
         {
             "key": "procolombia-inversion",
@@ -1155,7 +1155,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["convocatorias", "ciencia", "estadual"],
             "allowed_domains": ["faperj.br", "www.faperj.br"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": ["article", "main a[href*='convocatoria']", "main a[href*='call']", "main a[href*='edital']", "main a[href*='grant']", "main p", "main li", "section.corpo-interna a[href*='Edital']", "div.tamanho-fonte a[href*='Edital']", "div.tamanho-fonte a[href*='edital']", "section.corpo-interna a[href*='.pdf']"],
                 "title_selectors": ["a", "strong", "em", "h2", "h3"],
@@ -1188,7 +1188,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["convocatorias", "ciencia", "estadual"],
             "allowed_domains": ["fapemig.br", "www.fapemig.br", "api.site.fapemig.br"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
         },
         {
             "key": "inct-brasil",
@@ -1199,7 +1199,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["convocatorias", "ciencia", "investigacion"],
             "allowed_domains": ["gov.br", "www.gov.br"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
         },
         {
             "key": "anp-brasil",
@@ -1210,7 +1210,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["convocatorias", "energia", "investigacion"],
             "allowed_domains": ["gov.br", "anp.gov.br"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
         },
         # ================================================================
         # MORE INTERNATIONAL — 15 new sources
@@ -1244,7 +1244,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["convocatorias", "filantropia", "social"],
             "allowed_domains": ["fordfoundation.org", "www.fordfoundation.org"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
         },
         {
             "key": "rockefeller-foundation",
@@ -1255,7 +1255,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["convocatorias", "filantropia", "innovacion"],
             "allowed_domains": ["rockefellerfoundation.org", "www.rockefellerfoundation.org"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": ["a[href*='residency-program'], a[href*='big-bets-fellowships'], a[href*='/convenings/']"],
                 "title_selectors": ["h2", "h3", "a"],
@@ -1274,7 +1274,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["convocatorias", "internet", "innovacion"],
             "allowed_domains": ["foundation.mozilla.org"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
         },
         {
             "key": "interamerican-foundation",
@@ -1285,7 +1285,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["convocatorias", "desarrollo", "comunitario"],
             "allowed_domains": ["iaf.gov", "www.iaf.gov"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": ["article"],
                 "title_selectors": ["h2", "h2 a", "h3 a"],
@@ -1304,7 +1304,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["convocatorias", "ambiental", "sostenibilidad"],
             "allowed_domains": ["thegef.org", "www.thegef.org"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
         },
         {
             "key": "green-climate-fund",
@@ -1315,7 +1315,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["convocatorias", "clima", "sostenibilidad"],
             "allowed_domains": ["greenclimate.fund", "www.greenclimate.fund"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
         },
         {
             "key": "aecid-espana",
@@ -1378,7 +1378,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["convocatorias", "cooperacion", "investigacion"],
             "allowed_domains": ["sida.se", "www.sida.se"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
         },
         {
             "key": "norad-norway",
@@ -1389,7 +1389,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["convocatorias", "cooperacion", "desarrollo"],
             "allowed_domains": ["norad.no", "www.norad.no"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
         },
         {
             "key": "danida-denmark",
@@ -1400,7 +1400,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["convocatorias", "cooperacion", "investigacion"],
             "allowed_domains": ["um.dk", "www.um.dk"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": [
                     ".js-dynamic-list-module article",
@@ -1439,7 +1439,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["grants", "biodiversity", "conservation", "environment"],
             "allowed_domains": ["darwininitiative.org.uk"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
         },
         {
             "key": "eureka-network-biotech",
@@ -1450,7 +1450,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["grants", "biotech", "research", "innovation", "eureka"],
             "allowed_domains": ["eurekanetwork.org"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
         },
         {
             "key": "findeter-convocatorias",
@@ -1491,7 +1491,7 @@ def seed_default_sources(
             "source_type": "api",
             "category": ["grants", "research", "cooperation", "europe"],
             "allowed_domains": ["cost.eu", "www.cost.eu"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "throttle_max_per_day": 5,
                 "throttle_note": "022 throttle: low-yield, weekly",
@@ -1526,7 +1526,7 @@ def seed_default_sources(
             "source_type": "api",
             "category": ["convocatorias", "educacion", "cooperacion"],
             "allowed_domains": ["ascun.org.co", "www.ascun.org.co"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "throttle_max_per_day": 5,
                 "throttle_note": "022 throttle: 352 opps 0.9% close, 91-char noise; allowlist bypass via enabled flag",
@@ -1541,7 +1541,7 @@ def seed_default_sources(
             "source_type": "api",
             "category": ["convocatorias", "investigacion", "academia"],
             "allowed_domains": ["uniandes.edu.co", "www.uniandes.edu.co"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
         },
         # ================================================================
         # GLOBAL HIGH-VOLUME — 028
@@ -1600,7 +1600,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["grants", "fellowships", "research", "life-sciences"],
             "allowed_domains": ["embo.org", "www.embo.org"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": ["main li", "main article", "article"],
                 "title_selectors": ["a", "h2", "h3"],
@@ -1628,7 +1628,7 @@ def seed_default_sources(
                 "ec.europa.eu",
                 "rea.ec.europa.eu",
             ],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
         },
         {
             "key": "open-society-grants",
@@ -1643,7 +1643,7 @@ def seed_default_sources(
                 "opensocietyfoundations.org",
                 "www.opensocietyfoundations.org",
             ],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": ["li.m-cardsList__item", ".a-grantsCard"],
                 "title_selectors": [".a-grantsCard__title", "h2", "a"],
@@ -1672,7 +1672,7 @@ def seed_default_sources(
                 "www.who.int",
                 "who.my.site.com",
             ],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": [".list-view--item", "article", "main li"],
                 "title_selectors": ["h2", "h3", "a"],
@@ -1700,7 +1700,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["grants", "climate", "adaptation"],
             "allowed_domains": ["adaptation-fund.org", "www.adaptation-fund.org"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": [
                     ".wp-block-navigation-item",
@@ -1731,7 +1731,7 @@ def seed_default_sources(
                 "unicefventurefund.org",
                 "www.unicefventurefund.org",
             ],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": [
                     ".call-application-banner",
@@ -1763,7 +1763,7 @@ def seed_default_sources(
                 "volkswagenstiftung.de",
                 "www.volkswagenstiftung.de",
             ],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": [
                     ".list-item-grant",
@@ -1826,7 +1826,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["becas", "financiacion", "educacion"],
             "allowed_domains": ["eafit.edu.co", "www.eafit.edu.co"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": [
                     ".cards-cuadradas",
@@ -1854,7 +1854,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["convocatorias", "aceleradora", "emprendimiento"],
             "allowed_domains": ["hubbog.com", "www.hubbog.com"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": [".feature-card", ".event-card", "article"],
                 "title_selectors": ["a", "h2", "h3", ".text---program-tagline"],
@@ -1878,7 +1878,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["convocatorias", "investigacion", "academia"],
             "allowed_domains": ["urosario.edu.co", "www.urosario.edu.co"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": [
                     "div[id*='tab-convocatoria']",
@@ -1914,7 +1914,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["grants", "research", "fellowships", "hhmi"],
             "allowed_domains": ["hhmi.org", "www.hhmi.org"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": [
                     "a[href*='/programs/'][href*='fellow']",
@@ -1994,7 +1994,7 @@ def seed_default_sources(
                 "www.camaradirecta.com",
                 "proveedores.camaradirecta.com",
             ],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": [
                     "a[href*='programas-para-empresarios/']",
@@ -2021,7 +2021,7 @@ def seed_default_sources(
                 "fundacionbolivardavivienda.org",
                 "www.fundacionbolivardavivienda.org",
             ],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": [
                     "a[href*='noticia']",
@@ -2046,7 +2046,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["convocatorias", "innovacion", "ciencia-tecnologia"],
             "allowed_domains": ["tecnnova.org", "www.tecnnova.org"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": [
                     "a[href*='magazine-de-convocatorias']",
@@ -2071,7 +2071,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["convocatorias", "emprendimiento", "aceleracion"],
             "allowed_domains": ["creame.com.co", "www.creame.com.co"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": ["article", ".card", "main li", "main a"],
                 "title_selectors": ["h2", "h3", "a"],
@@ -2096,7 +2096,7 @@ def seed_default_sources(
                 "investigaciones.uniandes.edu.co",
                 "platypus.uniandes.edu.co",
             ],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": [
                     "a[href*='tdr-convocatoria']",
@@ -2121,7 +2121,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["convocatorias", "turismo", "fontur"],
             "allowed_domains": ["fontur.com.co", "www.fontur.com.co"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": [
                     "a[href*='/es/programas/']",
@@ -2201,7 +2201,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["convocatorias", "mujer", "contratacion"],
             "allowed_domains": ["fondomujer.gov.co", "www.fondomujer.gov.co"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": [
                     "article",
@@ -2297,7 +2297,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["innovacion", "energia", "desafios"],
             "allowed_domains": ["isa.co", "www.isa.co"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": [
                     "article",
@@ -2324,7 +2324,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["convocatorias", "deportes", "contratacion", "bogota"],
             "allowed_domains": ["idrd.gov.co", "www.idrd.gov.co", "secop.gov.co", "colombiacompra.gov.co"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": [
                     "article",
@@ -2351,7 +2351,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["convocatorias", "ciencia", "humanidades", "mexico"],
             "allowed_domains": ["secihti.mx", "www.secihti.mx", "secihti.gob.mx"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": [
                     "a[href*='/evento/']",
@@ -2377,7 +2377,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["becas", "posgrado", "mexico"],
             "allowed_domains": ["secihti.mx", "www.secihti.mx", "secihti.gob.mx"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": [
                     "a[href*='becas-al-extranjero']",
@@ -2430,7 +2430,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["becas", "scholarships", "oas", "oea"],
             "allowed_domains": ["oas.org", "www.oas.org"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": [
                     "a[href*='Academic_Program']",
@@ -2460,7 +2460,7 @@ def seed_default_sources(
                 "fundacioncarolina.es",
                 "www.fundacioncarolina.es",
             ],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": [
                     "a[href*='convocatoria-de-becas']",
@@ -2486,7 +2486,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["becas", "ciencias-sociales", "clacso"],
             "allowed_domains": ["clacso.org", "www.clacso.org"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": [
                     "article",
@@ -2514,7 +2514,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["convocatorias", "investigacion", "argentina"],
             "allowed_domains": ["argentina.gob.ar", "www.argentina.gob.ar"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": [
                     "a[href*='/noticias/']",
@@ -2538,7 +2538,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["convocatorias", "ciencia", "panama"],
             "allowed_domains": ["senacyt.gob.pa", "www.senacyt.gob.pa"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": [
                     "main a",
@@ -2564,7 +2564,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["becas", "formacion", "scholarships", "commonwealth"],
             "allowed_domains": ["cscuk.fcdo.gov.uk", "www.cscuk.fcdo.gov.uk"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": [
                     "article",
@@ -2588,7 +2588,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["formacion", "cursos", "diplomacia", "capacitacion"],
             "allowed_domains": ["unitar.org", "www.unitar.org", "event.unitar.org"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": [
                     "article",
@@ -2613,7 +2613,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["becas", "formacion", "financial-aid", "usa"],
             "allowed_domains": ["educationusa.state.gov"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": [
                     "h3 a",
@@ -2637,7 +2637,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["becas", "formacion", "scholarships", "iie"],
             "allowed_domains": ["iie.org", "www.iie.org"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": [
                     "h2 a",
@@ -2661,7 +2661,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["financiacion", "grants", "foundation"],
             "allowed_domains": ["macfound.org", "www.macfound.org"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": [
                     "a[href*='/programs/']",
@@ -2685,7 +2685,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["becas", "formacion", "mext", "japan"],
             "allowed_domains": ["studyinjapan.go.jp", "www.studyinjapan.go.jp"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": [
                     "a[href*='scholarship']",
@@ -2710,7 +2710,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["becas", "formacion", "worldbank"],
             "allowed_domains": ["worldbank.org", "www.worldbank.org"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": [
                     "a[href*='/programs/scholarships']",
@@ -2735,7 +2735,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["financiacion", "research", "awards"],
             "allowed_domains": ["amazon.science", "www.amazon.science"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": [
                     "a[href*='research-awards']",
@@ -2760,7 +2760,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["becas", "formacion", "scholarships", "netherlands"],
             "allowed_domains": ["nuffic.nl", "www.nuffic.nl"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": [
                     "a[href*='scholarship']",
@@ -2786,7 +2786,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["becas", "formacion", "manaaki", "new-zealand"],
             "allowed_domains": ["mfat.govt.nz", "www.mfat.govt.nz"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": [
                     "a[href*='scholar']",
@@ -2812,7 +2812,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["becas", "formacion", "fellowships", "women-in-science"],
             "allowed_domains": ["owsd.net", "www.owsd.net"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": [
                     "a[href*='fellow']",
@@ -2838,7 +2838,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["formacion", "fellowship", "social-entrepreneurship"],
             "allowed_domains": ["ashoka.org", "www.ashoka.org"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": [
                     "a[href*='fellow']",
@@ -2863,7 +2863,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["financiacion", "research", "erc", "grants"],
             "allowed_domains": ["erc.europa.eu"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": [
                     "a[href*='apply-grant']",
@@ -2890,7 +2890,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["financiacion", "research", "grants"],
             "allowed_domains": ["simonsfoundation.org", "www.simonsfoundation.org"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": [
                     "a[href*='funding']",
@@ -2917,7 +2917,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["financiacion", "research", "grants"],
             "allowed_domains": ["sloan.org", "www.sloan.org"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": [
                     "a[href*='grant']",
@@ -2943,7 +2943,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["financiacion", "climate", "grants"],
             "allowed_domains": ["climateworks.org", "www.climateworks.org"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": [
                     "a[href*='/programs/']",
@@ -2968,7 +2968,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["becas", "formacion", "scholarships", "rhodes"],
             "allowed_domains": ["rhodeshouse.ox.ac.uk", "www.rhodeshouse.ox.ac.uk"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": [
                     "a[href*='scholar']",
@@ -2994,7 +2994,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["becas", "formacion", "scholarships"],
             "allowed_domains": ["knight-hennessy.stanford.edu"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": [
                     "a[href*='admission']",
@@ -3020,7 +3020,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["becas", "formacion", "scholarships"],
             "allowed_domains": ["gatescambridge.org", "www.gatescambridge.org"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": [
                     "a[href*='apply']",
@@ -3045,7 +3045,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["formacion", "fellowship", "social-impact"],
             "allowed_domains": ["acumen.org", "www.acumen.org", "acumenacademy.org"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": [
                     "a[href*='fellow']",
@@ -3071,7 +3071,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["becas", "formacion", "scholarships"],
             "allowed_domains": ["vliruos.be", "www.vliruos.be"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": [
                     "a[href*='scholar']",
@@ -3097,7 +3097,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["becas", "financiacion", "fellowships", "research"],
             "allowed_domains": ["twas.org", "www.twas.org"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": [
                     "a[href*='/opportunity']",
@@ -3124,7 +3124,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["financiacion", "research", "grants"],
             "allowed_domains": ["schmidtsciences.org", "www.schmidtsciences.org"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": [
                     "a[href*='opport']",
@@ -3150,7 +3150,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["formacion", "fellowship", "social-entrepreneurship"],
             "allowed_domains": ["echoinggreen.org", "www.echoinggreen.org"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": [
                     "a[href*='fellow']",
@@ -3211,7 +3211,7 @@ def seed_default_sources(
                 "mincultura.gov.co",
                 "www.mincultura.gov.co",
             ],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": ["a[href*='/programas/']"],
                 "title_selectors": ["a"],
@@ -3263,7 +3263,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["convocatorias", "turismo", "bogota", "idt"],
             "allowed_domains": ["idt.gov.co", "www.idt.gov.co"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": [
                     "a[href*='.pdf']",
@@ -3318,7 +3318,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["financiacion", "agro", "credito", "finagro"],
             "allowed_domains": ["finagro.com.co", "www.finagro.com.co"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": [
                     "a[href*='linea']",
@@ -3346,7 +3346,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["financiacion", "agro", "credito", "finagro"],
             "allowed_domains": ["finagro.com.co", "www.finagro.com.co"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": [
                     "a[href*='credito']",
@@ -3373,7 +3373,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["cultura", "recreacion", "deporte", "bogota"],
             "allowed_domains": ["bogota.gov.co", "www.bogota.gov.co"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": [
                     "a[href*='convocat']",
@@ -3400,7 +3400,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["grants", "science", "conservation", "innovation"],
             "allowed_domains": ["moore.org", "www.moore.org"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": [
                     ".program-sub-items a",
@@ -3427,7 +3427,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["research", "innovation", "internships", "mitacs"],
             "allowed_domains": ["mitacs.ca", "www.mitacs.ca"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": [".loop-program", ".loop-item"],
                 "title_selectors": ["h2", "h3", "h4", "a"],
@@ -3451,7 +3451,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["grants", "research", "science", "templeton"],
             "allowed_domains": ["templeton.org", "www.templeton.org", "portal.templeton.org"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": [
                     "a[href*='/funding-areas/']",
@@ -3475,7 +3475,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["grants", "arts", "humanities", "mellon"],
             "allowed_domains": ["mellon.org", "www.mellon.org"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": [
                     "[class*='grantmakingAreasGrid_card']",
@@ -3505,7 +3505,7 @@ def seed_default_sources(
                 "humboldt-foundation.de",
                 "www.humboldt-foundation.de",
             ],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": [
                     ".article-teaser",
@@ -3533,7 +3533,7 @@ def seed_default_sources(
                 "www.boell.de",
                 "stipendium.boell.de",
             ],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": [
                     "main a[href*='stipend']",
@@ -3558,7 +3558,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["becas", "scholarships", "fes"],
             "allowed_domains": ["fes.de", "www.fes.de"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": [
                     ".teaser",
@@ -3670,7 +3670,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["convocatorias", "innovacion", "brasil"],
             "allowed_domains": ["finep.gov.br", "www.finep.gov.br", "legacy.finep.gov.br"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
         },
         {
             "key": "dane-convocatorias",
@@ -3682,7 +3682,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["convocatorias", "contratacion", "estadistica"],
             "allowed_domains": ["dane.gov.co", "www.dane.gov.co"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": ["article", "main a[href*='convocatoria']", "main a[href*='contratacion']", "main a[href*='contratación']", "main li a", ".item a"],
                 "title_selectors": ["a", "h2", "h3"],
@@ -3706,7 +3706,7 @@ def seed_default_sources(
             "source_type": "api",
             "category": ["grants", "culture", "creative europe", "eu funding"],
             "allowed_domains": ["api.tech.ec.europa.eu", "culture.ec.europa.eu", "ec.europa.eu"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
         },
         {
             "key": "eu-eacea-grants",
@@ -3718,7 +3718,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["grants", "education", "culture", "eacea", "eu funding"],
             "allowed_domains": ["eacea.ec.europa.eu", "ec.europa.eu"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": ["article", ".ecl-card", "main a[href*='grant']", "a[href*='grant']"],
                 "title_selectors": ["h2", "h3", "a"],
@@ -3739,7 +3739,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["grants", "culture", "mobility", "artists"],
             "allowed_domains": ["culture.ec.europa.eu", "ec.europa.eu"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": ["article", "main a[href*='call']", "a[href*='culture-moves']", "section a"],
                 "title_selectors": ["h2", "h3", "a"],
@@ -3760,7 +3760,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["convocatorias", "cultura", "estimulos", "bogota", "sicon"],
             "allowed_domains": ["sicon.scrd.gov.co", "www.sicon.scrd.gov.co", "scrd.gov.co"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": ["article", "div.card a[href*='convocatoria']", "div.card a[href*='estimulo']", "main a[href*='convocatoria']", "a[href*='estimulo']", "a[href*='convocatoria']"],
                 "title_selectors": ["h2", "h3", "a"],
@@ -3781,7 +3781,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["convocatorias", "audiovisual", "cine", "ibermedia", "cultura"],
             "allowed_domains": ["programaibermedia.com", "www.programaibermedia.com"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": ["article", "main a[href*='convocatoria']", "a[href*='convocatoria']"],
                 "title_selectors": ["h2", "h3", "a"],
@@ -3802,7 +3802,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["convocatorias", "musica", "cultura", "ibermusicas"],
             "allowed_domains": ["ibermusicas.org", "www.ibermusicas.org"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": ["article", "main a[href*='convocatoria']", "a[href*='convocatoria']", "a[href*='call']"],
                 "title_selectors": ["h2", "h3", "a"],
@@ -3823,7 +3823,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["grants", "cinema", "coproduction", "culture", "eurimages"],
             "allowed_domains": ["coe.int", "www.coe.int"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": ["article", "main a[href*='eurimages']", "a[href*='eurimages']", "a[href*='call']"],
                 "title_selectors": ["h2", "h3", "a"],
@@ -3844,7 +3844,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["grants", "education", "mobility", "erasmus", "eu funding"],
             "allowed_domains": ["erasmus-plus.ec.europa.eu", "ec.europa.eu"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": ["article", "main a[href*='opportunit']", "a[href*='opportunit']", ".ecl-card"],
                 "title_selectors": ["h2", "h3", "a"],
@@ -3868,7 +3868,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["grants", "research", "kakenhi", "japan"],
             "allowed_domains": ["jsps.go.jp"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": ["article", "main a[href*='grant']", "main a[href*='kakenhi']", "main a[href*='fellowship']", "main a[href*='fellow']", "main li a", "div.ww-text a[href*='grants01'], div.ww-text a[href*='lsrp'], div.ww-text a[href*='multi-year_fund']"],
                 "title_selectors": ["a", "h2", "h3"],
@@ -3889,7 +3889,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["grants", "research", "fellowships", "japan"],
             "allowed_domains": ["jsps.go.jp"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": ["article", "main a[href*='fellow']", "main a[href*='fellowship']", "main a[href*='grant']", "main a[href*='kakenhi']", "main li a", "div.ww-text a[href*='/e-fellow/e-']"],
                 "title_selectors": ["a", "h2", "h3"],
@@ -3910,7 +3910,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["grants", "health", "funding", "rwjf"],
             "allowed_domains": ["rwjf.org"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": ["main a[href*='grant']", "main a[href*='funding']", "article", "main li a"],
                 "title_selectors": ["a", "h2", "h3"],
@@ -3931,7 +3931,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["grants", "science", "research", "czi"],
             "allowed_domains": ["chanzuckerberg.com"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": ["main a[href*='grant']", "article", "main li a"],
                 "title_selectors": ["a", "h2", "h3"],
@@ -3952,7 +3952,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["grants", "foundation", "kellogg"],
             "allowed_domains": ["wkkf.org"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": ["main a[href*='grant']", "article", "main li a"],
                 "title_selectors": ["a", "h2", "h3"],
@@ -3973,7 +3973,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["grants", "foundation", "hewlett"],
             "allowed_domains": ["hewlett.org"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": ["main a[href*='grant']", "article", "main li a"],
                 "title_selectors": ["a", "h2", "h3"],
@@ -3994,7 +3994,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["grants", "foundation", "carnegie"],
             "allowed_domains": ["carnegie.org"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": ["main a[href*='grant']", "article", "main li a"],
                 "title_selectors": ["a", "h2", "h3"],
@@ -4015,7 +4015,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["grants", "bursaries", "funding", "south africa", "nrf"],
             "allowed_domains": ["nrf.ac.za"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": ["main a[href*='bursary']", "main a[href*='bursaries']", "main a[href*='funding']", "article", "main li a"],
                 "title_selectors": ["a", "h2", "h3"],
@@ -4056,7 +4056,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["convocatorias", "tourism", "eu", "funding"],
             "allowed_domains": ["transition-pathways.europa.eu"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": ["a[href*='/tourism/funding-calls/']"],
                 "title_selectors": ["a", "h2", "h3"],
@@ -4076,7 +4076,7 @@ def seed_default_sources(
             "source_type": "html",
             "category": ["convocatorias", "tourism", "un", "rural"],
             "allowed_domains": ["tourism-villages.unwto.org"],
-            "scraping_frequency": "weekly",
+            "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": [
                     "a[href*='/en/the-initiative']",
