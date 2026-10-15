@@ -108,6 +108,9 @@ def seed_default_sources(
         {
             "key": "grants-gov-rss",
             "name": "Grants.gov RSS Opportunities",
+            # Deshabilitada 2026-10-15: ingesta 100% duplicada (449/0 en 30d,
+            # 24/24 filas ya en grants-gov/simpler). grants-gov + simpler quedan.
+            "enabled": False,
             "base_url": "https://www.grants.gov/rss/GG_OppModByCategory.xml",
             "country": "United States",
             "region": "North America",
