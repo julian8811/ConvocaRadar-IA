@@ -211,6 +211,10 @@ def connector_for(
         return _heading_list_connector(source_key, base_url or "")
     if source_key == "giz-funding":
         return GizFundingConnector(base_url)
+    # ASCUN uses WordPress for institutional news, NOT a grants catalogue.
+    # Its key-specific connector must win over the generic WordPress URL rule.
+    if source_key == "ascun-convocatorias":
+        return AscunConnector(base_url)
     if source_key in WORDPRESS_GRANT_SOURCE_KEYS or "/wp-json/wp/v2/" in (base_url or ""):
         return _wordpress_connector(source_key, base_url or "")
 
