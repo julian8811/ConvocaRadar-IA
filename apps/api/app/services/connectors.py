@@ -8,7 +8,7 @@ timeout support.
 from __future__ import annotations
 
 import asyncio
-from datetime import UTC, datetime, timedelta
+from datetime import UTC, datetime, timedelta, timezone
 
 from sqlalchemy.orm import Session
 
@@ -111,6 +111,30 @@ def source_due_for_scraping(source: Source, *, now: datetime | None = None) -> b
         backoff = timedelta(hours=min(24, fails * 6))
 
     return elapsed >= cadence + backoff + jitter
+
+
+# Colombia no observa DST (UTC-5 estable desde 1993): offset fijo, sin
+# depender de tzdata del sistema en el contenedor.
+COT = timezone(timedelta(hours=-5))
+
+
+def _nightly_force_due(
+    now_cot: datetime,
+    *,
+    hour: int,
+    enabled: bool,
+    last_forced_date,
+) -> bool:
+    """Decide si este tick dispara la corrida nocturna forzada.
+
+    Pura (sin DB): dispara en el primer tick con hora local >= ``hour``
+    una vez por día. ``last_forced_date`` es la fecha ya corrida (o None).
+    """
+    if not enabled:
+        return False
+    if last_forced_date is not None and last_forced_date == now_cot.date():
+        return False
+    return now_cot.hour >= hour
 
 
 async def _scrape_source_candidates(

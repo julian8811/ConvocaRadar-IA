@@ -108,6 +108,11 @@ class Settings(BaseSettings):
     scheduler_interval_seconds: int = 1800
     scheduler_initial_delay_seconds: int = 30
     weekly_digest_interval_seconds: int = 604800
+    # Corrida nocturna forzada (odd/tasks/corrida-nocturna-1am.md): primer
+    # tick >= nightly_sweep_hour en America/Bogota corre TODAS las
+    # habilitadas. Solo tiene efecto donde corre el scheduler (worker).
+    nightly_sweep_enabled: bool = True
+    nightly_sweep_hour: int = 1
     # ── Extraction flags (022) ──────────────────────────────────────────
     extraction_cop_default: bool = True
     extraction_prompt_v4: bool = True

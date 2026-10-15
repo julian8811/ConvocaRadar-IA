@@ -68,6 +68,7 @@ async def _run_periodic_source_sweep(interval_seconds: int | None = None) -> Non
     interval_seconds = interval_seconds or scheduler_settings.scheduler_interval_seconds
     weekly_digest_seconds = scheduler_settings.weekly_digest_interval_seconds
     last_digest_at: datetime | None = None
+    last_nightly_date = None
 
     await asyncio.sleep(scheduler_settings.scheduler_initial_delay_seconds)
     while True:
@@ -165,7 +166,29 @@ async def _run_periodic_source_sweep(interval_seconds: int | None = None) -> Non
                         )
                     )
                     total = len(sources)
-                    raw_due = [s for s in sources if source_due_for_scraping(s)]
+                    # Corrida nocturna (odd/tasks/corrida-nocturna-1am.md): en el
+                    # primer tick >= nightly_sweep_hour (COT) fuerza TODAS las
+                    # habilitadas una vez por día. Solo corre donde vive el
+                    # scheduler (worker); api lo tiene deshabilitado.
+                    from app.services.connectors import COT as _COT
+                    from app.services.connectors import _nightly_force_due
+
+                    _cot_now = datetime.now(_COT)
+                    if _nightly_force_due(
+                        _cot_now,
+                        hour=scheduler_settings.nightly_sweep_hour,
+                        enabled=scheduler_settings.nightly_sweep_enabled,
+                        last_forced_date=last_nightly_date,
+                    ):
+                        raw_due = list(sources)
+                        last_nightly_date = _cot_now.date()
+                        struct_logger.info(
+                            "nightly_sweep_start",
+                            sources_forced=len(raw_due),
+                            cot_hour=_cot_now.hour,
+                        )
+                    else:
+                        raw_due = [s for s in sources if source_due_for_scraping(s)]
                     # Priority-sorted queue: strategic first, then complementary/experimental
                     try:
                         from app.scraper.priority_queue import build_priority_queue, partition_by_tier
