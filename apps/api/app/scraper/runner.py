@@ -32,6 +32,7 @@ from app.services.quarantine import (
     classify_validation_reason,
     quarantine_entry,
 )
+from app.services.source_quality import source_non_opportunity_reason
 from app.services.scoring import (
     should_auto_pause,
     update_consecutive_empty_runs,
@@ -199,6 +200,23 @@ async def _scrape_candidates(
             html=html,
             page_url=candidate.official_url,
         )
+        # Source-specific navigation false positives are quarantined, not persisted.
+        # The filter is deliberately narrow; unknown grants remain reviewable.
+        non_opportunity_reason = source_non_opportunity_reason(
+            source.key, candidate.title, candidate.official_url
+        )
+        if non_opportunity_reason:
+            validation_rejected += 1
+            if len(quarantine) < QUARANTINE_CAP_PER_RUN:
+                quarantine.append(
+                    quarantine_entry(
+                        "validacion",
+                        candidate.title or "(sin titulo)",
+                        url=candidate.official_url,
+                        detail=non_opportunity_reason,
+                    )
+                )
+            continue
         if is_noise_payload(candidate.title, candidate.summary, candidate.raw_text):
             noise_rejected += 1
             if len(quarantine) < QUARANTINE_CAP_PER_RUN:
