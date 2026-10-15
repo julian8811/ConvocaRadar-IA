@@ -149,3 +149,12 @@ class TestListingHash:
             "</body>", "<script>var ads=1;/*cmp*/</script><style>.a{color:red}</style></body>"
         )
         assert compute_listing_hash(base) == compute_listing_hash(noisy)
+
+    def test_visible_churn_without_new_links_keeps_hash_stable(self) -> None:
+        from app.scraper.dom_monitor import compute_listing_hash
+
+        base = "<html><body><main><a href='/conv/a'>A</a><span>3 visitas</span></main></body></html>"
+        churned = base.replace("3 visitas", "4 visitas").replace(
+            "</body>", '<input type="hidden" name="tok" value="abc123"/></body>'
+        )
+        assert compute_listing_hash(base) == compute_listing_hash(churned)

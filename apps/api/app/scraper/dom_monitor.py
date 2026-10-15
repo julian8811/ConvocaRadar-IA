@@ -25,6 +25,32 @@ _EMBEDDED_JSON_RE = re.compile(
     r"|id\s*=\s*[\"']__NEXT_DATA__[\"'])[^>]*>(.*?)</script>",
     re.DOTALL | re.IGNORECASE,
 )
+# Session/tracking params stripped from hrefs before fingerprinting so the
+# same listing with rotated session IDs still hashes identically.
+_SESSION_PARAM_RE = re.compile(
+    r"(\?|&)(jsessionid|phpsessid|sid|token|_token)=[^&\s\"'>]+",
+    re.IGNORECASE,
+)
+
+_HREF_RE = re.compile(r"""href\s*=\s*["']([^"'#]+)["']""", re.IGNORECASE)
+
+
+def extract_listing_links(html_content: str | None) -> str:
+    """Extract the sorted unique link set of a listing page.
+
+    Links are the "new items" signal: a new call always arrives as a new
+    link, while chrome churn (counters, tokens, ads) rarely adds hrefs.
+    Returns the newline-joined sorted set ("" when none).
+    """
+    if not html_content:
+        return ""
+    links = set()
+    for match in _HREF_RE.finditer(html_content):
+        href = _SESSION_PARAM_RE.sub("", match.group(1)).strip()
+        href = _ANALYTICS_PARAM_RE.sub("", href).strip()
+        if href:
+            links.add(href)
+    return "\n".join(sorted(links))
 # Patterns for content to strip during normalization
 _SCRIPT_RE = re.compile(r"<script[^>]*>.*?</script>", re.DOTALL | re.IGNORECASE)
 _STYLE_RE = re.compile(r"<style[^>]*>.*?</style>", re.DOTALL | re.IGNORECASE)
@@ -108,16 +134,21 @@ def extract_embedded_payloads(html_content: str | None) -> str:
 
 
 def compute_listing_hash(html_content: str | None) -> str:
-    """Fingerprint for the unchanged-page skip: visible DOM + embedded data.
+    """Fingerprint for the unchanged-page skip: link set + embedded data.
+
+    A new call always arrives as a new link, so the sorted href set is the
+    "new items" signal; chrome churn (counters, tokens, ads, viewstate)
+    rarely adds hrefs and stays invisible. Embedded data payloads are
+    hashed alongside so a data-only change is never missed. Pure
+    script/style noise alters NEITHER layer.
 
     Same 64-hex shape as :func:`compute_dom_hash` so stored values migrate
     transparently (one extra full scrape per source after deploy, then
-    stable). A change in EITHER layer alters the hash; pure script/style
-    noise alters NEITHER.
+    stable).
     """
-    visible = normalize_html(html_content or "")
+    links = extract_listing_links(html_content or "")
     embedded = extract_embedded_payloads(html_content or "")
-    return hashlib.sha256((visible + "\x00" + embedded).encode("utf-8")).hexdigest()
+    return hashlib.sha256((links + "\x00" + embedded).encode("utf-8")).hexdigest()
 
 
 def detect_structural_change(
