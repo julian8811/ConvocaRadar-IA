@@ -88,7 +88,7 @@ def test_040_catalog_count_and_uniqueness():
     # 185 -> 193 -> 201 (040) -> 203 (F3: split startup-chile 1 key -> 3
     # subfuentes build/growth/ignite, net +2; finep-brasil kept its key)
     # -> 208 (041: 5 agro/biodiversidad verificadas)
-    assert len(defs) == 208, f"expected 208 keys, got {len(defs)}"
+    assert len(defs) == 211, f"expected 211 keys, got {len(defs)}"
     from collections import Counter
 
     seed_path = Path(__file__).resolve().parents[1] / "app" / "db" / "seed.py"
