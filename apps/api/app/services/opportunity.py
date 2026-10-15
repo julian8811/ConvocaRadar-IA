@@ -600,8 +600,13 @@ def _update_opportunity(
     # Else: existing summary is substantive and the incoming one is thin
     # metadata (list-page rebuilds) — keep the better existing summary.
     opportunity.raw_text = data.raw_text or opportunity.raw_text
-    opportunity.official_url = data.official_url
-    opportunity.application_url = data.application_url
+    # A transient failed HEAD/GET may turn an incoming URL into None.
+    # Preserve previously verified links rather than silently erasing them.
+    # New nonempty URLs still replace the old value as before.
+    if data.official_url:
+        opportunity.official_url = data.official_url
+    if data.application_url:
+        opportunity.application_url = data.application_url
     # Backfill funding/close/open only when existing is missing — re-scrape patch
     if data.funding_amount_value is not None and opportunity.funding_amount_value is None:
         opportunity.funding_amount_value = data.funding_amount_value
