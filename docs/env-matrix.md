@@ -23,6 +23,8 @@ de `.env` (plantilla `.env.production.example`). Solo NOMBRES de claves, jamás 
 | `BACKUP_S3_RETENTION_DAYS` | — | backup |
 | `NEXT_PUBLIC_API_URL` | — (fijo `http://localhost:8002/api/v1` en build) | web (build arg, defecto `/api/v1`) |
 | `NEXT_PUBLIC_ENABLE_WAKE_RETRIES` | — | web (build arg, defecto `true`) |
+| `REGISTRATION_MODE` | api (`open` por defecto) | api (`domain`/`closed` en server) |
+| `REGISTRATION_ALLOWED_DOMAINS` | api (vacío por defecto) | api (dominios institucionales en server) |
 
 Cobertura: 5/5 `${VAR}` del compose dev y 15/15 del compose server están en la tabla.
 Además, `api` y `worker` cargan el `.env` completo vía `env_file` en ambos composes
