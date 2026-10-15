@@ -10,13 +10,13 @@ jobs:
   check-secrets:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - run: bash scripts/check-secrets.sh
 
   hadolint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: hadolint/hadolint-action@v3.1.0
         with:
           dockerfile: apps/api/Dockerfile
@@ -33,7 +33,7 @@ jobs:
   compose-lint:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Validate development compose
         run: |
           cp .env.example .env
@@ -54,7 +54,7 @@ jobs:
   prod-asserts:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Assert university server isolation and hardening
         run: |
           cp .env.production.example .env
@@ -104,7 +104,7 @@ jobs:
       run:
         working-directory: apps/api
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -119,7 +119,7 @@ jobs:
       run:
         working-directory: apps/api
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
@@ -133,7 +133,7 @@ jobs:
   frontend:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - uses: pnpm/action-setup@v4
         with:
           version: 10.7.0
@@ -154,7 +154,7 @@ jobs:
       MINIO_ROOT_PASSWORD: ci-dummy-minio-root-password-0123456789abcdef
       INTERNAL_API_KEY: ci-dummy-internal-api-key-0123456789abcdef
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       - name: Prepare non-secret smoke environment
         run: cp .env.example .env
       - run: docker compose build api
@@ -168,7 +168,7 @@ jobs:
       COMPOSE_PROJECT_NAME: convocaradar-ci
       COMPOSE_FILE: docker-compose.server.yml
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: Prepare production-like non-secret environment
         run: |
