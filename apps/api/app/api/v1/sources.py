@@ -33,6 +33,29 @@ from app.services.scoring import (
 router = APIRouter()
 
 
+def _fail_hung_source_runs(db: Session, source_id: str, budget_seconds: float) -> int:
+    """Mark orphaned ``running`` rows as failed after a hard-budget timeout.
+
+    Without this, a cancelled run leaves a ``running`` row behind and the
+    dispatcher skips the source forever ("duplicate running run").
+    """
+    now = datetime.now(UTC).replace(tzinfo=None)
+    rows = list(
+        db.scalars(
+            select(SourceRun).where(
+                SourceRun.source_id == source_id, SourceRun.status == "running"
+            )
+        )
+    )
+    for run in rows:
+        run.status = "failed"
+        run.finished_at = run.finished_at or now
+        note = "hard budget exceeded (%.0fs)" % budget_seconds
+        run.error_message = ((run.error_message or "") + " " + note).strip()[:2000]
+    db.commit()
+    return len(rows)
+
+
 def _run_source_via_dispatcher(source_id: str, org_id: str):
     """Sync wrapper — calls dispatcher.run_source via asyncio.run().
 
@@ -40,17 +63,45 @@ def _run_source_via_dispatcher(source_id: str, org_id: str):
     so we use ``asyncio.run()`` to create a fresh event loop, execute the
     async dispatcher, and close the loop — matching the pattern used by
     the old ``execute_source_run_locally`` wrapper.
+
+    Hard budget: the whole source (fetch + parse + enrich) must finish
+    within 2x the per-connector timeout (sdde-bogota ran 370s against a
+    180s timeout with no enforcement). ``asyncio.wait_for`` preempts the
+    coroutine; orphaned ``running`` rows are failed so the next sweep
+    does not skip the source forever.
     """
     import asyncio
 
+    from app.core.config import get_settings
     from app.core.http_client import closing_per_loop_client
 
+    budget_seconds = 2 * get_settings().per_connector_timeout_seconds
     worker_db = SessionLocal()
     try:
         source = worker_db.get(Source, source_id)
         if source is None:
             raise LookupError(f"Source {source_id} no longer exists")
-        run = asyncio.run(closing_per_loop_client(dispatcher_run_source(worker_db, source, org_id)))
+
+        async def _bounded():
+            return await asyncio.wait_for(
+                dispatcher_run_source(worker_db, source, org_id),
+                timeout=budget_seconds,
+            )
+
+        try:
+            run = asyncio.run(closing_per_loop_client(_bounded()))
+        except asyncio.TimeoutError:
+            worker_db.rollback()
+            marked = _fail_hung_source_runs(worker_db, source_id, budget_seconds)
+            struct_logger.error(
+                "run_source.hard_budget_exceeded",
+                source_id=source_id,
+                budget_seconds=budget_seconds,
+                orphaned_runs_marked=marked,
+            )
+            raise TimeoutError(
+                "source hard budget exceeded (%.0fs)" % budget_seconds
+            ) from None
         worker_db.commit()
         return run
     except Exception:
