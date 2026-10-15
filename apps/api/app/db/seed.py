@@ -3277,7 +3277,10 @@ def seed_default_sources(
         {
             "key": "idt-noticias",
             "name": "IDT Bogotá — Noticias y Oportunidades",
-            "enabled": True,
+            # Deshabilitada 2026-10-15 (dictamen E13): raspa el noticiero del IDT
+            # y sus notas caían en turismo; acuerdo: sólo se reportan convocatorias.
+            # IDT sigue cubierto por idt-experiencias-2026 (convocatoria real).
+            "enabled": False,
             "base_url": "https://www.idt.gov.co/noticias",
             "country": "Colombia",
             "region": "LatAm",
