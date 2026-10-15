@@ -12,7 +12,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 # temporarily when creating a ThreadPoolExecutor (avoids breakage when
 # tests monkeypatch threading.Thread).
 _original_thread_cls = _base_threading.Thread
-from sqlalchemy import func, or_, select
+from sqlalchemy import case, func, or_, select
 from sqlalchemy.orm import Session
 
 from app.api.deps import get_current_organization, get_current_user
@@ -158,6 +158,44 @@ def _source_coverage_ratios(db: Session, source_id: str) -> tuple[float, float, 
     )
 
 
+def _source_coverage_ratios_many(
+    db: Session, source_ids: list[str]
+) -> dict[str, tuple[float, float, float]]:
+    """Batch version of :func:`_source_coverage_ratios` (single GROUP BY).
+
+    Perf: the per-source variant costs 4 queries each (~828 for the full
+    catalog); this one query feeds dashboards and health lists. Sources
+    without opportunities map to all zeros, mirroring the single variant.
+    """
+    if not source_ids:
+        return {}
+    rows = db.execute(
+        select(
+            Opportunity.source_id,
+            func.count(),
+            func.sum(case((Opportunity.close_date.is_not(None), 1), else_=0)),
+            func.sum(case((Opportunity.funding_amount_value.is_not(None), 1), else_=0)),
+            func.sum(case((Opportunity.official_url.is_not(None), 1), else_=0)),
+        )
+        .where(Opportunity.source_id.in_(source_ids))
+        .group_by(Opportunity.source_id)
+    ).all()
+    out: dict[str, tuple[float, float, float]] = {}
+    for source_id, total, with_close, with_amount, with_url in rows:
+        total = total or 0
+        if total == 0:
+            out[source_id] = (0.0, 0.0, 0.0)
+        else:
+            out[source_id] = (
+                round(((with_close or 0) / total) * 100, 2),
+                round(((with_amount or 0) / total) * 100, 2),
+                round(((with_url or 0) / total) * 100, 2),
+            )
+    for source_id in source_ids:
+        out.setdefault(source_id, (0.0, 0.0, 0.0))
+    return out
+
+
 @router.get("/sources", response_model=list[SourceRead])
 def list_sources(
     organization: Organization = Depends(get_current_organization),
@@ -205,7 +243,10 @@ def _get_source_for_org(db: Session, source_id: str, organization: Organization)
 
 
 def _source_health(
-    db: Session, source: Source, raw_recent_runs: list[SourceRun] | None = None
+    db: Session,
+    source: Source,
+    raw_recent_runs: list[SourceRun] | None = None,
+    coverage: tuple[float, float, float] | None = None,
 ) -> SourceHealthRead:
     if raw_recent_runs is None:
         raw_recent_runs = list(
@@ -258,8 +299,12 @@ def _source_health(
     else:
         status = "healthy"
 
-    # Change C: compute coverage percentages from the source's opportunities
-    close_date_coverage, amount_coverage, url_coverage = _source_coverage_ratios(db, source.id)
+    # Change C: compute coverage percentages from the source's opportunities.
+    # A precomputed ``coverage`` tuple avoids the per-source queries when the
+    # caller already batched them (dashboards over the full catalog).
+    if coverage is None:
+        coverage = _source_coverage_ratios(db, source.id)
+    close_date_coverage, amount_coverage, url_coverage = coverage
 
     health_score = calculate_source_health_score(
         success_rate=success_rate,
