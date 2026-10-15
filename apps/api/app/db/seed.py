@@ -10,6 +10,7 @@ from app.models import Organization, OrganizationProfile, Role, Source, User
 def _seed_faculties_if_needed(db) -> None:
     try:
         from app.db.seed_faculties import seed_faculties_sync
+
         seed_faculties_sync(db)
     except Exception:
         pass
@@ -229,9 +230,21 @@ def seed_default_sources(
             "allowed_domains": ["unesco.org", "www.unesco.org"],
             "scraping_frequency": "daily",
             "connector_config": {
-                "list_selectors": ["article", "main a[href*='call']", "main a[href*='proposal']", "main a[href*='grant']", ".list-view--item", "main li a"],
+                "list_selectors": [
+                    "article",
+                    "main a[href*='call']",
+                    "main a[href*='proposal']",
+                    "main a[href*='grant']",
+                    ".list-view--item",
+                    "main li a",
+                ],
                 "title_selectors": ["h2", "h3", "a"],
-                "link_selectors": ["a[href*='call']", "a[href*='proposal']", "a[href*='grant']", "a"],
+                "link_selectors": [
+                    "a[href*='call']",
+                    "a[href*='proposal']",
+                    "a[href*='grant']",
+                    "a",
+                ],
                 "content_selectors": ["article", "main", ".list-view--item"],
                 "date_labels": ["Deadline:", "Closing:", "Due:", "Cierre:"],
                 "detail_enrichment": False,
@@ -885,7 +898,15 @@ def seed_default_sources(
             "allowed_domains": ["iadb.org", "www.iadb.org"],
             "scraping_frequency": "daily",
             "connector_config": {
-                "list_selectors": ["article", ".card", ".views-row", "li.views-row", "main a[href*='convocatoria']", "main a[href*='call']", "main a[href*='grant']"],
+                "list_selectors": [
+                    "article",
+                    ".card",
+                    ".views-row",
+                    "li.views-row",
+                    "main a[href*='convocatoria']",
+                    "main a[href*='call']",
+                    "main a[href*='grant']",
+                ],
                 "title_selectors": ["h2", "h3", "h2 a", "h3 a", "a"],
                 "link_selectors": [
                     "a[href*='convocatoria']",
@@ -1160,7 +1181,19 @@ def seed_default_sources(
             "allowed_domains": ["faperj.br", "www.faperj.br"],
             "scraping_frequency": "daily",
             "connector_config": {
-                "list_selectors": ["article", "main a[href*='convocatoria']", "main a[href*='call']", "main a[href*='edital']", "main a[href*='grant']", "main p", "main li", "section.corpo-interna a[href*='Edital']", "div.tamanho-fonte a[href*='Edital']", "div.tamanho-fonte a[href*='edital']", "section.corpo-interna a[href*='.pdf']"],
+                "list_selectors": [
+                    "article",
+                    "main a[href*='convocatoria']",
+                    "main a[href*='call']",
+                    "main a[href*='edital']",
+                    "main a[href*='grant']",
+                    "main p",
+                    "main li",
+                    "section.corpo-interna a[href*='Edital']",
+                    "div.tamanho-fonte a[href*='Edital']",
+                    "div.tamanho-fonte a[href*='edital']",
+                    "section.corpo-interna a[href*='.pdf']",
+                ],
                 "title_selectors": ["a", "strong", "em", "h2", "h3"],
                 "link_selectors": [
                     "a[href*='convocatoria']",
@@ -1260,7 +1293,9 @@ def seed_default_sources(
             "allowed_domains": ["rockefellerfoundation.org", "www.rockefellerfoundation.org"],
             "scraping_frequency": "daily",
             "connector_config": {
-                "list_selectors": ["a[href*='residency-program'], a[href*='big-bets-fellowships'], a[href*='/convenings/']"],
+                "list_selectors": [
+                    "a[href*='residency-program'], a[href*='big-bets-fellowships'], a[href*='/convenings/']"
+                ],
                 "title_selectors": ["h2", "h3", "a"],
                 "link_selectors": ["a"],
                 "content_selectors": ["main", "article"],
@@ -1466,7 +1501,11 @@ def seed_default_sources(
             "allowed_domains": ["findeter.gov.co", "www.findeter.gov.co"],
             "scraping_frequency": "daily",
             "connector_config": {
-                "list_selectors": ["a[href*='/convocatorias/']", "article a[href*='convocatoria']", "main a[href*='convocatoria']"],
+                "list_selectors": [
+                    "a[href*='/convocatorias/']",
+                    "article a[href*='convocatoria']",
+                    "main a[href*='convocatoria']",
+                ],
                 "title_selectors": ["a", "h2", "h3"],
                 "link_selectors": ["a[href*='/convocatorias/']", "a"],
                 "content_selectors": ["article", "main"],
@@ -1511,7 +1550,14 @@ def seed_default_sources(
             "allowed_domains": ["caricom.org", "www.caricom.org"],
             "scraping_frequency": "daily",
             "connector_config": {
-                "list_selectors": ["article a[href]", "h2 a", "h3 a", ".post-title a", "a[href*='tender']", "main a[href*='caricom.org']"],
+                "list_selectors": [
+                    "article a[href]",
+                    "h2 a",
+                    "h3 a",
+                    ".post-title a",
+                    "a[href*='tender']",
+                    "main a[href*='caricom.org']",
+                ],
                 "title_selectors": ["a", "h2", "h3"],
                 "link_selectors": ["a[href*='tender']", "a[href*='procurement']", "a"],
                 "content_selectors": ["article", "main"],
@@ -1944,7 +1990,12 @@ def seed_default_sources(
             "region": "LatAm",
             "source_type": "html",
             "category": ["convocatorias", "cultura", "estimulos", "bogota"],
-            "allowed_domains": ["idartes.gov.co", "www.idartes.gov.co", "crea.gov.co", "nidos.gov.co"],
+            "allowed_domains": [
+                "idartes.gov.co",
+                "www.idartes.gov.co",
+                "crea.gov.co",
+                "nidos.gov.co",
+            ],
             "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": [
@@ -2326,7 +2377,12 @@ def seed_default_sources(
             "region": "LatAm",
             "source_type": "html",
             "category": ["convocatorias", "deportes", "contratacion", "bogota"],
-            "allowed_domains": ["idrd.gov.co", "www.idrd.gov.co", "secop.gov.co", "colombiacompra.gov.co"],
+            "allowed_domains": [
+                "idrd.gov.co",
+                "www.idrd.gov.co",
+                "secop.gov.co",
+                "colombiacompra.gov.co",
+            ],
             "scraping_frequency": "daily",
             "connector_config": {
                 "list_selectors": [
@@ -3687,9 +3743,21 @@ def seed_default_sources(
             "allowed_domains": ["dane.gov.co", "www.dane.gov.co"],
             "scraping_frequency": "daily",
             "connector_config": {
-                "list_selectors": ["article", "main a[href*='convocatoria']", "main a[href*='contratacion']", "main a[href*='contratación']", "main li a", ".item a"],
+                "list_selectors": [
+                    "article",
+                    "main a[href*='convocatoria']",
+                    "main a[href*='contratacion']",
+                    "main a[href*='contratación']",
+                    "main li a",
+                    ".item a",
+                ],
                 "title_selectors": ["a", "h2", "h3"],
-                "link_selectors": ["a[href*='convocatoria']", "a[href*='contratacion']", "a[href*='call']", "a"],
+                "link_selectors": [
+                    "a[href*='convocatoria']",
+                    "a[href*='contratacion']",
+                    "a[href*='call']",
+                    "a",
+                ],
                 "content_selectors": ["article", "main", ".item"],
                 "date_labels": ["Fecha de cierre:", "Cierre:", "Deadline:", "Hasta:"],
                 "detail_enrichment": False,
@@ -3723,13 +3791,21 @@ def seed_default_sources(
             "allowed_domains": ["eacea.ec.europa.eu", "ec.europa.eu"],
             "scraping_frequency": "daily",
             "connector_config": {
-                "list_selectors": ["article", ".ecl-card", "main a[href*='grant']", "a[href*='grant']"],
+                "list_selectors": [
+                    "article",
+                    ".ecl-card",
+                    "main a[href*='grant']",
+                    "a[href*='grant']",
+                ],
                 "title_selectors": ["h2", "h3", "a"],
                 "link_selectors": ["a[href*='grant']", "a"],
                 "content_selectors": ["article", "main"],
                 "date_labels": ["Deadline:", "Closing:", "Deadline date:"],
                 "detail_enrichment": True,
-                "pagination": {"type": "next_link", "selector": "a[rel='next'], a.ecl-pagination__next"},
+                "pagination": {
+                    "type": "next_link",
+                    "selector": "a[rel='next'], a.ecl-pagination__next",
+                },
             },
         },
         {
@@ -3744,7 +3820,12 @@ def seed_default_sources(
             "allowed_domains": ["culture.ec.europa.eu", "ec.europa.eu"],
             "scraping_frequency": "daily",
             "connector_config": {
-                "list_selectors": ["article", "main a[href*='call']", "a[href*='culture-moves']", "section a"],
+                "list_selectors": [
+                    "article",
+                    "main a[href*='call']",
+                    "a[href*='culture-moves']",
+                    "section a",
+                ],
                 "title_selectors": ["h2", "h3", "a"],
                 "link_selectors": ["a[href*='call']", "a[href*='culture-moves']", "a"],
                 "content_selectors": ["article", "main", "section"],
@@ -3765,7 +3846,14 @@ def seed_default_sources(
             "allowed_domains": ["sicon.scrd.gov.co", "www.sicon.scrd.gov.co", "scrd.gov.co"],
             "scraping_frequency": "daily",
             "connector_config": {
-                "list_selectors": ["article", "div.card a[href*='convocatoria']", "div.card a[href*='estimulo']", "main a[href*='convocatoria']", "a[href*='estimulo']", "a[href*='convocatoria']"],
+                "list_selectors": [
+                    "article",
+                    "div.card a[href*='convocatoria']",
+                    "div.card a[href*='estimulo']",
+                    "main a[href*='convocatoria']",
+                    "a[href*='estimulo']",
+                    "a[href*='convocatoria']",
+                ],
                 "title_selectors": ["h2", "h3", "a"],
                 "link_selectors": ["a[href*='convocatoria']", "a[href*='estimulo']", "a"],
                 "content_selectors": ["article", "main", ".convocatoria", "div.card"],
@@ -3786,7 +3874,11 @@ def seed_default_sources(
             "allowed_domains": ["programaibermedia.com", "www.programaibermedia.com"],
             "scraping_frequency": "daily",
             "connector_config": {
-                "list_selectors": ["article", "main a[href*='convocatoria']", "a[href*='convocatoria']"],
+                "list_selectors": [
+                    "article",
+                    "main a[href*='convocatoria']",
+                    "a[href*='convocatoria']",
+                ],
                 "title_selectors": ["h2", "h3", "a"],
                 "link_selectors": ["a[href*='convocatoria']", "a"],
                 "content_selectors": ["article", "main"],
@@ -3807,7 +3899,12 @@ def seed_default_sources(
             "allowed_domains": ["ibermusicas.org", "www.ibermusicas.org"],
             "scraping_frequency": "daily",
             "connector_config": {
-                "list_selectors": ["article", "main a[href*='convocatoria']", "a[href*='convocatoria']", "a[href*='call']"],
+                "list_selectors": [
+                    "article",
+                    "main a[href*='convocatoria']",
+                    "a[href*='convocatoria']",
+                    "a[href*='call']",
+                ],
                 "title_selectors": ["h2", "h3", "a"],
                 "link_selectors": ["a[href*='convocatoria']", "a[href*='call']", "a"],
                 "content_selectors": ["article", "main"],
@@ -3828,7 +3925,12 @@ def seed_default_sources(
             "allowed_domains": ["coe.int", "www.coe.int"],
             "scraping_frequency": "daily",
             "connector_config": {
-                "list_selectors": ["article", "main a[href*='eurimages']", "a[href*='eurimages']", "a[href*='call']"],
+                "list_selectors": [
+                    "article",
+                    "main a[href*='eurimages']",
+                    "a[href*='eurimages']",
+                    "a[href*='call']",
+                ],
                 "title_selectors": ["h2", "h3", "a"],
                 "link_selectors": ["a[href*='eurimages']", "a[href*='call']", "a"],
                 "content_selectors": ["article", "main"],
@@ -3849,13 +3951,21 @@ def seed_default_sources(
             "allowed_domains": ["erasmus-plus.ec.europa.eu", "ec.europa.eu"],
             "scraping_frequency": "daily",
             "connector_config": {
-                "list_selectors": ["article", "main a[href*='opportunit']", "a[href*='opportunit']", ".ecl-card"],
+                "list_selectors": [
+                    "article",
+                    "main a[href*='opportunit']",
+                    "a[href*='opportunit']",
+                    ".ecl-card",
+                ],
                 "title_selectors": ["h2", "h3", "a"],
                 "link_selectors": ["a[href*='opportunit']", "a[href*='erasmus']", "a"],
                 "content_selectors": ["article", "main"],
                 "date_labels": ["Deadline:", "Application deadline:", "Cierre:"],
                 "detail_enrichment": True,
-                "pagination": {"type": "next_link", "selector": "a[rel='next'], a.ecl-pagination__next"},
+                "pagination": {
+                    "type": "next_link",
+                    "selector": "a[rel='next'], a.ecl-pagination__next",
+                },
             },
         },
         # ================================================================
@@ -3873,9 +3983,23 @@ def seed_default_sources(
             "allowed_domains": ["jsps.go.jp"],
             "scraping_frequency": "daily",
             "connector_config": {
-                "list_selectors": ["article", "main a[href*='grant']", "main a[href*='kakenhi']", "main a[href*='fellowship']", "main a[href*='fellow']", "main li a", "div.ww-text a[href*='grants01'], div.ww-text a[href*='lsrp'], div.ww-text a[href*='multi-year_fund']"],
+                "list_selectors": [
+                    "article",
+                    "main a[href*='grant']",
+                    "main a[href*='kakenhi']",
+                    "main a[href*='fellowship']",
+                    "main a[href*='fellow']",
+                    "main li a",
+                    "div.ww-text a[href*='grants01'], div.ww-text a[href*='lsrp'], div.ww-text a[href*='multi-year_fund']",
+                ],
                 "title_selectors": ["a", "h2", "h3"],
-                "link_selectors": ["a[href*='grant']", "a[href*='kakenhi']", "a[href*='fellowship']", "a[href*='fellow']", "a"],
+                "link_selectors": [
+                    "a[href*='grant']",
+                    "a[href*='kakenhi']",
+                    "a[href*='fellowship']",
+                    "a[href*='fellow']",
+                    "a",
+                ],
                 "content_selectors": ["article", "main"],
                 "date_labels": ["Deadline:", "Application deadline:", "Cierre:"],
                 "detail_enrichment": False,
@@ -3894,9 +4018,22 @@ def seed_default_sources(
             "allowed_domains": ["jsps.go.jp"],
             "scraping_frequency": "daily",
             "connector_config": {
-                "list_selectors": ["article", "main a[href*='fellow']", "main a[href*='fellowship']", "main a[href*='grant']", "main a[href*='kakenhi']", "main li a", "div.ww-text a[href*='/e-fellow/e-']"],
+                "list_selectors": [
+                    "article",
+                    "main a[href*='fellow']",
+                    "main a[href*='fellowship']",
+                    "main a[href*='grant']",
+                    "main a[href*='kakenhi']",
+                    "main li a",
+                    "div.ww-text a[href*='/e-fellow/e-']",
+                ],
                 "title_selectors": ["a", "h2", "h3"],
-                "link_selectors": ["a[href*='fellow']", "a[href*='fellowship']", "a[href*='grant']", "a"],
+                "link_selectors": [
+                    "a[href*='fellow']",
+                    "a[href*='fellowship']",
+                    "a[href*='grant']",
+                    "a",
+                ],
                 "content_selectors": ["article", "main"],
                 "date_labels": ["Deadline:", "Application deadline:", "Cierre:"],
                 "detail_enrichment": False,
@@ -3915,7 +4052,12 @@ def seed_default_sources(
             "allowed_domains": ["rwjf.org"],
             "scraping_frequency": "daily",
             "connector_config": {
-                "list_selectors": ["main a[href*='grant']", "main a[href*='funding']", "article", "main li a"],
+                "list_selectors": [
+                    "main a[href*='grant']",
+                    "main a[href*='funding']",
+                    "article",
+                    "main li a",
+                ],
                 "title_selectors": ["a", "h2", "h3"],
                 "link_selectors": ["a[href*='grant']", "a[href*='funding']", "a"],
                 "content_selectors": ["article", "main"],
@@ -4020,7 +4162,13 @@ def seed_default_sources(
             "allowed_domains": ["nrf.ac.za"],
             "scraping_frequency": "daily",
             "connector_config": {
-                "list_selectors": ["main a[href*='bursary']", "main a[href*='bursaries']", "main a[href*='funding']", "article", "main li a"],
+                "list_selectors": [
+                    "main a[href*='bursary']",
+                    "main a[href*='bursaries']",
+                    "main a[href*='funding']",
+                    "article",
+                    "main li a",
+                ],
                 "title_selectors": ["a", "h2", "h3"],
                 "link_selectors": ["a[href*='bursary']", "a[href*='funding']", "a"],
                 "content_selectors": ["article", "main"],
@@ -4083,7 +4231,12 @@ def seed_default_sources(
             "allowed_domains": ["cinea.ec.europa.eu"],
             "scraping_frequency": "weekly",
             "connector_config": {
-                "list_selectors": ["main a[href*='call']", "main a[href*='proposal']", "article", "main li a"],
+                "list_selectors": [
+                    "main a[href*='call']",
+                    "main a[href*='proposal']",
+                    "article",
+                    "main li a",
+                ],
                 "title_selectors": ["a", "h2", "h3"],
                 "link_selectors": ["a[href*='call']", "a[href*='proposal']", "a"],
                 "content_selectors": ["article", "main"],

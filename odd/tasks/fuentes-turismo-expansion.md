@@ -16,7 +16,7 @@ Objetivo: sumar convocatorias de turismo (MinCIT avisos, EU Tourism Platform, UN
 - [x] **T2** (inline) — S2: seed + tests + fixture EU platform. RED→GREEN. ✅ 2026-10-15
 - [x] **T3** (inline) — S3: seed + tests + fixture UN Tourism (alcance BTV, decisión usuario). RED→GREEN. ✅ 2026-10-15
 - [x] **T4** (inline) — S4: research CTO/OEA/CAF/otros, shortlist abajo. Sin código. ✅ 2026-10-15
-- [ ] **T5** (inline) — S5: commit + push + cherry + rebuild api + reseed + verify.
+- [x] **T5** (inline) — S5: commit `99ffd9a` + push + cherry `593cb20` a servidor (resolución manual: seed server recortado) + rebuild api + reseed (insert 0 / update 3, total 206) + verify live: mincit-avisos 8, eu-platform 5, un-villages 10 candidatos. ✅ 2026-10-15
 
 ## Log
 

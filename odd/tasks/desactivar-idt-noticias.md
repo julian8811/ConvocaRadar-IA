@@ -18,8 +18,8 @@ Objetivo: sacar las noticias del IDT del informe de turismo. Rama: main → cher
 - [x] **T4** (inline) — S4: cherry-pick limpio al branch del servidor → commit `10d7724`; rebuild api (healthy). Worker sin cambios, no reiniciado. ✅ 2026-10-15
 - [x] **T5** (inline) — S4: reseed con force=true (el seed sin force sólo adopta huérfanas: 203 skipped). Resultado: 203 updated, `idt-noticias.enabled=false`. ✅ 2026-10-15
 - [x] **T6** (inline) — S4: purga prod `--apply`: backup `reports/purge-idt-noticias-20261015-041304.json` (45 filas, JSON validado) + 45 borradas; verify: enabled=false, remaining=0, contenedores healthy. ✅ 2026-10-15
-- [ ] **T7** (inline) — S5: `scripts/purge_turismo_news_20261015.py` (9 IDs exactos, backup, dry-run default) + commit + push + cherry a servidor (sin rebuild: sin cambios en código api).
-- [ ] **T8** (inline) — S5: purga prod de las 9 noticias + verify turismo limpio.
+- [x] **T7** (inline) — S5: `scripts/purge_turismo_news_20261015.py` (9 IDs exactos, backup, dry-run default) + commit `3069f04` + push + cherry `86805da` a servidor (sin rebuild: sin cambios en código api). ✅ 2026-10-15
+- [x] **T8** (inline) — S5: purga prod de las 9 noticias (backup `reports/purge-turismo-news-20261015-041947.json` validado) + verify: turismo 26→17, 0 noticias. ✅ 2026-10-15
 
 ## Log
 

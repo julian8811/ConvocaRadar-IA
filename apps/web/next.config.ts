@@ -18,6 +18,32 @@ let nextConfig: NextConfig = {
       },
     ],
   },
+  // SEC-REMEDIATION-T4: security headers on every response (mirrors the
+  // API middleware). Deliberately no page-level CSP: Next injects inline
+  // flight data (__next_f) that a strict CSP would break.
+  async headers() {
+    return [
+      {
+        source: "/:path*",
+        headers: [
+          {
+            key: "Strict-Transport-Security",
+            value: "max-age=31536000; includeSubDomains",
+          },
+          { key: "X-Content-Type-Options", value: "nosniff" },
+          { key: "X-Frame-Options", value: "DENY" },
+          {
+            key: "Referrer-Policy",
+            value: "strict-origin-when-cross-origin",
+          },
+          {
+            key: "Permissions-Policy",
+            value: "camera=(), microphone=(), geolocation=()",
+          },
+        ],
+      },
+    ];
+  },
   // Browser traffic can use a same-origin public URL such as /api/v1, while
   // the Next.js server always proxies to the private Docker-network endpoint.
   // Keeping the two concerns separate prevents Docker hostnames from leaking

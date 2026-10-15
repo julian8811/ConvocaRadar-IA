@@ -41,9 +41,13 @@ SOURCE_KEY = "idt-noticias"
 
 
 def _backup_path() -> Path:
-    root = Path(__file__).resolve().parents[1]  # repo root (scripts/..)
+    override = os.environ.get("PURGE_BACKUP_DIR")
+    if override:
+        base = Path(override)
+    else:
+        base = Path(__file__).resolve().parents[1] / "reports"  # repo root
     stamp = _dt.datetime.now().strftime("%Y%m%d-%H%M%S")
-    return root / "reports" / f"purge-{SOURCE_KEY}-{stamp}.json"
+    return base / f"purge-{SOURCE_KEY}-{stamp}.json"
 
 
 def main(apply: bool) -> int:

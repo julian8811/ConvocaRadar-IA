@@ -551,9 +551,33 @@ app.add_middleware(
         "http://127.0.0.1:3006",
     ],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    # SEC-REMEDIATION-T3: explicit methods/headers, never "*". Mirrors what
+    # apps/web/lib/api.ts actually sends (JSON + X-CSRF-Protection, legacy
+    # Bearer in non-prod). QUERY is not used by any client — dropped.
+    allow_methods=["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"],
+    allow_headers=["authorization", "content-type", "x-csrf-protection"],
 )
+
+
+def _csp_header() -> str:
+    """Build the Content-Security-Policy from settings (SEC-REMEDIATION-T3).
+
+    No hardcoded cloud domains: allowed hosts derive from FRONTEND_URL /
+    BACKEND_URL so each deployment (local, cloud, university VM) gets a
+    matching policy. Operators extend coverage by changing those two
+    settings — never code.
+    """
+    front = get_settings().frontend_url.rstrip("/")
+    back = get_settings().backend_url.rstrip("/")
+    origins = " ".join(dict.fromkeys(o for o in (front, back) if o))
+    return (
+        "default-src 'self'; "
+        f"script-src 'self' 'unsafe-inline' {origins}; "
+        "style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data: https:; "
+        f"connect-src 'self' {origins}; "
+        "frame-ancestors 'none'"
+    )
 
 
 # Security headers middleware. Runs after every response so headers are
@@ -566,16 +590,8 @@ async def security_headers_middleware(request: Request, call_next):
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
-    # CSP: allow the Vercel frontend, Cloudflare analytics, and inline scripts
-    # needed by React and Recharts. Default-src 'self' for everything else.
-    response.headers["Content-Security-Policy"] = (
-        "default-src 'self'; "
-        "script-src 'self' 'unsafe-inline' https://convocaradar-web.vercel.app; "
-        "style-src 'self' 'unsafe-inline'; "
-        "img-src 'self' data: https:; "
-        "connect-src 'self' https://convocaradar-api.onrender.com; "
-        "frame-ancestors 'none'"
-    )
+    # CSP derived from settings (SEC-REMEDIATION-T3) — no hardcoded domains.
+    response.headers["Content-Security-Policy"] = _csp_header()
     return response
 
 

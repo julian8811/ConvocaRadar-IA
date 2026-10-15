@@ -13,7 +13,7 @@ Runner: pytest (api), ruff.
 
 ## Tasks
 
-- [ ] **T1** (inline) — S1,S2,S3: settings + trigger + tests. RED→GREEN.
+- [x] **T1** (inline) — S1,S2,S3: settings + trigger + helper + tests. RED→GREEN (4 passed). ✅ 2026-10-15
 - [ ] **T2** (inline) — S4: deploy worker + verify.
 
 ## Log

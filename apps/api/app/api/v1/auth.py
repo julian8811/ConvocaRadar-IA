@@ -43,6 +43,46 @@ TOKEN_COOKIE_MAX_AGE_SECONDS = 3600
 # §4. Tests clear the bucket between cases via ``forgot_limiter._buckets.clear()``.
 forgot_limiter = SlidingWindowLimiter(max_requests=5, window_seconds=3600)
 
+# SEC-REMEDIATION-T1: per-email rate limiter for the register endpoint. 5
+# attempts per email per hour, 6th is 429 — same documented contract as
+# login and forgot-password. Keyed by email (not IP): the API sits behind
+# the Next rewrite, so the socket IP is the web container for all browser
+# traffic and a per-IP bucket would be one shared budget. Spraying unique
+# emails is bounded by the global per-IP middleware plus the T2
+# registration-mode gate. Tests clear the bucket via
+# ``register_limiter._buckets.clear()``.
+register_limiter = SlidingWindowLimiter(max_requests=5, window_seconds=3600)
+
+
+def _registration_denial(email: str) -> str | None:
+    """Return the 403 detail when registration is gated, else None.
+
+    SEC-REMEDIATION-T2. Modes (REGISTRATION_MODE): ``open`` (default,
+    historic behavior), ``closed`` (reject all), ``domain`` (only
+    REGISTRATION_ALLOWED_DOMAINS, comma-separated, exact or subdomain
+    suffix match). Unknown modes fail closed. Lazy settings import, same
+    pattern as ``_smtp_configured`` below, to avoid import cycles.
+    """
+    from app.core.config import get_settings
+
+    settings = get_settings()
+    mode = (settings.registration_mode or "open").lower().strip()
+    if mode == "open":
+        return None
+    if mode == "closed":
+        return "Registration is disabled"
+    if mode == "domain":
+        allowed = {
+            d.strip().lower()
+            for d in (settings.registration_allowed_domains or "").split(",")
+            if d.strip()
+        }
+        domain = (email or "").lower().strip().rsplit("@", 1)[-1]
+        if domain and any(domain == d or domain.endswith("." + d) for d in allowed):
+            return None
+        return "Email domain not allowed for registration"
+    return "Registration is disabled"
+
 
 def _password_changed_at_epoch(user: User) -> int:
     """Return ``user.password_changed_at`` as epoch seconds, or 0 when NULL.
@@ -120,6 +160,18 @@ def _clear_token_cookie(response: Response) -> None:
 
 @router.post("/auth/register", response_model=Token)
 def register(payload: RegisterRequest, response: Response, db: Session = Depends(get_db)) -> Token:
+    # SEC-REMEDIATION-T1: rate-limit by email before any DB query or
+    # password hash so a sustained attacker does not burn CPU/DB.
+    email_key = payload.email.lower().strip()
+    if not register_limiter.check(email_key):
+        raise HTTPException(
+            status_code=429,
+            detail="Too many requests. Try again later.",
+        )
+    # SEC-REMEDIATION-T2: registration-mode gate after rate-limit, before DB.
+    denial = _registration_denial(payload.email)
+    if denial is not None:
+        raise HTTPException(status_code=403, detail=denial)
     existing = db.scalar(select(User).where(User.email == payload.email))
     if existing:
         raise HTTPException(status_code=409, detail="Email already registered")
@@ -318,9 +370,17 @@ def forgot_password(
             # over any account if SMTP ever fails (the URL is a valid reset
             # token signed with the same secret as real reset links).
             from app.core.config import get_settings
+
             if get_settings().app_env == "development":
                 detail = reset_url
-        audit(db, "forgot_password_requested", "user", user, user.id, metadata={"ip": _client_ip(request)})
+        audit(
+            db,
+            "forgot_password_requested",
+            "user",
+            user,
+            user.id,
+            metadata={"ip": _client_ip(request)},
+        )
         db.commit()
     return {"detail": detail}
 
