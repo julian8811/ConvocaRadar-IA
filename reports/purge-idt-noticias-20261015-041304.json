@@ -1,0 +1,412 @@
+{
+  "source_key": "idt-noticias",
+  "source_id": "054618bb-4fc2-4d15-a039-b87774f18b79",
+  "purged_at": "2026-10-15T04:13:04",
+  "opportunities": [
+    {
+      "id": "3b451f1c-b14b-4b6b-8f3e-3a89934ed41e",
+      "title": "Los comerciantes del barrio Santa Isabel se adaptan al avance de la Línea 1 del Metro de Bogotá",
+      "official_url": "https://www.idt.gov.co/noticias/los-comerciantes-del-barrio-santa-isabel-se-adaptan-al-avance-de-la-linea-1-del-metro-de",
+      "application_url": null,
+      "status": "unknown",
+      "sector": "otros",
+      "first_seen_at": "2026-09-07T15:40:42.997268"
+    },
+    {
+      "id": "55d0c4f9-254e-4fe3-94aa-8057f90a2a92",
+      "title": "Viaja a Bogotá y descubre Latinoamérica a través de la música en Jazz al Parque 2026",
+      "official_url": "https://www.idt.gov.co/noticias/viaja-a-bogota-y-descubre-latinoamerica-a-traves-de-la-musica-en-jazz-al-parque-2026",
+      "application_url": null,
+      "status": "unknown",
+      "sector": "cultura",
+      "first_seen_at": "2026-09-07T11:03:24.416695"
+    },
+    {
+      "id": "1ca01c69-0140-4a88-bcf2-a78283053315",
+      "title": "Bogotá Ciudad Rock proyecta un impacto económico de más de $148 mil millones y 75.000 turistas",
+      "official_url": "https://www.idt.gov.co/noticias/bogota-ciudad-rock-proyecta-un-impacto-economico-de-mas-de-148-mil-millones-y-75000",
+      "application_url": null,
+      "status": "unknown",
+      "sector": "turismo",
+      "first_seen_at": "2026-10-10T13:28:06.782302"
+    },
+    {
+      "id": "cf89d9cd-ceb6-4c97-9cee-2444b225b8fd",
+      "title": "Bogotá inaugura el Centro de Desarrollo Turístico en la emblemática Casa de los Comuneros",
+      "official_url": "https://www.idt.gov.co/noticias/bogota-inaugura-el-centro-de-desarrollo-turistico-en-la-emblematica-casa-de-los-comuneros",
+      "application_url": null,
+      "status": "unknown",
+      "sector": "otros",
+      "first_seen_at": "2026-09-07T15:40:42.997268"
+    },
+    {
+      "id": "d017145a-ae43-46bf-825f-10e29e4c3fba",
+      "title": "Festival Cordillera proyecta atraer cerca de 36.000 visitantes a Bogotá y generar un impacto económico de $81.601 millones",
+      "official_url": "https://www.idt.gov.co/noticias/festival-cordillera-proyecta-atraer-cerca-de-36000-visitantes-a-bogota-y-generar-un",
+      "application_url": null,
+      "status": "unknown",
+      "sector": "turismo",
+      "first_seen_at": "2026-09-09T03:59:09.829639"
+    },
+    {
+      "id": "dec857c9-b918-484f-8ad0-3198ec1dfa00",
+      "title": "Bogotá crece en conectividad y amplía su oferta turística durante 2026",
+      "official_url": "https://www.idt.gov.co/noticias/bogota-crece-en-conectividad-y-amplia-su-oferta-turistica-durante-2026",
+      "application_url": null,
+      "status": "unknown",
+      "sector": "otros",
+      "first_seen_at": "2026-09-07T11:03:24.416695"
+    },
+    {
+      "id": "6d129e3f-4b69-4e26-995e-68984b183a92",
+      "title": "Bogotá suma a las empresas transportadoras a la prevención de la trata de personas y la ESCNNA",
+      "official_url": "https://www.idt.gov.co/noticias/bogota-suma-a-las-empresas-transportadoras-a-la-prevencion-de-la-trata-de-personas-y-la",
+      "application_url": null,
+      "status": "unknown",
+      "sector": "otros",
+      "first_seen_at": "2026-10-06T03:28:28.895288"
+    },
+    {
+      "id": "b4136487-70de-421a-b535-11093f27d12f",
+      "title": "¡La capital no se detiene! Del fenómeno mundial de BTS a un banquete cultural 100% gratuito este fin de semana",
+      "official_url": "https://www.idt.gov.co/noticias/la-capital-no-se-detiene-del-fenomeno-mundial-de-bts-a-un-banquete-cultural-100-gratuito",
+      "application_url": null,
+      "status": "unknown",
+      "sector": "cultura",
+      "first_seen_at": "2026-10-06T03:28:28.895288"
+    },
+    {
+      "id": "75dd8adb-ddde-4874-9628-9eea363801e6",
+      "title": "Bogotá estrena su Centro de Desarrollo Turístico junto a la Plaza de Bolívar",
+      "official_url": "https://www.idt.gov.co/noticias/bogota-estrena-su-centro-de-desarrollo-turistico-junto-a-la-plaza-de-bolivar",
+      "application_url": null,
+      "status": "unknown",
+      "sector": "turismo",
+      "first_seen_at": "2026-09-07T11:03:24.416695"
+    },
+    {
+      "id": "e0ef9560-d41e-460c-85a4-05e99d3de11c",
+      "title": "Bogotá lleva sus sabores, cocineros y experiencias turísticas a Sabor Barranquilla 2026",
+      "official_url": "https://www.idt.gov.co/noticias/bogota-lleva-sus-sabores-cocineros-y-experiencias-turisticas-a-sabor-barranquilla-2026",
+      "application_url": null,
+      "status": "unknown",
+      "sector": "turismo",
+      "first_seen_at": "2026-09-07T11:03:24.416695"
+    },
+    {
+      "id": "ca35b521-5068-4ce6-ba80-3e5b830eb220",
+      "title": "Bogotá abre convocatoria para fortalecer experiencias turísticas que conectan a visitantes con la esencia de la ciudad",
+      "official_url": "https://www.idt.gov.co/noticias/bogota-abre-convocatoria-para-fortalecer-experiencias-turisticas-que-conectan-a-visitantes",
+      "application_url": null,
+      "status": "unknown",
+      "sector": "turismo",
+      "first_seen_at": "2026-09-07T11:03:24.416695"
+    },
+    {
+      "id": "7e320b9a-77a3-4d82-8feb-e90fb2caa5dc",
+      "title": "El nuevo punto turístico en el centro de Bogotá que compite con la Plaza de Bolívar y el Chorro",
+      "official_url": "https://www.idt.gov.co/noticias/el-nuevo-punto-turistico-en-el-centro-de-bogota-que-compite-con-la-plaza-de-bolivar-y-el",
+      "application_url": null,
+      "status": "unknown",
+      "sector": "turismo",
+      "first_seen_at": "2026-09-07T15:40:42.997268"
+    },
+    {
+      "id": "262c6899-bf90-445c-a415-8da2b3974ddb",
+      "title": "Bogotá será Capital Iberoamericana de las Culturas 2027: una nueva razón para viajar a la ciudad",
+      "official_url": "https://www.idt.gov.co/noticias/bogota-sera-capital-iberoamericana-de-las-culturas-2027-una-nueva-razon-para-viajar-a-la",
+      "application_url": null,
+      "status": "unknown",
+      "sector": "cultura",
+      "first_seen_at": "2026-09-07T11:03:24.416695"
+    },
+    {
+      "id": "2cd538ea-b11a-4ec2-8dac-8f72b84682a3",
+      "title": "Concejo de Bogotá aprueba el Acuerdo por una Ciudad Inteligente que transformará el turismo, la inversión y el empleo",
+      "official_url": "https://www.idt.gov.co/noticias/concejo-de-bogota-aprueba-el-acuerdo-por-una-ciudad-inteligente-que-transformara-el",
+      "application_url": null,
+      "status": "unknown",
+      "sector": "turismo",
+      "first_seen_at": "2026-10-06T03:28:28.895288"
+    },
+    {
+      "id": "2e1c5b76-cdf5-4445-ba7b-ce947cf7c35d",
+      "title": "Fritanga a 25.000 pesos en Bogotá: las plazas de mercado donde la venderán del 2 al 4 de octubre",
+      "official_url": "https://www.idt.gov.co/noticias/fritanga-a-25000-pesos-en-bogota-las-plazas-de-mercado-donde-la-venderan-del-2-al-4-de",
+      "application_url": null,
+      "status": "unknown",
+      "sector": "otros",
+      "first_seen_at": "2026-10-10T13:28:06.782302"
+    },
+    {
+      "id": "497d2bb6-eebc-4444-98e7-607931a2bf3d",
+      "title": "Razones por las que Bogotá se consolida como el principal destino de turismo médico en Colombia",
+      "official_url": "https://www.idt.gov.co/noticias/razones-por-las-que-bogota-se-consolida-como-el-principal-destino-de-turismo-medico-en",
+      "application_url": null,
+      "status": "unknown",
+      "sector": "turismo",
+      "first_seen_at": "2026-10-10T13:28:06.782302"
+    },
+    {
+      "id": "65a1f4bc-23f2-4bfa-b249-f9cba1b4b0c9",
+      "title": "Fritanga Fest llega a Bogotá: conozca las 13 plazas de mercado participantes y cuánto costará el plato",
+      "official_url": "https://www.idt.gov.co/noticias/fritanga-fest-llega-a-bogota-conozca-las-13-plazas-de-mercado-participantes-y-cuanto",
+      "application_url": null,
+      "status": "unknown",
+      "sector": "cultura",
+      "first_seen_at": "2026-10-10T13:28:06.782302"
+    },
+    {
+      "id": "670e3117-b549-42af-b4bf-4544dc295476",
+      "title": "Esta es la millonada que mueve la banda surcoreana BTS, que estará en concierto en Bogotá el 2 y 3 de octubre",
+      "official_url": "https://www.idt.gov.co/noticias/esta-es-la-millonada-que-mueve-la-banda-surcoreana-bts-que-estara-en-concierto-en-bogota",
+      "application_url": null,
+      "status": "unknown",
+      "sector": "otros",
+      "first_seen_at": "2026-10-10T13:28:06.782302"
+    },
+    {
+      "id": "35f86306-5c31-4a38-b2b0-2285b99ea2b3",
+      "title": "¿Qué hacer en Bogotá durante el Día del Amor y la Amistad? Estas son las opciones gratuitas y de bajo costo para compartir en pareja",
+      "official_url": "https://www.idt.gov.co/noticias/que-hacer-en-bogota-durante-el-dia-del-amor-y-la-amistad-estas-son-las-opciones-gratuitas",
+      "application_url": null,
+      "status": "unknown",
+      "sector": "otros",
+      "first_seen_at": "2026-10-06T03:28:28.895288"
+    },
+    {
+      "id": "64ab10ef-f181-4174-87ec-4695b563c694",
+      "title": "BTS mueve a Bogotá: sus dos conciertos movilizarán más de $99 mil millones en la economía de la ciudad",
+      "official_url": "https://www.idt.gov.co/noticias/bts-mueve-a-bogota-sus-dos-conciertos-movilizaran-mas-de-99-mil-millones-en-la-economia-de",
+      "application_url": null,
+      "status": "unknown",
+      "sector": "otros",
+      "first_seen_at": "2026-10-06T03:28:28.895288"
+    },
+    {
+      "id": "83ab828b-ffbc-419e-ac79-54a85bdf7348",
+      "title": "Bogotá fortalece su proyección internacional con nuevas alianzas en FIT Argentina 2026",
+      "official_url": "https://www.idt.gov.co/noticias/bogota-fortalece-su-proyeccion-internacional-con-nuevas-alianzas-en-fit-argentina-2026",
+      "application_url": null,
+      "status": "unknown",
+      "sector": "otros",
+      "first_seen_at": "2026-10-06T03:28:28.895288"
+    },
+    {
+      "id": "d87697e3-e80a-4e01-97d9-e65821bc2496",
+      "title": "Bogotá lanza estrategia para decirle No a la Explotación Sexual Comercial de Niñas, Niños y Adolescentes",
+      "official_url": "https://www.idt.gov.co/noticias/bogota-lanza-estrategia-para-decirle-no-a-la-explotacion-sexual-comercial-de-ninas-ninos-y",
+      "application_url": null,
+      "status": "unknown",
+      "sector": "salud",
+      "first_seen_at": "2026-10-06T03:28:28.895288"
+    },
+    {
+      "id": "f04d5401-57b1-473a-adbc-3c5a34c513e9",
+      "title": "¡Ojo con esa idea que tiene guardada! Bogotá la está buscando y hay plazo hasta el 27 de septiembre",
+      "official_url": "https://www.idt.gov.co/noticias/ojo-con-esa-idea-que-tiene-guardada-bogota-la-esta-buscando-y-hay-plazo-hasta-el-27-de",
+      "application_url": null,
+      "status": "unknown",
+      "sector": "otros",
+      "first_seen_at": "2026-10-06T03:28:28.895288"
+    },
+    {
+      "id": "47770c62-04ff-452b-bc8d-63d6240e639c",
+      "title": "Mundial de tejo 2026: Bogotá está lista para gritar ¡mecha! de la mano de 18 países",
+      "official_url": "https://www.idt.gov.co/noticias/mundial-de-tejo-2026-bogota-esta-lista-para-gritar-mecha-de-la-mano-de-18-paises",
+      "application_url": null,
+      "status": "unknown",
+      "sector": "otros",
+      "first_seen_at": "2026-10-06T03:28:28.895288"
+    },
+    {
+      "id": "57a61f70-95a5-46fa-bffd-ac8bb9bf1da2",
+      "title": "Bogotá le abre las puertas al mundo de la gastronomía internacional",
+      "official_url": "https://www.idt.gov.co/noticias/bogota-le-abre-las-puertas-al-mundo-de-la-gastronomia-internacional",
+      "application_url": null,
+      "status": "unknown",
+      "sector": "otros",
+      "first_seen_at": "2026-10-06T03:28:28.895288"
+    },
+    {
+      "id": "65bb0438-ee79-441a-9671-95046e1c25c0",
+      "title": "Festival multicultural y gastronómico reúne delegaciones internacionales en el Parque El Country de Bogotá en septiembre de 2026",
+      "official_url": "https://www.idt.gov.co/noticias/festival-multicultural-y-gastronomico-reune-delegaciones-internacionales-en-el-parque-el",
+      "application_url": null,
+      "status": "unknown",
+      "sector": "cultura",
+      "first_seen_at": "2026-10-06T03:28:28.895288"
+    },
+    {
+      "id": "7a237971-4a1e-4966-9b5e-e5967f0f29ff",
+      "title": "Buscan ideas para impulsar el desarrollo turístico de Bogotá; estos son los detalles",
+      "official_url": "https://www.idt.gov.co/noticias/buscan-ideas-para-impulsar-el-desarrollo-turistico-de-bogota-estos-son-los-detalles",
+      "application_url": null,
+      "status": "unknown",
+      "sector": "otros",
+      "first_seen_at": "2026-10-06T03:28:28.895288"
+    },
+    {
+      "id": "04a4c9ad-ebca-4724-b09f-56a37002375b",
+      "title": "Bogotá se proyecta como epicentro de bodas y grandes celebraciones con el Wedding Open House 2026",
+      "official_url": "https://www.idt.gov.co/noticias/bogota-se-proyecta-como-epicentro-de-bodas-y-grandes-celebraciones-con-el-wedding-open",
+      "application_url": null,
+      "status": "open",
+      "sector": "otros",
+      "first_seen_at": "2026-09-07T11:03:24.416695"
+    },
+    {
+      "id": "34363e55-d209-47d2-863c-0f2e5dee5064",
+      "title": "Vallenato al Parque 2026: una cita imperdible para vivir el ritmo y la tradición en Bogotá",
+      "official_url": "https://www.idt.gov.co/noticias/vallenato-al-parque-2026-una-cita-imperdible-para-vivir-el-ritmo-y-la-tradicion-en-bogota",
+      "application_url": null,
+      "status": "unknown",
+      "sector": "cultura",
+      "first_seen_at": "2026-09-07T11:03:24.416695"
+    },
+    {
+      "id": "0f3f3ebc-0e98-4c95-a7fc-96d214eac513",
+      "title": "El desfile de Autos Clásicos y Antiguos se reprograma, para facilitar la operación de acopio y envío de ayuda humanitaria hacia los departamentos...",
+      "official_url": "https://www.idt.gov.co/noticias/el-desfile-de-autos-clasicos-y-antiguos-se-reprograma-para-facilitar-la-operacion-de",
+      "application_url": null,
+      "status": "unknown",
+      "sector": "otros",
+      "first_seen_at": "2026-09-07T11:03:24.416695"
+    },
+    {
+      "id": "8b7ac8ec-8eb6-4c37-bafe-c9558efdeafa",
+      "title": "Agéndate este 22 de agosto: Bogotá celebra su memoria sobre ruedas con el Desfile de Autos Clásicos",
+      "official_url": "https://www.idt.gov.co/noticias/agendate-este-22-de-agosto-bogota-celebra-su-memoria-sobre-ruedas-con-el-desfile-de-autos",
+      "application_url": null,
+      "status": "unknown",
+      "sector": "otros",
+      "first_seen_at": "2026-09-07T11:03:24.416695"
+    },
+    {
+      "id": "438f8c1c-d6ec-4f9c-a154-288881a4518c",
+      "title": "Bogotá se destaca en los World Travel Awards 2026 con reconocimientos en turismo de reuniones y hotelería",
+      "official_url": "https://www.idt.gov.co/noticias/bogota-se-destaca-en-los-world-travel-awards-2026-con-reconocimientos-en-turismo-de",
+      "application_url": null,
+      "status": "unknown",
+      "sector": null,
+      "first_seen_at": "2026-10-14T16:06:36.602963"
+    },
+    {
+      "id": "6ab6cd7e-dd52-4be0-a5db-4bcc3e6458dd",
+      "title": "Bogotá se posiciona entre los 30 mejores destinos de compras de América y el Caribe para 2026",
+      "official_url": "https://www.idt.gov.co/noticias/bogota-se-posiciona-entre-los-30-mejores-destinos-de-compras-de-america-y-el-caribe-para",
+      "application_url": null,
+      "status": "unknown",
+      "sector": null,
+      "first_seen_at": "2026-10-14T16:06:36.602963"
+    },
+    {
+      "id": "3b001800-fa9a-4870-8b0d-731b0a5e0244",
+      "title": "Bogotá se alista para la edición 28 de Hip Hop al Parque: ¡vive el homenaje al barrio como territorio creativo y espacio de encuentro!",
+      "official_url": "https://www.idt.gov.co/noticias/bogota-se-alista-para-la-edicion-28-de-hip-hop-al-parque-vive-el-homenaje-al-barrio-como",
+      "application_url": null,
+      "status": "unknown",
+      "sector": null,
+      "first_seen_at": "2026-10-14T16:06:36.602963"
+    },
+    {
+      "id": "40bf19ca-79db-4e22-aaec-75fb457b453f",
+      "title": "Guía para turistas: lo que necesitas saber si visitas Bogotá para los 30 años de Rock al Parque",
+      "official_url": "https://www.idt.gov.co/noticias/guia-para-turistas-lo-que-necesitas-saber-si-visitas-bogota-para-los-30-anos-de-rock-al",
+      "application_url": null,
+      "status": "unknown",
+      "sector": "turismo",
+      "first_seen_at": "2026-10-10T13:28:06.782302"
+    },
+    {
+      "id": "7825fc86-e199-4aa6-8a2a-63cee14b8b99",
+      "title": "Guía para disfrutar la semana de receso en Bogotá: teatro, talleres de danza y experiencias en Maloka",
+      "official_url": "https://www.idt.gov.co/noticias/guia-para-disfrutar-la-semana-de-receso-en-bogota-teatro-talleres-de-danza-y-experiencias",
+      "application_url": null,
+      "status": "unknown",
+      "sector": "cultura",
+      "first_seen_at": "2026-10-10T13:28:06.782302"
+    },
+    {
+      "id": "ee3b01e4-1fed-46e3-9980-9078690d29e3",
+      "title": "Bogotá reconoce a Bruce Moran como Embajador de la ciudad por su aporte a la industria de la música en vivo",
+      "official_url": "https://www.idt.gov.co/noticias/bogota-reconoce-a-bruce-moran-como-embajador-de-la-ciudad-por-su-aporte-a-la-industria-de",
+      "application_url": null,
+      "status": "unknown",
+      "sector": "cultura",
+      "first_seen_at": "2026-10-10T13:28:06.782302"
+    },
+    {
+      "id": "1326031f-8ff5-40ee-aa55-5ade4cfa649d",
+      "title": "India vuelve a conquistar el mundial de tejo en Bogotá",
+      "official_url": "https://www.idt.gov.co/noticias/india-vuelve-a-conquistar-el-mundial-de-tejo-en-bogota",
+      "application_url": null,
+      "status": "unknown",
+      "sector": "otros",
+      "first_seen_at": "2026-10-10T13:28:06.782302"
+    },
+    {
+      "id": "e36cd010-06e9-416c-ac6d-ebd9862d733c",
+      "title": "Sabor Bogotá 2026 premia a los mejores representantes de la cocina local en ocho categorías gastronómicas",
+      "official_url": "https://www.idt.gov.co/noticias/sabor-bogota-2026-premia-a-los-mejores-representantes-de-la-cocina-local-en-ocho",
+      "application_url": null,
+      "status": "unknown",
+      "sector": "otros",
+      "first_seen_at": "2026-10-10T13:28:06.782302"
+    },
+    {
+      "id": "36bf5cf6-6168-43e3-85e2-b24eb0f580cf",
+      "title": "¿Visitas Bogotá? Conoce los Puntos de Información Turística y sus horarios",
+      "official_url": "https://www.idt.gov.co/noticias/visitas-bogota-conoce-los-puntos-de-informacion-turistica-y-sus-horarios",
+      "application_url": null,
+      "status": "unknown",
+      "sector": "turismo",
+      "first_seen_at": "2026-09-07T11:03:24.416695"
+    },
+    {
+      "id": "070213db-1089-43d8-9e89-034e3c1f6df4",
+      "title": "Bogotá impulsa su oferta turística en Costa Rica y fortalece su presencia en el mercado centroamericano",
+      "official_url": "https://www.idt.gov.co/noticias/bogota-impulsa-su-oferta-turistica-en-costa-rica-y-fortalece-su-presencia-en-el-mercado",
+      "application_url": null,
+      "status": "unknown",
+      "sector": "otros",
+      "first_seen_at": "2026-09-07T11:03:24.416695"
+    },
+    {
+      "id": "19fb9ff9-22a5-4034-80a3-48757b38838d",
+      "title": "Tres hoteles de Bogotá destacan en el top 10 de mejores alojamientos de la región",
+      "official_url": "https://www.idt.gov.co/noticias/tres-hoteles-de-bogota-destacan-en-el-top-10-de-mejores-alojamientos-de-la-region",
+      "application_url": null,
+      "status": "unknown",
+      "sector": "turismo",
+      "first_seen_at": "2026-09-07T15:40:42.997268"
+    },
+    {
+      "id": "32dc0710-4a1d-4f8f-9aa8-8483e1fcbb96",
+      "title": "Bogotá quiere que los turistas se queden más tiempo: la apuesta para descubrir la ciudad más allá de sus lugares tradicionales",
+      "official_url": "https://www.idt.gov.co/noticias/bogota-quiere-que-los-turistas-se-queden-mas-tiempo-la-apuesta-para-descubrir-la-ciudad",
+      "application_url": null,
+      "status": "unknown",
+      "sector": "turismo",
+      "first_seen_at": "2026-09-07T15:40:42.997268"
+    },
+    {
+      "id": "87441efc-0344-4d4c-a3fe-677c14f59c97",
+      "title": "El IDT alcanza 92,2 puntos en su Índice de Desempeño Institucional y se posiciona como la segunda entidad Distrital con mayor crecimiento",
+      "official_url": "https://www.idt.gov.co/noticias/el-idt-alcanza-922-puntos-en-su-indice-de-desempeno-institucional-y-se-posiciona-como-la",
+      "application_url": null,
+      "status": "unknown",
+      "sector": "otros",
+      "first_seen_at": "2026-09-09T03:59:09.829639"
+    },
+    {
+      "id": "88abc5ea-055a-4a50-bf73-885268fcdfb3",
+      "title": "“Bogotá para contar\"",
+      "official_url": "https://www.idt.gov.co/noticias/bogota-para-contar",
+      "application_url": null,
+      "status": "unknown",
+      "sector": "otros",
+      "first_seen_at": "2026-09-07T15:40:42.997268"
+    }
+  ]
+}

@@ -1,0 +1,69 @@
+{
+  "purged_at": "2026-10-15T04:19:47",
+  "reason": "noticias en sector turismo (sólo-convocatorias 2026-10-15)",
+  "opportunities": [
+    {
+      "id": "f7b5ee74-8ad6-4809-98e6-f10716b6e6e5",
+      "title": "Se extiende convocatoria para los Premios de Turismo Colombia CO",
+      "official_url": "https://www.procolombia.co/sala-de-prensa/noticias/se-extiende-convocatoria-para-los-premios-de-turismo-colombia-co-2023",
+      "status": "unknown",
+      "sector": "turismo"
+    },
+    {
+      "id": "82c8641f-e118-40ee-9f0b-66e17f2d6a17",
+      "title": "Bogotá se consolida como el principal destino de turismo médico en Colombia",
+      "official_url": "https://bogota.gov.co/mi-ciudad/desarrollo-economico/bogota-se-consolida-como-destino-para-turismo-medico-en-colombia",
+      "status": "unknown",
+      "sector": "turismo"
+    },
+    {
+      "id": "cb7bfcbb-2870-4576-8ed9-ceebb379dfd0",
+      "title": "Representantes de Zipaquirá y Cajicá fueron los ganadores en sus categorías en el Concurso Nacional de Bandas de Paipa",
+      "official_url": "https://www.cundinamarca.gov.co/noticias/representantes-de-zipaquira-y-cajica-fueron-los-ganadores-en-sus-categorias-en-el-concurso-nacional-de-bandas-de-paipa",
+      "status": "unknown",
+      "sector": "turismo"
+    },
+    {
+      "id": "0a508a40-5f33-41e1-be65-1d0a874247ef",
+      "title": "Festival Cordillera proyecta atraer cerca de 36.000 visitantes a Bogotá y generar un...",
+      "official_url": "https://bogota.gov.co/mi-ciudad/desarrollo-economico/festival-cordillera-2026-proyecta-atraer-36000-visitantes-bogota",
+      "status": "unknown",
+      "sector": "turismo"
+    },
+    {
+      "id": "fe8933c8-25d9-454c-b10d-dbcc0ec420ba",
+      "title": "Se abre convocatoria para los premios de Turismo Colombia CO 2023",
+      "official_url": "https://www.procolombia.co/sala-de-prensa/noticias/se-abre-convocatoria-para-los-premios-de-turismo-colombia-co-2023",
+      "status": "unknown",
+      "sector": "turismo"
+    },
+    {
+      "id": "01a9f654-93f8-48e7-b27c-10830eb71703",
+      "title": "Proyecto De Museos Para La Paz Gana Convocatoria Capaz",
+      "official_url": "https://www.uniandes.edu.co/es/noticias/premios-y-reconocimientos/proyecto-de-museos-para-la-paz-gana-convocatoria-capaz",
+      "status": "open",
+      "sector": "turismo"
+    },
+    {
+      "id": "86db3add-be7d-4421-83ac-e5aa1a730205",
+      "title": "Este fin de semana Bogotá espera miles de turistas y un millonario impacto económico...",
+      "official_url": "https://bogota.gov.co/mi-ciudad/desarrollo-economico/bogota-recibira-aportes-de-148800-millones-gracias-rock-al-parque",
+      "status": "unknown",
+      "sector": "turismo"
+    },
+    {
+      "id": "c5e1b843-fd3a-4aed-853f-eb7d8cb0e291",
+      "title": "Colombia hace por primera vez una misión comercial de turismo en Australia",
+      "official_url": "https://www.procolombia.co/sala-de-prensa/noticias/colombia-hace-por-primera-vez-una-mision-comercial-de-turismo-en-australia",
+      "status": "unknown",
+      "sector": "turismo"
+    },
+    {
+      "id": "2d17931b-a2d2-4c4a-949e-38427e7ab380",
+      "title": "Jazz al Parque 2026: un viaje por los sonidos de Latinoamérica que llega a todo el país...",
+      "official_url": "https://bogota.gov.co/mi-ciudad/cultura-recreacion-y-deporte/transmision-jazz-al-parque-2026-por-canal-capital-septiembre-12-y-13",
+      "status": "unknown",
+      "sector": "turismo"
+    }
+  ]
+}
