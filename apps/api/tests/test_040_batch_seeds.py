@@ -69,7 +69,8 @@ def test_040_keys_enabled_and_configurable():
         if "connector_type" in definition:
             assert definition["connector_type"] == "configurable_html"
         assert definition["source_type"] == "html"
-        assert definition["scraping_frequency"] == "weekly"
+        # Monitoreo diario total 2026-10-15: todas las habilitadas a daily.
+        assert definition["scraping_frequency"] == "daily"
         assert definition["base_url"] == BATCH_URLS[key]
         cfg = definition.get("connector_config")
         assert cfg is not None, f"{key} missing connector_config"
