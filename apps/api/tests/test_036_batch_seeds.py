@@ -83,6 +83,7 @@ def test_catalog_fully_enabled():
         "fondo-accion-convocatorias",
         "segib-noticias",
         "cnpq-brasil",
+        "grants-gov-rss",
     }
     assert len(defs) >= 168
 

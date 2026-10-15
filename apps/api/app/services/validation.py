@@ -44,6 +44,15 @@ def is_noise_title(title: str | None) -> bool:
         return True
     if "{" in cleaned or "}" in cleaned or "<style" in lowered or "<script" in lowered:
         return True
+    # Navigation/chrome labels scraped as titles (auditoría 2026-10-15:
+    # portales BR metían "Acesso à Informação"/"Ações e Programas").
+    if lowered in {
+        "acesso à informação",
+        "acesso a informacao",
+        "ações e programas",
+        "acoes e programas",
+    }:
+        return True
 
     if cleaned == cleaned.upper() and len(cleaned) > 30:
         if re.search(r"[A-Z]{3,}\s*[-–—]\s*\d{2,}", cleaned):
