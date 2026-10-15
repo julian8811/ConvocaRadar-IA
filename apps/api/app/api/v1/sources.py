@@ -13,7 +13,7 @@ from fastapi import APIRouter, Depends, HTTPException, Query
 # tests monkeypatch threading.Thread).
 _original_thread_cls = _base_threading.Thread
 from sqlalchemy import case, func, or_, select
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, load_only
 
 from app.api.deps import get_current_organization, get_current_user
 from app.db.seed import seed_default_sources
@@ -70,6 +70,10 @@ def _load_recent_runs_for_sources(db: Session, sources: list[Source]) -> dict[st
     """Batch-load the latest 10 SourceRun per source in a single query.
 
     Returns ``{source_id: [SourceRun, ...]}`` ordered newest-first per source.
+
+    Only the columns health computation reads are loaded (``load_only``):
+    hydrating full rows (``logs``/``progress`` JSON) for thousands of runs
+    dominated dashboard cost on production.
     """
     if not sources:
         return {}
@@ -77,6 +81,19 @@ def _load_recent_runs_for_sources(db: Session, sources: list[Source]) -> dict[st
     all_runs = list(
         db.scalars(
             select(SourceRun)
+            .options(
+                load_only(
+                    SourceRun.id,
+                    SourceRun.source_id,
+                    SourceRun.status,
+                    SourceRun.items_found,
+                    SourceRun.items_created,
+                    SourceRun.items_updated,
+                    SourceRun.started_at,
+                    SourceRun.finished_at,
+                    SourceRun.created_at,
+                )
+            )
             .where(SourceRun.source_id.in_(source_ids))
             .order_by(SourceRun.source_id, SourceRun.created_at.desc())
         )
