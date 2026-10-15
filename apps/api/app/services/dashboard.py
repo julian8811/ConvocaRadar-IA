@@ -562,12 +562,29 @@ def get_sources_health(db: Session, organization_id: str) -> list[SourceHealthRe
     The per-source health is computed by the same helper that backs
     ``GET /sources/health``; we import it lazily to avoid the route →
     service → route circular dependency.
+
+    Perf: runs and coverage ratios are preloaded in bulk (2 queries for the
+    whole catalog) instead of ~5 per source.
     """
-    from app.api.v1.sources import _source_health  # lazy: avoid circular import
+    from app.api.v1.sources import (  # lazy: avoid circular import
+        _load_recent_runs_for_sources,
+        _source_coverage_ratios_many,
+        _source_health,
+    )
 
     source_scope = or_(Source.organization_id == organization_id, Source.organization_id.is_(None))
     sources = list(db.scalars(select(Source).where(source_scope)))
-    return [_source_health(db, source) for source in sources]
+    runs_by_source = _load_recent_runs_for_sources(db, sources)
+    coverage_by_source = _source_coverage_ratios_many(db, [s.id for s in sources])
+    return [
+        _source_health(
+            db,
+            source,
+            runs_by_source.get(source.id, []),
+            coverage=coverage_by_source.get(source.id),
+        )
+        for source in sources
+    ]
 
 
 def get_source_health_summaries(
