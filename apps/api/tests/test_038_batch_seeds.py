@@ -42,6 +42,13 @@ BATCH_URLS = {
     ),
 }
 
+# Dictamen E13 (odd/tasks/enriquecimiento-detalle.md): idt-noticias raspa el
+# noticiero del IDT (https://www.idt.gov.co/noticias) y sus notas caían en el
+# sector turismo del informe. Acuerdo 2026-10-15: sólo se reportan
+# convocatorias. La fuente queda deshabilitada; IDT sigue cubierto por
+# idt-experiencias-2026 (convocatoria real).
+EXPECTED_DISABLED_BY_POLICY = ("idt-noticias",)
+
 
 def _seed_definitions_by_key() -> dict[str, dict]:
     seed_path = Path(__file__).resolve().parents[1] / "app" / "db" / "seed.py"
@@ -63,7 +70,8 @@ def test_038_keys_enabled_colombia():
     for key in BATCH_KEYS:
         assert key in defs, f"missing {key}"
         definition = defs[key]
-        assert definition.get("enabled", True) is True
+        expected = key not in EXPECTED_DISABLED_BY_POLICY
+        assert definition.get("enabled", True) is expected, f"{key} enabled={not expected}"
         assert definition["country"] == "Colombia"
         assert definition["base_url"] == BATCH_URLS[key]
         HtmlConnectorConfig.from_dict(definition["connector_config"])
@@ -71,7 +79,16 @@ def test_038_keys_enabled_colombia():
 
 def test_catalog_fully_enabled():
     defs = _seed_definitions_by_key()
-    assert [k for k, d in defs.items() if d.get("enabled", True) is False] == []
+    # Deshabilitadas por dictamen: 5 de la tanda 041 (gate X3, issue #62) +
+    # idt-noticias (dictamen E13, sólo-convocatorias).
+    assert {k for k, d in defs.items() if d.get("enabled", True) is False} == {
+        "idt-noticias",
+        "fontagro-convocatorias",
+        "fundacion-biodiversidad-convocatorias",
+        "eu-life-calls-cinea",
+        "biodiversa-calls",
+        "fondo-accion-convocatorias",
+    }
     assert len(defs) >= 184
 
 
@@ -85,3 +102,8 @@ def test_factory_configurable_html_for_038():
             connector_config=defs[key]["connector_config"],
         )
         assert connector.__class__.__name__ == "ConfigurableHtmlConnector"
+
+
+def test_idt_noticias_disabled_newsroom_policy():
+    defs = _seed_definitions_by_key()
+    assert defs["idt-noticias"].get("enabled", True) is False

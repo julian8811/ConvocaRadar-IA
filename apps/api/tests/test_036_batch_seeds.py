@@ -72,7 +72,16 @@ def test_036_keys_enabled():
 
 def test_catalog_fully_enabled():
     defs = _seed_definitions_by_key()
-    assert [k for k, d in defs.items() if d.get("enabled", True) is False] == []
+    # Deshabilitadas por dictamen: 5 de la tanda 041 (gate X3, issue #62) +
+    # idt-noticias (dictamen E13, sólo-convocatorias; ver test_038_batch_seeds.py).
+    assert {k for k, d in defs.items() if d.get("enabled", True) is False} == {
+        "idt-noticias",
+        "fontagro-convocatorias",
+        "fundacion-biodiversidad-convocatorias",
+        "eu-life-calls-cinea",
+        "biodiversa-calls",
+        "fondo-accion-convocatorias",
+    }
     assert len(defs) >= 168
 
 
