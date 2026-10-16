@@ -16,7 +16,7 @@ from app.connectors.registry import registered_keys
 # ── Fixture data ────────────────────────────────────────────────────────────
 
 # F&T search-API v2 shape (metadata.callTitle/callIdentifier/identifier/...).
-ERC_SAMPLE = """{"results": [{"summary": "ERC Starting Grant", "reference": "31086861sl", "metadata": {"callTitle": ["Call for proposals for ERC Starting Grant"], "callIdentifier": ["ERC-2026-STG"], "identifier": ["ERC-2026-STG"], "status": ["Ongoing"], "keywords": ["European Research Council"], "actions": [], "startDate": ["2025-07-03T00:00:00.000+0000"], "deadlineDate": ["2026-10-15T00:00:00.000+0000"]}}]}"""
+ERC_SAMPLE = """{"results": [{"summary": "ERC Starting Grant", "reference": "31086861sl", "metadata": {"callTitle": ["Call for proposals for ERC Starting Grant"], "callIdentifier": ["ERC-2026-STG"], "identifier": ["ERC-2026-STG"], "status": ["Ongoing"], "keywords": ["European Research Council"], "actions": [], "startDate": ["2025-07-03T00:00:00.000+0000"], "deadlineDate": ["2028-10-15T00:00:00.000+0000"]}}]}"""
 ERC_EMPTY = """{"results": []}"""
 ERC_GARBAGE = "not json"
 

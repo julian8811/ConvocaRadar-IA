@@ -9,6 +9,10 @@ SHELL ["/bin/ash", "-o", "pipefail", "-c"]
 # python3 (stdlib only) powers the best-effort off-site copy
 # (scripts/backup_offsite.py: SigV4 upload to S3/MinIO). No pip packages:
 # urllib + hmac + hashlib are enough, keeping the image small.
+# Pinning the Alpine python3 micro-version would couple the build to one
+# moving snapshot without security value (stdlib-only use); deliberately
+# exempt, same convention as the DL3008/DL3013 ignores in apps/api/Dockerfile.
+# hadolint ignore=DL3018
 RUN apk add --no-cache python3
 
 # Bake the scheduler into the image instead of downloading executable code on

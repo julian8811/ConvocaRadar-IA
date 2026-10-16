@@ -111,11 +111,30 @@ def test_all_reactivated_keys_enabled_with_urls():
             HtmlConnectorConfig.from_dict(config)
 
 
+# Intentionally disabled seeds: 041 agro/biodiversidad (5, off by design until
+# verified) + quarantined (grants-gov-rss, cnpq-brasil, segib-noticias,
+# idt-noticias). Precedent: 039/040 pins were bumped the same way when the
+# catalog intentionally grew (211 keys). Any OTHER disabled seed fails.
+EXPECTED_DISABLED = sorted(
+    [
+        "grants-gov-rss",
+        "cnpq-brasil",
+        "segib-noticias",
+        "idt-noticias",
+        "fontagro-convocatorias",
+        "fundacion-biodiversidad-convocatorias",
+        "eu-life-calls-cinea",
+        "biodiversa-calls",
+        "fondo-accion-convocatorias",
+    ]
+)
+
+
 def test_no_seed_definition_is_disabled():
-    """Catalog health: after 029 reactivation, seed should have zero enabled=False."""
+    """Catalog health: only the known intentionally-disabled seeds may be off."""
     defs = _seed_definitions_by_key()
-    disabled = [k for k, d in defs.items() if d.get("enabled", True) is False]
-    assert disabled == [], f"unexpected disabled seeds: {disabled}"
+    disabled = sorted(k for k, d in defs.items() if d.get("enabled", True) is False)
+    assert disabled == EXPECTED_DISABLED, f"unexpected disabled seeds: {disabled}"
 
 
 def test_factory_resolves_reactivated_connectors():

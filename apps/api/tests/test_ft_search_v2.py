@@ -43,13 +43,14 @@ ERC_OPEN_ITEM = {
                     {
                         "status": {"id": 31094501, "abbreviation": "Open"},
                         "plannedOpeningDate": "03 July 2025",
-                        "deadlineDates": ["15 October 2026"],
+                        "deadlineDates": ["15 October 2028"],
                     }
                 ]
             )
         ],
         "startDate": ["2025-07-03T00:00:00.000+0000"],
-        "deadlineDate": ["2026-10-15T00:00:00.000+0000"],
+        # Open by design — keep future (expired 2026-10-15 rotted the suite).
+        "deadlineDate": ["2028-10-15T00:00:00.000+0000"],
     },
 }
 
@@ -107,7 +108,7 @@ CREA_ITEM = {
         "keywords": ["Creative Europe", "culture", "networks"],
         "actions": None,
         "startDate": ["2025-10-01T00:00:00.000+0000"],
-        "deadlineDate": ["2027-01-15T00:00:00.000+0000"],
+        "deadlineDate": ["2028-01-15T00:00:00.000+0000"],
     },
 }
 
@@ -123,7 +124,7 @@ HORIZON_ITEM = {
         "keywords": ["Horizon Europe", "democracy", "research"],
         "actions": None,
         "startDate": ["2025-09-01T00:00:00.000+0000"],
-        "deadlineDate": ["2027-03-01T00:00:00.000+0000"],
+        "deadlineDate": ["2028-03-01T00:00:00.000+0000"],
     },
 }
 
