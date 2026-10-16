@@ -31,6 +31,7 @@ Pedido del usuario (parafraseado, secretos redactados): arreglar las novedades d
 - [x] T4 `headers()` en Next (HSTS, nosniff, DENY, referrer, permissions)
 - [ ] T5 Tests enfocados + suite vecina (auth) verde
 - [x] T6 Purge `1d8feaf` (backup bundle, filter-repo, verify, force-push) ✅ remoto limpio + rama local recuperada
+- [x] T10 Servidor: merge 85b6eeb en rama server + .env (domain/colmayor, COOKIE_SECURE=false) + rebuild api/worker/web + verify vivo ✅ (health/login/headers/CSP/gate/sesión)
 
 ## Acceptance
 - Register limitado y gateado por config; defaults intactos.
@@ -39,7 +40,7 @@ Pedido del usuario (parafraseado, secretos redactados): arreglar las novedades d
 - Servidor/GitHub quedan para el paso siguiente (no en este feature).
 
 ## Progress
-- 2026-10-15: TODO CERRADO. T1–T4 GREEN + suite (44+110) + purge verificado (remoto d1dab48, local recuperado, 7+2 re-verificados). Vars en `docs/env-matrix.md`. PENDIENTE USUARIO: rotar claves (consultor, servidor, PAT), arreglar `gh auth`, fetch+reset en los 3 worktrees vinculados.
+- 2026-10-15: TODO 10/10 CERRADO Y VERIFICADO EN VIVO. Deploy 85b6eeb + dashboard 1970/256 + gate 403 + CSP/headers. PENDIENTE USUARIO: rotar claves (consultor, servidor, PAT), gh auth, worktrees, segundo purge en rama server.
 
 ## Next step
-- T1: leer `auth.py:register` + `rate_limit.py` + `config.py`, test RED, implementar.
+- Resolver next.config.ts (unión basePath server + headers T4), subir y `git add`; luego auth.py, config.py, main.py; después los 22 restantes.
