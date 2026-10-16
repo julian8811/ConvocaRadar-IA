@@ -15,7 +15,7 @@ pytest (api), ruff.
 
 - [ ] **T1** (inline) — S1: flag + pin + catálogo + script purga. RED→GREEN.
 - [ ] **T2** (inline) — S2: guard + tests + purga BR.
-- [ ] **T3** (inline) — S3: backfill en prod por tandas + recount.
+- [ ] **T3** (inline) — S3: backfill en prod por tandas + recount. Lanzado detached (`--limit 1500`, log `/tmp/backfill.log` en servidor). 1510 flacas pendientes al lanzar. Progreso por poll.
 - [ ] **T4** (inline) — S4: circuito completo.
 
 ## Log

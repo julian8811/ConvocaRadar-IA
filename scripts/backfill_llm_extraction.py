@@ -156,7 +156,12 @@ def apply_llm_gap_fill(opp: Opportunity, fields: dict) -> dict:
     return updates
 
 
-def fetch_targets(db, source_key: str | None, limit: int) -> list[Opportunity]:
+def fetch_targets(
+    db,
+    source_key: str | None,
+    limit: int,
+    statuses: list[str] | None = None,
+) -> list[Opportunity]:
     """Stored rows missing open OR close OR funding value, oldest-first.
 
     ``updated_at`` ASC (not DESC) so repeated runs progress through the
@@ -175,6 +180,8 @@ def fetch_targets(db, source_key: str | None, limit: int) -> list[Opportunity]:
         if source_id is None:
             return []
         stmt = stmt.where(Opportunity.source_id == source_id)
+    if statuses:
+        stmt = stmt.where(Opportunity.status.in_(statuses))
     stmt = stmt.order_by(Opportunity.updated_at.asc()).limit(limit)
     return list(db.scalars(stmt))
 
@@ -186,6 +193,7 @@ async def run_backfill(
     sleep_seconds: float = DEFAULT_SLEEP_SECONDS,
     dry_run: bool = True,
     source_key: str | None = None,
+    statuses: list[str] | None = None,
     batch_size: int = BACKFILL_BATCH_SIZE,
     min_text_length: int = DEFAULT_MIN_TEXT_LENGTH,
     sleep_fn=None,
@@ -204,7 +212,7 @@ async def run_backfill(
     "failed", ...}``.
     """
     sleep = sleep_fn or asyncio.sleep
-    targets = fetch_targets(db, source_key, limit)
+    targets = fetch_targets(db, source_key, limit, statuses)
     summary: dict = {
         "scanned": len(targets),
         "filled": 0,
@@ -347,6 +355,12 @@ def main(argv: list[str] | None = None) -> int:
         help="Scope to one source key (default: all sources)",
     )
     parser.add_argument(
+        "--status",
+        default=None,
+        help="Scope to comma-separated opportunity statuses "
+        "(e.g. --status open,closing_soon). Default: all statuses.",
+    )
+    parser.add_argument(
         "--min-text-length",
         dest="min_text_length",
         type=int,
@@ -364,6 +378,9 @@ def main(argv: list[str] | None = None) -> int:
 
     from app.db.session import SessionLocal
 
+    statuses = (
+        [s.strip() for s in args.status.split(",") if s.strip()] if args.status else None
+    )
     try:
         db = SessionLocal()
     except Exception as exc:
@@ -378,6 +395,7 @@ def main(argv: list[str] | None = None) -> int:
                     sleep_seconds=args.sleep_seconds,
                     dry_run=args.dry_run,
                     source_key=args.source_key,
+                    statuses=statuses,
                     min_text_length=args.min_text_length,
                 )
             )
