@@ -1,4 +1,4 @@
-﻿import logging
+import logging
 
 from functools import lru_cache
 from typing import ClassVar
@@ -10,14 +10,27 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 logger = logging.getLogger(__name__)
 
 
-PLACEHOLDERS = {"change-me", "changeme", "change_me", "replace_with", "replace-with", "password", "placeholder"}
+PLACEHOLDERS = {
+    "change-me",
+    "changeme",
+    "change_me",
+    "replace_with",
+    "replace-with",
+    "password",
+    "placeholder",
+}
+
 
 class Settings(BaseSettings):
     app_env: str = "development"
     app_name: str = "ConvocaRadar IA"
     database_url: str = "sqlite:///./convocaradar.db"
-    postgres_password: str | None = Field(default=None, description="Postgres password — required in production, >=16 non-placeholder")
-    minio_root_password: str | None = Field(default=None, description="MinIO password — required in production, >=16 non-placeholder")
+    postgres_password: str | None = Field(
+        default=None, description="Postgres password — required in production, >=16 non-placeholder"
+    )
+    minio_root_password: str | None = Field(
+        default=None, description="MinIO password — required in production, >=16 non-placeholder"
+    )
     jwt_secret: str = Field(min_length=32)
     jwt_algorithm: str = "HS256"
     access_token_expire_minutes: int = 60
@@ -52,9 +65,7 @@ class Settings(BaseSettings):
     bootstrap_source_keys: str = "grants-gov-rss,grants-gov,innpulsa,minciencias,nsf-funding-rss"
     sentry_dsn: str | None = None
     sentry_send_default_pii: bool = False
-    scraping_user_agent: str = (
-        "Mozilla/5.0 (compatible; ConvocaRadarBot/1.0; +https://github.com/ConvocaRadar/ConvocaRadar-IA)"
-    )
+    scraping_user_agent: str = "Mozilla/5.0 (compatible; ConvocaRadarBot/1.0; +https://github.com/ConvocaRadar/ConvocaRadar-IA)"
     scraping_timeout_seconds: int = 180
     scraping_max_source_seconds: int = 180
     scraping_max_concurrency: int = 6
@@ -71,7 +82,7 @@ class Settings(BaseSettings):
     scraping_proxy_list: list[str] = Field(
         default_factory=list,
         description="Comma-separated proxy URLs for rotation. "
-                    "Format: http://user:pass@host:port,http://user:pass@host2:port",
+        "Format: http://user:pass@host:port,http://user:pass@host2:port",
     )
     internal_api_key: str = Field(min_length=32)
     reset_token_secret: str | None = None
@@ -101,6 +112,13 @@ class Settings(BaseSettings):
     # for cross-origin frontends. False = plain-HTTP LAN: no Secure flag +
     # SameSite=Lax (SameSite=None requires Secure; Lax fits same-origin).
     cookie_secure: bool = True
+    # ── Registration gate (SEC-REMEDIATION-T2) ──────────────────────────
+    # open (default) = historic behavior; closed = reject all with 403;
+    # domain = only REGISTRATION_ALLOWED_DOMAINS (comma-separated, exact or
+    # subdomain suffix match). Unknown modes fail closed. The university
+    # server runs domain/closed; dev keeps open.
+    registration_mode: str = "open"
+    registration_allowed_domains: str = ""
     app_timezone: str = "America/Bogota"
     rate_limit_requests_per_minute: int = 120
     rate_limit_window_seconds: int = 60
@@ -108,6 +126,11 @@ class Settings(BaseSettings):
     scheduler_interval_seconds: int = 1800
     scheduler_initial_delay_seconds: int = 30
     weekly_digest_interval_seconds: int = 604800
+    # Corrida nocturna forzada (odd/tasks/corrida-nocturna-1am.md): primer
+    # tick >= nightly_sweep_hour en America/Bogota corre TODAS las
+    # habilitadas. Solo tiene efecto donde corre el scheduler (worker).
+    nightly_sweep_enabled: bool = True
+    nightly_sweep_hour: int = 1
     # ── Extraction flags (022) ──────────────────────────────────────────
     extraction_cop_default: bool = True
     extraction_prompt_v4: bool = True
@@ -177,18 +200,31 @@ class Settings(BaseSettings):
         if env == "production":
             # SQLite forbidden in production — must be PostgreSQL
             if "sqlite" in (self.database_url or "").lower():
-                raise ValueError("DATABASE_URL must be PostgreSQL in production — SQLite is not safe for concurrent writes")
+                raise ValueError(
+                    "DATABASE_URL must be PostgreSQL in production — SQLite is not safe for concurrent writes"
+                )
             # Strong secrets: placeholder rejection + >=16 in prod
-            for field_name in ("jwt_secret", "internal_api_key", "postgres_password", "minio_root_password"):
+            for field_name in (
+                "jwt_secret",
+                "internal_api_key",
+                "postgres_password",
+                "minio_root_password",
+            ):
                 val = getattr(self, field_name, None)
                 if val is not None:
                     if len(val) < 16 or any(p in val.lower() for p in PLACEHOLDERS):
-                        raise ValueError(f"{field_name} must be >=16 and not placeholder in production")
+                        raise ValueError(
+                            f"{field_name} must be >=16 and not placeholder in production"
+                        )
             # reset_token_secret required and strong in prod
             if self.reset_token_secret is None or len(self.reset_token_secret) < 16:
-                raise ValueError("RESET_TOKEN_SECRET must be >=16 and not placeholder in production")
+                raise ValueError(
+                    "RESET_TOKEN_SECRET must be >=16 and not placeholder in production"
+                )
             if any(p in self.reset_token_secret.lower() for p in PLACEHOLDERS):
-                raise ValueError("RESET_TOKEN_SECRET must be >=16 and not placeholder in production")
+                raise ValueError(
+                    "RESET_TOKEN_SECRET must be >=16 and not placeholder in production"
+                )
         return self
 
     @computed_field  # type: ignore[prop-decorator]
@@ -225,7 +261,9 @@ class Settings(BaseSettings):
         }
         raw = overrides.get(key, self.scraping_max_concurrency_experimental)
         if raw is None:
-            raw = self.TIER_CONCURRENCY_DEFAULTS.get(key, self.TIER_CONCURRENCY_DEFAULTS["experimental"])
+            raw = self.TIER_CONCURRENCY_DEFAULTS.get(
+                key, self.TIER_CONCURRENCY_DEFAULTS["experimental"]
+            )
         return max(1, min(int(raw), self.global_concurrency_cap()))
 
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8", extra="ignore")
@@ -266,9 +304,3 @@ def effective_llm_provider(provider: str | None = None) -> str:
     if value in {"local", ""}:
         return "local"
     return value
-
-
-
-
-
-

@@ -1,0 +1,31 @@
+{
+  "http_status": 200,
+  "latency_ms": 212,
+  "content_type": "text/html; charset=UTF-8",
+  "body_bytes": 790388,
+  "kind": "html",
+  "n_items": 2,
+  "sample": [
+    {
+      "title": "Breadcrumb",
+      "url": ""
+    },
+    {
+      "title": "Innovation and technology",
+      "url": ""
+    },
+    {
+      "title": "Procurement principles",
+      "url": "/en/about-us/procurement/procurement-principles"
+    },
+    {
+      "title": "Gender-responsive procurement",
+      "url": "/en/about-us/procurement/gender-responsive-procurement"
+    },
+    {
+      "title": "Doing business with UN Women",
+      "url": "/en/about-us/procurement/doing-business-with-un-women"
+    }
+  ],
+  "sanitized_url": "https://www.unwomen.org/en/how-we-work/innovation-and-technology"
+}

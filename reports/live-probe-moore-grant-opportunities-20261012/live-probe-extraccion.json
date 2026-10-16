@@ -1,0 +1,31 @@
+{
+  "http_status": 200,
+  "latency_ms": 680,
+  "content_type": "text/html; charset=utf-8",
+  "body_bytes": 45500,
+  "kind": "html",
+  "n_items": 8,
+  "sample": [
+    {
+      "title": "Environmental Conservation",
+      "url": ""
+    },
+    {
+      "title": "Science",
+      "url": ""
+    },
+    {
+      "title": "San Francisco Bay Area",
+      "url": ""
+    },
+    {
+      "title": "Our Grantmaking",
+      "url": "/about/our-grantmaking"
+    },
+    {
+      "title": "Grantee Portal",
+      "url": "https://grantees.moore.org/index.aspx"
+    }
+  ],
+  "sanitized_url": "https://www.moore.org/grant-opportunities"
+}

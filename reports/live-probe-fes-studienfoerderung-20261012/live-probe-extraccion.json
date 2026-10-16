@@ -1,0 +1,23 @@
+{
+  "http_status": 200,
+  "latency_ms": 900,
+  "content_type": "text/html; charset=utf-8",
+  "body_bytes": 259411,
+  "kind": "html",
+  "n_items": 8,
+  "sample": [
+    {
+      "title": "Studienförderung der Friedrich- Ebert-Stiftung",
+      "url": ""
+    },
+    {
+      "title": "Unsere Stipendien schaffen Chancen!",
+      "url": ""
+    },
+    {
+      "title": "Engagiert studieren & Gesellschaft gestalten!",
+      "url": ""
+    }
+  ],
+  "sanitized_url": "https://www.fes.de/studienfoerderung"
+}

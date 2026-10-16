@@ -1,0 +1,30 @@
+{
+  "http_status": 200,
+  "latency_ms": 2938,
+  "content_type": "application/json; charset=UTF-8",
+  "body_bytes": 747513,
+  "items": 100,
+  "sample": [
+    {
+      "title": "Start Package Grants – for faculty recruitment Q1 2027",
+      "url": "https://novonordiskfonden.dk/grant/start-package-grants-for-faculty-recruitment-q1-2027/"
+    },
+    {
+      "title": "Novo Nordisk Fondens Naturfaglige EUD-Underviserpris",
+      "url": "https://novonordiskfonden.dk/grant/novo-nordisk-fondens-naturfaglige-eud-underviserpris/"
+    },
+    {
+      "title": "Start Package Grants – for faculty recruitment Q4 2026",
+      "url": "https://novonordiskfonden.dk/grant/start-package-grants-for-faculty-recruitment-q4-2026/"
+    },
+    {
+      "title": "Nexa innovation call: Innovations that reduce the impact of heat on people living with cardiometabolic diseases in Africa",
+      "url": "https://novonordiskfonden.dk/grant/nexa-innovation-call-innovations-that-reduce-the-impact-of-heat-on-people-living-with-cardiometabolic-diseases-in-africa/"
+    },
+    {
+      "title": "Project Grants in Bioscience and Basic Biomedicine",
+      "url": "https://novonordiskfonden.dk/grant/projektstoette-i-biovidenskab-og-basal-biomedicin/"
+    }
+  ],
+  "sanitized_url": "https://novonordiskfonden.dk/wp-json/wp/v2/grant"
+}

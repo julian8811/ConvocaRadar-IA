@@ -1,4 +1,4 @@
-﻿import asyncio
+import asyncio
 import logging
 import time
 from collections import defaultdict, deque
@@ -47,8 +47,6 @@ if settings.sentry_dsn:
         logger.warning("Sentry DSN configured but sentry-sdk is not installed")
 
 
-
-
 async def _run_periodic_source_sweep(interval_seconds: int | None = None) -> None:
     """Every ``interval_seconds`` (default 30 min), trigger a sweep of all
     enabled sources. Redis is not reachable on the free tier, so we use
@@ -68,6 +66,7 @@ async def _run_periodic_source_sweep(interval_seconds: int | None = None) -> Non
     interval_seconds = interval_seconds or scheduler_settings.scheduler_interval_seconds
     weekly_digest_seconds = scheduler_settings.weekly_digest_interval_seconds
     last_digest_at: datetime | None = None
+    last_nightly_date = None
 
     await asyncio.sleep(scheduler_settings.scheduler_initial_delay_seconds)
     while True:
@@ -94,6 +93,7 @@ async def _run_periodic_source_sweep(interval_seconds: int | None = None) -> Non
                 if orgs:
                     # Send pending alerts (uses Resend when configured)
                     from app.api.v1.alerts import send_pending_alerts
+
                     try:
                         send_pending_alerts(db)
                         db.flush()
@@ -102,6 +102,7 @@ async def _run_periodic_source_sweep(interval_seconds: int | None = None) -> Non
 
                     # Reactivate auto-paused sources that have cooled down
                     from app.models import Source as _Source
+
                     _cutoff = datetime.now(UTC).replace(tzinfo=None) - timedelta(hours=24)
                     _paused_list = list(
                         db.scalars(
@@ -124,10 +125,13 @@ async def _run_periodic_source_sweep(interval_seconds: int | None = None) -> Non
                     # Batch score unscored opportunities for each org
                     from app.models import Opportunity, OpportunityScore, OrganizationProfile
                     from app.services.scoring import calculate_score
+
                     for org in orgs:
                         try:
                             profile = db.scalar(
-                                select(OrganizationProfile).where(OrganizationProfile.organization_id == org.id)
+                                select(OrganizationProfile).where(
+                                    OrganizationProfile.organization_id == org.id
+                                )
                             )
                             if not profile:
                                 continue
@@ -138,10 +142,12 @@ async def _run_periodic_source_sweep(interval_seconds: int | None = None) -> Non
                             ).all()
                             unscored = list(
                                 db.scalars(
-                                    select(Opportunity).where(
+                                    select(Opportunity)
+                                    .where(
                                         Opportunity.organization_id == org.id,
                                         ~Opportunity.id.in_(scored_ids),
-                                    ).limit(100)
+                                    )
+                                    .limit(100)
                                 )
                             )
                             if unscored:
@@ -157,18 +163,41 @@ async def _run_periodic_source_sweep(interval_seconds: int | None = None) -> Non
                                     scored=len(unscored),
                                 )
                         except Exception as exc:
-                            struct_logger.warning("batch_scoring_failed", org_id=org.id, error=str(exc))
+                            struct_logger.warning(
+                                "batch_scoring_failed", org_id=org.id, error=str(exc)
+                            )
 
-                    sources = list(
-                        db.scalars(
-                            select(Source).where(Source.enabled.is_(True))
-                        )
-                    )
+                    sources = list(db.scalars(select(Source).where(Source.enabled.is_(True))))
                     total = len(sources)
-                    raw_due = [s for s in sources if source_due_for_scraping(s)]
+                    # Corrida nocturna (odd/tasks/corrida-nocturna-1am.md): en el
+                    # primer tick >= nightly_sweep_hour (COT) fuerza TODAS las
+                    # habilitadas una vez por día. Solo corre donde vive el
+                    # scheduler (worker); api lo tiene deshabilitado.
+                    from app.services.connectors import COT as _COT
+                    from app.services.connectors import _nightly_force_due
+
+                    _cot_now = datetime.now(_COT)
+                    if _nightly_force_due(
+                        _cot_now,
+                        hour=scheduler_settings.nightly_sweep_hour,
+                        enabled=scheduler_settings.nightly_sweep_enabled,
+                        last_forced_date=last_nightly_date,
+                    ):
+                        raw_due = list(sources)
+                        last_nightly_date = _cot_now.date()
+                        struct_logger.info(
+                            "nightly_sweep_start",
+                            sources_forced=len(raw_due),
+                            cot_hour=_cot_now.hour,
+                        )
+                    else:
+                        raw_due = [s for s in sources if source_due_for_scraping(s)]
                     # Priority-sorted queue: strategic first, then complementary/experimental
                     try:
-                        from app.scraper.priority_queue import build_priority_queue, partition_by_tier
+                        from app.scraper.priority_queue import (
+                            build_priority_queue,
+                            partition_by_tier,
+                        )
 
                         _pq = build_priority_queue(raw_due)
                         due_sources = _pq.drain_ordered()
@@ -205,9 +234,6 @@ async def _run_periodic_source_sweep(interval_seconds: int | None = None) -> Non
                         for src in _tier_buckets.get(tier, [])
                     ]
                     db.commit()
-                    # #region agent log
-                    struct_logger.info("debug_e8a25f_sweep_outer_committed", hypothesisId="A", jobs=len(tier_jobs))
-                    # #endregion
 
                     async def _run_one(src_id, src_key, tier_sem) -> int:
                         async with global_sem, tier_sem:
@@ -261,7 +287,9 @@ async def _run_periodic_source_sweep(interval_seconds: int | None = None) -> Non
                         total=total,
                         due=run_count,
                         concurrency=max_conc,
-                        tier_concurrency={t: scheduler_settings.tier_concurrency(t) for t in tier_sems},
+                        tier_concurrency={
+                            t: scheduler_settings.tier_concurrency(t) for t in tier_sems
+                        },
                         sweep_duration_s=sweep_duration_s,
                     )
 
@@ -270,7 +298,10 @@ async def _run_periodic_source_sweep(interval_seconds: int | None = None) -> Non
                     # quota. Restarting the API restarts the timer — that's
                     # fine for a v1 cron substitute on Render's free tier.
                     now = datetime.now(UTC).replace(tzinfo=None)
-                    if last_digest_at is None or (now - last_digest_at).total_seconds() >= weekly_digest_seconds:
+                    if (
+                        last_digest_at is None
+                        or (now - last_digest_at).total_seconds() >= weekly_digest_seconds
+                    ):
                         delivered_count = 0
                         for org in orgs:
                             try:
@@ -306,6 +337,7 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     # a container restart.
     from app.db.session import SessionLocal
     from app.scraper.recovery import mark_stale_runs_failed
+
     recovery_db = SessionLocal()
     try:
         recovered = mark_stale_runs_failed(recovery_db)
@@ -327,10 +359,9 @@ async def lifespan(_: FastAPI) -> AsyncIterator[None]:
     # Background scheduler: every 30 minutes, run all enabled sources
     # via an asyncio loop instead of a Celery beat schedule.
     import asyncio
+
     scheduler_task = (
-        asyncio.create_task(_run_periodic_source_sweep())
-        if settings.scheduler_enabled
-        else None
+        asyncio.create_task(_run_periodic_source_sweep()) if settings.scheduler_enabled else None
     )
     try:
         yield
@@ -533,9 +564,33 @@ app.add_middleware(
         "http://127.0.0.1:3006",
     ],
     allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+    # SEC-REMEDIATION-T3: explicit methods/headers, never "*". Mirrors what
+    # apps/web/lib/api.ts actually sends (JSON + X-CSRF-Protection, legacy
+    # Bearer in non-prod). QUERY is not used by any client — dropped.
+    allow_methods=["DELETE", "GET", "HEAD", "OPTIONS", "PATCH", "POST", "PUT"],
+    allow_headers=["authorization", "content-type", "x-csrf-protection"],
 )
+
+
+def _csp_header() -> str:
+    """Build the Content-Security-Policy from settings (SEC-REMEDIATION-T3).
+
+    No hardcoded cloud domains: allowed hosts derive from FRONTEND_URL /
+    BACKEND_URL so each deployment (local, cloud, university VM) gets a
+    matching policy. Operators extend coverage by changing those two
+    settings — never code.
+    """
+    front = get_settings().frontend_url.rstrip("/")
+    back = get_settings().backend_url.rstrip("/")
+    origins = " ".join(dict.fromkeys(o for o in (front, back) if o))
+    return (
+        "default-src 'self'; "
+        f"script-src 'self' 'unsafe-inline' {origins}; "
+        "style-src 'self' 'unsafe-inline'; "
+        "img-src 'self' data: https:; "
+        f"connect-src 'self' {origins}; "
+        "frame-ancestors 'none'"
+    )
 
 
 # Security headers middleware. Runs after every response so headers are
@@ -548,16 +603,8 @@ async def security_headers_middleware(request: Request, call_next):
     response.headers["X-Frame-Options"] = "DENY"
     response.headers["Referrer-Policy"] = "strict-origin-when-cross-origin"
     response.headers["Permissions-Policy"] = "camera=(), microphone=(), geolocation=()"
-    # CSP: allow the Vercel frontend, Cloudflare analytics, and inline scripts
-    # needed by React and Recharts. Default-src 'self' for everything else.
-    response.headers["Content-Security-Policy"] = (
-        "default-src 'self'; "
-        "script-src 'self' 'unsafe-inline' https://convocaradar-web.vercel.app; "
-        "style-src 'self' 'unsafe-inline'; "
-        "img-src 'self' data: https:; "
-        "connect-src 'self' https://convocaradar-api.onrender.com; "
-        "frame-ancestors 'none'"
-    )
+    # CSP derived from settings (SEC-REMEDIATION-T3) — no hardcoded domains.
+    response.headers["Content-Security-Policy"] = _csp_header()
     return response
 
 
@@ -637,7 +684,11 @@ def health_sources_summary() -> dict:
         enabled = db.scalar(select(func.count(Source.id)).where(Source.enabled.is_(True))) or 0
         with_tier = db.scalar(select(func.count(Source.id)).where(Source.tier.isnot(None))) or 0
         tiers = {}
-        for row in db.execute(select(Source.tier, func.count(Source.id)).where(Source.tier.isnot(None)).group_by(Source.tier)):
+        for row in db.execute(
+            select(Source.tier, func.count(Source.id))
+            .where(Source.tier.isnot(None))
+            .group_by(Source.tier)
+        ):
             tiers[row[0]] = row[1]
         return {
             "total": total,
@@ -678,10 +729,23 @@ def metrics() -> dict:
         db = SessionLocal()
         try:
             total_runs = db.scalar(select(func.count(SourceRun.id))) or 0
-            success = db.scalar(select(func.count(SourceRun.id)).where(SourceRun.status == "success")) or 0
-            degraded = db.scalar(select(func.count(SourceRun.id)).where(SourceRun.status == "degraded")) or 0
-            failed = db.scalar(select(func.count(SourceRun.id)).where(SourceRun.status == "failed")) or 0
-            base = {"total_runs": total_runs, "success": success, "degraded": degraded, "failed": failed}
+            success = (
+                db.scalar(select(func.count(SourceRun.id)).where(SourceRun.status == "success"))
+                or 0
+            )
+            degraded = (
+                db.scalar(select(func.count(SourceRun.id)).where(SourceRun.status == "degraded"))
+                or 0
+            )
+            failed = (
+                db.scalar(select(func.count(SourceRun.id)).where(SourceRun.status == "failed")) or 0
+            )
+            base = {
+                "total_runs": total_runs,
+                "success": success,
+                "degraded": degraded,
+                "failed": failed,
+            }
             from app.scraper.metrics import compute_sweep_gauges, snapshot, sweep_overrun
 
             base.update(compute_sweep_gauges(db))
@@ -743,13 +807,10 @@ def _degraded_metrics_snapshot() -> dict:
     try:
         from app.scraper.metrics import sweep_overrun
 
-        body["sweep_overrun"] = sweep_overrun(
-            interval_seconds=settings.scheduler_interval_seconds
-        )
+        body["sweep_overrun"] = sweep_overrun(interval_seconds=settings.scheduler_interval_seconds)
     except Exception:
         body["sweep_overrun"] = 0
     return body
 
 
 app.include_router(api_router)
-

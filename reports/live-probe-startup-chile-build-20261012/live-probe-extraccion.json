@@ -1,0 +1,23 @@
+{
+  "http_status": 200,
+  "latency_ms": 467,
+  "content_type": "text/html; charset=UTF-8",
+  "body_bytes": 57988,
+  "kind": "html",
+  "n_items": 8,
+  "sample": [
+    {
+      "title": "¿Eres el próximo emprendedor BUILD?",
+      "url": ""
+    },
+    {
+      "title": "¿QUÉ ES BUILD?",
+      "url": ""
+    },
+    {
+      "title": "¡CONOCE LA ÚLTIMA GENERACIÓN DE BUILD!",
+      "url": ""
+    }
+  ],
+  "sanitized_url": "https://startupchile.org/postula/build/"
+}

@@ -1,0 +1,10 @@
+{
+  "http_status": 404,
+  "latency_ms": 659,
+  "content_type": "application/json",
+  "body_bytes": 26,
+  "kind": "json",
+  "n_items": 0,
+  "sample": [],
+  "sanitized_url": "https://www.gov.br/cnpq/pt-br/assuntos/institutos-nacionais-de-ciencia-e-tecnologia"
+}

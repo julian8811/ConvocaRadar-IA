@@ -1,0 +1,50 @@
+{
+  "source_key": "conacyt-mexico",
+  "status": "live_ok",
+  "http_status": 200,
+  "latency_ms": 610,
+  "requests_made": 2,
+  "bytes_truncated": false,
+  "ttl_s": 86400,
+  "pending_manual_review": false,
+  "evidence": {
+    "source_key": "conacyt-mexico",
+    "duration_ms": 1439,
+    "requests_made": 2,
+    "urls": [
+      "https://conahcyt.mx/convocatorias/",
+      "https://secihti.mx/convocatorias/"
+    ],
+    "policy": {
+      "max_requests_per_source": 2,
+      "timeout_s": 15,
+      "total_budget_s": 60,
+      "max_concurrency_global": 2,
+      "max_concurrency_per_host": 1,
+      "max_bytes_per_page": 2000000,
+      "max_pages_per_source": 10,
+      "max_redirects": 3,
+      "retry_max": 2
+    },
+    "pending_manual_review": false,
+    "http_status": 200,
+    "bytes_truncated": false,
+    "bytes_received": 180045,
+    "content_type": "text/html; charset=UTF-8",
+    "titles_sample": [
+      "Archivos: Convocatorias"
+    ],
+    "titles_count": 1,
+    "single_get_reused": true,
+    "retry_after_s": null,
+    "redirect_chain": [
+      {
+        "from": "https://conahcyt.mx/convocatorias/",
+        "to": "https://secihti.mx/convocatorias/",
+        "reason": "mapeo explícito documentado"
+      }
+    ],
+    "reason": null
+  },
+  "predicted": "pasa (mapeo explicito secihti.mx)"
+}

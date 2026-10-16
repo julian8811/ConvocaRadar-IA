@@ -1,0 +1,23 @@
+{
+  "http_status": 200,
+  "latency_ms": 127,
+  "content_type": "text/html; charset=UTF-8",
+  "body_bytes": 69857,
+  "kind": "html",
+  "n_items": 8,
+  "sample": [
+    {
+      "title": "Admission",
+      "url": ""
+    },
+    {
+      "title": "Main navigation",
+      "url": ""
+    },
+    {
+      "title": "Before You Apply",
+      "url": ""
+    }
+  ],
+  "sanitized_url": "https://knight-hennessy.stanford.edu/admission"
+}

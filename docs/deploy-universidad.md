@@ -2,6 +2,8 @@
 
 Esta guía es la ruta oficial para la VM universitaria. Producción usa `docker-compose.server.yml`, un Compose autónomo que no hereda puertos ni ajustes del entorno de desarrollo.
 
+Guía general (cloud + índice de anexos): `DEPLOYMENT.md`. Checklist para evaluadores: `docs/entrega-universidad.md`. Restauración: `docs/restore-runbook.md`. Qué vive dónde (local vs servidor): `docs/estructura-local-vs-servidor.md`.
+
 ## Arquitectura de producción
 
 ```text

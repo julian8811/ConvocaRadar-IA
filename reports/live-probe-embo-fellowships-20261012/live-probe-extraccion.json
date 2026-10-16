@@ -1,0 +1,31 @@
+{
+  "http_status": 200,
+  "latency_ms": 1647,
+  "content_type": "text/html; charset=UTF-8",
+  "body_bytes": 184820,
+  "kind": "html",
+  "n_items": 8,
+  "sample": [
+    {
+      "title": "Fellowships, grants and career support",
+      "url": ""
+    },
+    {
+      "title": "Postdoctoral Fellowships​",
+      "url": ""
+    },
+    {
+      "title": "Scientific Exchange Grants",
+      "url": ""
+    },
+    {
+      "title": "Find a Young Investigator, Installation Grantee or Global Investigator",
+      "url": "https://www.embo.org/the-embo-communities/embo-young-investigator-network/find-a-young-investigator-installation-grantee-or-global-investigator/"
+    },
+    {
+      "title": "FEBS|EMBO Women in Science Awardees",
+      "url": "https://www.embo.org/the-embo-communities/febsembo-women-in-science-awardees/"
+    }
+  ],
+  "sanitized_url": "https://www.embo.org/funding/fellowships-grants-and-career-support/"
+}

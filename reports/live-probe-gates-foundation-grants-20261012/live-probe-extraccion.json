@@ -1,0 +1,31 @@
+{
+  "http_status": 200,
+  "latency_ms": 821,
+  "content_type": "text/html; charset=utf-8",
+  "body_bytes": 125542,
+  "kind": "html",
+  "n_items": 4,
+  "sample": [
+    {
+      "title": "Unsupported browser detected",
+      "url": ""
+    },
+    {
+      "title": "How we work",
+      "url": ""
+    },
+    {
+      "title": "Grant opportunities",
+      "url": ""
+    },
+    {
+      "title": "Our commitment to grantees",
+      "url": "/about/how-we-work/our-commitment-to-grantees"
+    },
+    {
+      "title": "Grant applicant FAQ",
+      "url": "/about/how-we-work/grant-applicant-faq"
+    }
+  ],
+  "sanitized_url": "https://www.gatesfoundation.org/about/how-we-work/grant-opportunities"
+}

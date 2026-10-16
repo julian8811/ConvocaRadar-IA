@@ -1,0 +1,31 @@
+{
+  "http_status": 404,
+  "latency_ms": 1194,
+  "content_type": "text/html; charset=UTF-8",
+  "body_bytes": 190227,
+  "kind": "html",
+  "n_items": 8,
+  "sample": [
+    {
+      "title": "Header Navigation",
+      "url": ""
+    },
+    {
+      "title": "Access funding",
+      "url": ""
+    },
+    {
+      "title": "GCF funding journey",
+      "url": ""
+    },
+    {
+      "title": "Access funding",
+      "url": "/access-funding"
+    },
+    {
+      "title": "How funding works",
+      "url": "/access-funding"
+    }
+  ],
+  "sanitized_url": "https://www.greenclimate.fund/projects/call-for-proposals"
+}

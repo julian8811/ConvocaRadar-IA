@@ -1,0 +1,31 @@
+{
+  "http_status": 200,
+  "latency_ms": 374,
+  "content_type": "text/html;charset=UTF-8",
+  "body_bytes": 185332,
+  "kind": "html",
+  "n_items": 2,
+  "sample": [
+    {
+      "title": "Navegación",
+      "url": ""
+    },
+    {
+      "title": "Becas para estudios en el exterior",
+      "url": ""
+    },
+    {
+      "title": "Becas para estudios en el exterior",
+      "url": "https://web.icetex.gov.co/becas/becas-para-estudios-en-el-exterior"
+    },
+    {
+      "title": "Programa de reciprocidad para extranjeros en Colombia",
+      "url": "https://web.icetex.gov.co/becas/programa-de-reciprocidad-para-extranjeros-en-colombia"
+    },
+    {
+      "title": "Otros Servicios",
+      "url": "https://web.icetex.gov.co/becas/otros-servicios"
+    }
+  ],
+  "sanitized_url": "https://web.icetex.gov.co/becas/becas-para-estudios-en-el-exterior"
+}

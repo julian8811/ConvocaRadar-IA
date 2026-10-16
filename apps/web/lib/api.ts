@@ -1,5 +1,3 @@
-import { withBasePath } from "@/lib/base-path";
-
 import type {
   AdminMetrics,
   Alert,
@@ -143,9 +141,8 @@ export function clearToken(): void {
 function handleUnauthorized(path: string) {
   if (typeof window === "undefined" || path.startsWith("/auth/")) return;
   clearToken();
-  const loginPath = withBasePath("/login");
-  if (window.location.pathname !== loginPath) {
-    window.location.replace(loginPath);
+  if (window.location.pathname !== "/login") {
+    window.location.replace("/login");
   }
 }
 

@@ -1,0 +1,31 @@
+{
+  "http_status": 200,
+  "latency_ms": 2398,
+  "content_type": "text/html; charset=UTF-8",
+  "body_bytes": 148389,
+  "kind": "html",
+  "n_items": 8,
+  "sample": [
+    {
+      "title": "Our grants",
+      "url": ""
+    },
+    {
+      "title": "Awarded grants",
+      "url": ""
+    },
+    {
+      "title": "Grantmaking at a glance",
+      "url": ""
+    },
+    {
+      "title": "Awarded Grants",
+      "url": "https://www.fordfoundation.org/work/our-grants/awarded-grants/"
+    },
+    {
+      "title": "BUILD Program",
+      "url": "https://www.fordfoundation.org/work/our-grants/building-institutions-and-networks/"
+    }
+  ],
+  "sanitized_url": "https://www.fordfoundation.org/work/our-grants/"
+}

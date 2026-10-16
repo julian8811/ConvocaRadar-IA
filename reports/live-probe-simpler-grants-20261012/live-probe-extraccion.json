@@ -1,0 +1,31 @@
+{
+  "http_status": 200,
+  "latency_ms": 522,
+  "content_type": "text/html; charset=utf-8",
+  "body_bytes": 611490,
+  "kind": "html",
+  "n_items": 8,
+  "sample": [
+    {
+      "title": "Sign in to Simpler.Grants.gov",
+      "url": ""
+    },
+    {
+      "title": "Search funding opportunities",
+      "url": ""
+    },
+    {
+      "title": "Filters Clear filters",
+      "url": ""
+    },
+    {
+      "title": "Discussion forum",
+      "url": "https://forum.simpler.grants.gov/"
+    },
+    {
+      "title": "www.grants.gov",
+      "url": "https://www.grants.gov"
+    }
+  ],
+  "sanitized_url": "https://simpler.grants.gov/search"
+}

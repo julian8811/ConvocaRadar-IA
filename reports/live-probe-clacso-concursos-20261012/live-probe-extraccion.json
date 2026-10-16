@@ -1,0 +1,31 @@
+{
+  "http_status": 200,
+  "latency_ms": 808,
+  "content_type": "text/html; charset=UTF-8",
+  "body_bytes": 195288,
+  "kind": "html",
+  "n_items": 7,
+  "sample": [
+    {
+      "title": "Nuevas convocatorias",
+      "url": ""
+    },
+    {
+      "title": "El fin del petróleo y el Sur Global",
+      "url": ""
+    },
+    {
+      "title": "Cuadernos cortos para la incidencia pública",
+      "url": ""
+    },
+    {
+      "title": "Programa de Becas de Posgrado CLACSO-CONACYT",
+      "url": "https://www.clacso.org/becas-clacso-conacyt/presentacion-clacso-conacyt/"
+    },
+    {
+      "title": "Promoción de la investigación",
+      "url": "https://www.clacso.org/becas/"
+    }
+  ],
+  "sanitized_url": "https://www.clacso.org/becas/concursos/"
+}

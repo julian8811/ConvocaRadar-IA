@@ -1,0 +1,31 @@
+{
+  "http_status": 200,
+  "latency_ms": 1314,
+  "content_type": "text/html; charset=utf-8",
+  "body_bytes": 258694,
+  "kind": "html",
+  "n_items": 8,
+  "sample": [
+    {
+      "title": "Subvenciones no pertenecientes a la UE/globales/internacionales",
+      "url": ""
+    },
+    {
+      "title": "Subvenciones y oportunidades de financiación no pertenecientes a la UE",
+      "url": ""
+    },
+    {
+      "title": "Convocatoria para la presentación de solicitudes de financiación para la creación y preservación de conjuntos de datos científicos de alta calidad para las cien",
+      "url": ""
+    },
+    {
+      "title": "Portal de financiación de la UE",
+      "url": "https://eufundingportal.eu/es/"
+    },
+    {
+      "title": "¿Por qué suscribirse?",
+      "url": "https://eufundingportal.eu/es/%C2%BFPor-qu%C3%A9-suscribirse/"
+    }
+  ],
+  "sanitized_url": "https://eufundingportal.eu/es/programa-cultural--social-y-deportivo./subvenciones-no-comunitarias/"
+}

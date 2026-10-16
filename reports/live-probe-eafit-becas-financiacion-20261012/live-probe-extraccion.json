@@ -1,0 +1,31 @@
+{
+  "http_status": 200,
+  "latency_ms": 327,
+  "content_type": "text/html; charset=UTF-8",
+  "body_bytes": 320429,
+  "kind": "html",
+  "n_items": 8,
+  "sample": [
+    {
+      "title": "Becas y financiación de pregrados y posgrados",
+      "url": ""
+    },
+    {
+      "title": "EAFIT a tu alcance",
+      "url": ""
+    },
+    {
+      "title": "Crédito educativo Sufi a corto plazo y libre educativo",
+      "url": ""
+    },
+    {
+      "title": "Becas y financiación",
+      "url": "/becas-y-financiacion"
+    },
+    {
+      "title": "Conoce el Fondo Futuro",
+      "url": "/becas-y-financiacion/fondo-futuro"
+    }
+  ],
+  "sanitized_url": "https://www.eafit.edu.co/becas-y-financiacion"
+}

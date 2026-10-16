@@ -11,9 +11,9 @@ LLM-enrichment cuando la página no cambió. Runner: pytest (api), ruff.
 
 ## Tasks
 
-- [ ] **T1** (inline) — S1: pin + test de regresión. Pin (ya verde, documentado).
-- [ ] **T2** (inline) — S2: test RED (spy enrich en doble scrape idéntico) → GREEN.
-- [ ] **T3** (inline) — S3: deploy + verify.
+- [x] **T1** (inline) — S1: pin `selectolax>=1.0,<2` + test regresión + env local a 1.0.0. ✅ 2026-10-15
+- [x] **T2** (inline) — S2: hash compuesto + skip pre-parse + finalize success. RED→GREEN, 100 passed. ✅ 2026-10-15
+- [x] **T3** (inline) — S3: deploy api+worker (cherrys 77e5a84, a895f76) + prueba viva: sdde 22.6s→1.0s con `dom_unchanged_skip`. ✅ 2026-10-15
 
 ## Log
 

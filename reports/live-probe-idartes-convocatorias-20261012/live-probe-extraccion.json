@@ -1,0 +1,31 @@
+{
+  "http_status": 200,
+  "latency_ms": 6720,
+  "content_type": "text/html; charset=UTF-8",
+  "body_bytes": 53672,
+  "kind": "html",
+  "n_items": 8,
+  "sample": [
+    {
+      "title": "Ruta de navegación",
+      "url": ""
+    },
+    {
+      "title": "¿Quiénes pueden participar?",
+      "url": ""
+    },
+    {
+      "title": "Plataforma de inscripción y participación en las convocatorias e invitaciones:",
+      "url": ""
+    },
+    {
+      "title": "Proyecto Calle 13",
+      "url": "#"
+    },
+    {
+      "title": "Sobre las convocatorias",
+      "url": "/es/convocatorias"
+    }
+  ],
+  "sanitized_url": "https://www.idartes.gov.co/es/convocatorias"
+}

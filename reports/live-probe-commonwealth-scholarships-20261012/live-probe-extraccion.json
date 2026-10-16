@@ -1,0 +1,31 @@
+{
+  "http_status": 200,
+  "latency_ms": 317,
+  "content_type": "text/html; charset=UTF-8",
+  "body_bytes": 193274,
+  "kind": "html",
+  "n_items": 7,
+  "sample": [
+    {
+      "title": "Scholarships",
+      "url": ""
+    },
+    {
+      "title": "Commonwealth Fellowships – information for candidates",
+      "url": ""
+    },
+    {
+      "title": "Commonwealth Startup Fellowships – information for candidates",
+      "url": ""
+    },
+    {
+      "title": "Scholarships and Fellowships",
+      "url": "https://cscuk.fcdo.gov.uk/about-us/scholarships-and-fellowships/"
+    },
+    {
+      "title": "CSC Research Impact Awards",
+      "url": "https://cscuk.fcdo.gov.uk/csc-research-impact-awards-2/"
+    }
+  ],
+  "sanitized_url": "https://cscuk.fcdo.gov.uk/scholarships/"
+}

@@ -1,0 +1,87 @@
+{
+  "lote": "lote-1-preflight",
+  "issue": 59,
+  "gate": "NO-GO red hasta autorizacion expresa (L3)",
+  "max_requests_total": 5,
+  "mode": "secuencial, 1 GET/fuente",
+  "network_used": false,
+  "sources": [
+    {
+      "source_key": "novo-nordisk-grants",
+      "base_url_saneada": "https://novonordiskfonden.dk/wp-json/wp/v2/grant",
+      "hosts_autorizados": [
+        "novonordiskfonden.dk"
+      ],
+      "tipo": "api",
+      "justificacion": "WP-JSON de fundacion privada grande (salud/biotech/investigacion); formato WP distinto de RSS/HTML; host danes sin WAF conocido.",
+      "pertinencia_prior": "alta",
+      "pertinencia_prior_motivo": "categoria grants/health/biotech/research del catalogo; endpoint WP de grants",
+      "max_requests": 1,
+      "dry_run": "reports/lote-1-preflight/dry-runs/novo-nordisk-grants.plan.json",
+      "muestra_titulos": "pendiente piloto L3 (0 red en preflight)",
+      "needs_human_review": true
+    },
+    {
+      "source_key": "grants-gov-forecast",
+      "base_url_saneada": "https://www.grants.gov/rss/GG_ForecastOpportunities.xml",
+      "hosts_autorizados": [
+        "www.grants.gov"
+      ],
+      "tipo": "rss",
+      "justificacion": "RSS federal EEUU (forecast de oportunidades); unico RSS del lote; host www.grants.gov sin WAF conocido.",
+      "pertinencia_prior": "alta",
+      "pertinencia_prior_motivo": "feed RSS dedicado a forecast de oportunidades federales, no noticias",
+      "max_requests": 1,
+      "dry_run": "reports/lote-1-preflight/dry-runs/grants-gov-forecast.plan.json",
+      "muestra_titulos": "pendiente piloto L3 (0 red en preflight)",
+      "needs_human_review": true
+    },
+    {
+      "source_key": "minciencias",
+      "base_url_saneada": "https://minciencias.gov.co/convocatorias/todas",
+      "hosts_autorizados": [
+        "minciencias.gov.co"
+      ],
+      "tipo": "html",
+      "justificacion": "HTML gobierno CO (ciencia/innovacion); alto impacto local directo para la mision; host minciencias.gov.co sin WAF conocido.",
+      "pertinencia_prior": "alta",
+      "pertinencia_prior_motivo": "pagina dedicada /convocatorias/todas del ente rector de ciencia CO",
+      "max_requests": 1,
+      "dry_run": "reports/lote-1-preflight/dry-runs/minciencias.plan.json",
+      "muestra_titulos": "pendiente piloto L3 (0 red en preflight)",
+      "needs_human_review": true
+    },
+    {
+      "source_key": "ukri-opportunities",
+      "base_url_saneada": "https://www.ukri.org/opportunity/",
+      "hosts_autorizados": [
+        "ukri.org",
+        "www.ukri.org"
+      ],
+      "tipo": "html",
+      "justificacion": "HTML de financiador publico UK (research/innovation); alto impacto global; host ukri.org sin WAF conocido.",
+      "pertinencia_prior": "alta",
+      "pertinencia_prior_motivo": "buscador dedicado de oportunidades de financiamiento UKRI",
+      "max_requests": 1,
+      "dry_run": "reports/lote-1-preflight/dry-runs/ukri-opportunities.plan.json",
+      "muestra_titulos": "pendiente piloto L3 (0 red en preflight)",
+      "needs_human_review": true
+    },
+    {
+      "source_key": "innpulsa",
+      "base_url_saneada": "https://convocatorias.innpulsacolombia.com/api/convocatorias",
+      "hosts_autorizados": [
+        "convocatorias.innpulsacolombia.com",
+        "innpulsacolombia.com"
+      ],
+      "tipo": "api",
+      "justificacion": "API de emprendimiento CO; unico API-REST puro del lote; host convocatorias.innpulsacolombia.com sin WAF conocido.",
+      "pertinencia_prior": "alta",
+      "pertinencia_prior_motivo": "API dedicada de convocatorias con filtro active_only=true",
+      "max_requests": 1,
+      "dry_run": "reports/lote-1-preflight/dry-runs/innpulsa.plan.json",
+      "muestra_titulos": "pendiente piloto L3 (0 red en preflight)",
+      "needs_human_review": true
+    }
+  ]
+}

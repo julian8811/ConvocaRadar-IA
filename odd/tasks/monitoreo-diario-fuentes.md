@@ -13,7 +13,7 @@ todas, sin recortes de frecuencia). Runner: pytest (api), ruff.
 ## Tasks
 
 - [x] **T1** (inline) — S1,S2: flip de 130 frecuencias a daily (solo habilitadas; deshabilitadas intactas por gates) + pin `test_seed_daily_cadence.py` + 039/040 a daily. RED→GREEN, 111 passed. ✅ 2026-10-15
-- [ ] **T2** (inline) — S3,S4: commit + push + cherry + rebuild + reseed + verify sweep.
+- [x] **T2** (inline) — S3,S4: commit `09a316d` + push + cherry `0dce7f3` (limpio) + guard IDLE + rebuild api + reseed force (206 updated): daily=203, non-daily-enabled=0. 0 vencidas ahora (todo corrió <24h); la cadencia diaria rige en los próximos ticks. ✅ 2026-10-15
 
 ## Log
 

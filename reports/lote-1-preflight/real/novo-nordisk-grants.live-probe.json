@@ -1,0 +1,43 @@
+{
+  "status": "live_ok",
+  "evidence": {
+    "source_key": "novo-nordisk-grants",
+    "duration_ms": 3111,
+    "requests_made": 1,
+    "urls": [
+      "https://novonordiskfonden.dk/wp-json/wp/v2/grant"
+    ],
+    "policy": {
+      "max_requests_per_source": 1,
+      "timeout_s": 15,
+      "total_budget_s": 60,
+      "max_concurrency_global": 2,
+      "max_concurrency_per_host": 1,
+      "max_bytes_per_page": 2000000,
+      "max_pages_per_source": 10,
+      "max_redirects": 3,
+      "retry_max": 2
+    },
+    "pending_manual_review": false,
+    "http_status": 200,
+    "bytes_truncated": false,
+    "bytes_received": 747513,
+    "content_type": "application/json; charset=UTF-8",
+    "titles_sample": [
+      "Start Package Grants – for faculty recruitment Q1 2027",
+      "Novo Nordisk Fondens Naturfaglige EUD-Underviserpris",
+      "Start Package Grants – for faculty recruitment Q4 2026",
+      "Nexa innovation call: Innovations that reduce the impact of heat on people living with cardiometabolic diseases in Africa",
+      "Project Grants in Bioscience and Basic Biomedicine",
+      "Project Grants in the Natural and Technical Sciences 2026",
+      "Postdoctoral Fellowships for research within Plant Science, Agriculture and Food Biotechnology",
+      "Postdoctoral Fellowships for research within Industrial Biotechnology and Environmental Biotechnology",
+      "Project Grants for research within Industrial Biotechnology and Environmental Biotechnology",
+      "Project Grants for research within Plant Science, Agriculture and Food Biotechnology"
+    ],
+    "titles_count": 10,
+    "single_get_reused": true,
+    "retry_after_s": null,
+    "reason": null
+  }
+}

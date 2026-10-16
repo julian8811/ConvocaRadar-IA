@@ -1,0 +1,30 @@
+{
+  "http_status": 200,
+  "latency_ms": 681,
+  "content_type": "text/html; charset=UTF-8",
+  "body_bytes": 48291,
+  "items": 8,
+  "sample": [
+    {
+      "title": "Convocatorias",
+      "url": ""
+    },
+    {
+      "title": "Carrera del Investigador",
+      "url": ""
+    },
+    {
+      "title": "Programa de Becas",
+      "url": ""
+    },
+    {
+      "title": "Convocatorias",
+      "url": "https://convocatorias.conicet.gov.ar/"
+    },
+    {
+      "title": "Agenda CONICET",
+      "url": "https://www.conicet.gov.ar/oportunidades-y-becas/difundir-en-agenda-conicet/"
+    }
+  ],
+  "sanitized_url": "https://convocatorias.conicet.gov.ar/"
+}

@@ -1,0 +1,30 @@
+{
+  "source_key": "fapemig-brasil",
+  "start_urls": [
+    "https://api.site.fapemig.br/wp-json/fapemig-chamadas-e-editais/v1/chamadas"
+  ],
+  "estimated_requests": 1,
+  "hosts": [
+    "api.site.fapemig.br"
+  ],
+  "budgets": {
+    "max_requests_per_source": 10,
+    "timeout_s": 15,
+    "total_budget_s": 60,
+    "max_concurrency_global": 2,
+    "max_concurrency_per_host": 1,
+    "max_bytes_per_page": 2000000,
+    "max_pages_per_source": 10,
+    "max_redirects": 3,
+    "retry_max": 2
+  },
+  "risks": [
+    "red real solo con --allow-network + --source-key explicitos",
+    "bloqueo SSRF activo: privados/localhost/red interna denegados",
+    "redirects solo a hosts autorizados; otros => blocked_by_policy",
+    "presupuesto: <=10 req/fuente, timeout <=15s c/u, total <=60s",
+    "STOP ante WAF/CAPTCHA con pending_manual_review",
+    "sin escrituras SQL, sin envios, sin embeddings, sin side effects"
+  ],
+  "network_used": false
+}

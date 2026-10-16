@@ -91,5 +91,5 @@ Decisión explícita del usuario: cirugía mayor (opción a).
 
 ## Progress (cont.)
 - 2026-10-10: batch persist verificado live (cherry-pick + rebuild + reseed 203): **ascun 188 success, novo 135 success** (tras unpause; el 409 `paused_cooldown` funcionó en vivo), apc 34 y WB 93 ya verdes. PR #50 mergeado. Timeouts sistémicos cerrados.
-- 2026-10-10: QA exhaustivo con cuenta consultor (tras reset de su password a `Julian881100` — el hash estaba bien pero no coincidía): API 22/22 en 200 + detail/scores + favorito reversible + single-run urosario success; web 16/16 (307 raíz normal). NO probado a propósito: register, passwords, envíos de alertas, bulks admin, deletes.
+- 2026-10-10: QA exhaustivo con cuenta consultor (tras reset de su password a `[REDACTED]` — el hash estaba bien pero no coincidía): API 22/22 en 200 + detail/scores + favorito reversible + single-run urosario success; web 16/16 (307 raíz normal). NO probado a propósito: register, passwords, envíos de alertas, bulks admin, deletes.
 - 2026-10-10: sweep force final de cierre (`cb9f3a41`): **203/203 success, failed 0**, 2885 ítems, 194 success / 9 degraded / 0 failed. Restan solo: aladi/cali (sección eliminada), bogota/sloan (WAF), dane/idb/procolombia/sicon (sin contenido vigente o migrado), conacyt-mexico (único sin triage profundo).

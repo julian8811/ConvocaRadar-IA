@@ -1,0 +1,59 @@
+{
+  "source_key": "erasmus-plus-opportunities",
+  "status": "live_ok",
+  "http_status": 200,
+  "latency_ms": 454,
+  "requests_made": 2,
+  "bytes_truncated": false,
+  "ttl_s": 86400,
+  "pending_manual_review": false,
+  "evidence": {
+    "source_key": "erasmus-plus-opportunities",
+    "duration_ms": 1157,
+    "requests_made": 2,
+    "urls": [
+      "https://erasmus-plus.ec.europa.eu/opportunities/opportunities-for-organisations",
+      "https://erasmus-plus.ec.europa.eu/opportunities/organisations"
+    ],
+    "policy": {
+      "max_requests_per_source": 2,
+      "timeout_s": 15,
+      "total_budget_s": 60,
+      "max_concurrency_global": 2,
+      "max_concurrency_per_host": 1,
+      "max_bytes_per_page": 2000000,
+      "max_pages_per_source": 10,
+      "max_redirects": 3,
+      "retry_max": 2
+    },
+    "pending_manual_review": false,
+    "http_status": 200,
+    "bytes_truncated": false,
+    "bytes_received": 191126,
+    "content_type": "text/html; charset=utf-8",
+    "titles_sample": [
+      "Opportunities for organisations",
+      "Select your language",
+      "EU official languages",
+      "Key Actions",
+      "Support",
+      "Give your feedback about this page",
+      "Share this page",
+      "EAC Footer",
+      "Helpful links",
+      "Quick links"
+    ],
+    "titles_count": 14,
+    "single_get_reused": true,
+    "retry_after_s": null,
+    "redirect_chain": [
+      {
+        "from": "https://erasmus-plus.ec.europa.eu/opportunities/opportunities-for-organisations",
+        "to": "https://erasmus-plus.ec.europa.eu/opportunities/organisations",
+        "reason": "host autorizado"
+      }
+    ],
+    "reason": null
+  },
+  "predicted": "pasa (mismo registrable ec.europa.eu)"
+}

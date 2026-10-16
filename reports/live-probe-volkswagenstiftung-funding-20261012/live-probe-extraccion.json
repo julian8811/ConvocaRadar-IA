@@ -1,0 +1,31 @@
+{
+  "http_status": 200,
+  "latency_ms": 734,
+  "content_type": "text/html; charset=UTF-8",
+  "body_bytes": 142696,
+  "kind": "html",
+  "n_items": 8,
+  "sample": [
+    {
+      "title": "Free live webinar in English on our funding portfolio on 13 April, 10 a.m.",
+      "url": ""
+    },
+    {
+      "title": "Our Funding Portfolio",
+      "url": ""
+    },
+    {
+      "title": "We provide support in four profile areas",
+      "url": ""
+    },
+    {
+      "title": "Our Funding Portfolio",
+      "url": "/en/our-funding-portfolio"
+    },
+    {
+      "title": "For applicants",
+      "url": "/en/funding/information-applicants"
+    }
+  ],
+  "sanitized_url": "https://www.volkswagenstiftung.de/en/our-funding-portfolio"
+}
