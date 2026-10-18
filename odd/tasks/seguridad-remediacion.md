@@ -37,10 +37,10 @@ Pedido del usuario (parafraseado, secretos redactados): arreglar las novedades d
 - Register limitado y gateado por config; defaults intactos.
 - Tests nuevos en RED→GREEN + suite auth verde.
 - `git log -S <secreto>` limpio tras purge; working tree sin secretos.
-- Servidor/GitHub quedan para el paso siguiente (no en este feature).
+- Servidor deployado y verificado en vivo; GitHub al día (main 9f6ebda + rama seguridad-remediacion 3f23f61 con d61ed60 para PR).
 
 ## Progress
-- 2026-10-15: TODO 10/10 CERRADO Y VERIFICADO EN VIVO. Deploy 85b6eeb + dashboard 1970/256 + gate 403 + CSP/headers. PENDIENTE USUARIO: rotar claves (consultor, servidor, PAT), gh auth, worktrees, segundo purge en rama server.
+- 2026-10-15: TODO 10/10 CERRADO Y VERIFICADO EN VIVO. Deploy 85b6eeb + dashboard 1970/256 + gate 403 + CSP/headers. GitHub al día: main 9f6ebda, rama seguridad-remediacion 3f23f61. PENDIENTE USUARIO: rotar claves (consultor, servidor, PATs), gh auth, worktrees, segundo purge en rama server.
 
 ## Next step
-- Resolver next.config.ts (unión basePath server + headers T4), subir y `git add`; luego auth.py, config.py, main.py; después los 22 restantes.
+- Nada pendiente en este feature: T11 cerró la puesta al día. Resto en manos del usuario (rotaciones, worktrees, segundo purge, CI rojo pre-existente ofrecido aparte).
