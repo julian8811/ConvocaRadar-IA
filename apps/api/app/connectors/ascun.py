@@ -5,7 +5,13 @@ from __future__ import annotations
 import json
 
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
-from app.connectors.common import clean_text, fetch_httpx_text, parse_date_text, thin_fill_candidates
+from app.connectors.common import (
+    clean_text,
+    fetch_httpx_text,
+    looks_like_news,
+    parse_date_text,
+    thin_fill_candidates,
+)
 from app.connectors.registry import register
 
 ASCUN_API_URL = "https://ascun.org.co/wp-json/wp/v2/posts"
@@ -87,4 +93,6 @@ class AscunConnector:
             return ValidationResult(ok=False, reason="Missing title or URL")
         if "ascun.org.co" not in candidate.official_url:
             return ValidationResult(ok=False, reason="URL is outside ASCUN")
+        if looks_like_news(candidate.title, candidate.summary, candidate.official_url):
+            return ValidationResult(ok=False, reason="News item, not a call")
         return ValidationResult(ok=True)

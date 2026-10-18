@@ -162,7 +162,52 @@ class TestWordPressMaxPages:
     def test_factory_keeps_legacy_cap_for_other_wp(self) -> None:
         from app.connectors.factory import connector_for
 
-        connector = connector_for(
-            "cost-eu", "https://www.cost.eu/wp-json/wp/v2/pages"
-        )
+        connector = connector_for("cost-eu", "https://www.cost.eu/wp-json/wp/v2/pages")
         assert connector.max_pages == 10
+
+
+class TestWordPressNewsFilter:
+    """T2b: the WP-generic path (used by ascun in prod) must reject news.
+
+    Prod evidence 2026-10-18: ascun resolves to WordPressGrantsConnector
+    (factory URL-sniff), probe showed 200 parsed / 200 valid — the news
+    items passed straight through.
+    """
+
+    def _connector(self):
+        from app.connectors.wordpress_grants import WordPressGrantsConnector
+
+        return WordPressGrantsConnector(
+            source_key="ascun-convocatorias",
+            base_url="https://ascun.org.co/wp-json/wp/v2/posts",
+            entity_name="ASCUN Colombia",
+            default_country="Colombia",
+        )
+
+    async def test_validate_rejects_noticias_path(self):
+        from app.connectors.base import OpportunityCandidate
+
+        result = await self._connector().validate(
+            OpportunityCandidate(
+                title="Con más de 80 asistentes y 16 expertos, cerró en Medellín el Encuentro",
+                entity="ASCUN Colombia",
+                country="Colombia",
+                official_url="https://ascun.org.co/noticias-ies/encuentro-egresados-2026/",
+                summary="Encuentro anual de egresados.",
+            )
+        )
+        assert result.ok is False
+
+    async def test_validate_keeps_real_call(self):
+        from app.connectors.base import OpportunityCandidate
+
+        result = await self._connector().validate(
+            OpportunityCandidate(
+                title="Convocatoria nacional de becas de investigacion 2026",
+                entity="ASCUN Colombia",
+                country="Colombia",
+                official_url="https://ascun.org.co/convocatoria-becas-2026/",
+                summary="Becas para movilidad academica. Cierre: 30 de noviembre de 2026.",
+            )
+        )
+        assert result.ok is True

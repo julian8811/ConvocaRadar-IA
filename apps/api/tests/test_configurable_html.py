@@ -479,3 +479,56 @@ class TestValidate:
         )
         result = await connector.validate(candidate)
         assert result.ok is False
+
+
+# ═══════════════════════════════════════════════════════════════
+# T2b. News rejection flag (reject_news, default off)
+# ═══════════════════════════════════════════════════════════════
+
+NEWS_CANDIDATE = OpportunityCandidate(
+    title="Con más de 80 asistentes y 16 expertos, cerró en Medellín el Encuentro",
+    entity="Test",
+    country="Colombia",
+    official_url="https://www.cundinamarca.gov.co/noticias/encuentro-egresados-2026",
+    summary="Encuentro anual de egresados.",
+)
+
+CALL_CANDIDATE = OpportunityCandidate(
+    title="Convocatoria fondo concursable 2026",
+    entity="Test",
+    country="Colombia",
+    official_url="https://www.cundinamarca.gov.co/convocatorias/fondo-2026",
+    summary="Apoyo a proyectos productivos. Cierre: 30 de noviembre de 2026.",
+)
+
+
+class TestRejectNewsFlag:
+    def test_flag_defaults_off(self):
+        config = HtmlConnectorConfig.from_dict(dict(VALID_CONFIG))
+        assert config.reject_news is False
+
+    def test_flag_parses_from_dict(self):
+        config = HtmlConnectorConfig.from_dict({**VALID_CONFIG, "reject_news": True})
+        assert config.reject_news is True
+
+    @pytest.mark.asyncio
+    async def test_news_rejected_when_flag_on(self):
+        connector = ConfigurableHtmlConnector(
+            CONNECTOR_KEY, CONNECTOR_URL, {**VALID_CONFIG, "reject_news": True}
+        )
+        result = await connector.validate(NEWS_CANDIDATE)
+        assert result.ok is False
+
+    @pytest.mark.asyncio
+    async def test_news_passes_when_flag_off(self):
+        connector = ConfigurableHtmlConnector(CONNECTOR_KEY, CONNECTOR_URL, VALID_CONFIG)
+        result = await connector.validate(NEWS_CANDIDATE)
+        assert result.ok is True
+
+    @pytest.mark.asyncio
+    async def test_call_passes_when_flag_on(self):
+        connector = ConfigurableHtmlConnector(
+            CONNECTOR_KEY, CONNECTOR_URL, {**VALID_CONFIG, "reject_news": True}
+        )
+        result = await connector.validate(CALL_CANDIDATE)
+        assert result.ok is True

@@ -265,6 +265,10 @@ def seed_default_sources(
         {
             "key": "unwomen-innovate",
             "name": "UN Women Innovation Calls",
+            # Deshabilitada 2026-10-18: la página fuente es institucional sin
+            # convocatorias (45/45 filas sin fecha ni monto, muestreo prod;
+            # acuerdo sólo-convocatorias, purge trio 2026-10-18).
+            "enabled": False,
             "base_url": "https://www.unwomen.org/en/how-we-work/innovation-and-technology",
             "country": "International",
             "region": "Global",
@@ -2293,6 +2297,7 @@ def seed_default_sources(
                 "content_selectors": ["article", "main", "a"],
                 "date_labels": ["Cierre:", "Deadline:"],
                 "detail_enrichment": False,
+                "reject_news": True,
             },
         },
         {
@@ -2339,6 +2344,7 @@ def seed_default_sources(
                 "content_selectors": ["article", "main"],
                 "date_labels": ["Cierre:", "Deadline:"],
                 "detail_enrichment": False,
+                "reject_news": True,
             },
         },
         {
