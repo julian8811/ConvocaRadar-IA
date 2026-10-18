@@ -173,6 +173,14 @@ class HtmlConnectorConfig:
     detail_enrichment: bool = False
     """If True, fetch detail pages for low-confidence candidates."""
 
+    reject_news: bool = False
+    """If True, reject candidates that look like news posts, not calls.
+
+    Uses :func:`looks_like_news` (news-section URL + no call signal).
+    Opt-in per source: listing pages that mix news with calls
+    (e.g. gov portals) set it; default off so no source changes
+    behaviour unless it asked for it."""
+
     user_agent: str | None = None
     """Optional User-Agent override for this source.
     
@@ -255,6 +263,7 @@ class HtmlConnectorConfig:
             date_labels=list(raw["date_labels"]),
             pagination=pagination,
             detail_enrichment=bool(raw.get("detail_enrichment", False)),
+            reject_news=bool(raw.get("reject_news", False)),
             user_agent=raw.get("user_agent"),
             browser_fallback=bool(raw.get("browser_fallback", False)),
             force_render=bool(raw.get("force_render", False)),
@@ -451,6 +460,10 @@ class ConfigurableHtmlConnector:
             candidate.title, candidate.summary, candidate.raw_text, candidate.close_date
         ):
             return ValidationResult(ok=False, reason="Opportunity appears closed")
+        if self.config.reject_news and common.looks_like_news(
+            candidate.title, candidate.summary, candidate.official_url
+        ):
+            return ValidationResult(ok=False, reason="News item, not a call")
         return ValidationResult(ok=True)
 
     # ── Internal helpers ─────────────────────────────────────────────────

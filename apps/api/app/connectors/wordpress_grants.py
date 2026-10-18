@@ -9,13 +9,20 @@ from app.core.config import get_settings
 from app.core.http_client import http_client
 from app.connectors.base import OpportunityCandidate, RawSourceResult, ValidationResult
 from app.connectors.common import (
+    apply_extracted_fields,
     clean_text,
+    enrich_from_detail_page,
     extract_funding_details,
     is_allowed_host,
+    looks_like_news,
     normalize_text,
     parse_date_text,
     thin_fill_candidates,
 )
+
+# T4: cap on detail-page fetches per parse() run. Novo fichas render
+# slowly (~seconds each); 10 bounds the added latency while daily sweeps
+# progressively cover the catalog.
 
 
 def _clean(value: str | None) -> str:
@@ -102,9 +109,7 @@ def extract_novo_detail_fields(html: str) -> dict[str, object]:
         side_labels = [
             clean_text(node.text()) for node in tree.css("div.nnf-project-sidebar__label")
         ]
-        side_data = [
-            clean_text(node.text()) for node in tree.css("div.nnf-project-sidebar__data")
-        ]
+        side_data = [clean_text(node.text()) for node in tree.css("div.nnf-project-sidebar__data")]
         for label, data in zip(side_labels, side_data):
             if normalize_text(label) == "amount" and result["funding_amount_value"] is None:
                 raw, value, currency = extract_funding_details(data)
@@ -127,6 +132,9 @@ def _with_page(url: str, page: int, *, per_page: int = 100) -> str:
     return urlunparse(parsed._replace(query=urlencode(query, doseq=True)))
 
 
+_WP_DETAIL_LIMIT = 10
+
+
 class WordPressGrantsConnector:
     source_key: str
     entity_name: str
@@ -142,6 +150,7 @@ class WordPressGrantsConnector:
         default_country: str = "Por validar",
         allowed_domains: list[str] | None = None,
         max_pages: int | None = None,
+        detail_enrichment: bool = False,
     ) -> None:
         self.source_key = source_key
         self.base_url = base_url
@@ -154,6 +163,10 @@ class WordPressGrantsConnector:
         # holds ~136 grants over 2 pages; 10 sequential slow pages (~15s each)
         # can brush the 180s per-source cap.
         self.max_pages = max_pages or 10
+        # T4: opt-in detail-ficha enrichment (novo only). The WP JSON list
+        # carries no ACF funding/dates for some catalogs; detail pages do.
+        # Default off so every other WP-routed source keeps legacy behavior.
+        self.detail_enrichment = detail_enrichment
 
     async def fetch(self) -> RawSourceResult:
         settings = get_settings()
@@ -248,7 +261,56 @@ class WordPressGrantsConnector:
                     close_date=close_date,
                 )
             )
+        if self.detail_enrichment and candidates:
+            candidates = await self._enrich_missing_funding(candidates)
         return thin_fill_candidates(candidates[:200])
+
+    async def _enrich_missing_funding(
+        self, candidates: list[OpportunityCandidate]
+    ) -> list[OpportunityCandidate]:
+        """Fill missing funding/dates from detail fichas, gap-fill only.
+
+        Only candidates without funding are fetched (capped per run), and
+        merging never overwrites list-provided fields. Detail extraction is
+        host-gated inside :func:`enrich_from_detail_page`, so hosts without
+        a targeted parser yield nothing and the candidate passes through.
+        """
+        import asyncio
+        from dataclasses import replace as _replace
+
+        to_enrich = [c for c in candidates if not c.funding_amount_raw][
+            :_WP_DETAIL_LIMIT
+        ]
+        if not to_enrich:
+            return candidates
+        sem = asyncio.Semaphore(5)
+
+        async def _bounded(url: str):
+            async with sem:
+                try:
+                    return await enrich_from_detail_page(url)
+                except Exception:
+                    return None
+
+        urls = [c.official_url for c in to_enrich]
+        results = await asyncio.gather(
+            *(_bounded(url) for url in urls), return_exceptions=True
+        )
+        detail_by_url = {
+            url: (result if isinstance(result, dict) else None)
+            for url, result in zip(urls, results)
+        }
+        enriched: list[OpportunityCandidate] = []
+        for candidate in candidates:
+            detail = detail_by_url.get(candidate.official_url)
+            if detail:
+                merged = apply_extracted_fields(
+                    candidate, detail, prefer_extracted_text=True
+                )
+                enriched.append(_replace(merged, confidence_score=0.82))
+            else:
+                enriched.append(candidate)
+        return enriched
 
     async def validate(self, candidate: OpportunityCandidate) -> ValidationResult:
         if not candidate.title or not candidate.official_url:
@@ -257,4 +319,9 @@ class WordPressGrantsConnector:
             candidate.official_url, self.allowed_domains
         ):
             return ValidationResult(ok=False, reason="domain not allowed")
+        # T2b: the WP-generic path serves listing feeds that mix news with
+        # calls (ascun in prod). looks_like_news needs BOTH a news-section
+        # URL and zero call signals, so real grants are never rejected.
+        if looks_like_news(candidate.title, candidate.summary, candidate.official_url):
+            return ValidationResult(ok=False, reason="news item, not a call")
         return ValidationResult(ok=True)

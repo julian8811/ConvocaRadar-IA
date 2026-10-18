@@ -90,3 +90,46 @@ class TestAscunParseGuard:
         )
 
         assert await connector.parse(raw) == []
+
+
+class TestAscunNewsFilter:
+    """T2b: news items must not validate as opportunities.
+
+    Real prod evidence 2026-10-18: ascun stored items like
+    "Con más de 80 asistentes y 16 expertos, cerró en Medellín el
+    Encuentro Internacional de Egresados" (news, no close date possible).
+    """
+
+    @pytest.mark.asyncio
+    async def test_validate_rejects_noticias_path(self):
+        from app.connectors.base import OpportunityCandidate
+
+        connector = AscunConnector()
+        result = await connector.validate(
+            OpportunityCandidate(
+                title="Con más de 80 asistentes y 16 expertos, cerró en Medellín el Encuentro",
+                entity="ASCUN Colombia",
+                country="Colombia",
+                official_url="https://ascun.org.co/noticias-ies/encuentro-egresados-2026/",
+                summary="Encuentro anual de egresados.",
+            )
+        )
+
+        assert result.ok is False
+
+    @pytest.mark.asyncio
+    async def test_validate_keeps_real_call(self):
+        from app.connectors.base import OpportunityCandidate
+
+        connector = AscunConnector()
+        result = await connector.validate(
+            OpportunityCandidate(
+                title="Convocatoria nacional de becas de investigacion 2026",
+                entity="ASCUN Colombia",
+                country="Colombia",
+                official_url="https://ascun.org.co/convocatoria-becas-2026/",
+                summary="Becas para movilidad academica. Cierre: 30 de noviembre de 2026.",
+            )
+        )
+
+        assert result.ok is True

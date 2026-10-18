@@ -37,6 +37,10 @@ EXPECTED_CHAIN = [
     "0016_faculty_match_ivfflat",
     "0017_opportunity_sector",
     "0018_unique_opportunity_score",
+    "0019_canonical_source_urls",
+    "0020_reject_news_cundinamarca_bogota",
+    "0021_reject_news_full_config",
+    "0022_disable_unwomen_innovate",
 ]
 
 
@@ -53,7 +57,7 @@ def _function_body(path: Path, name: str) -> str:
 
 
 def test_migration_graph_has_exactly_one_current_head() -> None:
-    assert _script().get_heads() == ["0018_unique_opportunity_score"]
+    assert _script().get_heads() == ["0022_disable_unwomen_innovate"]
 
 
 def test_chain_is_linear_from_base_to_head() -> None:

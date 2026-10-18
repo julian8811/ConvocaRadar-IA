@@ -129,6 +129,10 @@ def _wordpress_connector(source_key: str, base_url: str) -> WordPressGrantsConne
             # Catalog ~136 grants / 2 pages; 3 pages (300 items) cover it with
             # margin while keeping worst-case fetch ~= 45s (was ~150s).
             "max_pages": 3,
+            # T4: the WP list carries ``acf: []`` (no funding/dates) while
+            # detail fichas render Amount + Call opens/closes (E19). Opt-in
+            # here only; every other WP-routed source keeps legacy behavior.
+            "detail_enrichment": True,
         },
         "ascun-convocatorias": {
             "entity_name": "ASCUN Colombia",
@@ -148,6 +152,7 @@ def _wordpress_connector(source_key: str, base_url: str) -> WordPressGrantsConne
         default_country=config.get("default_country", "Por validar"),
         allowed_domains=config.get("allowed_domains"),
         max_pages=config.get("max_pages"),
+        detail_enrichment=bool(config.get("detail_enrichment", False)),
     )
 
 

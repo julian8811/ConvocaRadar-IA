@@ -18,7 +18,13 @@ from app.core.http_client import http_client
 
 # ── SPA shell detection (023 S3) ──────────────────────────────────────────
 SPA_SHELL_THRESHOLD: int = 8000  # bytes/chars below which text/html with no h1 is considered shell
-SPA_ALLOWLIST: set[str] = {"grants-gov", "grants.gov", "simpler-grants", "simpler.grants.gov", "simpler"}
+SPA_ALLOWLIST: set[str] = {
+    "grants-gov",
+    "grants.gov",
+    "simpler-grants",
+    "simpler.grants.gov",
+    "simpler",
+}
 
 
 def is_shell_response(content: str, content_type: str, candidates: int) -> bool:
@@ -263,6 +269,78 @@ def looks_like_noise_text(value: str | None) -> bool:
     )
 
 
+# ── News-vs-call detection (T2b) ───────────────────────────────────────────
+# Listing pages mix news posts with real calls; persisting news as
+# opportunities yields items that can never have dates/funding and poisons
+# backfills with junk. A candidate is news only when BOTH hold: its URL
+# path carries a news-section marker AND its title+summary carry no
+# call signal. Content alone never decides (a real call may live anywhere).
+_NEWS_PATH_MARKERS: tuple[str, ...] = (
+    "noticia",
+    "noticia",
+    "news",
+    "novedad",
+    "blog",
+    "evento",
+    "prensa",
+    "actualidad",
+)
+
+_CALL_SIGNALS: tuple[str, ...] = (
+    "convocatoria",
+    "convocatori",
+    "beca",
+    "bolsa",
+    "inscri",
+    "inscrev",
+    "postula",
+    "aplica",
+    "apply",
+    "application",
+    "plazo",
+    "cierre",
+    "deadline",
+    "closing",
+    "call for",
+    "call-for",
+    "proposals",
+    "propuestas",
+    "edital",
+    "chamada",
+    "fellowship",
+    "scholarship",
+    "grant",
+    "subvencion",
+    "subvención",
+    "premio",
+    "award",
+    "funding",
+    "financiamiento",
+    "licita",
+    "tender",
+    "adquisicion",
+    "adquisición",
+)
+
+
+def looks_like_news(title: str | None, summary: str | None, url: str | None) -> bool:
+    """True when a candidate is a news post, not a call for proposals.
+
+    Requires a news-section marker in the URL path plus the absence of
+    any call signal in title+summary. Either condition alone is not
+    enough: real calls may mention events, and news sections may (rarely)
+    host a call — the call signal then saves it.
+    """
+    try:
+        path = (urlparse(url or "").path or "").lower()
+    except Exception:
+        return False
+    if not path or not any(marker in path for marker in _NEWS_PATH_MARKERS):
+        return False
+    text = normalize_text(f"{title or ''} {summary or ''}")
+    return not any(signal in text for signal in _CALL_SIGNALS)
+
+
 def _is_private_host(hostname: str) -> bool:
     host = hostname.lower()
     if host in {"localhost", "127.0.0.1", "0.0.0.0", "::1"}:
@@ -343,9 +421,7 @@ def _year_guard(dt: datetime | None, allow_past: bool = False) -> datetime | Non
     return dt
 
 
-def extract_dates(
-    text: str, allow_past: bool = False
-) -> tuple[datetime | None, datetime | None]:
+def extract_dates(text: str, allow_past: bool = False) -> tuple[datetime | None, datetime | None]:
     """Extract (open_date, close_date) from text using tier fallback + dateparser.
 
     Finds all date candidates via keyword-prefixed tiers and generic sweep,
@@ -433,7 +509,9 @@ def extract_close_date(text: str, allow_past: bool = False) -> datetime | None:
         flags=re.IGNORECASE,
     )
     if labeled:
-        parsed = _year_guard(parse_date_text(labeled.group(1), allow_past=allow_past), allow_past=allow_past)
+        parsed = _year_guard(
+            parse_date_text(labeled.group(1), allow_past=allow_past), allow_past=allow_past
+        )
         if parsed:
             return parsed
     tier1 = [
@@ -453,7 +531,9 @@ def extract_close_date(text: str, allow_past: bool = False) -> datetime | None:
     for pattern in tier1:
         match = re.search(pattern, _text, flags=re.IGNORECASE)
         if match:
-            parsed = _year_guard(parse_date_text(match.group(1), allow_past=allow_past), allow_past=allow_past)
+            parsed = _year_guard(
+                parse_date_text(match.group(1), allow_past=allow_past), allow_past=allow_past
+            )
             if parsed:
                 return parsed
     # fallback to tuple
@@ -475,7 +555,9 @@ def extract_open_date(text: str, allow_past: bool = False) -> datetime | None:
     for pattern in _OPEN_DATE_PATTERNS:
         match = pattern.search(_text)
         if match:
-            parsed = _year_guard(parse_date_text(match.group(1), allow_past=allow_past), allow_past=allow_past)
+            parsed = _year_guard(
+                parse_date_text(match.group(1), allow_past=allow_past), allow_past=allow_past
+            )
             if parsed:
                 return parsed
     open_date, _ = extract_dates(text, allow_past=allow_past)
@@ -626,9 +708,7 @@ def _parse_date_text_value(value: str, allow_past: bool = False) -> datetime | N
         candidate = f"{eng_match.group(1).title()} {eng_match.group(2)}, {eng_match.group(3)}"
         for fmt in ("%B %d, %Y", "%b %d, %Y"):
             try:
-                return _year_guard(
-                    datetime.strptime(candidate, fmt), allow_past=allow_past
-                )
+                return _year_guard(datetime.strptime(candidate, fmt), allow_past=allow_past)
             except ValueError:
                 continue
     # 4. Spanish comma: "junio 30, 2027"
@@ -951,11 +1031,7 @@ def extract_unitar_detail_fields(html: str) -> dict[str, object]:
             from selectolax.lexbor import LexborHTMLParser as HTMLParser
 
             tree = HTMLParser(html)
-            node = (
-                tree.css_first("main")
-                or tree.css_first("article")
-                or tree.css_first("body")
-            )
+            node = tree.css_first("main") or tree.css_first("article") or tree.css_first("body")
             visible = clean_text(node.text()) if node is not None else ""
         except Exception:
             visible = ""
@@ -1163,11 +1239,7 @@ def extract_labeled_section(
             if position < 0:
                 continue
             # Earliest occurrence wins; on a tie prefer the more specific label.
-            if (
-                best is None
-                or position < best[0]
-                or (position == best[0] and len(label) > best[1])
-            ):
+            if best is None or position < best[0] or (position == best[0] and len(label) > best[1]):
                 best = (position, len(label))
         if best is None:
             return []
@@ -1558,9 +1630,7 @@ def _apply_structured_item(
     if not result["categories"]:
         result["categories"] = _as_text_list(_first_value(item, _STRUCTURED_CATEGORY_KEYS))
     if not result["eligible_applicants"]:
-        result["eligible_applicants"] = _as_text_list(
-            _first_value(item, _STRUCTURED_AUDIENCE_KEYS)
-        )
+        result["eligible_applicants"] = _as_text_list(_first_value(item, _STRUCTURED_AUDIENCE_KEYS))
 
 
 def extract_structured_data(html: str, base_url: str | None = None) -> dict[str, object]:
@@ -1814,7 +1884,9 @@ def apply_extracted_fields(
 
     extra_title = extracted.get("title")
     if isinstance(extra_title, str) and extra_title.strip():
-        if not candidate.title or (prefer_extracted_text and len(extra_title) > len(candidate.title)):
+        if not candidate.title or (
+            prefer_extracted_text and len(extra_title) > len(candidate.title)
+        ):
             updates["title"] = extra_title.strip()[:180]
 
     for text_key in ("summary", "description", "raw_text"):
@@ -1824,10 +1896,14 @@ def apply_extracted_fields(
         current = getattr(candidate, text_key) or ""
         if current and not prefer_extracted_text:
             continue
-        chosen = _prefer_longer_text(current, incoming) if prefer_extracted_text else incoming.strip()
+        chosen = (
+            _prefer_longer_text(current, incoming) if prefer_extracted_text else incoming.strip()
+        )
         if chosen and chosen != current:
-            limit = _RAW_TEXT_LIMIT if text_key == "raw_text" else (
-                _DESCRIPTION_LIMIT if text_key == "description" else _SUMMARY_LIMIT
+            limit = (
+                _RAW_TEXT_LIMIT
+                if text_key == "raw_text"
+                else (_DESCRIPTION_LIMIT if text_key == "description" else _SUMMARY_LIMIT)
             )
             updates[text_key] = chosen[:limit]
 
@@ -1920,7 +1996,9 @@ def fill_candidate_from_content(
     page_url: str | None = None,
 ) -> OpportunityCandidate:
     """Fill missing candidate fields from page HTML and/or visible text."""
-    extracted = extract_page_fields(html=html, text=text, page_url=page_url or candidate.official_url)
+    extracted = extract_page_fields(
+        html=html, text=text, page_url=page_url or candidate.official_url
+    )
     return apply_extracted_fields(candidate, extracted)
 
 
@@ -2185,7 +2263,14 @@ async def fetch_httpx_text(
         # 403 JSON API already raised above; remaining 4xx JSON should not fallback
         if last_status == 403 and last_error is not None:
             try:
-                if "json" in str(getattr(getattr(last_error, "response", None), "headers", {}).get("content-type", "")).lower():
+                if (
+                    "json"
+                    in str(
+                        getattr(getattr(last_error, "response", None), "headers", {}).get(
+                            "content-type", ""
+                        )
+                    ).lower()
+                ):
                     raise last_error
             except Exception:
                 pass
@@ -2622,10 +2707,7 @@ def _candidate_needs_detail_enrichment(candidate: OpportunityCandidate) -> bool:
     return (
         candidate.open_date is None
         or candidate.close_date is None
-        or (
-            candidate.funding_amount_raw is None
-            and candidate.funding_amount_value is None
-        )
+        or (candidate.funding_amount_raw is None and candidate.funding_amount_value is None)
     )
 
 
@@ -2657,9 +2739,7 @@ async def enrich_pilot_candidates(
             return await enrich_developmentaid_render(candidates)
         except Exception:
             return candidates
-    enriched = await enrich_candidates_batch(
-        missing[:DETAIL_ENRICHMENT_MAX_FETCHES_PER_RUN]
-    )
+    enriched = await enrich_candidates_batch(missing[:DETAIL_ENRICHMENT_MAX_FETCHES_PER_RUN])
     if not enriched:
         return candidates
     by_url: dict[str, OpportunityCandidate] = {}
@@ -2702,9 +2782,7 @@ GRANTS_GOV_LLM_TEXT_LIMIT: int = 8000
 
 def _candidate_needs_render_llm(candidate: OpportunityCandidate) -> bool:
     """True when a grants-gov candidate still has no funding to gap-fill."""
-    return (
-        candidate.funding_amount_raw is None and candidate.funding_amount_value is None
-    )
+    return candidate.funding_amount_raw is None and candidate.funding_amount_value is None
 
 
 def _llm_data_to_candidate_fields(data: dict[str, object]) -> dict[str, object]:
@@ -2755,9 +2833,8 @@ def _llm_data_to_candidate_fields(data: dict[str, object]) -> dict[str, object]:
             if cleaned_items:
                 fields[key] = cleaned_items
     application_url = data.get("application_url")
-    if (
-        isinstance(application_url, str)
-        and application_url.strip().lower().startswith(("http://", "https://"))
+    if isinstance(application_url, str) and application_url.strip().lower().startswith(
+        ("http://", "https://")
     ):
         fields["application_url"] = application_url.strip()
     return fields
@@ -2791,9 +2868,7 @@ async def _enrich_grants_gov_candidate_render_llm(
     try:
         from app.core import ai as _ai
 
-        extraction = await _ai.extract_opportunity_structured(
-            visible[:GRANTS_GOV_LLM_TEXT_LIMIT]
-        )
+        extraction = await _ai.extract_opportunity_structured(visible[:GRANTS_GOV_LLM_TEXT_LIMIT])
     except Exception:
         return deterministic if deterministic.get("title") else None
     try:
