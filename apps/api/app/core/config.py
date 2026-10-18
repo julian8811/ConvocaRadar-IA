@@ -131,6 +131,12 @@ class Settings(BaseSettings):
     # habilitadas. Solo tiene efecto donde corre el scheduler (worker).
     nightly_sweep_enabled: bool = True
     nightly_sweep_hour: int = 1
+    # Sweeper diario de vencidas (vigencia S4,
+    # odd/tasks/vigencia-gate-sweeper.md): purga close_date pasada con
+    # backup rotativo en el loop del scheduler. Ver app/services/expiry.py.
+    expiry_sweep_enabled: bool = True
+    expiry_sweep_hour: int = 2
+    expiry_backup_retain_days: int = 7
     # ── Extraction flags (022) ──────────────────────────────────────────
     extraction_cop_default: bool = True
     extraction_prompt_v4: bool = True

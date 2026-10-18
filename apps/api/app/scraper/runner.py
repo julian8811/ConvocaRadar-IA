@@ -109,6 +109,28 @@ async def _warm_url_cache(urls: list[str | None]) -> None:
         pass
 
 
+def vigencia_reject_reason(candidate) -> str | None:
+    """T2 (vigencia S1/S3): reject candidates without a verified future close_date.
+
+    Runs post pilot-enrichment + connector validate: a missing close_date or
+    a past close means there is no vigencia to register. Reason strings use
+    the ``fecha de cierre`` marker so :func:`classify_validation_reason` maps
+    them to ``sin_fecha`` (never the bare word ``deadline``: the classifier
+    matches the ``dead`` substring first and would mistag them ``url_muerta``).
+    Returns the reason, or None when the candidate is vigente.
+    """
+    close = candidate.close_date
+    if close is None:
+        return "sin fecha de cierre"
+    try:
+        day = close.date() if isinstance(close, datetime) else close
+    except Exception:
+        return "sin fecha de cierre"
+    if day < datetime.now(UTC).date():
+        return f"fecha de cierre pasada ({day.isoformat()})"
+    return None
+
+
 async def _scrape_candidates(
     source: Source, stats: dict[str, object] | None = None
 ) -> list[OpportunityCreate]:
@@ -197,6 +219,7 @@ async def _scrape_candidates(
     noise_rejected = 0
     validation_rejected = 0
     validation_reasons: list[str] = []
+    vigencia_rejected = 0
     # T4 (fortalecer-201): quarantine — every discarded candidate is recorded
     # with its reason instead of vanishing silently. Persisted into
     # SourceRun.logs by run_source_inline (no new tables, no migration).
@@ -240,6 +263,19 @@ async def _scrape_candidates(
                         )
                     )
                 continue
+        vigencia_reason = vigencia_reject_reason(candidate)
+        if vigencia_reason is not None:
+            vigencia_rejected += 1
+            if len(quarantine) < QUARANTINE_CAP_PER_RUN:
+                quarantine.append(
+                    quarantine_entry(
+                        classify_validation_reason(vigencia_reason),
+                        candidate.title or "(sin titulo)",
+                        url=candidate.official_url,
+                        detail=vigencia_reason,
+                    )
+                )
+            continue
         opportunities.append(
             OpportunityCreate(
                 source_id=source.id,
@@ -280,6 +316,7 @@ async def _scrape_candidates(
     if stats is not None:
         stats["noise_rejected"] = noise_rejected
         stats["validation_rejected"] = validation_rejected
+        stats["vigencia_rejected"] = vigencia_rejected
         stats["validation_reasons"] = validation_reasons
         stats["opportunities_normalized"] = len(opportunities)
         stats["quarantine"] = quarantine
@@ -737,6 +774,8 @@ async def run_source_inline(db, source: Source, organization_id: str | None = No
         # T4: scrape-phase quarantine (ruido/validacion) joins the run logs
         # here so _finalize_run's `*run.logs` spread carries it forward.
         scrape_quarantine = scrape_stats.get("quarantine") or []
+        if not isinstance(scrape_quarantine, list):
+            scrape_quarantine = []
         if scrape_quarantine:
             run.logs = [
                 *run.logs,

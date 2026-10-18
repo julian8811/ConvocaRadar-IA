@@ -1,12 +1,13 @@
-"""Purge trio 2026-10-18: unwomen-innovate disabled (sólo-convocatorias).
+"""Disable zero-yield sources (T1/T2 2026-10-18, sólo-convocatorias).
 
-La página fuente de unwomen-innovate es institucional sin convocatorias
-(45/45 filas sin fecha ni monto, muestreo prod 2026-10-18). Acuerdo:
-deshabilitar la fuente + purgar sus 45 filas. ascun-convocatorias y
-cost-open-calls siguen habilitadas (solo purga de filas-noticia/chrome).
+- unwomen-innovate: institucional sin convocatorias (45/45 filas, purge trio).
+- ascun-convocatorias: feed 100% noticias (200 parsed/0 válidos tras filtro T2b).
+- dane-convocatorias, idb-calls-proposals, sicon-bogota-estimulos: 0 filas
+  + last_item_count=0 + consecutive_empty_runs=5 (T1).
+- cost-open-calls sigue habilitada (3 calls reales sobreviven a su purga).
 
-RED: falla mientras unwomen-innovate siga habilitada en seed.py.
-GREEN: seed la declara con enabled=False.
+RED: falla mientras alguna de las 4 siga habilitada en seed.py.
+GREEN: seed las declara con enabled=False.
 """
 
 from __future__ import annotations
@@ -30,17 +31,31 @@ def _seed_definitions_by_key() -> dict[str, dict]:
     raise AssertionError("source_definitions not found")
 
 
+_DISABLED_ZERO_YIELD = (
+    "unwomen-innovate",
+    "ascun-convocatorias",
+    "dane-convocatorias",
+    "idb-calls-proposals",
+    "sicon-bogota-estimulos",
+)
+
+
 def test_unwomen_innovate_disabled_institutional_no_calls():
     defs = _seed_definitions_by_key()
     assert "unwomen-innovate" in defs, "missing unwomen-innovate"
     assert defs["unwomen-innovate"].get("enabled", True) is False
 
 
-def test_purge_trio_keeps_ascun_and_cost_enabled():
-    # ascun-convocatorias: purga de 67 filas-noticia, fuente habilitada
-    # (filtro T2b reject_news ya bloquea nuevas). cost-open-calls: purga
-    # de 58 chrome, fuente habilitada (3 calls reales sobreviven).
+def test_zero_yield_sources_disabled():
     defs = _seed_definitions_by_key()
-    for key in ("ascun-convocatorias", "cost-open-calls"):
+    for key in _DISABLED_ZERO_YIELD:
         assert key in defs, f"missing {key}"
-        assert defs[key].get("enabled", True) is True, f"{key} must stay enabled"
+        assert defs[key].get("enabled", True) is False, f"{key} must be disabled"
+
+
+def test_purge_trio_keeps_cost_enabled():
+    # cost-open-calls: purga de 58 chrome, fuente habilitada
+    # (3 calls reales sobreviven).
+    defs = _seed_definitions_by_key()
+    assert "cost-open-calls" in defs, "missing cost-open-calls"
+    assert defs["cost-open-calls"].get("enabled", True) is True
