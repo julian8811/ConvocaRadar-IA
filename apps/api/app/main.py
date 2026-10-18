@@ -67,6 +67,7 @@ async def _run_periodic_source_sweep(interval_seconds: int | None = None) -> Non
     weekly_digest_seconds = scheduler_settings.weekly_digest_interval_seconds
     last_digest_at: datetime | None = None
     last_nightly_date = None
+    last_expiry_date = None
 
     await asyncio.sleep(scheduler_settings.scheduler_initial_delay_seconds)
     while True:
@@ -192,6 +193,29 @@ async def _run_periodic_source_sweep(interval_seconds: int | None = None) -> Non
                         )
                     else:
                         raw_due = [s for s in sources if source_due_for_scraping(s)]
+                    # Sweeper diario de vencidas (vigencia S4): purga
+                    # close_date pasada con backup rotativo (S3/Minio).
+                    # Best-effort: el backup fallido aborta dentro de la
+                    # función; aquí solo se loguea y el sweep sigue.
+                    if _nightly_force_due(
+                        _cot_now,
+                        hour=scheduler_settings.expiry_sweep_hour,
+                        enabled=scheduler_settings.expiry_sweep_enabled,
+                        last_forced_date=last_expiry_date,
+                    ):
+                        last_expiry_date = _cot_now.date()
+                        try:
+                            from app.services.expiry import (
+                                purge_expired_opportunities as _purge_expired,
+                            )
+
+                            _exp_result = _purge_expired(
+                                db,
+                                backup_retain=scheduler_settings.expiry_backup_retain_days,
+                            )
+                            struct_logger.info("expiry_sweep_complete", **_exp_result)
+                        except Exception as exc:
+                            struct_logger.warning("expiry_sweep_failed", error=str(exc))
                     # Priority-sorted queue: strategic first, then complementary/experimental
                     try:
                         from app.scraper.priority_queue import (

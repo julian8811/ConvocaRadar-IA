@@ -21,7 +21,7 @@ _PILOT_DETAIL_HTML = """<html><body>
   <h1 class="name">Convocatoria de Ciencia 2026</h1>
   <div class="content">
     <p>Apertura: 1 de agosto de 2026</p>
-    <p>Fecha de cierre: 30 de septiembre de 2026</p>
+    <p>Fecha de cierre: 30 de diciembre de 2026</p>
     <p>Presupuesto: USD 500,000</p>
     <p>El proyecto busca fortalecer capacidades institucionales de investigacion...</p>
   </div>
@@ -65,7 +65,7 @@ class TestPilotDetailEnrichment:
         assert enriched.close_date is not None
         assert (enriched.close_date.year, enriched.close_date.month, enriched.close_date.day) == (
             2026,
-            9,
+            12,
             30,
         )
         assert enriched.funding_amount_raw is not None
@@ -153,7 +153,7 @@ class TestPilotDetailEnrichment:
 
         assert len(opportunities) == 1
         assert opportunities[0].close_date is not None
-        assert (opportunities[0].close_date.year, opportunities[0].close_date.month) == (2026, 9)
+        assert (opportunities[0].close_date.year, opportunities[0].close_date.month) == (2026, 12)
 
     @pytest.mark.asyncio
     async def test_runner_skips_enrichment_for_non_pilot(self, monkeypatch):
@@ -189,8 +189,9 @@ class TestPilotDetailEnrichment:
 
         opportunities = await _scrape_candidates(source)
 
-        assert len(opportunities) == 1
-        assert opportunities[0].close_date is None
+        # T2 (vigencia): sin fecha verificada no se registra; el no-piloto
+        # sigue sin fetchear detail (el gate rechaza, no el enrich).
+        assert len(opportunities) == 0
         mock_fetch.assert_not_awaited()
 
 

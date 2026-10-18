@@ -893,7 +893,8 @@ def seed_default_sources(
         {
             "key": "idb-calls-proposals",
             "name": "IDB Calls for Proposals",
-            "enabled": True,
+            # Deshabilitada 2026-10-18: yield cero (0 filas, last_item_count=0, T1).
+            "enabled": False,
             "base_url": "https://www.iadb.org/en/how-we-can-work-together/calls-proposals",
             "country": "International",
             "region": "LatAm",
@@ -1573,6 +1574,8 @@ def seed_default_sources(
         {
             "key": "ascun-convocatorias",
             "name": "ASCUN Colombia — Convocatorias",
+            # Deshabilitada 2026-10-18: feed 100% noticias (200 parsed/0 válidos, T1).
+            "enabled": False,
             "base_url": "https://ascun.org.co/wp-json/wp/v2/posts",
             "country": "Colombia",
             "region": "LatAm",
@@ -3740,7 +3743,8 @@ def seed_default_sources(
         {
             "key": "dane-convocatorias",
             "name": "DANE — Convocatorias y contratación",
-            "enabled": True,
+            # Deshabilitada 2026-10-18: yield cero (0 filas, last_item_count=0, T1).
+            "enabled": False,
             "base_url": "https://www.dane.gov.co/index.php/component/content/category/275-servicios-al-ciudadano/276-convocatorias-y-contratacion?Itemid=109",
             "country": "Colombia",
             "region": "LatAm",
@@ -3843,7 +3847,8 @@ def seed_default_sources(
         {
             "key": "sicon-bogota-estimulos",
             "name": "SICON — SCRD Bogotá Estímulos (PDE)",
-            "enabled": True,
+            # Deshabilitada 2026-10-18: yield cero (0 filas, last_item_count=0, T1).
+            "enabled": False,
             "base_url": "https://sicon.scrd.gov.co/",
             "country": "Colombia",
             "region": "LatAm",

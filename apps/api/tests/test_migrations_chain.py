@@ -41,6 +41,7 @@ EXPECTED_CHAIN = [
     "0020_reject_news_cundinamarca_bogota",
     "0021_reject_news_full_config",
     "0022_disable_unwomen_innovate",
+    "0023_disable_zero_yield_sources",
 ]
 
 
@@ -57,7 +58,7 @@ def _function_body(path: Path, name: str) -> str:
 
 
 def test_migration_graph_has_exactly_one_current_head() -> None:
-    assert _script().get_heads() == ["0022_disable_unwomen_innovate"]
+    assert _script().get_heads() == ["0023_disable_zero_yield_sources"]
 
 
 def test_chain_is_linear_from_base_to_head() -> None:

@@ -63,11 +63,15 @@ def _source(key: str, **kwargs) -> Source:
 def _candidate(**kwargs) -> object:
     from app.connectors.base import OpportunityCandidate
 
+    # T2 (vigencia S1/S3): el gate central exige close_date futura; los tests
+    # de cuarentena/duplicado/url-muerta cubren su conducta original, así que
+    # sus candidatos traen fecha vigente por defecto.
     defaults = {
         "title": "Beca de investigación en salud pública",
         "entity": "Minciencias",
         "country": "Colombia",
         "official_url": None,
+        "close_date": _now() + timedelta(days=30),
     }
     defaults.update(kwargs)
     return OpportunityCandidate(**defaults)
