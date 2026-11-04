@@ -33,6 +33,19 @@ function formatLabel(value: string) {
   return map[value] ?? value;
 }
 
+function extractCounts(html: string) {
+  const num = (re: RegExp) => {
+    const m = html.match(re);
+    return m ? Number(m[1]) : null;
+  };
+  return {
+    // legacy 8-stat grid first, operational priority bar (entities escaped) second
+    total: num(/<span>Total<\/span><strong>(\d+)<\/strong>/) ?? num(/(\d+) en total</),
+    urgentes: num(/Por cerrar &middot; (\d+)/) ?? num(/<span>Por cerrar<\/span><strong>(\d+)<\/strong>/),
+    sinValidar: num(/Sin validar &middot; (\d+)/) ?? num(/<span>Sin validar<\/span><strong>(\d+)<\/strong>/),
+  };
+}
+
 function ReportCard({ report }: { report: Report }) {
   const queryClient = useQueryClient();
   const downloadLabel = `Descargar ${formatLabel(report.format)}`;
@@ -70,6 +83,17 @@ function ReportCard({ report }: { report: Report }) {
         <CardDescription>
           Tipo: {fixEncoding(report.report_type)} · Generado: {formatBogota(report.generated_at)} · Estado: {report.status}
         </CardDescription>
+        {(() => {
+          const counts = extractCounts(report.html_content ?? "");
+          if (counts.total == null && counts.urgentes == null && counts.sinValidar == null) return null;
+          return (
+            <div className="flex flex-wrap gap-1.5">
+              {counts.total != null ? <Badge tone="medium">Total {counts.total}</Badge> : null}
+              {counts.urgentes != null ? <Badge tone="closing_soon">Por cerrar {counts.urgentes}</Badge> : null}
+              {counts.sinValidar != null ? <Badge tone="muted">Sin validar {counts.sinValidar}</Badge> : null}
+            </div>
+          );
+        })()}
       </CardHeader>
       <CardContent className="space-y-4 pt-5">
         <div className="max-h-44 overflow-hidden rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-100/40 p-3 text-xs text-slate-700 dark:bg-slate-800/40 dark:text-slate-300">

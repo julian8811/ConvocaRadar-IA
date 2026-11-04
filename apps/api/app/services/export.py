@@ -159,6 +159,182 @@ def _sector_order_key(sector: str) -> tuple[int, str]:
     return (1, sector)
 
 
+# ── Operational-priority layer (Opcion B) ─────────────────────────────────
+# Small reports (<= _OP_COMPACT_THRESHOLD items) keep the legacy full-card
+# layout untouched; large reports switch to: sticky priority bar + alert with
+# the next closings + hot cards for urgent items + dense 1-row-per-item
+# tables + collapsed unvalidated backlog. No network (system font stack).
+
+_OP_COMPACT_THRESHOLD = 12
+_OP_URGENT_DAYS = 15
+_OP_HOT_MAX = 24
+_OP_DENSE_MAX = 500
+_OP_BACKLOG_MAX = 100
+
+
+def _op_today(now=None):
+    from datetime import date as _date
+
+    try:
+        return (now or now_bogota()).date()
+    except Exception:
+        return _date.today()
+
+
+def _days_to_close(item: object, today) -> int | None:
+    close = getattr(item, "close_date", None)
+    if close is None:
+        return None
+    try:
+        return (close.date() - today).days
+    except Exception:
+        return None
+
+
+def _is_urgent(item: object, today) -> bool:
+    status = getattr(item, "status", None) or OpportunityStatus.unknown.value
+    if status == OpportunityStatus.closed.value:
+        return False
+    if status == OpportunityStatus.closing_soon.value:
+        return True
+    days = _days_to_close(item, today)
+    return days is not None and 0 <= days <= _OP_URGENT_DAYS
+
+
+def _partition_operational(opportunities: list, today):
+    """Split into (urgent, validated_rest, unvalidated) preserving input order."""
+    unknown = OpportunityStatus.unknown.value
+    unvalidated = [i for i in opportunities if (getattr(i, "status", None) or unknown) == unknown]
+    validated = [i for i in opportunities if (getattr(i, "status", None) or unknown) != unknown]
+    urgent = [i for i in validated if _is_urgent(i, today)]
+    urgent_ids = {id(i) for i in urgent}
+    rest = [i for i in validated if id(i) not in urgent_ids]
+
+    def _rest_key(item):
+        days = _days_to_close(item, today)
+        if days is not None and days >= 0:
+            return (0, days, "")
+        return (1, 10_000, str(getattr(item, "title", "")))
+
+    urgent.sort(
+        key=lambda i: (
+            _days_to_close(i, today) if _days_to_close(i, today) is not None else 10_000,
+            str(getattr(i, "title", "")),
+        )
+    )
+    rest.sort(key=_rest_key)
+    return urgent, rest, unvalidated
+
+
+def _op_bar_html(urgent_n: int, validated_n: int, unvalidated_n: int, total: int) -> str:
+    return f"""<div class="op-bar" role="navigation" aria-label="Prioridades del reporte">
+      <span class="op-pill op-pill--red">Por cerrar &middot; {urgent_n}</span>
+      <span class="op-pill op-pill--amber">Validadas &middot; {validated_n}</span>
+      <span class="op-pill">Sin validar &middot; {unvalidated_n}</span>
+      <span class="op-total">{total} en total</span>
+    </div>"""
+
+
+def _op_alert_html(urgent: list, unvalidated_n: int) -> str:
+    if urgent:
+        items = "".join(
+            "<li><strong>{}</strong> — cierra {}</li>".format(
+                safe_escape(repair_mojibake(getattr(i, "title", "Sin título"))),
+                safe_escape(getattr(i, "close_date", None).date().isoformat())
+                if getattr(i, "close_date", None)
+                else "pronto",
+            )
+            for i in urgent[:5]
+        )
+        return (
+            f'<div class="op-alert"><h3>Hoy: {len(urgent)} vencen en '
+            f"&le;{_OP_URGENT_DAYS} d&iacute;as — asignar responsable</h3><ul>{items}</ul></div>"
+        )
+    if unvalidated_n:
+        return (
+            '<div class="op-alert op-alert--calm"><h3>Sin urgencias con fecha: el backlog es la prioridad</h3>'
+            f"<p>{unvalidated_n} registros sin validar colapsados al final. Curadur&iacute;a antes que difusi&oacute;n.</p></div>"
+        )
+    return ""
+
+
+def _dense_row_html(item: object) -> str:
+    url = getattr(item, "official_url", None) or getattr(item, "application_url", None) or "#"
+    title = safe_escape(repair_mojibake(getattr(item, "title", "Sin título")))
+    link = (
+        f'<a href="{safe_escape(url)}" target="_blank" rel="noopener noreferrer">{title}</a>'
+        if url != "#"
+        else title
+    )
+    close = getattr(item, "close_date", None)
+    close_txt = safe_escape(close.date().isoformat()) if close else "—"
+    raw = getattr(item, "funding_amount_raw", "") or ""
+    val = getattr(item, "funding_amount_value", None)
+    amount = raw if raw else (f"{val:,.0f}".replace(",", ".") if val is not None else "—")
+    return (
+        f"<tr><td>{link}</td><td>{safe_escape(getattr(item, 'country', '') or '')}</td>"
+        f'<td class="num">{close_txt}</td><td>{safe_escape(amount) if amount else "—"}</td></tr>'
+    )
+
+
+def _dense_table_html(items: list) -> str:
+    rows = "\n".join(_dense_row_html(i) for i in items[:_OP_DENSE_MAX])
+    note = ""
+    if len(items) > _OP_DENSE_MAX:
+        note = f"<p class=\"note\">+{len(items) - _OP_DENSE_MAX} filas m&aacute;s en CSV/Excel.</p>"
+    return (
+        '<div class="dense-wrap"><table class="dense-table">'
+        "<thead><tr><th>Convocatoria</th><th>Pa&iacute;s</th><th>Cierre</th><th>Monto</th></tr></thead>"
+        f"<tbody>{rows or '<tr><td colspan=\"4\">Sin registros.</td></tr>'}</tbody></table>{note}</div>"
+    )
+
+
+def _op_backlog_html(unvalidated: list) -> str:
+    if not unvalidated:
+        return ""
+    items = "".join(
+        f"<li>{safe_escape(repair_mojibake(getattr(i, 'title', 'Sin título')))}</li>"
+        for i in unvalidated[:_OP_BACKLOG_MAX]
+    )
+    extra = (
+        f"<p class=\"note\">+{len(unvalidated) - _OP_BACKLOG_MAX} m&aacute;s en el CSV.</p>"
+        if len(unvalidated) > _OP_BACKLOG_MAX
+        else ""
+    )
+    return (
+        f'<details class="op-details"><summary>Ver {len(unvalidated)} sin validar '
+        "(backlog de scrapers — solo si lo necesit&aacute;s)</summary>"
+        f"<ul>{items}</ul>{extra}</details>"
+    )
+
+
+def _op_css() -> str:
+    return """
+/* ── Operational priority layer (compact reports) ── */
+.op-bar { position: sticky; top: 0; z-index: 20; display: flex; gap: 10px; align-items: center; flex-wrap: wrap; background: #0f172a; color: #fff; border-radius: 14px; padding: 12px 16px; margin-bottom: 18px; }
+.op-pill { display: inline-block; padding: 6px 13px; border-radius: 999px; font-size: 0.78rem; font-weight: 700; background: #f1f5f9; color: #475569; border: 1px solid #e2e8f0; white-space: nowrap; }
+.op-pill--red { background: #fef2f2; color: #991b1b; border-color: #fecaca; }
+.op-pill--amber { background: #fffbeb; color: #92400e; border-color: #fde68a; }
+.op-total { margin-left: auto; font-size: 0.78rem; color: #94a3b8; }
+.op-alert { background: #fff7ed; border: 1px solid #fed7aa; border-left: 5px solid #d97706; border-radius: 12px; padding: 14px 18px; margin-bottom: 18px; }
+.op-alert--calm { background: #f8fafc; border-left-color: var(--secondary); }
+.op-alert h3 { margin: 0; font-size: 0.92rem; }
+.op-alert ul { margin: 8px 0 0; padding-left: 18px; font-size: 0.85rem; }
+.op-alert p { margin: 6px 0 0; font-size: 0.85rem; color: var(--muted); }
+.story-grid--hot .story-card { border-color: #fca5a5; }
+.dense-wrap { overflow-x: auto; }
+.dense-table { width: 100%; border-collapse: collapse; font-size: 0.83rem; }
+.dense-table th { text-align: left; font-size: 0.7rem; text-transform: uppercase; letter-spacing: 0.06em; color: var(--muted); padding: 9px 12px; background: #f8fafc; border-bottom: 2px solid var(--secondary); }
+.dense-table td { padding: 8px 12px; border-bottom: 1px solid #f1f5f9; vertical-align: top; }
+.dense-table tr:hover td { background: #f8fafc; }
+.dense-table td.num { font-family: ui-monospace, "JetBrains Mono", Menlo, monospace; white-space: nowrap; }
+.op-details { margin-top: 16px; border: 1px dashed #cbd5e1; border-radius: 12px; padding: 12px 16px; background: #fff; }
+.op-details summary { cursor: pointer; font-weight: 700; font-size: 0.85rem; }
+.op-details ul { columns: 2; font-size: 0.8rem; color: var(--muted); }
+@media print { .op-bar { display: none; } .op-details ul { columns: 1; } }
+@media (max-width: 760px) { .op-details ul { columns: 1; } .op-total { margin-left: 0; } }"""
+
+
 def generate_report_html_by_sector(title: str, organization: object, opportunities: list[Opportunity]) -> str:
     """Alias of :func:`generate_report_html` (sector grouping is built in)."""
     return generate_report_html(title, organization, opportunities)
@@ -189,6 +365,13 @@ def generate_report_html(title: str, organization: object, opportunities: list[O
         ((category, sum(1 for item in opportunities if category in item.categories)) for category in categories),
         key=lambda entry: (-entry[1], entry[0]),
     )[:6]
+
+    # Operational-priority partition (Opcion B). Computed once, reused below.
+    _op_today_val = _op_today()
+    _urgent, _rest, _unvalidated = _partition_operational(opportunities, _op_today_val)
+    _is_compact = total > _OP_COMPACT_THRESHOLD
+    _op_bar = _op_bar_html(len(_urgent), total - len(_unvalidated), len(_unvalidated), total)
+    _op_alert = _op_alert_html(_urgent, len(_unvalidated))
 
     def _format_amount(item: Opportunity) -> str:
         if item.funding_amount_raw:
@@ -287,10 +470,17 @@ def generate_report_html(title: str, organization: object, opportunities: list[O
         </article>
         """
 
-    featured = opportunities[:9]
+    sectorized = any(_sector_of(item) for item in opportunities)
+    if _is_compact and _urgent:
+        _hot = _urgent[:_OP_HOT_MAX]
+    elif _is_compact:
+        _hot = _rest[:12]
+        _rest = _rest[12:]
+    else:
+        _hot = []
+    featured = _hot if _is_compact else opportunities[:9]
     featured_cards = "\n".join(_card_html(item) for item in featured)
     all_cards = "\n".join(_card_html(item) for item in opportunities)
-    sectorized = any(_sector_of(item) for item in opportunities)
 
     def _sector_section_html(sector: str, items: list[Opportunity]) -> str:
         """One group: header (count + top amounts/dates) + existing cards."""
@@ -322,9 +512,28 @@ def generate_report_html(title: str, organization: object, opportunities: list[O
         groups: dict[str, list[Opportunity]] = {}
         for item in opportunities:
             groups.setdefault(_canonical_sector(_sector_of(item) or "otros"), []).append(item)
-        all_body = "\n".join(
-            _sector_section_html(sector, groups[sector]) for sector in sorted(groups, key=_sector_order_key)
-        )
+        if _is_compact:
+            _dense_groups: dict[str, list[Opportunity]] = {}
+            for item in _rest:
+                _dense_groups.setdefault(_canonical_sector(_sector_of(item) or "otros"), []).append(item)
+            _dense_sections = []
+            for _sec in sorted(_dense_groups, key=_sector_order_key):
+                _items = _dense_groups[_sec]
+                _label = "1 oportunidad" if len(_items) == 1 else f"{len(_items)} oportunidades"
+                _dense_sections.append(
+                    f'<section class="sector-group" data-sector="{safe_escape(_sec)}">'
+                    f'<div class="sector-group__head"><div class="sector-group__title-row">'
+                    f'<h3 class="sector-group__title">{safe_escape(_sec.capitalize())}</h3>'
+                    f"<span class=\"sector-group__count\">{_label}</span>"
+                    "</div></div>"
+                    f"{_dense_table_html(_items)}</section>"
+                )
+            all_body = "\n".join(_dense_sections) + _op_backlog_html(_unvalidated)
+        else:
+            all_body = "\n".join(
+                _sector_section_html(sector, groups[sector])
+                for sector in sorted(groups, key=_sector_order_key)
+            )
         sector_css = """
 /* Distinctive band per sector group: count badge + secondary meta row. */
 .sector-group { margin-top: 28px; }
@@ -349,10 +558,54 @@ def generate_report_html(title: str, organization: object, opportunities: list[O
   .sector-group, .sector-group__head { box-shadow: none !important; break-inside: avoid; }
 }"""
     else:
-        all_body = f"""<div class="story-grid">
+        if _is_compact:
+            all_body = _dense_table_html(_rest) + _op_backlog_html(_unvalidated)
+        else:
+            all_body = f"""<div class="story-grid">
       {all_cards or '<div class="story-card"><p class="story-card__body">No hay convocatorias disponibles.</p></div>'}
     </div>"""
         sector_css = ""
+    if _is_compact:
+        _stats_section = f"""<section class="stats-grid" aria-label="Indicadores">
+  <div class="stat"><span>Por cerrar</span><strong>{len(_urgent)}</strong></div>
+  <div class="stat"><span>Abiertas</span><strong>{open_count}</strong></div>
+  <div class="stat"><span>Con monto</span><strong>{with_amount}</strong></div>
+  <div class="stat"><span>Sin validar</span><strong>{len(_unvalidated)}</strong></div>
+</section>"""
+        _hero_extra = (
+            f" Priorizadas {len(_urgent)} urgentes arriba, "
+            f"{len(_rest)} en tabla, {len(_unvalidated)} sin validar colapsados."
+        )
+        _dest_title = "Priorizadas — acción inmediata"
+        _dest_sub = "Tarjetas solo para lo urgente. El resto va en tabla compacta."
+        _todas_sub = (
+            f"Tabla compacta de {len(_rest)} validadas con enlace oficial a cada convocatoria."
+        )
+        _featured_grid = f"""<div class="story-grid story-grid--hot">
+      {featured_cards or '<div class="story-card"><p class="story-card__body">No hay convocatorias para mostrar.</p></div>'}
+    </div>"""
+    else:
+        _stats_section = f"""<section class="stats-grid" aria-label="Indicadores">
+  <div class="stat"><span>Total</span><strong>{total}</strong></div>
+  <div class="stat"><span>Abiertas</span><strong>{open_count}</strong></div>
+  <div class="stat"><span>Por cerrar</span><strong>{closing_soon_count}</strong></div>
+  <div class="stat"><span>Con fecha</span><strong>{with_date}</strong></div>
+  <div class="stat"><span>Con fuente</span><strong>{with_source}</strong></div>
+  <div class="stat"><span>Con resumen</span><strong>{with_summary}</strong></div>
+  <div class="stat"><span>Con monto</span><strong>{with_amount}</strong></div>
+  <div class="stat"><span>Sin validar</span><strong>{unknown_count}</strong></div>
+</section>"""
+        _hero_extra = ""
+        _dest_title = "Convocatorias destacadas"
+        _dest_sub = "Tarjetas editoriales con las oportunidades m&aacute;s relevantes."
+        _todas_sub = f"{total} oportunidades identificadas en tarjetas con enlace oficial a cada convocatoria."
+        _featured_grid = f"""<div class="story-grid">
+      {featured_cards or '<div class="story-card"><p class="story-card__body">No hay convocatorias para mostrar.</p></div>'}
+    </div>"""
+    _hero_lead = (
+        f"Generado: {format_bogota(now_bogota())} (hora de Bogot&aacute;) &middot; "
+        f"{total} oportunidades identificadas.{_hero_extra}"
+    )
     country_rows = "\n".join(f"<tr><td>{safe_escape(country)}</td><td>{count}</td></tr>" for country, count in top_countries)
     category_rows = "\n".join(f"<tr><td>{safe_escape(category)}</td><td>{count}</td></tr>" for category, count in top_categories)
     return f"""<!doctype html>
@@ -629,7 +882,7 @@ tbody tr:hover {{ background: rgba(0,179,175,0.03); }}
   .brand-bar {{ flex-wrap: wrap; }}
   .story-grid, .stats-grid, .grid-2 {{ grid-template-columns: 1fr; }}
   .story-card__meta-grid {{ grid-template-columns: 1fr; }}
-}}{sector_css}
+}}{sector_css}{_op_css()}
 </style></head>
 <body>
 <div class="shell">
@@ -642,10 +895,11 @@ tbody tr:hover {{ background: rgba(0,179,175,0.03); }}
   </div>
 </div>
 
+{_op_bar}
 <section class="hero">
   <div class="hero__inner">
     <h1>{safe_escape(title)}</h1>
-    <p class="hero__lead">Generado: {format_bogota(now_bogota())} (hora de Bogot&aacute;) &middot; {total} oportunidades identificadas.</p>
+    <p class="hero__lead">{_hero_lead}</p>
     <div class="hero__toolbar">
       <a class="btn btn--primary" href="#oportunidades">Ver convocatorias</a>
       <a class="btn" href="#resumen">Resumen ejecutivo</a>
@@ -654,16 +908,8 @@ tbody tr:hover {{ background: rgba(0,179,175,0.03); }}
   </div>
 </section>
 
-<section class="stats-grid" aria-label="Indicadores">
-  <div class="stat"><span>Total</span><strong>{total}</strong></div>
-  <div class="stat"><span>Abiertas</span><strong>{open_count}</strong></div>
-  <div class="stat"><span>Por cerrar</span><strong>{closing_soon_count}</strong></div>
-  <div class="stat"><span>Con fecha</span><strong>{with_date}</strong></div>
-  <div class="stat"><span>Con fuente</span><strong>{with_source}</strong></div>
-  <div class="stat"><span>Con resumen</span><strong>{with_summary}</strong></div>
-  <div class="stat"><span>Con monto</span><strong>{with_amount}</strong></div>
-  <div class="stat"><span>Sin validar</span><strong>{unknown_count}</strong></div>
-</section>
+{_op_alert}
+{_stats_section}
 
 <section class="section" id="resumen">
   <div class="section__head">
@@ -685,20 +931,18 @@ tbody tr:hover {{ background: rgba(0,179,175,0.03); }}
 
 <section class="section">
   <div class="section__head">
-    <h2 class="section__title">Convocatorias destacadas</h2>
-    <p class="section__subtitle">Tarjetas editoriales con las oportunidades m&aacute;s relevantes.</p>
+    <h2 class="section__title">{_dest_title}</h2>
+    <p class="section__subtitle">{_dest_sub}</p>
   </div>
   <div class="section__body">
-    <div class="story-grid">
-      {featured_cards or '<div class="story-card"><p class="story-card__body">No hay convocatorias para mostrar.</p></div>'}
-    </div>
+    {_featured_grid}
   </div>
 </section>
 
 <section class="section" id="oportunidades">
   <div class="section__head">
     <h2 class="section__title">Todas las convocatorias</h2>
-    <p class="section__subtitle">{total} oportunidades identificadas en tarjetas con enlace oficial a cada convocatoria.</p>
+    <p class="section__subtitle">{_todas_sub}</p>
   </div>
   <div class="section__body">
     {all_body}
